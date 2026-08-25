@@ -222,9 +222,9 @@ function resolveCoordinates(
 export async function calculateDistanceBetweenCeps(
   originCep: string,
   destinationCep: string,
-  fuelPrice: number = 5.89,
-  consumptionKmL: number = 9.5,
-  tollRoadPercent: number = 40,
+  fuelPrice: number = 6.1,
+  consumptionKmL: number = 10,
+  tollRoadPercent: number = 70,
   isRoundTrip: boolean = true,
 ): Promise<RouteCalculationResult> {
   const cleanOrig = (originCep || '89066-000').replace(/\D/g, '')
@@ -249,17 +249,13 @@ export async function calculateDistanceBetweenCeps(
   const roundTripKm = distanceOneWayKm * 2
   const effectiveDistanceKm = isRoundTrip ? roundTripKm : distanceOneWayKm
 
-  // Combustível
-  const liters = effectiveDistanceKm / (consumptionKmL > 0 ? consumptionKmL : 9.5)
+  // Combustível: distância / consumo (10 km/L) × preço do combustível (R$6,10/L)
+  const liters = effectiveDistanceKm / (consumptionKmL > 0 ? consumptionKmL : 10)
   const fuelCost = Math.round(liters * fuelPrice * 100) / 100
 
-  // Pedágio (se ida e volta, praças × 2)
-  const oneWayTollBooths = Math.max(
-    1,
-    Math.round((distanceOneWayKm / 80) * (tollRoadPercent / 100)),
-  )
-  const tollBoothsCount = isRoundTrip ? oneWayTollBooths * 2 : oneWayTollBooths
-  const tollCost = tollBoothsCount * 14.5
+  // Pedágio: 70% da rota em rodovias pedagiadas × R$0,15/km (com suporte a customização via percentual e distância)
+  // Fórmula: effectiveDistanceKm × (tollRoadPercent / 100) × R$0,15/km
+  const tollCost = Math.round(effectiveDistanceKm * (tollRoadPercent / 100) * 0.15 * 100) / 100
 
   const originFormatted = origInfo.address || `${origInfo.city}/${origInfo.state}`
   const destinationFormatted = destInfo.address || `${destInfo.city}/${destInfo.state}`
