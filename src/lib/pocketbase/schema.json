@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-25T01:40:14.055Z",
+  "generatedAt": "2026-08-25T11:46:55.656Z",
   "collections": [
     {
       "name": "users",
@@ -159,6 +159,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "contacts",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -810,6 +816,157 @@
         "CREATE INDEX idx_activities_due ON activities (due_date)",
         "CREATE INDEX idx_activities_status ON activities (status)",
         "CREATE INDEX idx_activities_client ON activities (client_id)"
+      ]
+    },
+    {
+      "name": "service_orders",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "order_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "quote_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "quotes"
+        },
+        {
+          "name": "quote_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "client_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "pending_approval",
+            "approved",
+            "in_progress",
+            "completed",
+            "rejected",
+            "cancelled"
+          ]
+        },
+        {
+          "name": "services",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total_value",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["low", "medium", "high", "urgent"]
+        },
+        {
+          "name": "assigned_to",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "technical_details",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approval_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_service_orders_number ON service_orders (order_number)",
+        "CREATE INDEX idx_service_orders_status ON service_orders (status)",
+        "CREATE INDEX idx_service_orders_client ON service_orders (client_name)"
       ]
     }
   ]

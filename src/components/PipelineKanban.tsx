@@ -115,7 +115,7 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
       probability: Number(newDealProbability) || 50,
       priority: newDealPriority,
       notes: newDealNotes,
-      assigned_to: 'Alexandre Nogueira',
+      assigned_to: 'Alex Nogueia',
     })
 
     setNewDealTitle('')

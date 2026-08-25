@@ -1,5 +1,11 @@
 import pb from '@/lib/pocketbase/client'
-import type { TicketRecord, ServiceRecord, ActivityRecord, ProductRecord } from '@/types/crm'
+import type {
+  TicketRecord,
+  ServiceRecord,
+  ServiceOrderRecord,
+  ActivityRecord,
+  ProductRecord,
+} from '@/types/crm'
 
 export const ticketsService = {
   async getAll(): Promise<TicketRecord[]> {
@@ -78,6 +84,47 @@ export const productsService = {
 
   async delete(id: string): Promise<boolean> {
     return await pb.collection('products').delete(id)
+  },
+}
+
+export const serviceOrdersService = {
+  async getAll(): Promise<ServiceOrderRecord[]> {
+    return await pb.collection('service_orders').getFullList<ServiceOrderRecord>({
+      sort: '-created',
+    })
+  },
+
+  async getById(id: string): Promise<ServiceOrderRecord> {
+    return await pb.collection('service_orders').getOne<ServiceOrderRecord>(id)
+  },
+
+  async create(data: Partial<ServiceOrderRecord>): Promise<ServiceOrderRecord> {
+    return await pb.collection('service_orders').create<ServiceOrderRecord>(data)
+  },
+
+  async update(id: string, data: Partial<ServiceOrderRecord>): Promise<ServiceOrderRecord> {
+    return await pb.collection('service_orders').update<ServiceOrderRecord>(id, data)
+  },
+
+  async updateStatus(
+    id: string,
+    status: ServiceOrderRecord['status'],
+    approval_notes?: string,
+    approved_by?: string,
+  ): Promise<ServiceOrderRecord> {
+    const payload: Partial<ServiceOrderRecord> = { status }
+    if (status === 'approved') {
+      payload.approved_at = new Date().toISOString()
+      payload.approved_by = approved_by || 'Alex Nogueia (Gestor Técnico)'
+    }
+    if (approval_notes !== undefined) {
+      payload.approval_notes = approval_notes
+    }
+    return await pb.collection('service_orders').update<ServiceOrderRecord>(id, payload)
+  },
+
+  async delete(id: string): Promise<boolean> {
+    return await pb.collection('service_orders').delete(id)
   },
 }
 

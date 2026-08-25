@@ -32,8 +32,19 @@ import {
   ArrowUpRight,
   UserCheck,
   FileText,
+  Users,
+  Trash2,
+  Calendar,
+  Briefcase,
+  Edit2,
 } from 'lucide-react'
-import type { ClientRecord, ClientStatus, DealRecord, QuoteRecord } from '@/types/crm'
+import type {
+  ClientRecord,
+  ClientStatus,
+  ClientContact,
+  DealRecord,
+  QuoteRecord,
+} from '@/types/crm'
 
 interface ClientsManagerProps {
   clients: ClientRecord[]
@@ -81,6 +92,8 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   // Form states
+  const [isEditClientModalOpen, setIsEditClientModalOpen] = useState(false)
+  const [editingClientId, setEditingClientId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [companyName, setCompanyName] = useState('')
   const [document, setDocument] = useState('')
@@ -94,6 +107,100 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
   const [state, setState] = useState('')
   const [address, setAddress] = useState('')
   const [notes, setNotes] = useState('')
+  const [contacts, setContacts] = useState<ClientContact[]>([
+    {
+      id: 'c-' + Date.now(),
+      name: '',
+      birth_date: '',
+      role: '',
+      phone: '',
+      email: '',
+    },
+  ])
+
+  const handleAddContact = () => {
+    setContacts([
+      ...contacts,
+      {
+        id: 'c-' + Date.now() + '-' + Math.random().toString(36).substring(2, 5),
+        name: '',
+        birth_date: '',
+        role: '',
+        phone: '',
+        email: '',
+      },
+    ])
+  }
+
+  const handleRemoveContact = (index: number) => {
+    setContacts(contacts.filter((_, i) => i !== index))
+  }
+
+  const handleUpdateContact = (index: number, field: keyof ClientContact, value: string) => {
+    const updated = [...contacts]
+    updated[index] = { ...updated[index], [field]: value }
+    setContacts(updated)
+  }
+
+  const handleOpenNewClientModal = () => {
+    setEditingClientId(null)
+    setName('')
+    setCompanyName('')
+    setDocument('')
+    setEmail('')
+    setPhone('')
+    setWhatsapp('')
+    setSegment('')
+    setStatus('prospect')
+    setScore('80')
+    setCity('')
+    setState('')
+    setAddress('')
+    setNotes('')
+    setContacts([
+      {
+        id: 'c-' + Date.now(),
+        name: '',
+        birth_date: '',
+        role: '',
+        phone: '',
+        email: '',
+      },
+    ])
+    setIsModalOpen(true)
+  }
+
+  const handleOpenEditClientModal = (client: ClientRecord) => {
+    setEditingClientId(client.id)
+    setName(client.name || '')
+    setCompanyName(client.company_name || '')
+    setDocument(client.document || '')
+    setEmail(client.email || '')
+    setPhone(client.phone || '')
+    setWhatsapp(client.whatsapp || '')
+    setSegment(client.segment || '')
+    setStatus(client.status || 'prospect')
+    setScore(String(client.score || 80))
+    setCity(client.city || '')
+    setState(client.state || '')
+    setAddress(client.address || '')
+    setNotes(client.notes || '')
+    if (client.contacts && Array.isArray(client.contacts) && client.contacts.length > 0) {
+      setContacts(client.contacts)
+    } else {
+      setContacts([
+        {
+          id: 'c-' + Date.now(),
+          name: '',
+          birth_date: '',
+          role: '',
+          phone: '',
+          email: '',
+        },
+      ])
+    }
+    setIsModalOpen(true)
+  }
 
   const filteredClients = clients.filter((c) => {
     const matchesSearch =
@@ -107,9 +214,12 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
     return matchesSearch && matchesStatus
   })
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleSaveClient = (e: React.FormEvent) => {
     e.preventDefault()
-    onCreateClient({
+    // Filtra contatos com pelo menos o nome preenchido
+    const validContacts = contacts.filter((c) => c.name.trim().length > 0)
+
+    const payload: Partial<ClientRecord> = {
       name,
       company_name: companyName || undefined,
       document: document || undefined,
@@ -123,8 +233,15 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
       state: state || undefined,
       address: address || undefined,
       notes: notes || undefined,
-      assigned_to: 'Alexandre Nogueira',
-    })
+      contacts: validContacts.length > 0 ? validContacts : undefined,
+      assigned_to: 'Alex Nogueia',
+    }
+
+    if (editingClientId) {
+      onUpdateClient(editingClientId, payload)
+    } else {
+      onCreateClient(payload)
+    }
 
     setName('')
     setCompanyName('')
@@ -136,6 +253,8 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
     setCity('')
     setState('')
     setNotes('')
+    setContacts([])
+    setEditingClientId(null)
     setIsModalOpen(false)
   }
 
@@ -165,7 +284,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
           </p>
         </div>
         <Button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenNewClientModal}
           className="bg-indigo-600 hover:bg-indigo-500 shadow-sm"
         >
           <Plus className="h-4 w-4 mr-1.5" />
@@ -311,14 +430,24 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                       {selectedClient.segment || 'Geral'}
                     </CardDescription>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onSelectClient(null)}
-                    className="text-xs"
-                  >
-                    Fechar
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenEditClientModal(selectedClient)}
+                      className="text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-950"
+                    >
+                      <Edit2 className="h-3 w-3 mr-1" /> Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onSelectClient(null)}
+                      className="text-xs"
+                    >
+                      Fechar
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-4 space-y-4">
@@ -355,9 +484,85 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                       Responsável na Conta:
                     </span>
                     <span className="font-medium text-slate-900 dark:text-slate-100">
-                      {selectedClient.assigned_to || 'Alexandre Nogueira'}
+                      {selectedClient.assigned_to || 'Alex Nogueia'}
                     </span>
                   </div>
+                </div>
+
+                {/* Seção de Múltiplos Contatos / Responsáveis vinculados ao CNPJ */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-indigo-600" />
+                      <span>
+                        Responsáveis & Contatos Vinculados (
+                        {selectedClient.contacts ? selectedClient.contacts.length : 0})
+                      </span>
+                    </h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenEditClientModal(selectedClient)}
+                      className="h-6 text-[10px] px-2 text-indigo-700 border-indigo-200"
+                    >
+                      <Plus className="h-3 w-3 mr-1" /> Gerenciar Contatos
+                    </Button>
+                  </div>
+
+                  {selectedClient.contacts && selectedClient.contacts.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {selectedClient.contacts.map((contact, idx) => (
+                        <div
+                          key={contact.id || idx}
+                          className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-1.5 text-xs"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                              <UserCheck className="h-3.5 w-3.5 text-teal-600" />
+                              {contact.name}
+                            </span>
+                            {contact.role && (
+                              <Badge variant="secondary" className="text-[9px]">
+                                {contact.role}
+                              </Badge>
+                            )}
+                          </div>
+
+                          <div className="space-y-0.5 text-[11px] text-muted-foreground">
+                            {contact.birth_date && (
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-3 w-3 text-slate-400" />
+                                <span>
+                                  Nasc:{' '}
+                                  <strong>
+                                    {contact.birth_date.includes('-')
+                                      ? contact.birth_date.split('-').reverse().join('/')
+                                      : contact.birth_date}
+                                  </strong>
+                                </span>
+                              </div>
+                            )}
+                            {contact.phone && (
+                              <div className="flex items-center gap-1">
+                                <Phone className="h-3 w-3 text-slate-400" />
+                                <span>{contact.phone}</span>
+                              </div>
+                            )}
+                            {contact.email && (
+                              <div className="flex items-center gap-1 truncate">
+                                <Mail className="h-3 w-3 text-slate-400" />
+                                <span className="truncate">{contact.email}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground p-3 border border-dashed rounded-lg text-center bg-slate-50/30 dark:bg-slate-900/30">
+                      Nenhum responsável específico cadastrado para este CNPJ.
+                    </div>
+                  )}
                 </div>
 
                 {/* Notas de Negócio */}
@@ -450,137 +655,274 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
         )}
       </div>
 
-      {/* Modal Criar Cliente */}
+      {/* Modal Criar / Editar Cliente */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[550px]">
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold">Cadastrar Novo Cliente / Conta</DialogTitle>
+            <DialogTitle className="text-lg font-bold">
+              {editingClientId
+                ? 'Editar Dados do Cliente / Conta'
+                : 'Cadastrar Novo Cliente / Conta'}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-3.5 py-2">
-            <div className="space-y-1">
-              <Label className="text-xs font-medium">Razão Social / Nome Completo *</Label>
-              <Input
-                required
-                placeholder="Ex: Sigma Soluções Empresariais Ltda"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="text-xs"
-              />
+          <form onSubmit={handleSaveClient} className="space-y-4 py-2">
+            {/* Dados Cadastrais Principais */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider block">
+                1. Dados da Empresa (Pessoa Jurídica / Física)
+              </span>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Razão Social / Nome Completo *</Label>
+                <Input
+                  required
+                  placeholder="Ex: Sigma Soluções Industriais Ltda"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="text-xs bg-white dark:bg-slate-950"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Nome Fantasia</Label>
+                  <Input
+                    placeholder="Sigma Tech"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    className="text-xs bg-white dark:bg-slate-950"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">CNPJ / CPF</Label>
+                  <Input
+                    placeholder="00.000.000/0001-00"
+                    value={document}
+                    onChange={(e) => setDocument(e.target.value)}
+                    className="text-xs bg-white dark:bg-slate-950"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">E-mail Geral da Empresa</Label>
+                  <Input
+                    type="email"
+                    placeholder="comercial@sigma.com.br"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="text-xs bg-white dark:bg-slate-950"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Telefone Geral / Recepção</Label>
+                  <Input
+                    placeholder="(11) 99999-8888"
+                    value={whatsapp}
+                    onChange={(e) => {
+                      setWhatsapp(e.target.value)
+                      setPhone(e.target.value)
+                    }}
+                    className="text-xs bg-white dark:bg-slate-950"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Segmento</Label>
+                  <Input
+                    placeholder="Alimentos / Sucroalcooleiro"
+                    value={segment}
+                    onChange={(e) => setSegment(e.target.value)}
+                    className="text-xs bg-white dark:bg-slate-950"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Cidade</Label>
+                  <Input
+                    placeholder="São Paulo"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    className="text-xs bg-white dark:bg-slate-950"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">UF</Label>
+                  <Input
+                    placeholder="SP"
+                    maxLength={2}
+                    value={state}
+                    onChange={(e) => setState(e.target.value.toUpperCase())}
+                    className="text-xs bg-white dark:bg-slate-950"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Status do Relacionamento</Label>
+                  <Select value={status} onValueChange={(v) => setStatus(v as ClientStatus)}>
+                    <SelectTrigger className="text-xs bg-white dark:bg-slate-950">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lead" className="text-xs">
+                        Lead Inbound
+                      </SelectItem>
+                      <SelectItem value="prospect" className="text-xs">
+                        Prospect Qualificado
+                      </SelectItem>
+                      <SelectItem value="active" className="text-xs">
+                        Cliente Ativo
+                      </SelectItem>
+                      <SelectItem value="partner" className="text-xs">
+                        Parceiro
+                      </SelectItem>
+                      <SelectItem value="churned" className="text-xs">
+                        Inativo / Churned
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Score da Conta (0-100)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={score}
+                    onChange={(e) => setScore(e.target.value)}
+                    className="text-xs bg-white dark:bg-slate-950"
+                  />
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">Nome Fantasia</Label>
-                <Input
-                  placeholder="Sigma Tech"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="text-xs"
-                />
+            {/* SEÇÃO 2: MÚLTIPLOS CONTATOS / RESPONSÁVEIS POR CNPJ */}
+            <div className="p-3.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/60 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-bold text-indigo-950 dark:text-indigo-200 uppercase tracking-wider flex items-center gap-1.5">
+                    <Users className="h-4 w-4 text-indigo-600" />
+                    2. Contatos & Responsáveis do Cliente (Múltiplos por CNPJ)
+                  </span>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Cadastre múltiplos responsáveis como Manutenção, Engenharia, Compras, etc.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleAddContact}
+                  className="h-7 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Contato
+                </Button>
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">CNPJ / CPF</Label>
-                <Input
-                  placeholder="00.000.000/0001-00"
-                  value={document}
-                  onChange={(e) => setDocument(e.target.value)}
-                  className="text-xs"
-                />
-              </div>
+
+              {contacts.length === 0 ? (
+                <div className="p-3 text-xs text-muted-foreground bg-white dark:bg-slate-950 rounded-lg border border-dashed text-center">
+                  Nenhum contato adicionado. Clique no botão acima para adicionar um responsável.
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {contacts.map((contact, index) => (
+                    <div
+                      key={contact.id || index}
+                      className="p-3 rounded-lg bg-white dark:bg-slate-950 border border-indigo-100 dark:border-indigo-900 space-y-2 relative"
+                    >
+                      <div className="flex items-center justify-between pb-1 border-b border-slate-100 dark:border-slate-800">
+                        <span className="text-[11px] font-bold text-indigo-700 dark:text-indigo-400">
+                          Responsável #{index + 1}
+                        </span>
+                        {contacts.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveContact(index)}
+                            className="h-6 w-6 p-0 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950"
+                            title="Remover este contato"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                            Nome do Responsável *
+                          </Label>
+                          <Input
+                            placeholder="Ex: Eng. Carlos Alberto"
+                            value={contact.name}
+                            onChange={(e) => handleUpdateContact(index, 'name', e.target.value)}
+                            className="text-xs h-8"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                            Data de Nascimento
+                          </Label>
+                          <Input
+                            type="date"
+                            value={contact.birth_date || ''}
+                            onChange={(e) =>
+                              handleUpdateContact(index, 'birth_date', e.target.value)
+                            }
+                            className="text-xs h-8"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                            Função / Cargo
+                          </Label>
+                          <Input
+                            placeholder="Ex: Gerente de Manutenção"
+                            value={contact.role || ''}
+                            onChange={(e) => handleUpdateContact(index, 'role', e.target.value)}
+                            className="text-xs h-8"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">
+                            Telefone / WhatsApp Direto
+                          </Label>
+                          <Input
+                            placeholder="(47) 99888-7766"
+                            value={contact.phone || ''}
+                            onChange={(e) => handleUpdateContact(index, 'phone', e.target.value)}
+                            className="text-xs h-7"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground">E-mail Direto</Label>
+                          <Input
+                            type="email"
+                            placeholder="carlos@empresa.com.br"
+                            value={contact.email || ''}
+                            onChange={(e) => handleUpdateContact(index, 'email', e.target.value)}
+                            className="text-xs h-7"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">E-mail Comercial</Label>
-                <Input
-                  type="email"
-                  placeholder="comercial@sigma.com.br"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">WhatsApp / Telefone</Label>
-                <Input
-                  placeholder="(11) 99999-8888"
-                  value={whatsapp}
-                  onChange={(e) => {
-                    setWhatsapp(e.target.value)
-                    setPhone(e.target.value)
-                  }}
-                  className="text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">Segmento</Label>
-                <Input
-                  placeholder="Tecnologia / Varejo"
-                  value={segment}
-                  onChange={(e) => setSegment(e.target.value)}
-                  className="text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">Cidade</Label>
-                <Input
-                  placeholder="São Paulo"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  className="text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">UF</Label>
-                <Input
-                  placeholder="SP"
-                  maxLength={2}
-                  value={state}
-                  onChange={(e) => setState(e.target.value.toUpperCase())}
-                  className="text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">Status do Relacionamento</Label>
-                <Select value={status} onValueChange={(v) => setStatus(v as ClientStatus)}>
-                  <SelectTrigger className="text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="lead" className="text-xs">
-                      Lead Inbound
-                    </SelectItem>
-                    <SelectItem value="prospect" className="text-xs">
-                      Prospect Qualificado
-                    </SelectItem>
-                    <SelectItem value="active" className="text-xs">
-                      Cliente Ativo
-                    </SelectItem>
-                    <SelectItem value="partner" className="text-xs">
-                      Parceiro
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">Score de Oportunidade (0-100)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={score}
-                  onChange={(e) => setScore(e.target.value)}
-                  className="text-xs"
-                />
-              </div>
-            </div>
-
+            {/* Observações */}
             <div className="space-y-1">
               <Label className="text-xs font-medium">Observações Estratégicas</Label>
               <Textarea
@@ -602,7 +944,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                 Cancelar
               </Button>
               <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-500">
-                Salvar Cliente
+                {editingClientId ? 'Salvar Alterações' : 'Salvar Cliente'}
               </Button>
             </DialogFooter>
           </form>

@@ -99,7 +99,7 @@ export const TicketsSupport: React.FC<TicketsSupportProps> = ({
       channel,
       priority,
       status: 'open',
-      assigned_to: 'Alexandre Nogueira',
+      assigned_to: 'Alex Nogueia',
       timeline: [
         {
           author: client ? client.name : 'Cliente',
@@ -124,7 +124,7 @@ export const TicketsSupport: React.FC<TicketsSupportProps> = ({
     const updatedTimeline = [
       ...currentTimeline,
       {
-        author: 'Alexandre Nogueira (Especialista)',
+        author: 'Alex Nogueia (Especialista)',
         role: 'agent' as const,
         message: replyText,
         timestamp: new Date().toISOString(),

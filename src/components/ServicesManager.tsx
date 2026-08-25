@@ -32,9 +32,17 @@ import {
   UserCheck,
   Building2,
   Tag,
+  CheckCircle,
+  XCircle,
+  FileCheck2,
+  ShieldCheck,
+  Info,
+  DollarSign,
 } from 'lucide-react'
 import type {
   ServiceRecord,
+  ServiceOrderRecord,
+  ServiceOrderStatus,
   ClientRecord,
   DealRecord,
   ServiceStatus,
@@ -43,20 +51,34 @@ import type {
 
 interface ServicesManagerProps {
   services: ServiceRecord[]
+  serviceOrders?: ServiceOrderRecord[]
   clients: ClientRecord[]
   deals: DealRecord[]
   onCreateService: (data: Partial<ServiceRecord>) => void
+  onUpdateServiceOrderStatus?: (
+    id: string,
+    status: ServiceOrderStatus,
+    approvalNotes?: string,
+  ) => Promise<void> | void
 }
 
 export const ServicesManager: React.FC<ServicesManagerProps> = ({
   services,
+  serviceOrders = [],
   clients,
   deals,
   onCreateService,
+  onUpdateServiceOrderStatus,
 }) => {
+  const [activeTab, setActiveTab] = useState<'orders' | 'services'>('orders')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [selectedOrderForApproval, setSelectedOrderForApproval] =
+    useState<ServiceOrderRecord | null>(null)
+  const [approvalNotes, setApprovalNotes] = useState('')
+  const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
+  const [actionType, setActionType] = useState<'approve' | 'reject'>('approve')
 
   // Form State
   const [title, setTitle] = useState('')
@@ -72,6 +94,15 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
       s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.client_name && s.client_name.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesStatus = statusFilter === 'all' || s.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  const filteredOrders = serviceOrders.filter((so) => {
+    const matchesSearch =
+      so.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      so.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      so.client_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || so.status === statusFilter
     return matchesSearch && matchesStatus
   })
 
@@ -121,20 +152,49 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
         <div>
           <h2 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Wrench className="h-6 w-6 text-teal-600 dark:text-teal-400" />
-            Ordens de Serviço & Manutenção BERMO
+            Ordens de Serviço & Manutenções BERMO
           </h2>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-            Acompanhamento de equipes técnicas em campo, trocas de gaxetas, revisões de válvulas e
-            comissionamento.
+            Ordens geradas automaticamente na aprovação de propostas, aguardando aprovação técnica e
+            execução.
           </p>
         </div>
-        <Button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="bg-teal-700 hover:bg-teal-600 text-white text-xs"
-        >
-          <Plus className="h-4 w-4 mr-1.5" />
-          Nova Ordem de Serviço
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Navegação entre Abas */}
+          <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-lg flex gap-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveTab('orders')}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'orders'
+                  ? 'bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              <FileCheck2 className="h-3.5 w-3.5" />
+              Ordens de Serviço ({serviceOrders.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('services')}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'services'
+                  ? 'bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              <Wrench className="h-3.5 w-3.5" />
+              Contratos & Manutenção ({services.length})
+            </button>
+          </div>
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="bg-teal-700 hover:bg-teal-600 text-white text-xs"
+          >
+            <Plus className="h-4 w-4 mr-1.5" />
+            Nova OS Manual
+          </Button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -162,59 +222,303 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
         </Select>
       </div>
 
-      {/* Grid de Serviços */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredServices.map((s) => (
-          <Card
-            key={s.id}
-            className="border-slate-200 dark:border-slate-800 hover:border-teal-500/50 transition-all flex flex-col justify-between"
-          >
-            <CardHeader className="pb-2.5">
-              <div className="flex items-start justify-between gap-2">
-                <Badge
-                  variant="outline"
-                  className="text-[10px] font-mono uppercase text-teal-700 dark:text-teal-400"
-                >
-                  {s.service_type || 'Manutenção'}
-                </Badge>
-                {getStatusBadge(s.status)}
-              </div>
-              <CardTitle className="text-sm font-bold mt-2 text-slate-900 dark:text-slate-100 line-clamp-1">
-                {s.title}
-              </CardTitle>
-              <CardDescription className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                <Building2 className="h-3.5 w-3.5" />
-                {s.client_name || 'Cliente Industrial'}
-              </CardDescription>
-            </CardHeader>
+      {/* ABA 1: ORDENS DE SERVIÇO (GERADAS AUTOMATICAMENTE DAS PROPOSTAS APROVADAS) */}
+      {activeTab === 'orders' ? (
+        <div className="space-y-4">
+          {filteredOrders.length === 0 ? (
+            <Card className="p-10 text-center text-muted-foreground">
+              <FileCheck2 className="h-10 w-10 mx-auto text-teal-500 mb-2 opacity-50" />
+              <p className="text-sm font-semibold">Nenhuma Ordem de Serviço encontrada</p>
+              <p className="text-xs">
+                Aprove uma proposta na tela de Orçamentos para gerar uma OS automaticamente com a
+                mesma numeração.
+              </p>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredOrders.map((so) => {
+                const isPending = so.status === 'pending_approval'
+                const isApproved = so.status === 'approved'
 
-            <CardContent className="pt-0 space-y-3">
-              {s.notes && (
-                <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 bg-slate-50 dark:bg-slate-900 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
-                  {s.notes}
-                </p>
-              )}
+                return (
+                  <Card
+                    key={so.id}
+                    className={`border transition-all flex flex-col justify-between ${
+                      isPending
+                        ? 'border-amber-300 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-950/10'
+                        : isApproved
+                          ? 'border-emerald-300 dark:border-emerald-800'
+                          : 'border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    <CardHeader className="pb-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-mono text-xs font-bold text-teal-700 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/60 px-2 py-0.5 rounded border border-teal-200 dark:border-teal-800">
+                          OS #{so.order_number}
+                        </span>
+                        {so.status === 'pending_approval' && (
+                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] flex items-center gap-1">
+                            <Clock className="h-3 w-3" /> Aguardando Aprovação
+                          </Badge>
+                        )}
+                        {so.status === 'approved' && (
+                          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] flex items-center gap-1">
+                            <ShieldCheck className="h-3 w-3" /> Aprovada pelo Gestor
+                          </Badge>
+                        )}
+                        {so.status === 'rejected' && (
+                          <Badge className="bg-rose-600 text-white text-[10px]">Rejeitada</Badge>
+                        )}
+                        {so.status === 'in_progress' && (
+                          <Badge className="bg-blue-600 text-white text-[10px]">Em Execução</Badge>
+                        )}
+                        {so.status === 'completed' && (
+                          <Badge className="bg-teal-600 text-white text-[10px]">Finalizada</Badge>
+                        )}
+                      </div>
 
-              <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                <div className="text-muted-foreground flex items-center gap-1 text-[11px]">
-                  <Calendar className="h-3 w-3" />
-                  {s.start_date
-                    ? new Date(s.start_date).toLocaleDateString('pt-BR')
-                    : 'Data a definir'}
+                      <CardTitle className="text-sm font-bold mt-2 text-slate-900 dark:text-slate-100 line-clamp-2">
+                        {so.title}
+                      </CardTitle>
+                      <CardDescription className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <Building2 className="h-3.5 w-3.5" />
+                        {so.client_name || 'Cliente Industrial'}
+                      </CardDescription>
+                    </CardHeader>
+
+                    <CardContent className="pt-0 space-y-3">
+                      {/* Resumo dos Serviços Vinculados */}
+                      {so.services && Array.isArray(so.services) && so.services.length > 0 && (
+                        <div className="space-y-1 bg-slate-50 dark:bg-slate-900 p-2 rounded-lg border border-slate-100 dark:border-slate-800 text-[11px]">
+                          <span className="font-semibold text-slate-700 dark:text-slate-300 block">
+                            Itens do Escopo ({so.services.length}):
+                          </span>
+                          <ul className="list-disc list-inside space-y-0.5 text-slate-600 dark:text-slate-400">
+                            {so.services.slice(0, 2).map((item: any, idx: number) => (
+                              <li key={idx} className="truncate">
+                                {item.description || item.service_name || 'Item de manutenção'}
+                              </li>
+                            ))}
+                            {so.services.length > 2 && (
+                              <li className="text-[10px] text-muted-foreground italic">
+                                + {so.services.length - 2} outros itens
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+
+                      {so.notes && (
+                        <p className="text-[11px] text-slate-600 dark:text-slate-300 line-clamp-2 italic">
+                          "{so.notes}"
+                        </p>
+                      )}
+
+                      {so.approved_by && (
+                        <div className="text-[10px] text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3 shrink-0" />
+                          <span>Aprovado por: {so.approved_by}</span>
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                        <div>
+                          <span className="text-[10px] text-muted-foreground block">
+                            Valor Total:
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                            {(so.total_value || 0).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </span>
+                        </div>
+
+                        {/* Botões de Ação do Gestor */}
+                        {isPending && onUpdateServiceOrderStatus && (
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedOrderForApproval(so)
+                                setActionType('reject')
+                                setApprovalNotes('')
+                                setIsApproveModalOpen(true)
+                              }}
+                              className="h-7 px-2 text-[11px] text-rose-600 hover:bg-rose-50 border-rose-200"
+                            >
+                              Rejeitar
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedOrderForApproval(so)
+                                setActionType('approve')
+                                setApprovalNotes('')
+                                setIsApproveModalOpen(true)
+                              }}
+                              className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
+                            >
+                              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Aprovar OS
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ABA 2: SERVIÇOS & CONTRATOS */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredServices.map((s) => (
+            <Card
+              key={s.id}
+              className="border-slate-200 dark:border-slate-800 hover:border-teal-500/50 transition-all flex flex-col justify-between"
+            >
+              <CardHeader className="pb-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] font-mono uppercase text-teal-700 dark:text-teal-400"
+                  >
+                    {s.service_type || 'Manutenção'}
+                  </Badge>
+                  {getStatusBadge(s.status)}
                 </div>
-                {s.monthly_value ? (
-                  <span className="font-bold text-slate-900 dark:text-slate-100">
-                    {s.monthly_value.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </span>
-                ) : null}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                <CardTitle className="text-sm font-bold mt-2 text-slate-900 dark:text-slate-100 line-clamp-1">
+                  {s.title}
+                </CardTitle>
+                <CardDescription className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Building2 className="h-3.5 w-3.5" />
+                  {s.client_name || 'Cliente Industrial'}
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="pt-0 space-y-3">
+                {s.notes && (
+                  <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2 bg-slate-50 dark:bg-slate-900 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
+                    {s.notes}
+                  </p>
+                )}
+
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                  <div className="text-muted-foreground flex items-center gap-1 text-[11px]">
+                    <Calendar className="h-3 w-3" />
+                    {s.start_date
+                      ? new Date(s.start_date).toLocaleDateString('pt-BR')
+                      : 'Data a definir'}
+                  </div>
+                  {s.monthly_value ? (
+                    <span className="font-bold text-slate-900 dark:text-slate-100">
+                      {s.monthly_value.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Modal de Aprovação / Rejeição de OS pelo Gestor */}
+      <Dialog open={isApproveModalOpen} onOpenChange={setIsApproveModalOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              {actionType === 'approve' ? (
+                <>
+                  <ShieldCheck className="h-5 w-5 text-emerald-600" />
+                  Aprovar Ordem de Serviço #{selectedOrderForApproval?.order_number}
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-5 w-5 text-rose-600" />
+                  Rejeitar Ordem de Serviço #{selectedOrderForApproval?.order_number}
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-1">
+              <p className="font-bold text-slate-900 dark:text-slate-100">
+                {selectedOrderForApproval?.title}
+              </p>
+              <p className="text-muted-foreground">
+                Cliente: {selectedOrderForApproval?.client_name}
+              </p>
+              <p className="text-muted-foreground">
+                Valor Total:{' '}
+                <strong>
+                  {(selectedOrderForApproval?.total_value || 0).toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+                </strong>
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">
+                {actionType === 'approve'
+                  ? 'Observações de Liberação / Gestão Técnica (Opcional)'
+                  : 'Motivo da Rejeição (Obrigatório)'}
+              </Label>
+              <Textarea
+                placeholder={
+                  actionType === 'approve'
+                    ? 'Ex: Escopo validado. Liberado para agendamento com o cliente...'
+                    : 'Ex: Aguardando chegada de peças de reposição...'
+                }
+                value={approvalNotes}
+                onChange={(e) => setApprovalNotes(e.target.value)}
+                className="text-xs h-20"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsApproveModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={async () => {
+                if (selectedOrderForApproval && onUpdateServiceOrderStatus) {
+                  await onUpdateServiceOrderStatus(
+                    selectedOrderForApproval.id,
+                    actionType === 'approve' ? 'approved' : 'rejected',
+                    approvalNotes,
+                  )
+                  setIsApproveModalOpen(false)
+                  setSelectedOrderForApproval(null)
+                }
+              }}
+              className={
+                actionType === 'approve'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                  : 'bg-rose-600 hover:bg-rose-500 text-white'
+              }
+            >
+              {actionType === 'approve' ? 'Confirmar Aprovação' : 'Confirmar Rejeição'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal Nova OS */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>

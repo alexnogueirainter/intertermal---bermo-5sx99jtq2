@@ -86,7 +86,7 @@ export const ActivitiesManager: React.FC<ActivitiesManagerProps> = ({
       priority,
       status: 'pending',
       description,
-      assigned_to: 'Alexandre Nogueira',
+      assigned_to: 'Alex Nogueia',
     })
 
     setTitle('')

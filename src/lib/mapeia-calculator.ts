@@ -65,43 +65,187 @@ export function normalizeCep(cep: string): string {
 /**
  * Tenta obter coordenadas aproximadas a partir do prefixo do CEP brasileiro
  */
-export function estimateCoordsFromCep(cleanCep: string): { lat: number; lng: number } {
-  if (cleanCep.length < 2) return { lat: -26.8584, lng: -49.1174 } // Blumenau
+export function estimateCoordsFromCep(cleanCep: string): {
+  lat: number
+  lng: number
+  cityHint?: string
+  stateHint?: string
+} {
+  // Se for um CEP conhecido exato
+  const formatted =
+    cleanCep.length === 8 ? `${cleanCep.slice(0, 5)}-${cleanCep.slice(5)}` : cleanCep
+  if (KNOWN_CEP_COORDS[formatted]) {
+    const k = KNOWN_CEP_COORDS[formatted]
+    return { lat: k.lat, lng: k.lng, cityHint: k.city, stateHint: k.state }
+  }
+
+  if (cleanCep.length < 2)
+    return { lat: -26.8584, lng: -49.1174, cityHint: 'Blumenau', stateHint: 'SC' }
 
   const prefix1 = cleanCep.charAt(0)
   const prefix2 = cleanCep.substring(0, 2)
+  const prefix3 = cleanCep.substring(0, 3)
 
-  // Mapeamento por Faixa de CEP dos Correios (macrorregiões brasileiras)
+  // Mapeamento refinado por Faixa de CEP dos Correios (macrorregiões e microrregiões)
   switch (prefix1) {
     case '0': // Grande SP
-      return { lat: -23.5505, lng: -46.6333 }
+      return { lat: -23.5505, lng: -46.6333, cityHint: 'São Paulo', stateHint: 'SP' }
     case '1': // Interior SP
-      return { lat: -22.9099, lng: -47.0626 }
+      if (prefix2 === '13')
+        return { lat: -22.9099, lng: -47.0626, cityHint: 'Campinas', stateHint: 'SP' }
+      if (prefix2 === '14')
+        return { lat: -21.1767, lng: -47.8108, cityHint: 'Ribeirão Preto', stateHint: 'SP' }
+      if (prefix2 === '12')
+        return { lat: -23.1791, lng: -45.8872, cityHint: 'São José dos Campos', stateHint: 'SP' }
+      if (prefix2 === '18')
+        return { lat: -23.5015, lng: -47.4521, cityHint: 'Sorocaba', stateHint: 'SP' }
+      if (prefix2 === '15')
+        return { lat: -20.8113, lng: -49.3758, cityHint: 'São José do Rio Preto', stateHint: 'SP' }
+      return { lat: -22.9099, lng: -47.0626, cityHint: 'Interior SP', stateHint: 'SP' }
     case '2': // RJ / ES
-      return prefix2.startsWith('29')
-        ? { lat: -20.3155, lng: -40.3128 } // ES
-        : { lat: -22.9068, lng: -43.1729 } // RJ
+      if (prefix2.startsWith('29')) {
+        return { lat: -20.3155, lng: -40.3128, cityHint: 'Vitória', stateHint: 'ES' }
+      }
+      return { lat: -22.9068, lng: -43.1729, cityHint: 'Rio de Janeiro', stateHint: 'RJ' }
     case '3': // MG
-      return { lat: -19.9217, lng: -43.9378 }
+      if (prefix2 === '38')
+        return { lat: -18.9186, lng: -48.2772, cityHint: 'Uberlândia', stateHint: 'MG' }
+      if (prefix2 === '36')
+        return { lat: -21.7642, lng: -43.3496, cityHint: 'Juiz de Fora', stateHint: 'MG' }
+      return { lat: -19.9217, lng: -43.9378, cityHint: 'Belo Horizonte', stateHint: 'MG' }
     case '4': // BA / SE
-      return { lat: -12.9777, lng: -38.5016 }
+      if (prefix2.startsWith('49'))
+        return { lat: -10.9472, lng: -37.0731, cityHint: 'Aracaju', stateHint: 'SE' }
+      return { lat: -12.9777, lng: -38.5016, cityHint: 'Salvador', stateHint: 'BA' }
     case '5': // PE / AL / PB / RN
-      return { lat: -8.0476, lng: -34.877 }
+      if (prefix2.startsWith('57'))
+        return { lat: -9.6658, lng: -35.7351, cityHint: 'Maceió', stateHint: 'AL' }
+      if (prefix2.startsWith('58'))
+        return { lat: -7.1153, lng: -34.861, cityHint: 'João Pessoa', stateHint: 'PB' }
+      if (prefix2.startsWith('59'))
+        return { lat: -5.7945, lng: -35.211, cityHint: 'Natal', stateHint: 'RN' }
+      return { lat: -8.0476, lng: -34.877, cityHint: 'Recife', stateHint: 'PE' }
     case '6': // CE / PI / MA / PA / AP / AM / RR / AC
-      return { lat: -3.7319, lng: -38.5267 }
+      if (prefix2.startsWith('64'))
+        return { lat: -5.0919, lng: -42.8034, cityHint: 'Teresina', stateHint: 'PI' }
+      if (prefix2.startsWith('65'))
+        return { lat: -2.5307, lng: -44.3068, cityHint: 'São Luís', stateHint: 'MA' }
+      if (prefix2.startsWith('66') || prefix2.startsWith('67') || prefix2.startsWith('68')) {
+        return { lat: -1.4558, lng: -48.4902, cityHint: 'Belém', stateHint: 'PA' }
+      }
+      if (prefix2.startsWith('69'))
+        return { lat: -3.119, lng: -60.0217, cityHint: 'Manaus', stateHint: 'AM' }
+      return { lat: -3.7319, lng: -38.5267, cityHint: 'Fortaleza', stateHint: 'CE' }
     case '7': // DF / GO / TO / MT / MS / RO
-      return { lat: -15.7942, lng: -47.8822 }
+      if (
+        prefix2.startsWith('70') ||
+        prefix2.startsWith('71') ||
+        prefix2.startsWith('72') ||
+        prefix2.startsWith('73')
+      ) {
+        return { lat: -15.7942, lng: -47.8822, cityHint: 'Brasília', stateHint: 'DF' }
+      }
+      if (prefix2.startsWith('74') || prefix2.startsWith('75') || prefix2.startsWith('76')) {
+        return { lat: -16.6869, lng: -49.2648, cityHint: 'Goiânia', stateHint: 'GO' }
+      }
+      if (prefix2.startsWith('78'))
+        return { lat: -15.6014, lng: -56.0979, cityHint: 'Cuiabá', stateHint: 'MT' }
+      if (prefix2.startsWith('79'))
+        return { lat: -20.4697, lng: -54.6201, cityHint: 'Campo Grande', stateHint: 'MS' }
+      if (prefix2.startsWith('77'))
+        return { lat: -10.2491, lng: -48.3243, cityHint: 'Palmas', stateHint: 'TO' }
+      return { lat: -15.7942, lng: -47.8822, cityHint: 'Centro-Oeste', stateHint: 'DF' }
     case '8': // PR / SC
-      return prefix2.startsWith('89') || prefix2.startsWith('88')
-        ? { lat: -26.8584, lng: -49.1174 } // SC
-        : { lat: -25.4284, lng: -49.2733 } // PR
+      if (prefix2.startsWith('89')) {
+        if (prefix3 === '890' || prefix3 === '891')
+          return { lat: -26.9194, lng: -49.0661, cityHint: 'Blumenau', stateHint: 'SC' }
+        if (prefix3 === '892')
+          return { lat: -26.3045, lng: -48.8487, cityHint: 'Joinville', stateHint: 'SC' }
+        if (prefix3 === '898')
+          return { lat: -27.1004, lng: -52.6152, cityHint: 'Chapecó', stateHint: 'SC' }
+        return { lat: -26.8584, lng: -49.1174, cityHint: 'Blumenau/Vale', stateHint: 'SC' }
+      }
+      if (prefix2.startsWith('88')) {
+        if (prefix3 === '880')
+          return { lat: -27.5954, lng: -48.548, cityHint: 'Florianópolis', stateHint: 'SC' }
+        if (prefix3 === '883')
+          return { lat: -26.9078, lng: -48.6619, cityHint: 'Itajaí', stateHint: 'SC' }
+        if (prefix3 === '888')
+          return { lat: -28.6775, lng: -49.3704, cityHint: 'Criciúma', stateHint: 'SC' }
+        return { lat: -27.5954, lng: -48.548, cityHint: 'Litoral SC', stateHint: 'SC' }
+      }
+      // PR
+      if (
+        prefix3 === '800' ||
+        prefix3 === '801' ||
+        prefix3 === '802' ||
+        prefix3 === '810' ||
+        prefix3 === '820'
+      ) {
+        return { lat: -25.4284, lng: -49.2733, cityHint: 'Curitiba', stateHint: 'PR' }
+      }
+      if (prefix3 === '860' || prefix3 === '861')
+        return { lat: -23.3045, lng: -51.1696, cityHint: 'Londrina', stateHint: 'PR' }
+      if (prefix3 === '870')
+        return { lat: -23.4205, lng: -51.9331, cityHint: 'Maringá', stateHint: 'PR' }
+      if (prefix3 === '858')
+        return { lat: -24.9578, lng: -53.4595, cityHint: 'Cascavel', stateHint: 'PR' }
+      return { lat: -25.4284, lng: -49.2733, cityHint: 'Paraná', stateHint: 'PR' }
     case '9': // RS
-      return { lat: -30.0346, lng: -51.2177 }
+      if (prefix2 === '90' || prefix2 === '91')
+        return { lat: -30.0346, lng: -51.2177, cityHint: 'Porto Alegre', stateHint: 'RS' }
+      if (prefix2 === '95')
+        return { lat: -29.1678, lng: -51.1794, cityHint: 'Caxias do Sul', stateHint: 'RS' }
+      if (prefix2 === '96')
+        return { lat: -31.7654, lng: -52.3376, cityHint: 'Pelotas', stateHint: 'RS' }
+      if (prefix2 === '97')
+        return { lat: -29.6842, lng: -53.8069, cityHint: 'Santa Maria', stateHint: 'RS' }
+      if (prefix2 === '99')
+        return { lat: -28.2628, lng: -52.4067, cityHint: 'Passo Fundo', stateHint: 'RS' }
+      return { lat: -30.0346, lng: -51.2177, cityHint: 'Rio Grande do Sul', stateHint: 'RS' }
     default:
-      return { lat: -23.5505, lng: -46.6333 }
+      return { lat: -23.5505, lng: -46.6333, cityHint: 'São Paulo', stateHint: 'SP' }
   }
 }
 
+/**
+ * Consulta API pública ViaCEP (com timeout rápido e fallback gracioso)
+ */
+export async function lookupCepDetails(cleanCep: string): Promise<{
+  city?: string
+  state?: string
+  address?: string
+  neighborhood?: string
+  found: boolean
+}> {
+  if (cleanCep.length !== 8) {
+    return { found: false }
+  }
+
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 2000)
+    const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`, {
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+    if (res.ok) {
+      const data = await res.json()
+      if (!data.erro) {
+        return {
+          city: data.localidade,
+          state: data.uf,
+          address: data.logradouro,
+          neighborhood: data.bairro,
+          found: true,
+        }
+      }
+    }
+  } catch (_) {
+    // Falha silenciosa de rede — usa o simulador
+  }
+  return { found: false }
+}
 /**
  * Calcula a rota completa no padrão Mapeia:
  * - Distância

@@ -2,6 +2,15 @@ import type { BermoProductItem } from '@/data/bermo-catalog'
 
 export type ClientStatus = 'lead' | 'prospect' | 'active' | 'churned' | 'partner'
 
+export interface ClientContact {
+  id: string
+  name: string
+  birth_date?: string
+  role?: string
+  phone?: string
+  email?: string
+}
+
 export interface ClientRecord {
   id: string
   name: string
@@ -18,6 +27,7 @@ export interface ClientRecord {
   state?: string
   notes?: string
   tags?: string[]
+  contacts?: ClientContact[]
   assigned_to?: string
   created?: string
   updated?: string
@@ -75,6 +85,9 @@ export interface ProductRecord {
 export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'expired'
 
 // 3a. Especificações Técnicas de Serviço para produtos BERMO
+export type WorkAreaDifficulty = 'Alto' | 'Médio' | 'Baixo'
+export type IntegrationNeed = 'Sim' | 'Não'
+
 export interface ServiceTechnicalSpecs {
   productId?: string
   productCode?: string
@@ -103,6 +116,12 @@ export interface ServiceTechnicalSpecs {
   platesCount?: number | string // Número das placas
   plateDimensions?: string // Dimensão das placas
   gasketsCount?: number | string // Quantidade de gaxetas
+  // Novos campos Item 3A
+  workAreaDifficulty?: WorkAreaDifficulty // Grau de dificuldade da área de trabalho (Alto, Médio, Baixo)
+  workAreaObservations?: string // Observações do grau de dificuldade
+  needsIntegration?: IntegrationNeed // Necessidade de integração (Sim, Não)
+  integrationObservations?: string // Observações sobre a necessidade de integração
+  pipeMeasurement?: string // Medida da tubulação (campo de texto editável)
 }
 
 // 3b. Mão de obra — 3 funções
@@ -297,6 +316,38 @@ export interface ServiceRecord {
   assigned_to?: string
   checklist?: ServiceChecklistItem[]
   stages?: ServiceStageItem[]
+  notes?: string
+  created?: string
+  updated?: string
+}
+
+export type ServiceOrderStatus =
+  | 'pending_approval'
+  | 'approved'
+  | 'in_progress'
+  | 'completed'
+  | 'rejected'
+  | 'cancelled'
+
+export interface ServiceOrderRecord {
+  id: string
+  order_number: string
+  quote_id?: string
+  quote_number?: string
+  client_id?: string
+  client_name?: string
+  title: string
+  status: ServiceOrderStatus
+  services?: any[]
+  total_value?: number
+  priority?: Priority
+  assigned_to?: string
+  technical_details?: any
+  approval_notes?: string
+  approved_at?: string
+  approved_by?: string
+  start_date?: string
+  end_date?: string
   notes?: string
   created?: string
   updated?: string

@@ -30,6 +30,7 @@ import { dealsService } from '@/services/deals'
 import { quotesService } from '@/services/quotes'
 import {
   servicesExtraService,
+  serviceOrdersService,
   ticketsService,
   activitiesService,
   productsService,
@@ -42,6 +43,8 @@ import type {
   ProductRecord,
   TicketRecord,
   ServiceRecord,
+  ServiceOrderRecord,
+  ServiceOrderStatus,
   ActivityRecord,
   DealStage,
 } from '@/types/crm'
@@ -83,6 +86,7 @@ export default function IndexPage() {
   const [products, setProducts] = useState<ProductRecord[]>([])
   const [tickets, setTickets] = useState<TicketRecord[]>([])
   const [services, setServices] = useState<ServiceRecord[]>([])
+  const [serviceOrders, setServiceOrders] = useState<ServiceOrderRecord[]>([])
   const [activities, setActivities] = useState<ActivityRecord[]>([])
 
   // Selection states for cross-view navigation
@@ -93,16 +97,25 @@ export default function IndexPage() {
   const loadAllData = async () => {
     try {
       setIsLoading(true)
-      const [clientsRes, dealsRes, quotesRes, productsRes, ticketsRes, servicesRes, activitiesRes] =
-        await Promise.all([
-          clientsService.getAll(),
-          dealsService.getAll(),
-          quotesService.getAll(),
-          productsService.getAll(),
-          ticketsService.getAll(),
-          servicesExtraService.getAll(),
-          activitiesService.getAll(),
-        ])
+      const [
+        clientsRes,
+        dealsRes,
+        quotesRes,
+        productsRes,
+        ticketsRes,
+        servicesRes,
+        serviceOrdersRes,
+        activitiesRes,
+      ] = await Promise.all([
+        clientsService.getAll(),
+        dealsService.getAll(),
+        quotesService.getAll(),
+        productsService.getAll(),
+        ticketsService.getAll(),
+        servicesExtraService.getAll(),
+        serviceOrdersService.getAll().catch(() => [] as ServiceOrderRecord[]),
+        activitiesService.getAll(),
+      ])
 
       setClients(clientsRes)
       setDeals(dealsRes)
@@ -110,6 +123,7 @@ export default function IndexPage() {
       setProducts(productsRes)
       setTickets(ticketsRes)
       setServices(servicesRes)
+      setServiceOrders(serviceOrdersRes)
       setActivities(activitiesRes)
     } catch (err: any) {
       console.error('Erro ao carregar dados:', err)
@@ -210,14 +224,93 @@ export default function IndexPage() {
     }
   }
 
+  const handleUpdateQuote = async (id: string, data: Partial<QuoteRecord>) => {
+    try {
+      const updated = await quotesService.update(id, data)
+      setQuotes(quotes.map((q) => (q.id === id ? updated : q)))
+      if (selectedQuote?.id === id) setSelectedQuote(updated)
+      toast({ title: 'Orçamento atualizado com sucesso!' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao atualizar proposta',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleUpdateQuoteStatus = async (id: string, status: QuoteStatus) => {
     try {
       const updated = await quotesService.update(id, { status })
       setQuotes(quotes.map((q) => (q.id === id ? updated : q)))
       if (selectedQuote?.id === id) setSelectedQuote(updated)
-      toast({ title: `Orçamento marcado como ${status}!` })
+
+      // Se a proposta for aprovada, gerar automaticamente uma Ordem de Serviço (OS)
+      if (status === 'approved') {
+        try {
+          const client = clients.find((c) => c.id === updated.client_id)
+          const newOrderNumber = updated.quote_number || `INT-${Date.now().toString().slice(-4)}`
+
+          const createdOS = await serviceOrdersService.create({
+            order_number: newOrderNumber,
+            quote_id: updated.id,
+            quote_number: updated.quote_number,
+            client_id: updated.client_id,
+            client_name: updated.client_name || client?.name || 'Cliente Industrial',
+            title: `OS ${newOrderNumber} - ${updated.title || 'Manutenção em Equipamento BERMO'}`,
+            status: 'pending_approval',
+            total_value: updated.total || 0,
+            priority: 'high',
+            assigned_to: updated.assigned_to || 'Alex Nogueia',
+            services: updated.items || [],
+            technical_details: updated.service_details || {},
+            notes: `Ordem de Serviço gerada automaticamente a partir da proposta aprovada ${updated.quote_number}. Aguardando validação do gestor técnico.`,
+          })
+
+          setServiceOrders((prev) => [createdOS, ...prev])
+          toast({
+            title: '🎉 Proposta Aprovada & OS Gerada!',
+            description: `Ordem de Serviço #${newOrderNumber} gerada com status "Pendente de Aprovação".`,
+          })
+        } catch (osErr: any) {
+          console.error('Erro ao gerar OS automática:', osErr)
+          toast({
+            title: 'Proposta aprovada',
+            description: 'Status atualizado para aprovado.',
+          })
+        }
+      } else {
+        toast({ title: `Orçamento marcado como ${status}!` })
+      }
     } catch (err: any) {
       toast({ title: 'Erro ao atualizar', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  // OS Handlers
+  const handleUpdateServiceOrderStatus = async (
+    id: string,
+    status: ServiceOrderStatus,
+    approvalNotes?: string,
+  ) => {
+    try {
+      const updated = await serviceOrdersService.updateStatus(
+        id,
+        status,
+        approvalNotes,
+        'Alex Nogueia (Gestor Técnico)',
+      )
+      setServiceOrders((prev) => prev.map((o) => (o.id === id ? updated : o)))
+      toast({
+        title: status === 'approved' ? '✅ OS Aprovada com Sucesso!' : 'OS Atualizada',
+        description: `Ordem de Serviço #${updated.order_number} agora está ${status}.`,
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao atualizar OS',
+        description: err.message,
+        variant: 'destructive',
+      })
     }
   }
 
@@ -469,7 +562,7 @@ export default function IndexPage() {
             </div>
             <div className="overflow-hidden">
               <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                Alexandre Nogueira
+                Alex Nogueia
               </p>
               <p className="text-[10px] text-teal-700 dark:text-teal-400 truncate">
                 Especialista BERMO
@@ -550,6 +643,7 @@ export default function IndexPage() {
               selectedQuote={selectedQuote}
               onSelectQuote={setSelectedQuote}
               onCreateQuote={handleCreateQuote}
+              onUpdateQuote={handleUpdateQuote}
               onUpdateQuoteStatus={handleUpdateQuoteStatus}
               onCreateClient={handleCreateClient}
               onOpenCatalog={() => setActiveTab('catalog')}
@@ -584,9 +678,11 @@ export default function IndexPage() {
           {activeTab === 'services' && (
             <ServicesManager
               services={services}
+              serviceOrders={serviceOrders}
               clients={clients}
               deals={deals}
               onCreateService={handleCreateService}
+              onUpdateServiceOrderStatus={handleUpdateServiceOrderStatus}
             />
           )}
 
