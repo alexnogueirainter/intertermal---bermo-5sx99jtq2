@@ -1,3 +1,5 @@
+import type { BermoProductItem } from '@/data/bermo-catalog'
+
 export type ClientStatus = 'lead' | 'prospect' | 'active' | 'churned' | 'partner'
 
 export interface ClientRecord {
@@ -72,6 +74,114 @@ export interface ProductRecord {
 
 export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'expired'
 
+// 3a. Especificações Técnicas de Serviço para produtos BERMO
+export interface ServiceTechnicalSpecs {
+  productId?: string
+  productCode?: string
+  productModel?: string
+  productBrand?: 'BERMO' | 'ARI Armaturen'
+  category?: string
+  serviceScope?: string // ex: Manutenção preventiva, Reparos em sede, Retubagem, Troca de gaxetas, Instalação e start-up, Calibração
+  fluidType?:
+    | 'vapor'
+    | 'oleo_termico'
+    | 'agua_quente'
+    | 'agua_gelada'
+    | 'ar_comprimido'
+    | 'gases'
+    | 'quimico'
+    | 'outros'
+  fluidName?: string
+  inletTemp?: number | string // °C
+  outletTemp?: number | string // °C
+  operatingPressure?: number | string // bar / barg
+  flowRate?: number | string // m³/h ou kg/s
+  pressureDrop?: number | string // bar / mca
+  equipmentSize?: string // Tamanho ou número de placas/DN
+  frameMaterial?: string // ex: Aço Carbono, Inox 304, Inox 316
+  gasketType?: string // ex: NBR, EPDM, Viton, PTFE
+}
+
+// 3b. Mão de obra — 3 funções
+export interface LaborRoleItem {
+  professionalsCount: number
+  estimatedHours: number
+  hourlyRate: number // R$/h
+  total: number
+}
+
+export interface LaborCosts {
+  technician: LaborRoleItem // Técnico
+  helper: LaborRoleItem // Ajudante
+  inspector: LaborRoleItem // Inspetor
+  total: number
+}
+
+// 3c. Deslocamento (Google Maps / Mapeia / Haversine)
+export interface TravelCosts {
+  originAddress: string
+  originCep: string
+  destinationAddress: string
+  destinationCep: string
+  distanceKm: number
+  roundTrip: boolean // Ida e volta (2x)
+  fuelConsumptionKmL: number // Padrão 10 km/L
+  fuelPricePerLiter: number // Padrão R$ 6.10
+  tollRoadPercentage: number // Padrão 70%
+  tollRatePerKm: number // Padrão R$ 0.15 por km pedagiado
+  calculatedFuelCost: number
+  calculatedTollCost: number
+  manualFuelAdjustment: number
+  manualTollAdjustment: number
+  total: number
+}
+
+// 3d. Hospedagem e Alimentação
+export interface LodgingMealsCosts {
+  hotelDailyCount: number
+  hotelDailyRate: number // R$ por diária
+  mealsDailyCount: number
+  mealsDailyRate: number // R$ por refeição/diária
+  hotelSubtotal: number
+  mealsSubtotal: number
+  total: number
+}
+
+// 3e. Custos Indiretos (Internos - NÃO exibidos ao cliente na proposta final)
+export interface IndirectTaxes {
+  pis: number // Padrão 1.65%
+  cofins: number // Padrão 7.60%
+  iss: number // Padrão 5.00% (editável conforme município)
+  csll: number // Padrão 1.08%
+  irpj: number // Padrão 4.80%
+  irDifference: number // Padrão 20.00% sobre o IRPJ (= 0.96%)
+  totalTaxesPercentage: number
+  calculatedTaxesAmount: number
+}
+
+export interface IndirectCosts {
+  serviceMarginPercent: number // 20% a 30% (Padrão 25%)
+  administrativeCostPercent: number // Fixo 15%
+  taxes: IndirectTaxes
+  salesCommissionPercent: number // 4% a 10% (Padrão 6%)
+  totalDirectCosts: number // MO + Deslocamento + Hosp/Alim + Equip/Peças
+  serviceMarginAmount: number
+  adminCostAmount: number
+  salesCommissionAmount: number
+  taxesAmount: number
+  totalIndirectAmount: number
+  calculatedSalePrice: number
+}
+
+// 3f. Prazos e Condições
+export type PaymentConditionType = '14_ddl' | '28_ddl' | '30_ddl' | '45_ddl' | '60_ddl' | 'custom'
+
+export interface PaymentAndValidity {
+  validityDays: number // Padrão 10 dias úteis
+  conditionType: PaymentConditionType
+  customConditionText?: string
+}
+
 export interface QuoteItem {
   product_id?: string
   name: string
@@ -79,6 +189,16 @@ export interface QuoteItem {
   unit_price: number
   discount: number
   total: number
+  bermo_specs?: ServiceTechnicalSpecs
+}
+
+export interface QuoteServiceDetails {
+  service_technical_specs?: ServiceTechnicalSpecs
+  labor_costs?: LaborCosts
+  travel_costs?: TravelCosts
+  lodging_meals_costs?: LodgingMealsCosts
+  indirect_costs?: IndirectCosts
+  payment_and_validity?: PaymentAndValidity
 }
 
 export interface QuoteRecord {
@@ -99,6 +219,8 @@ export interface QuoteRecord {
   assigned_to?: string
   created?: string
   updated?: string
+  // Dados estendidos de prestação de serviços (armazenados em notes/JSON ou campos estruturados)
+  service_details?: QuoteServiceDetails
 }
 
 export type TicketChannel = 'whatsapp' | 'email' | 'phone' | 'chat' | 'in_person'

@@ -1,5 +1,5 @@
 import pb from '@/lib/pocketbase/client'
-import type { TicketRecord, ServiceRecord, ActivityRecord } from '@/types/crm'
+import type { TicketRecord, ServiceRecord, ActivityRecord, ProductRecord } from '@/types/crm'
 
 export const ticketsService = {
   async getAll(): Promise<TicketRecord[]> {
@@ -60,3 +60,25 @@ export const activitiesService = {
     return await pb.collection('activities').delete(id)
   },
 }
+
+export const productsService = {
+  async getAll(): Promise<ProductRecord[]> {
+    return await pb.collection('products').getFullList<ProductRecord>({
+      sort: 'name',
+    })
+  },
+
+  async create(data: Partial<ProductRecord>): Promise<ProductRecord> {
+    return await pb.collection('products').create<ProductRecord>(data)
+  },
+
+  async update(id: string, data: Partial<ProductRecord>): Promise<ProductRecord> {
+    return await pb.collection('products').update<ProductRecord>(id, data)
+  },
+
+  async delete(id: string): Promise<boolean> {
+    return await pb.collection('products').delete(id)
+  },
+}
+
+export const servicesExtraService = servicesService

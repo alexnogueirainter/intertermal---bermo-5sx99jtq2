@@ -1,19 +1,21 @@
 import React from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
-  TrendingUp,
   Users,
-  DollarSign,
+  TrendingUp,
   FileSpreadsheet,
-  Headphones,
+  AlertCircle,
+  Wrench,
   CheckCircle2,
-  Calendar,
-  Sparkles,
-  ArrowRight,
-  ShieldCheck,
+  Clock,
+  Flame,
+  Package,
+  Layers,
   Building2,
+  ArrowRight,
+  ShieldAlert,
 } from 'lucide-react'
 import type {
   ClientRecord,
@@ -21,7 +23,6 @@ import type {
   QuoteRecord,
   TicketRecord,
   ServiceRecord,
-  ActivityRecord,
 } from '@/types/crm'
 
 interface OverviewDashboardProps {
@@ -30,11 +31,7 @@ interface OverviewDashboardProps {
   quotes: QuoteRecord[]
   tickets: TicketRecord[]
   services: ServiceRecord[]
-  activities: ActivityRecord[]
   onNavigate: (tab: string) => void
-  onSelectClient?: (client: ClientRecord) => void
-  onSelectDeal?: (deal: DealRecord) => void
-  onSelectQuote?: (quote: QuoteRecord) => void
 }
 
 export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
@@ -43,283 +40,187 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   quotes,
   tickets,
   services,
-  activities,
   onNavigate,
-  onSelectClient,
-  onSelectQuote,
 }) => {
+  // Cálculos de métricas
   const totalPipelineValue = deals
     .filter((d) => d.stage !== 'lost')
-    .reduce((acc, curr) => acc + (curr.value || 0), 0)
+    .reduce((sum, d) => sum + (Number(d.value) || 0), 0)
 
-  const wonDealsValue = deals
-    .filter((d) => d.stage === 'won')
-    .reduce((acc, curr) => acc + (curr.value || 0), 0)
+  const approvedQuotesTotal = quotes
+    .filter((q) => q.status === 'approved')
+    .reduce((sum, q) => sum + (Number(q.total) || 0), 0)
 
-  const pendingQuotesValue = quotes
-    .filter((q) => q.status === 'sent' || q.status === 'draft')
-    .reduce((acc, curr) => acc + (curr.total || 0), 0)
-
-  const openTicketsCount = tickets.filter(
-    (t) => t.status === 'open' || t.status === 'in_progress',
-  ).length
-  const pendingActivitiesCount = activities.filter((a) => a.status === 'pending').length
+  const pendingQuotes = quotes.filter((q) => q.status === 'sent' || q.status === 'draft')
+  const openTickets = tickets.filter((t) => t.status === 'open' || t.status === 'in_progress')
+  const activeServices = services.filter(
+    (s) => s.status === 'in_progress' || s.status === 'planning',
+  )
 
   return (
     <div className="space-y-6">
-      {/* Banner / Guia Rápido "Onde está o modelo?" */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 text-white shadow-xl border border-indigo-900/50">
+      {/* Banner de Boas-Vindas Intertermal */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 p-6 md:p-8 text-white shadow-xl border border-teal-800/40">
         <div className="relative z-10 max-w-3xl space-y-3">
-          <div className="inline-flex items-center gap-2 rounded-full bg-indigo-500/20 px-3 py-1 text-xs font-semibold text-indigo-300 backdrop-blur-md border border-indigo-400/30">
-            <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
-            Central de Navegação & Modelos do Sistema
+          <div className="inline-flex items-center gap-2 rounded-full bg-teal-500/20 px-3 py-1 text-xs font-semibold text-teal-300 backdrop-blur-md border border-teal-400/30">
+            <Flame className="h-3.5 w-3.5 text-teal-400" />
+            Intertermal • Engenharia & Serviços Autorizados BERMO
           </div>
           <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-            Localizador de Modelos & Gestão Comercial
+            Gestão Comercial & Prestação de Serviços Técnicos
           </h2>
-          <p className="text-sm md:text-base text-slate-300 leading-relaxed">
-            Precisa encontrar um <strong>modelo de orçamento</strong>,{' '}
-            <strong>ficha do cliente</strong>, <strong>etapa do funil</strong> ou o{' '}
-            <strong>mapa de entidades do sistema</strong>? Tudo está organizado em módulos
-            inteligentes com busca rápida e integração em tempo real.
+          <p className="text-xs md:text-sm text-slate-300 leading-relaxed">
+            Painel integrado de orçamentos técnicos de válvulas e trocadores de calor BERMO, ordens
+            de serviço de campo, cálculo logístico no padrão Mapeia e inteligência operacional.
           </p>
-          <div className="pt-2 flex flex-wrap gap-2.5">
+          <div className="flex flex-wrap gap-2.5 pt-2">
             <Button
               size="sm"
-              onClick={() => onNavigate('model_architecture')}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-md font-medium"
-            >
-              <ShieldCheck className="mr-1.5 h-4 w-4" />
-              Ver Mapa do Modelo de Dados
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
               onClick={() => onNavigate('quotes')}
-              className="border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200"
+              className="bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold shadow-md"
             >
-              <FileSpreadsheet className="mr-1.5 h-4 w-4" />
-              Modelos de Propostas & Orçamentos
+              <FileSpreadsheet className="h-4 w-4 mr-1.5" />
+              Novo Orçamento de Serviço
             </Button>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onNavigate('copilot')}
-              className="border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200"
+              onClick={() => onNavigate('catalog')}
+              className="bg-slate-800/80 hover:bg-slate-700 text-teal-200 border-teal-500/40 text-xs font-semibold"
             >
-              <Sparkles className="mr-1.5 h-4 w-4 text-amber-400" />
-              Perguntar ao Copiloto IA
+              <Package className="h-4 w-4 mr-1.5 text-teal-400" />
+              Catálogo BERMO & ARI Armaturen
             </Button>
           </div>
         </div>
-        <div className="absolute right-0 top-0 h-full w-1/3 bg-gradient-to-l from-indigo-500/10 to-transparent pointer-events-none" />
       </div>
 
-      {/* KPI Cards */}
+      {/* Grid de KPIs Principais */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow border-slate-200 dark:border-slate-800">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Pipeline Total Ativo
+        <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Orçamentos Aprovados
             </CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-950/60 flex items-center justify-center text-blue-600">
-              <DollarSign className="h-4 w-4" />
+            <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <CheckCircle2 className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              {approvedQuotesTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-1">
+              {quotes.filter((q) => q.status === 'approved').length} propostas fechadas
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Pipeline Comercial BERMO
+            </CardTitle>
+            <div className="h-8 w-8 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+              <TrendingUp className="h-4 w-4" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">
               {totalPipelineValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              <TrendingUp className="h-3 w-3 text-emerald-500" />
+            <p className="text-[11px] text-muted-foreground mt-1">
               {deals.length} oportunidades em andamento
             </p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow border-slate-200 dark:border-slate-800">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Receita Fechada (Ganhos)
+        <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Ordens de Serviço em Campo
             </CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600">
-              <CheckCircle2 className="h-4 w-4" />
+            <div className="h-8 w-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <Wrench className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {wonDealsValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              {activeServices.length} ativas
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {deals.filter((d) => d.stage === 'won').length} contratos confirmados
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Manutenções e revisões térmicas
             </p>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow border-slate-200 dark:border-slate-800">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Propostas em Análise
+        <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Chamados & Suporte
             </CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-950/60 flex items-center justify-center text-amber-600">
-              <FileSpreadsheet className="h-4 w-4" />
+            <div className="h-8 w-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <AlertCircle className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              {pendingQuotesValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            <div className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              {openTickets.length} abertos
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {quotes.filter((q) => q.status === 'sent' || q.status === 'draft').length} propostas
-              emitidas
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow border-slate-200 dark:border-slate-800">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Clientes & Atendimento
-            </CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-violet-100 dark:bg-violet-950/60 flex items-center justify-center text-violet-600">
-              <Users className="h-4 w-4" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-              {clients.length}{' '}
-              <span className="text-sm font-normal text-muted-foreground">empresas</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-              <Headphones className="h-3 w-3 text-amber-500" />
-              {openTicketsCount} chamados abertos / {pendingActivitiesCount} tarefas
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Atendimento pós-venda industrial
             </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Grid 2 colunas: Acesso Rápido a Modelos + Oportunidades Quentes */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Painel "Onde encontrar cada modelo" */}
-        <Card className="lg:col-span-1 border-slate-200 dark:border-slate-800">
-          <CardHeader>
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-indigo-600" />
-              Guia: Onde está cada Modelo?
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Atalhos diretos para as estruturas de dados e modelos operacionais:
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div
-              onClick={() => onNavigate('model_architecture')}
-              className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 bg-slate-50/50 dark:bg-slate-900/50 cursor-pointer transition-all flex items-center justify-between group"
-            >
-              <div>
-                <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600">
-                  Modelo Conceitual & Tabelas
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  7 coleções estruturadas (schema, campos e regras)
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-
-            <div
-              onClick={() => onNavigate('quotes')}
-              className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 bg-slate-50/50 dark:bg-slate-900/50 cursor-pointer transition-all flex items-center justify-between group"
-            >
-              <div>
-                <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600">
-                  Modelos de Orçamento & Proposta
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  Formatos comerciais, parcelamentos e itens
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-
-            <div
-              onClick={() => onNavigate('clients')}
-              className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 bg-slate-50/50 dark:bg-slate-900/50 cursor-pointer transition-all flex items-center justify-between group"
-            >
-              <div>
-                <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600">
-                  Modelo de Conta & Cliente 360°
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  Score de engajamento, CNPJ, contatos e histórico
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-
-            <div
-              onClick={() => onNavigate('services')}
-              className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-indigo-400 dark:hover:border-indigo-600 bg-slate-50/50 dark:bg-slate-900/50 cursor-pointer transition-all flex items-center justify-between group"
-            >
-              <div>
-                <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600">
-                  Modelo de Contratos & Onboarding
-                </div>
-                <div className="text-[11px] text-muted-foreground">
-                  Checklists, entregáveis e renovação recorrente
-                </div>
-              </div>
-              <ArrowRight className="h-4 w-4 text-slate-400 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Propostas e Orçamentos Recentes */}
-        <Card className="lg:col-span-2 border-slate-200 dark:border-slate-800">
+      {/* Grid Central: Orçamentos Recentes de Serviços + Clientes Industriais */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Orçamentos Recentes */}
+        <Card className="lg:col-span-8 border-slate-200 dark:border-slate-800">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
-              <CardTitle className="text-base font-bold">Últimos Orçamentos & Propostas</CardTitle>
+              <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                Orçamentos de Serviços BERMO Recentes
+              </CardTitle>
               <CardDescription className="text-xs">
-                Modelos de propostas comerciais emitidas no sistema
+                Propostas técnicas com cálculo de M.O., Deslocamento e Custos Indiretos
               </CardDescription>
             </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => onNavigate('quotes')}
-              className="text-xs text-indigo-600 hover:text-indigo-700"
+              className="text-xs text-teal-700 dark:text-teal-400 hover:text-teal-800"
             >
-              Ver Todos <ArrowRight className="ml-1 h-3.5 w-3.5" />
+              Ver todos <ArrowRight className="h-3.5 w-3.5 ml-1" />
             </Button>
           </CardHeader>
           <CardContent className="space-y-3">
             {quotes.slice(0, 4).map((q) => (
               <div
                 key={q.id}
-                onClick={() => {
-                  if (onSelectQuote) onSelectQuote(q)
-                  onNavigate('quotes')
-                }}
-                className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-800/80 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors cursor-pointer"
+                onClick={() => onNavigate('quotes')}
+                className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-teal-500/40 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-all cursor-pointer text-xs"
               >
-                <div className="space-y-1">
+                <div className="space-y-0.5 max-w-[65%]">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                    <span className="font-mono font-bold text-teal-700 dark:text-teal-400">
                       {q.quote_number}
                     </span>
-                    <span className="text-xs font-medium text-slate-800 dark:text-slate-200">
+                    <span className="font-semibold text-slate-900 dark:text-slate-100 truncate">
                       {q.client_name || 'Cliente'}
                     </span>
                   </div>
-                  <div className="text-[11px] text-muted-foreground">
-                    Condição: {q.payment_terms || 'À combinar'}
-                  </div>
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    {q.notes || 'Serviço em produtos BERMO'}
+                  </p>
                 </div>
 
                 <div className="text-right space-y-1">
-                  <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                  <span className="font-bold text-slate-900 dark:text-slate-100 block">
                     {(q.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </div>
+                  </span>
                   <Badge
                     variant={
                       q.status === 'approved'
@@ -328,7 +229,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                           ? 'secondary'
                           : 'outline'
                     }
-                    className="text-[10px] capitalize"
+                    className="text-[9px] uppercase px-1.5"
                   >
                     {q.status === 'approved'
                       ? 'Aprovado'
@@ -343,110 +244,31 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             ))}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Grid Secundário: Clientes Principais e Tarefas Imediatas */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Principais Clientes */}
-        <Card className="border-slate-200 dark:border-slate-800">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <div>
-              <CardTitle className="text-base font-bold">Clientes em Destaque</CardTitle>
-              <CardDescription className="text-xs">
-                Contas corporativas com maior score de oportunidade
-              </CardDescription>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigate('clients')}
-              className="text-xs text-indigo-600 hover:text-indigo-700"
-            >
-              Ver Carteira <ArrowRight className="ml-1 h-3.5 w-3.5" />
-            </Button>
+        {/* Resumo de Clientes Industriais */}
+        <Card className="lg:col-span-4 border-slate-200 dark:border-slate-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              Plantas & Clientes Industriais
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Segmentos industriais com trocadores e válvulas BERMO
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2.5">
+          <CardContent className="space-y-3 text-xs">
             {clients.slice(0, 4).map((c) => (
               <div
                 key={c.id}
-                onClick={() => {
-                  if (onSelectClient) onSelectClient(c)
-                  onNavigate('clients')
-                }}
-                className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer transition-colors"
+                onClick={() => onNavigate('clients')}
+                className="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-teal-500/40 transition-all cursor-pointer"
               >
-                <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-lg bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold flex items-center justify-center text-xs">
-                    <Building2 className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                      {c.name}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {c.city ? `${c.city}/${c.state}` : c.segment || 'Corporativo'} •{' '}
-                      {c.phone || c.email}
-                    </div>
-                  </div>
+                <div className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                  {c.name}
                 </div>
-                <div className="text-right">
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] bg-indigo-50/50 text-indigo-700 border-indigo-200"
-                  >
-                    Score {c.score || 80}/100
-                  </Badge>
+                <div className="flex justify-between items-center text-[10px] text-muted-foreground mt-1">
+                  <span>{c.segment || 'Indústria Geral'}</span>
+                  <span>{c.city ? `${c.city}/${c.state}` : 'Brasil'}</span>
                 </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Agenda & Atividades */}
-        <Card className="border-slate-200 dark:border-slate-800">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <div>
-              <CardTitle className="text-base font-bold">Próximas Ações Comerciais</CardTitle>
-              <CardDescription className="text-xs">
-                Reuniões, ligações e follow-ups agendados
-              </CardDescription>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigate('activities')}
-              className="text-xs text-indigo-600 hover:text-indigo-700"
-            >
-              Agenda Completa <ArrowRight className="ml-1 h-3.5 w-3.5" />
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-2.5">
-            {activities.slice(0, 4).map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 transition-colors"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center text-xs">
-                    <Calendar className="h-3.5 w-3.5" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                      {a.title}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {a.client_name} •{' '}
-                      {a.due_date ? new Date(a.due_date).toLocaleDateString('pt-BR') : 'Hoje'}{' '}
-                      {a.time || ''}
-                    </div>
-                  </div>
-                </div>
-                <Badge
-                  variant={a.priority === 'high' ? 'destructive' : 'secondary'}
-                  className="text-[10px]"
-                >
-                  {a.priority === 'high' ? 'Alta' : a.priority === 'medium' ? 'Média' : 'Normal'}
-                </Badge>
               </div>
             ))}
           </CardContent>

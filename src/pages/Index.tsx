@@ -1,62 +1,82 @@
 import React, { useState, useEffect } from 'react'
 import {
-  LayoutDashboard,
-  Briefcase,
   Users,
+  Kanban,
   FileSpreadsheet,
-  Headphones,
-  Repeat,
-  Calendar,
-  Sparkles,
-  Database,
+  Layers,
+  Wrench,
+  MessageSquare,
+  Activity,
+  Bot,
+  LayoutDashboard,
   Search,
-  Plus,
-  Moon,
-  Sun,
-  ShieldCheck,
+  Bell,
   CheckCircle2,
-  HelpCircle,
-  FolderSearch,
+  AlertCircle,
+  Plus,
+  Compass,
+  Package,
+  Shield,
+  Flame,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { toast } from '@/components/ui/use-toast'
+import { useToast } from '@/hooks/use-toast'
 
-import { OverviewDashboard } from '@/components/OverviewDashboard'
-import { PipelineKanban } from '@/components/PipelineKanban'
-import { ClientsManager } from '@/components/ClientsManager'
-import { QuotesManager } from '@/components/QuotesManager'
-import { TicketsSupport } from '@/components/TicketsSupport'
-import { ServicesManager } from '@/components/ServicesManager'
-import { ActivitiesManager } from '@/components/ActivitiesManager'
-import { ModelArchitectureViewer } from '@/components/ModelArchitectureViewer'
-import { CopilotAssistant } from '@/components/CopilotAssistant'
-
+// Services & Types
 import { clientsService } from '@/services/clients'
 import { dealsService } from '@/services/deals'
-import { quotesService, productsService } from '@/services/quotes'
-import { ticketsService, servicesService, activitiesService } from '@/services/crm-extras'
-
+import { quotesService } from '@/services/quotes'
+import {
+  servicesExtraService,
+  ticketsService,
+  activitiesService,
+  productsService,
+} from '@/services/crm-extras'
 import type {
   ClientRecord,
   DealRecord,
   QuoteRecord,
+  QuoteStatus,
   ProductRecord,
   TicketRecord,
   ServiceRecord,
   ActivityRecord,
   DealStage,
-  QuoteStatus,
 } from '@/types/crm'
+import { BermoProductItem } from '@/data/bermo-catalog'
 
-export default function Index() {
-  const [currentTab, setCurrentTab] = useState<string>('overview')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isQuickFinderOpen, setIsQuickFinderOpen] = useState(false)
+// Feature Components
+import { OverviewDashboard } from '@/components/OverviewDashboard'
+import { ClientsManager } from '@/components/ClientsManager'
+import { PipelineKanban } from '@/components/PipelineKanban'
+import { QuotesManager } from '@/components/QuotesManager'
+import { ServicesManager } from '@/components/ServicesManager'
+import { TicketsSupport } from '@/components/TicketsSupport'
+import { ActivitiesManager } from '@/components/ActivitiesManager'
+import { CopilotAssistant } from '@/components/CopilotAssistant'
+import { ModelArchitectureViewer } from '@/components/ModelArchitectureViewer'
+import { BermoCatalogViewer } from '@/components/BermoCatalogViewer'
 
-  // Data State
+type ActiveTab =
+  | 'overview'
+  | 'clients'
+  | 'deals'
+  | 'quotes'
+  | 'catalog'
+  | 'services'
+  | 'tickets'
+  | 'activities'
+  | 'copilot'
+  | 'architecture'
+
+export default function IndexPage() {
+  const { toast } = useToast()
+  const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
+  const [isLoading, setIsLoading] = useState(true)
+
+  // Global CRM State
   const [clients, setClients] = useState<ClientRecord[]>([])
   const [deals, setDeals] = useState<DealRecord[]>([])
   const [quotes, setQuotes] = useState<QuoteRecord[]>([])
@@ -65,37 +85,37 @@ export default function Index() {
   const [services, setServices] = useState<ServiceRecord[]>([])
   const [activities, setActivities] = useState<ActivityRecord[]>([])
 
-  // Selected State
+  // Selection states for cross-view navigation
   const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(null)
   const [selectedQuote, setSelectedQuote] = useState<QuoteRecord | null>(null)
 
-  const [isLoading, setIsLoading] = useState(true)
-
+  // Carregar dados iniciais
   const loadAllData = async () => {
     try {
       setIsLoading(true)
-      const [cList, dList, qList, pList, tList, sList, aList] = await Promise.all([
-        clientsService.getAll(),
-        dealsService.getAll(),
-        quotesService.getAll(),
-        productsService.getAll(),
-        ticketsService.getAll(),
-        servicesService.getAll(),
-        activitiesService.getAll(),
-      ])
+      const [clientsRes, dealsRes, quotesRes, productsRes, ticketsRes, servicesRes, activitiesRes] =
+        await Promise.all([
+          clientsService.getAll(),
+          dealsService.getAll(),
+          quotesService.getAll(),
+          productsService.getAll(),
+          ticketsService.getAll(),
+          servicesExtraService.getAll(),
+          activitiesService.getAll(),
+        ])
 
-      setClients(cList)
-      setDeals(dList)
-      setQuotes(qList)
-      setProducts(pList)
-      setTickets(tList)
-      setServices(sList)
-      setActivities(aList)
-    } catch (err) {
-      console.error('Erro ao carregar dados do CRM:', err)
+      setClients(clientsRes)
+      setDeals(dealsRes)
+      setQuotes(quotesRes)
+      setProducts(productsRes)
+      setTickets(ticketsRes)
+      setServices(servicesRes)
+      setActivities(activitiesRes)
+    } catch (err: any) {
+      console.error('Erro ao carregar dados:', err)
       toast({
-        title: 'Aviso',
-        description: 'Não foi possível carregar os dados em tempo real.',
+        title: 'Erro ao conectar ao banco',
+        description: err.message || 'Verifique as coleções do PocketBase.',
         variant: 'destructive',
       })
     } finally {
@@ -107,481 +127,498 @@ export default function Index() {
     loadAllData()
   }, [])
 
-  // Handlers para Atualização & Criação
-  const handleUpdateDealStage = async (dealId: string, newStage: DealStage) => {
-    try {
-      const updated = await dealsService.updateStage(dealId, newStage)
-      setDeals((prev) => prev.map((d) => (d.id === dealId ? updated : d)))
-      toast({
-        title: 'Pipeline Atualizado',
-        description: `Oportunidade movida para ${newStage}.`,
-      })
-    } catch (err) {
-      toast({ title: 'Erro ao mover negócio', variant: 'destructive' })
-    }
+  // Handler de seleção de produto do catálogo para abrir o orçamento
+  const handleSelectProductForQuote = (product: BermoProductItem) => {
+    setActiveTab('quotes')
+    toast({
+      title: 'Produto BERMO Selecionado',
+      description: `${product.name} pronto para composição de orçamento técnico.`,
+    })
   }
 
-  const handleCreateDeal = async (data: Partial<DealRecord>) => {
-    try {
-      const created = await dealsService.create(data)
-      setDeals((prev) => [created, ...prev])
-      toast({ title: 'Oportunidade criada com sucesso!' })
-    } catch (err) {
-      toast({ title: 'Erro ao criar oportunidade', variant: 'destructive' })
-    }
-  }
-
+  // Clientes Handlers
   const handleCreateClient = async (data: Partial<ClientRecord>) => {
     try {
       const created = await clientsService.create(data)
-      setClients((prev) => [created, ...prev])
-      setSelectedClient(created)
+      setClients([created, ...clients])
       toast({ title: 'Cliente cadastrado com sucesso!' })
-    } catch (err) {
-      toast({ title: 'Erro ao cadastrar cliente', variant: 'destructive' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao cadastrar', description: err.message, variant: 'destructive' })
     }
   }
 
   const handleUpdateClient = async (id: string, data: Partial<ClientRecord>) => {
     try {
       const updated = await clientsService.update(id, data)
-      setClients((prev) => prev.map((c) => (c.id === id ? updated : c)))
+      setClients(clients.map((c) => (c.id === id ? updated : c)))
       if (selectedClient?.id === id) setSelectedClient(updated)
-      toast({ title: 'Cliente atualizado!' })
-    } catch (err) {
-      toast({ title: 'Erro ao atualizar cliente', variant: 'destructive' })
-    }
-  }
-
-  const handleCreateQuote = async (data: Partial<QuoteRecord>) => {
-    try {
-      const created = await quotesService.create(data)
-      setQuotes((prev) => [created, ...prev])
-      setSelectedQuote(created)
-      toast({ title: 'Proposta / Orçamento gerado com sucesso!' })
-    } catch (err) {
-      toast({ title: 'Erro ao gerar proposta', variant: 'destructive' })
-    }
-  }
-
-  const handleUpdateQuoteStatus = async (id: string, status: QuoteStatus) => {
-    try {
-      const updated = await quotesService.updateStatus(id, status)
-      setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
-      if (selectedQuote?.id === id) setSelectedQuote(updated)
-      toast({ title: `Status do orçamento alterado para ${status}.` })
-    } catch (err) {
-      toast({ title: 'Erro ao atualizar status do orçamento', variant: 'destructive' })
-    }
-  }
-
-  const handleCreateTicket = async (data: Partial<TicketRecord>) => {
-    try {
-      const created = await ticketsService.create(data)
-      setTickets((prev) => [created, ...prev])
-      toast({ title: 'Chamado aberto com sucesso!' })
-    } catch (err) {
-      toast({ title: 'Erro ao abrir chamado', variant: 'destructive' })
+      toast({ title: 'Cliente atualizado com sucesso!' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao atualizar cliente',
+        description: err.message,
+        variant: 'destructive',
+      })
     }
   }
 
   const handleUpdateTicket = async (id: string, data: Partial<TicketRecord>) => {
     try {
       const updated = await ticketsService.update(id, data)
-      setTickets((prev) => prev.map((t) => (t.id === id ? updated : t)))
+      setTickets(tickets.map((t) => (t.id === id ? updated : t)))
       toast({ title: 'Chamado atualizado!' })
-    } catch (err) {
-      toast({ title: 'Erro ao atualizar chamado', variant: 'destructive' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao atualizar chamado',
+        description: err.message,
+        variant: 'destructive',
+      })
     }
   }
 
+  // Oportunidades Handlers
+  const handleUpdateDealStage = async (id: string, stage: DealStage) => {
+    try {
+      const updated = await dealsService.update(id, { stage })
+      setDeals(deals.map((d) => (d.id === id ? updated : d)))
+      toast({ title: 'Estágio atualizado!' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao atualizar', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  const handleCreateDeal = async (data: Partial<DealRecord>) => {
+    try {
+      const created = await dealsService.create(data)
+      setDeals([created, ...deals])
+      toast({ title: 'Negócio criado no funil!' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao criar', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  // Orçamentos Handlers
+  const handleCreateQuote = async (data: Partial<QuoteRecord>) => {
+    try {
+      const created = await quotesService.create(data)
+      setQuotes([created, ...quotes])
+      setSelectedQuote(created)
+      toast({ title: 'Orçamento de serviços gerado com sucesso!' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao gerar proposta', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  const handleUpdateQuoteStatus = async (id: string, status: QuoteStatus) => {
+    try {
+      const updated = await quotesService.update(id, { status })
+      setQuotes(quotes.map((q) => (q.id === id ? updated : q)))
+      if (selectedQuote?.id === id) setSelectedQuote(updated)
+      toast({ title: `Orçamento marcado como ${status}!` })
+    } catch (err: any) {
+      toast({ title: 'Erro ao atualizar', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  // Tickets Handlers
+  const handleCreateTicket = async (data: Partial<TicketRecord>) => {
+    try {
+      const created = await ticketsService.create(data)
+      setTickets([created, ...tickets])
+      toast({ title: 'Chamado técnico registrado!' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao abrir chamado', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  // Serviços Pós-Venda Handlers
   const handleCreateService = async (data: Partial<ServiceRecord>) => {
     try {
-      const created = await servicesService.create(data)
-      setServices((prev) => [created, ...prev])
-      toast({ title: 'Contrato / Serviço criado com sucesso!' })
-    } catch (err) {
-      toast({ title: 'Erro ao criar serviço', variant: 'destructive' })
+      const created = await servicesExtraService.create(data)
+      setServices([created, ...services])
+      toast({ title: 'Ordem de serviço aberta!' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao registrar serviço',
+        description: err.message,
+        variant: 'destructive',
+      })
     }
   }
 
-  const handleUpdateService = async (id: string, data: Partial<ServiceRecord>) => {
-    try {
-      const updated = await servicesService.update(id, data)
-      setServices((prev) => prev.map((s) => (s.id === id ? updated : s)))
-      toast({ title: 'Contrato atualizado!' })
-    } catch (err) {
-      toast({ title: 'Erro ao atualizar contrato', variant: 'destructive' })
-    }
-  }
-
+  // Atividades Handlers
   const handleCreateActivity = async (data: Partial<ActivityRecord>) => {
     try {
       const created = await activitiesService.create(data)
-      setActivities((prev) => [created, ...prev])
-      toast({ title: 'Atividade agendada com sucesso!' })
-    } catch (err) {
-      toast({ title: 'Erro ao agendar atividade', variant: 'destructive' })
+      setActivities([created, ...activities])
+      toast({ title: 'Atividade agendada!' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao agendar', description: err.message, variant: 'destructive' })
     }
   }
 
   const handleUpdateActivity = async (id: string, data: Partial<ActivityRecord>) => {
     try {
       const updated = await activitiesService.update(id, data)
-      setActivities((prev) => prev.map((a) => (a.id === id ? updated : a)))
+      setActivities(activities.map((a) => (a.id === id ? updated : a)))
       toast({ title: 'Atividade atualizada!' })
-    } catch (err) {
-      toast({ title: 'Erro ao atualizar atividade', variant: 'destructive' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao atualizar atividade',
+        description: err.message,
+        variant: 'destructive',
+      })
     }
   }
 
-  // Model Navigation Tabs
-  const NAV_ITEMS = [
-    { id: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
-    { id: 'pipeline', label: 'Pipeline & Funil', icon: Briefcase, badge: deals.length },
-    { id: 'clients', label: 'Clientes 360°', icon: Users, badge: clients.length },
-    { id: 'quotes', label: 'Orçamentos & Modelos', icon: FileSpreadsheet, badge: quotes.length },
-    {
-      id: 'tickets',
-      label: 'Atendimento & Suporte',
-      icon: Headphones,
-      badge: tickets.filter((t) => t.status === 'open' || t.status === 'in_progress').length,
-    },
-    { id: 'services', label: 'Contratos & Serviços', icon: Repeat, badge: services.length },
-    {
-      id: 'activities',
-      label: 'Agenda & Ações',
-      icon: Calendar,
-      badge: activities.filter((a) => a.status === 'pending').length,
-    },
-    { id: 'model_architecture', label: 'Mapa do Modelo', icon: Database, isHighlight: true },
-    { id: 'copilot', label: 'Copiloto IA', icon: Sparkles, isHighlight: true },
-  ]
-
-  // Quick Finder Results
-  const matchedClients = clients.filter((c) =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
-  const matchedQuotes = quotes.filter(
-    (q) =>
-      q.quote_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (q.client_name && q.client_name.toLowerCase().includes(searchQuery.toLowerCase())),
-  )
-  const matchedDeals = deals.filter(
-    (d) =>
-      d.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (d.client_name && d.client_name.toLowerCase().includes(searchQuery.toLowerCase())),
-  )
-
   return (
-    <div className="min-h-screen bg-slate-50/60 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col">
-      {/* Top Navbar */}
-      <header className="sticky top-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          {/* Logo & Marca */}
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-              <FolderSearch className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-slate-900 to-indigo-900 dark:from-white dark:to-indigo-300 bg-clip-text text-transparent">
-                  Localizar Modelo
-                </span>
-                <Badge className="bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 text-[10px] font-bold border-indigo-200">
-                  CRM Comercial
-                </Badge>
+    <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans">
+      {/* Sidebar de Navegação */}
+      <aside className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col justify-between hidden md:flex shrink-0">
+        <div>
+          {/* Logo & Branding Intertermal / BERMO */}
+          <div className="p-5 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-teal-700 via-teal-600 to-emerald-500 flex items-center justify-center text-white shadow-md shadow-teal-500/20">
+                <Flame className="h-5 w-5" />
               </div>
-              <p className="text-[11px] text-muted-foreground hidden sm:block">
-                Gestão Estratégica, Pipeline & Localizador de Modelos
+              <div>
+                <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
+                  INTERTERMAL
+                </h1>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-[10px] uppercase font-bold text-teal-700 dark:text-teal-400 tracking-wider">
+                    Serviços & Engenharia
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="text-[8px] px-1 py-0 h-4 border-teal-300 text-teal-700"
+                  >
+                    BERMO
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Menu de Navegação */}
+          <nav className="p-3 space-y-1">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'overview'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Painel Geral
+            </button>
+
+            <button
+              onClick={() => setActiveTab('quotes')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'quotes'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <FileSpreadsheet className="h-4 w-4" />
+                Orçamentos BERMO
+              </div>
+              <Badge className="bg-teal-500/20 text-teal-700 dark:text-teal-300 text-[10px] px-1.5">
+                {quotes.length}
+              </Badge>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('catalog')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'catalog'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Package className="h-4 w-4" />
+                Catálogo BERMO
+              </div>
+              <Badge variant="outline" className="text-[9px] px-1 py-0 text-slate-500">
+                Oficial
+              </Badge>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('deals')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'deals'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Kanban className="h-4 w-4" />
+                Pipeline Comercial
+              </div>
+              <Badge variant="secondary" className="text-[10px] px-1.5">
+                {deals.length}
+              </Badge>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('clients')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'clients'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Users className="h-4 w-4" />
+                Clientes Industriais
+              </div>
+              <span className="text-[11px] text-muted-foreground">{clients.length}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('services')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'services'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Wrench className="h-4 w-4" />
+                Ordens de Serviço
+              </div>
+              <Badge variant="outline" className="text-[10px] px-1.5">
+                {services.length}
+              </Badge>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('tickets')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'tickets'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <MessageSquare className="h-4 w-4" />
+                Suporte & Ocorrências
+              </div>
+              {tickets.filter((t) => t.status === 'open').length > 0 && (
+                <Badge className="bg-amber-500 text-white text-[10px] px-1.5">
+                  {tickets.filter((t) => t.status === 'open').length}
+                </Badge>
+              )}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('activities')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'activities'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Activity className="h-4 w-4" />
+                Agenda & Visitas
+              </div>
+              <span className="text-[11px] text-muted-foreground">{activities.length}</span>
+            </button>
+
+            <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
+              <button
+                onClick={() => setActiveTab('copilot')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'copilot'
+                    ? 'bg-teal-700 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Bot className="h-4 w-4 text-teal-600" />
+                Copilot Técnico Intertermal
+              </button>
+
+              <button
+                onClick={() => setActiveTab('architecture')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'architecture'
+                    ? 'bg-teal-700 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Compass className="h-4 w-4 text-slate-500" />
+                Arquitetura do Sistema
+              </button>
+            </div>
+          </nav>
+        </div>
+
+        {/* Footer do Usuário na Sidebar */}
+        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-full bg-teal-800 text-white flex items-center justify-center font-bold text-xs">
+              AN
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
+                Alexandre Nogueira
+              </p>
+              <p className="text-[10px] text-teal-700 dark:text-teal-400 truncate">
+                Especialista BERMO
               </p>
             </div>
           </div>
+        </div>
+      </aside>
 
-          {/* Barra de Busca Global / Localizador Rápido */}
-          <div className="flex-1 max-w-md hidden md:block">
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Localizar modelo, cliente, orçamento ou proposta..."
-                value={searchQuery}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value)
-                  if (e.target.value.trim().length > 1) setIsQuickFinderOpen(true)
-                }}
-                onFocus={() => {
-                  if (searchQuery.trim().length > 1) setIsQuickFinderOpen(true)
-                }}
-                className="pl-9 pr-8 text-xs bg-slate-100/80 dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-full h-9 focus-visible:ring-indigo-500"
-              />
-              <span className="absolute right-3 top-2.5 text-[10px] font-mono font-medium text-slate-400">
-                ⌘K
+      {/* Área Principal de Conteúdo */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Top Header */}
+        <header className="h-14 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between px-4 sm:px-6 shrink-0">
+          {/* Navegação Mobile e Título */}
+          <div className="flex items-center gap-3">
+            <div className="md:hidden flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-teal-700 flex items-center justify-center text-white font-bold text-xs">
+                IT
+              </div>
+              <span className="font-bold text-sm tracking-tight text-slate-900">Intertermal</span>
+            </div>
+
+            {/* Breadcrumb / Visão Ativa */}
+            <div className="hidden sm:flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              <span className="text-teal-700 dark:text-teal-400 font-bold">Intertermal</span>
+              <span>/</span>
+              <span className="capitalize text-slate-900 dark:text-slate-100">
+                {activeTab === 'overview' && 'Painel Geral'}
+                {activeTab === 'quotes' && 'Orçamentos de Serviços BERMO'}
+                {activeTab === 'catalog' && 'Catálogo de Produtos & Válvulas BERMO'}
+                {activeTab === 'deals' && 'Pipeline Comercial (Funil)'}
+                {activeTab === 'clients' && 'Gestão de Clientes Industriais'}
+                {activeTab === 'services' && 'Ordens de Serviço'}
+                {activeTab === 'tickets' && 'Suporte Técnico & Pós-Venda'}
+                {activeTab === 'activities' && 'Agenda & Visitas de Campo'}
+                {activeTab === 'copilot' && 'Copiloto de Engenharia'}
+                {activeTab === 'architecture' && 'Especificação da Arquitetura'}
               </span>
             </div>
           </div>
 
-          {/* Ações Rápidas Direitas */}
+          {/* Ações de Topo */}
           <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              onClick={() => setCurrentTab('model_architecture')}
-              className="bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 border border-indigo-200 dark:border-indigo-800 text-xs h-9"
-            >
-              <Database className="h-3.5 w-3.5 mr-1.5" />
-              Onde está o Modelo?
-            </Button>
+            <div className="hidden sm:flex items-center text-xs text-muted-foreground mr-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
+              Skip Cloud PocketBase Ativo
+            </div>
 
             <Button
               size="sm"
-              onClick={() => setCurrentTab('copilot')}
-              className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm text-xs h-9"
+              onClick={() => setActiveTab('quotes')}
+              className="bg-teal-700 hover:bg-teal-600 text-white text-xs h-8"
             >
-              <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-300" />
-              Copiloto IA
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Novo Orçamento
             </Button>
           </div>
+        </header>
+
+        {/* Conteúdo Renderizado por Aba */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+          {activeTab === 'overview' && (
+            <OverviewDashboard
+              clients={clients}
+              deals={deals}
+              quotes={quotes}
+              tickets={tickets}
+              services={services}
+              onNavigate={(tab) => setActiveTab(tab as ActiveTab)}
+            />
+          )}
+
+          {activeTab === 'quotes' && (
+            <QuotesManager
+              quotes={quotes}
+              clients={clients}
+              products={products}
+              selectedQuote={selectedQuote}
+              onSelectQuote={setSelectedQuote}
+              onCreateQuote={handleCreateQuote}
+              onUpdateQuoteStatus={handleUpdateQuoteStatus}
+              onOpenCatalog={() => setActiveTab('catalog')}
+            />
+          )}
+
+          {activeTab === 'catalog' && (
+            <BermoCatalogViewer onSelectProductForQuote={handleSelectProductForQuote} />
+          )}
+
+          {activeTab === 'deals' && (
+            <PipelineKanban
+              deals={deals}
+              clients={clients}
+              onUpdateDealStage={handleUpdateDealStage}
+              onCreateDeal={handleCreateDeal}
+            />
+          )}
+
+          {activeTab === 'clients' && (
+            <ClientsManager
+              clients={clients}
+              deals={deals}
+              quotes={quotes}
+              selectedClient={selectedClient}
+              onSelectClient={setSelectedClient}
+              onCreateClient={handleCreateClient}
+              onUpdateClient={handleUpdateClient}
+            />
+          )}
+
+          {activeTab === 'services' && (
+            <ServicesManager
+              services={services}
+              clients={clients}
+              deals={deals}
+              onCreateService={handleCreateService}
+            />
+          )}
+
+          {activeTab === 'tickets' && (
+            <TicketsSupport
+              tickets={tickets}
+              clients={clients}
+              onCreateTicket={handleCreateTicket}
+              onUpdateTicket={handleUpdateTicket}
+            />
+          )}
+
+          {activeTab === 'activities' && (
+            <ActivitiesManager
+              activities={activities}
+              clients={clients}
+              onCreateActivity={handleCreateActivity}
+              onUpdateActivity={handleUpdateActivity}
+            />
+          )}
+
+          {activeTab === 'copilot' && (
+            <CopilotAssistant
+              clients={clients}
+              deals={deals}
+              quotes={quotes}
+              services={services}
+              tickets={tickets}
+            />
+          )}
+
+          {activeTab === 'architecture' && <ModelArchitectureViewer />}
         </div>
-
-        {/* Abas de Navegação Horizontal */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-slate-100 dark:border-slate-800/80">
-          <div className="flex items-center gap-1 overflow-x-auto py-1.5 no-scrollbar">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon
-              const isActive = currentTab === item.id
-
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setCurrentTab(item.id)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
-                    isActive
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : item.isHighlight
-                        ? 'bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100'
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 hover:text-slate-900 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span>{item.label}</span>
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                        isActive
-                          ? 'bg-indigo-700 text-white'
-                          : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      </header>
-
-      {/* Conteúdo Principal */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {currentTab === 'overview' && (
-          <OverviewDashboard
-            clients={clients}
-            deals={deals}
-            quotes={quotes}
-            tickets={tickets}
-            services={services}
-            activities={activities}
-            onNavigate={(tab) => setCurrentTab(tab)}
-            onSelectClient={(c) => {
-              setSelectedClient(c)
-              setCurrentTab('clients')
-            }}
-            onSelectDeal={(d) => {
-              setCurrentTab('pipeline')
-            }}
-            onSelectQuote={(q) => {
-              setSelectedQuote(q)
-              setCurrentTab('quotes')
-            }}
-          />
-        )}
-
-        {currentTab === 'pipeline' && (
-          <PipelineKanban
-            deals={deals}
-            clients={clients}
-            onUpdateDealStage={handleUpdateDealStage}
-            onCreateDeal={handleCreateDeal}
-            onSelectDeal={() => {}}
-          />
-        )}
-
-        {currentTab === 'clients' && (
-          <ClientsManager
-            clients={clients}
-            deals={deals}
-            quotes={quotes}
-            selectedClient={selectedClient}
-            onSelectClient={setSelectedClient}
-            onCreateClient={handleCreateClient}
-            onUpdateClient={handleUpdateClient}
-          />
-        )}
-
-        {currentTab === 'quotes' && (
-          <QuotesManager
-            quotes={quotes}
-            clients={clients}
-            products={products}
-            selectedQuote={selectedQuote}
-            onSelectQuote={setSelectedQuote}
-            onCreateQuote={handleCreateQuote}
-            onUpdateQuoteStatus={handleUpdateQuoteStatus}
-          />
-        )}
-
-        {currentTab === 'tickets' && (
-          <TicketsSupport
-            tickets={tickets}
-            clients={clients}
-            onCreateTicket={handleCreateTicket}
-            onUpdateTicket={handleUpdateTicket}
-          />
-        )}
-
-        {currentTab === 'services' && (
-          <ServicesManager
-            services={services}
-            clients={clients}
-            onCreateService={handleCreateService}
-            onUpdateService={handleUpdateService}
-          />
-        )}
-
-        {currentTab === 'activities' && (
-          <ActivitiesManager
-            activities={activities}
-            clients={clients}
-            onCreateActivity={handleCreateActivity}
-            onUpdateActivity={handleUpdateActivity}
-          />
-        )}
-
-        {currentTab === 'model_architecture' && (
-          <ModelArchitectureViewer onNavigate={(tab) => setCurrentTab(tab)} />
-        )}
-
-        {currentTab === 'copilot' && <CopilotAssistant onNavigate={(tab) => setCurrentTab(tab)} />}
       </main>
-
-      {/* Modal Quick Finder / Resultados de Busca */}
-      <Dialog open={isQuickFinderOpen} onOpenChange={setIsQuickFinderOpen}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <Search className="h-4 w-4 text-indigo-600" />
-              Resultados da Busca Rápida: "{searchQuery}"
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
-            {/* Clientes Encontrados */}
-            <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
-                Clientes & Contas ({matchedClients.length})
-              </span>
-              {matchedClients.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-1">
-                  Nenhum cliente correspondente.
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {matchedClients.map((c) => (
-                    <div
-                      key={c.id}
-                      onClick={() => {
-                        setSelectedClient(c)
-                        setCurrentTab('clients')
-                        setIsQuickFinderOpen(false)
-                      }}
-                      className="p-2 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer flex items-center justify-between text-xs"
-                    >
-                      <span className="font-semibold">{c.name}</span>
-                      <span className="text-muted-foreground text-[11px]">
-                        {c.segment || c.city}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Propostas Encontradas */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
-                Modelos de Orçamento ({matchedQuotes.length})
-              </span>
-              {matchedQuotes.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-1">
-                  Nenhuma proposta correspondente.
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {matchedQuotes.map((q) => (
-                    <div
-                      key={q.id}
-                      onClick={() => {
-                        setSelectedQuote(q)
-                        setCurrentTab('quotes')
-                        setIsQuickFinderOpen(false)
-                      }}
-                      className="p-2 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer flex items-center justify-between text-xs"
-                    >
-                      <span className="font-mono font-bold text-indigo-600">
-                        {q.quote_number} - {q.client_name}
-                      </span>
-                      <span className="font-bold">
-                        {(q.total || 0).toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Negócios Encontrados */}
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
-                Oportunidades do Pipeline ({matchedDeals.length})
-              </span>
-              {matchedDeals.length === 0 ? (
-                <div className="text-xs text-muted-foreground py-1">
-                  Nenhum negócio correspondente.
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {matchedDeals.map((d) => (
-                    <div
-                      key={d.id}
-                      onClick={() => {
-                        setCurrentTab('pipeline')
-                        setIsQuickFinderOpen(false)
-                      }}
-                      className="p-2 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 cursor-pointer flex items-center justify-between text-xs"
-                    >
-                      <span className="font-semibold">{d.title}</span>
-                      <span className="text-muted-foreground text-[11px]">Etapa: {d.stage}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
