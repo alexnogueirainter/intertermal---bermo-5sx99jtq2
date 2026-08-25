@@ -137,6 +137,10 @@ export interface QuoteTravelConfig {
   tollRoadPercent?: number
   manualFuelAdj?: number
   manualTollAdj?: number
+  car_rental_type?: 'none' | 'simple' | 'complete' | 'custom' | string
+  car_rental_daily_rate?: number
+  car_rental_days?: number
+  car_rental_total?: number
 }
 
 export interface QuoteLodgingMealsConfig {
@@ -219,6 +223,10 @@ export interface QuoteRecord {
   toll_road_percent?: number
   manual_fuel_adj?: number
   manual_toll_adj?: number
+  car_rental_type?: 'none' | 'simple' | 'complete' | 'custom' | string
+  car_rental_daily_rate?: number
+  car_rental_days?: number
+  car_rental_total?: number
   travel_config?: QuoteTravelConfig
 
   // Hospedagem & Alimentação

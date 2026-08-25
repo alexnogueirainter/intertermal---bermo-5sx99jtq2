@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import {
   FileText,
   Plus,
@@ -22,6 +22,7 @@ import {
   UserCheck,
   ShieldCheck,
   Calculator,
+  Car,
 } from 'lucide-react'
 import {
   QuoteRecord,
@@ -41,7 +42,12 @@ import {
 } from '@/data/fornecedores'
 import { productsService } from '@/services/crm-extras'
 import { calculateQuotePricing, PricingCalculationResult } from '@/lib/quote-calculator'
-import { fetchCepCoordinates, haversineDistanceKm, BLUMENAU_COORDS } from '@/lib/mapeia-calculator'
+import {
+  fetchCepCoordinates,
+  geocodeCity,
+  haversineDistanceKm,
+  BLUMENAU_COORDS,
+} from '@/lib/mapeia-calculator'
 import { QuotePdfPreviewDialog } from '@/components/QuotePdfPreviewDialog'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -200,6 +206,9 @@ export function QuotesManager({
   const [manualFuelAdj, setManualFuelAdj] = useState<number>(0)
   const [manualTollAdj, setManualTollAdj] = useState<number>(0)
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false)
+  const [carRentalType, setCarRentalType] = useState<string>('none') // 'none' | 'simple' | 'complete' | 'custom'
+  const [carRentalDailyRate, setCarRentalDailyRate] = useState<number>(0)
+  const [carRentalDays, setCarRentalDays] = useState<number>(1)
 
   // Seção 3D: Hospedagem & Alimentação
   const [hotelDays, setHotelDays] = useState<number>(2)
@@ -508,8 +517,11 @@ export function QuotesManager({
   }
 
   // ----------------------------------------------------
-  // ITEM 3C: Deslocamento Automático ao digitar 8 dígitos no CEP
+  // ITEM 3C: Deslocamento Automático ao digitar CEP ou CIDADES
   // ----------------------------------------------------
+  const lastAutoCalculatedAddressesRef = useRef<string>('')
+
+  // Função para recalcular rota por CEP
   const handleRecalculateRoute = async (
     targetDestCep = destinationCep,
     targetOrigCep = originCep,
@@ -552,10 +564,10 @@ export function QuotesManager({
 
       toast({
         title: 'Rota calculada automaticamente',
-        description: `Distância estimada: ${finalDistKm} km (${isRoundTrip ? 'Ida + Volta' : 'Só Ida'}) entre ${origCoords.city} e ${destCoords.city}.`,
+        description: `Distância estimada: ${finalDistKm} km (${isRoundTrip ? 'Ida + Volta' : 'Só Ida'}) entre ${origCoords.city || 'Origem'} e ${destCoords.city || 'Destino'}.`,
       })
     } catch (err) {
-      console.error('Erro ao calcular rota:', err)
+      console.error('Erro ao calcular rota por CEP:', err)
       toast({
         title: 'Consulta de CEP',
         description:
@@ -566,6 +578,76 @@ export function QuotesManager({
     }
   }
 
+  // Função para calcular rota por Nomes de Cidade (Nominatim / OSM)
+  const handleCalculateRouteByCities = async (origCity: string, destCity: string) => {
+    if (!origCity || origCity.trim().length < 3 || !destCity || destCity.trim().length < 3) {
+      return
+    }
+
+    setIsCalculatingRoute(true)
+    try {
+      const [origCoords, destCoords] = await Promise.all([
+        geocodeCity(origCity),
+        geocodeCity(destCity),
+      ])
+
+      if (origCoords && destCoords) {
+        const oneWayKm = haversineDistanceKm(
+          origCoords.lat,
+          origCoords.lng,
+          destCoords.lat,
+          destCoords.lng,
+          1.28,
+        )
+        const finalDistKm = isRoundTrip ? Math.round(oneWayKm * 2) : Math.round(oneWayKm)
+        setDistanceKm(finalDistKm > 0 ? finalDistKm : 50)
+
+        // Preenche com formato Cidade - UF se disponível
+        if (origCoords.city) {
+          const origLabel = origCoords.state
+            ? `${origCoords.city} - ${origCoords.state}`
+            : origCoords.city
+          setOriginAddress(origLabel)
+        }
+        if (destCoords.city) {
+          const destLabel = destCoords.state
+            ? `${destCoords.city} - ${destCoords.state}`
+            : destCoords.city
+          setDestinationAddress(destLabel)
+        }
+
+        toast({
+          title: 'Rota calculada automaticamente',
+          description: `Distância estimada: ${finalDistKm} km (${isRoundTrip ? 'Ida + Volta' : 'Só Ida'}) entre ${origCoords.city || origCity} e ${destCoords.city || destCity}.`,
+        })
+      }
+    } catch (err) {
+      console.warn('Erro ao calcular rota por cidade via Nominatim:', err)
+    } finally {
+      setIsCalculatingRoute(false)
+    }
+  }
+
+  // useEffect que monitora originAddress e destinationAddress (mínimo 3 caracteres em ambos)
+  useEffect(() => {
+    if (!isCreateModalOpen) return
+    const orig = originAddress.trim()
+    const dest = destinationAddress.trim()
+    if (orig.length >= 3 && dest.length >= 3) {
+      const pairKey = `${orig} -> ${dest}`
+      if (lastAutoCalculatedAddressesRef.current === pairKey) {
+        return
+      }
+
+      const timer = setTimeout(() => {
+        lastAutoCalculatedAddressesRef.current = pairKey
+        handleCalculateRouteByCities(orig, dest)
+      }, 700)
+
+      return () => clearTimeout(timer)
+    }
+  }, [originAddress, destinationAddress, isCreateModalOpen])
+
   // Toggle Ida e Volta
   const handleToggleRoundTrip = (checked: boolean) => {
     const prevChecked = isRoundTrip
@@ -574,6 +656,18 @@ export function QuotesManager({
       setDistanceKm((prev) => Math.round(prev * 2))
     } else if (prevChecked && !checked) {
       setDistanceKm((prev) => Math.max(10, Math.round(prev / 2)))
+    }
+  }
+
+  // Handler para troca de tipo de aluguel de carro
+  const handleCarRentalTypeChange = (type: string) => {
+    setCarRentalType(type)
+    if (type === 'none') {
+      setCarRentalDailyRate(0)
+    } else if (type === 'simple') {
+      setCarRentalDailyRate(230)
+    } else if (type === 'complete') {
+      setCarRentalDailyRate(350)
     }
   }
 
@@ -587,11 +681,14 @@ export function QuotesManager({
 
   const lodgingMealsTotal = hotelDays * hotelRate + mealsDays * mealsRate
 
+  const carRentalSubtotal =
+    carRentalType !== 'none' ? Math.max(0, carRentalDailyRate * carRentalDays) : 0
+
   const litersFuel = distanceKm / (consumptionKmL || 9.5)
   const baseFuelCost = litersFuel * fuelPrice + manualFuelAdj
   const estimatedTolls = Math.max(1, Math.round((distanceKm / 100) * (tollRoadPercent / 100) * 1.5))
   const baseTollCost = estimatedTolls * 14.5 + manualTollAdj
-  const travelTotal = Math.max(0, baseFuelCost + baseTollCost)
+  const travelTotal = Math.max(0, baseFuelCost + baseTollCost + carRentalSubtotal)
 
   const customMaterialsTotal = customMaterialsList.reduce((acc, m) => acc + m.qty * m.unitPrice, 0)
   const totalMaterials = materialsCost + customMaterialsTotal
@@ -684,6 +781,10 @@ export function QuotesManager({
       tollRoadPercent: Number(tollRoadPercent),
       manualFuelAdj: Number(manualFuelAdj),
       manualTollAdj: Number(manualTollAdj),
+      car_rental_type: carRentalType,
+      car_rental_daily_rate: Number(carRentalDailyRate),
+      car_rental_days: Number(carRentalDays),
+      car_rental_total: Number(carRentalSubtotal),
     }
 
     const lodgingMealsConfig = {
@@ -744,6 +845,10 @@ export function QuotesManager({
         tollRoadPercent,
         manualFuelAdj,
         manualTollAdj,
+        car_rental_type: carRentalType,
+        car_rental_daily_rate: Number(carRentalDailyRate),
+        car_rental_days: Number(carRentalDays),
+        car_rental_total: Number(carRentalSubtotal),
         totalTravelCost: travelTotal,
       },
       lodging_meals_costs: {
@@ -867,6 +972,10 @@ export function QuotesManager({
       destination_address: destinationAddress,
       distance_km: Number(distanceKm),
       is_round_trip: isRoundTrip,
+      car_rental_type: carRentalType,
+      car_rental_daily_rate: Number(carRentalDailyRate),
+      car_rental_days: Number(carRentalDays),
+      car_rental_total: Number(carRentalSubtotal),
       travel_config: travelConfig,
       lodging_meals_config: lodgingMealsConfig,
 
@@ -1032,6 +1141,9 @@ export function QuotesManager({
     setTollRoadPercent(60)
     setManualFuelAdj(0)
     setManualTollAdj(0)
+    setCarRentalType('none')
+    setCarRentalDailyRate(0)
+    setCarRentalDays(1)
     setHotelDays(2)
     setHotelRate(220)
     setMealsDays(4)
@@ -1222,6 +1334,21 @@ export function QuotesManager({
     setTollRoadPercent(travelCfg.tollRoadPercent || sTravel.tollRoadPercent || 60)
     setManualFuelAdj(travelCfg.manualFuelAdj || sTravel.manualFuelAdjustment || 0)
     setManualTollAdj(travelCfg.manualTollAdj || sTravel.manualTollAdjustment || 0)
+
+    // Aluguel de Carro
+    const restoredRentalType =
+      q.car_rental_type || travelCfg.car_rental_type || sTravel.car_rental_type || 'none'
+    const restoredRentalRate =
+      q.car_rental_daily_rate ??
+      travelCfg.car_rental_daily_rate ??
+      sTravel.car_rental_daily_rate ??
+      (restoredRentalType === 'simple' ? 230 : restoredRentalType === 'complete' ? 350 : 0)
+    const restoredRentalDays =
+      q.car_rental_days ?? travelCfg.car_rental_days ?? sTravel.car_rental_days ?? 1
+
+    setCarRentalType(restoredRentalType)
+    setCarRentalDailyRate(restoredRentalRate)
+    setCarRentalDays(restoredRentalDays)
 
     // Hospedagem & Alimentação
     const lodgingCfg = q.lodging_meals_config || {}
@@ -2507,17 +2634,128 @@ export function QuotesManager({
                 </div>
               </div>
 
+              {/* CAMPO DE ALUGUEL DE CARRO */}
+              <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Car className="h-4 w-4 text-emerald-600" />
+                    <Label className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                      Aluguel de Veículo / Carro
+                    </Label>
+                  </div>
+                  {carRentalType !== 'none' && (
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-mono border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40"
+                    >
+                      Subtotal Carro:{' '}
+                      {carRentalSubtotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground font-medium">
+                      Categoria do Veículo
+                    </Label>
+                    <Select value={carRentalType} onValueChange={handleCarRentalTypeChange}>
+                      <SelectTrigger className="text-xs h-8">
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sem aluguel</SelectItem>
+                        <SelectItem value="simple">Carro Simples (R$ 230,00/dia)</SelectItem>
+                        <SelectItem value="complete">Carro Completo (R$ 350,00/dia)</SelectItem>
+                        <SelectItem value="custom">Personalizado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {carRentalType !== 'none' && (
+                    <>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground font-medium">
+                          Valor Diária (R$) {carRentalType !== 'custom' && '(Editável)'}
+                        </Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={carRentalDailyRate}
+                          onChange={(e) => setCarRentalDailyRate(Number(e.target.value))}
+                          className="text-xs h-8 font-mono font-semibold"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground font-medium">
+                          Quantidade de Dias
+                        </Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={carRentalDays}
+                          onChange={(e) => setCarRentalDays(Math.max(1, Number(e.target.value)))}
+                          className="text-xs h-8 font-mono font-semibold"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {carRentalType !== 'none' && (
+                  <div className="text-[10.5px] text-slate-500 flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
+                    <span>
+                      Cálculo: {carRentalDays} diária(s) ×{' '}
+                      {carRentalDailyRate.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
+                    <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
+                      ={' '}
+                      {carRentalSubtotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
+                  </div>
+                )}
+              </div>
+
               <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine com precisão
-                  rodoviária.
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-muted-foreground">
+                    * Digite as cidades (ou CEPs) para rota automática via Nominatim/Mapeia.
+                  </span>
+                  {isCalculatingRoute && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] px-1.5 py-0 text-teal-700 bg-teal-50 border-teal-300 flex items-center gap-1 animate-pulse"
+                    >
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                      Automático
+                    </Badge>
+                  )}
+                </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
+                  onClick={() => {
+                    const orig = originAddress.trim()
+                    const dest = destinationAddress.trim()
+                    if (orig.length >= 3 && dest.length >= 3) {
+                      handleCalculateRouteByCities(orig, dest)
+                    } else {
+                      handleRecalculateRoute()
+                    }
+                  }}
                   className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
                 >
                   {isCalculatingRoute ? (

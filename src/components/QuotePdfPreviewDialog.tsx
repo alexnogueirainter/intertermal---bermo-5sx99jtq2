@@ -140,8 +140,33 @@ export function QuotePdfPreviewDialog({
   const baseFuelCost = litersFuel * fuelPrice + manualFuelAdj
   const estimatedTolls = Math.max(1, Math.round((distanceKm / 100) * (tollRoadPercent / 100) * 1.5))
   const baseTollCost = estimatedTolls * 14.5 + manualTollAdj
+
+  const carRentalType =
+    travelDetails?.car_rental_type ??
+    quote.car_rental_type ??
+    quote.travel_config?.car_rental_type ??
+    'none'
+  const carRentalDailyRate =
+    travelDetails?.car_rental_daily_rate ??
+    quote.car_rental_daily_rate ??
+    quote.travel_config?.car_rental_daily_rate ??
+    0
+  const carRentalDays =
+    travelDetails?.car_rental_days ??
+    quote.car_rental_days ??
+    quote.travel_config?.car_rental_days ??
+    1
+  const carRentalTotal =
+    carRentalType !== 'none'
+      ? (travelDetails?.car_rental_total ??
+        quote.car_rental_total ??
+        quote.travel_config?.car_rental_total ??
+        carRentalDailyRate * carRentalDays)
+      : 0
+
+  const calculatedTravelCost = Math.max(0, baseFuelCost + baseTollCost + carRentalTotal)
   const totalTravelCost =
-    travelDetails?.totalTravelCost ?? quote.travel_cost ?? Math.max(0, baseFuelCost + baseTollCost)
+    travelDetails?.totalTravelCost ?? quote.travel_cost ?? calculatedTravelCost
 
   // Resolução de Hospedagem & Alimentação
   const hotelDays =
@@ -586,7 +611,9 @@ export function QuotePdfPreviewDialog({
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px]">
+                <div
+                  className={`grid grid-cols-1 ${carRentalType !== 'none' ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px]`}
+                >
                   <div className="space-y-0.5">
                     <span className="text-[10px] font-bold text-slate-500 uppercase block">
                       Distância / Rota
@@ -621,6 +648,27 @@ export function QuotePdfPreviewDialog({
                     </div>
                   </div>
 
+                  {carRentalType !== 'none' && (
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                        Aluguel de Carro
+                      </span>
+                      <div className="font-bold text-slate-900 font-mono">
+                        {carRentalTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                      <div className="text-[10px] text-slate-500">
+                        {carRentalDays} diária(s) ×{' '}
+                        {carRentalDailyRate.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-0.5 bg-amber-50/80 p-2 rounded border border-amber-200">
                     <span className="text-[10px] font-bold text-amber-900 uppercase block">
                       Total Deslocamento
@@ -631,7 +679,11 @@ export function QuotePdfPreviewDialog({
                         currency: 'BRL',
                       })}
                     </div>
-                    <div className="text-[9.5px] text-amber-700">Combustível + Pedágios</div>
+                    <div className="text-[9.5px] text-amber-700">
+                      {carRentalType !== 'none'
+                        ? 'Combustível + Pedágios + Carro'
+                        : 'Combustível + Pedágios'}
+                    </div>
                   </div>
                 </div>
               </div>

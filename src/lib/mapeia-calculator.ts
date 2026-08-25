@@ -28,6 +28,53 @@ const KNOWN_CITY_COORDS: Record<string, Coordinates> = {
   concordia: { lat: -27.2336, lng: -52.0239, city: 'Concórdia', state: 'SC' },
 }
 
+export async function geocodeCity(cityName: string): Promise<Coordinates | null> {
+  const cleanCity = (cityName || '').trim()
+  if (!cleanCity || cleanCity.length < 3) {
+    return null
+  }
+
+  // 1. Tenta correspondência direta nas cidades conhecidas locais
+  const lower = cleanCity.toLowerCase()
+  for (const [key, coords] of Object.entries(KNOWN_CITY_COORDS)) {
+    if (lower.includes(key) || key.includes(lower)) {
+      return coords
+    }
+  }
+
+  // 2. Consulta a API Nominatim / OpenStreetMap
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanCity)},Brazil&limit=1`
+    const res = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+    if (!res.ok) throw new Error(`Nominatim HTTP ${res.status}`)
+    const data = await res.json()
+    if (Array.isArray(data) && data.length > 0) {
+      const first = data[0]
+      const lat = parseFloat(first.lat)
+      const lng = parseFloat(first.lon)
+      const displayName = first.display_name || ''
+      const parts = displayName.split(',').map((p: string) => p.trim())
+      const city = parts[0] || cleanCity
+      const state = parts.length > 2 ? parts[parts.length - 3] : undefined
+
+      return {
+        lat,
+        lng,
+        city,
+        state,
+      }
+    }
+    return null
+  } catch (err) {
+    console.warn('Erro ao consultar Nominatim OSM para cidade:', cleanCity, err)
+    return null
+  }
+}
+
 export async function fetchCepCoordinates(cep: string): Promise<Coordinates> {
   const cleanCep = cep.replace(/\D/g, '')
   if (cleanCep.length !== 8) {
