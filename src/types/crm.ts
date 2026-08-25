@@ -125,6 +125,8 @@ export interface ServiceTechnicalSpecs {
   integrationCost?: number // Custo calculado automaticamente da integração
   integrationObservations?: string // Observações sobre a necessidade de integração
   pipeMeasurement?: string // Medida da tubulação (campo de texto editável)
+  includeProductCost?: boolean // Toggle para incluir o valor do produto na proposta
+  productBasePrice?: number // Preço de lista do produto de referência BERMO
 }
 
 // 3b. Mão de obra — 3 funções
@@ -215,6 +217,7 @@ export interface QuoteItem {
   discount: number
   total: number
   bermo_specs?: ServiceTechnicalSpecs
+  include_product_cost?: boolean // Flag indicando se o custo do produto foi incluído
 }
 
 export interface QuoteServiceDetails {
