@@ -3364,6 +3364,7 @@ export function QuotesManager({
         quote={quoteForPdf}
         open={isPdfPreviewOpen}
         onOpenChange={setIsPdfPreviewOpen}
+        viewMode={quoteViewMode}
       />
     </div>
   )
