@@ -15,6 +15,7 @@ import {
   PROPOSAL_INCLUSIONS_TEXT,
   BermoProductItem,
 } from '@/data/bermo-catalog'
+import { searchEquipmentSpecsOnline } from '@/services/quotes'
 import { calculateQuotePricing } from '@/lib/quote-calculator'
 import { calculateDistanceBetweenCeps } from '@/lib/mapeia-calculator'
 import { QuotePdfPreviewDialog } from '@/components/QuotePdfPreviewDialog'
@@ -61,6 +62,8 @@ import {
   Search,
   Layers,
   AlertCircle,
+  Globe,
+  Loader2,
 } from 'lucide-react'
 
 interface QuotesManagerProps {
@@ -183,6 +186,8 @@ export function QuotesManager({
   const [supplierSearchQuery, setSupplierSearchQuery] = useState('')
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false)
   const [matchedSupplierInfo, setMatchedSupplierInfo] = useState<BermoProductItem | null>(null)
+  const [specSource, setSpecSource] = useState<'local' | 'web' | 'manual'>('local')
+  const [isSearchingOnline, setIsSearchingOnline] = useState(false)
   const [activeItemIndexForDropdown, setActiveItemIndexForDropdown] = useState<number | null>(null)
 
   const [fluidType, setFluidType] = useState('vapor')
@@ -305,6 +310,7 @@ export function QuotesManager({
       setSelectedBermoCode(prod.code)
       setModelSearchInput(prod.model || prod.code)
       setMatchedSupplierInfo(prod)
+      setSpecSource('local')
       setShowSupplierDropdown(false)
       setActiveItemIndexForDropdown(null)
 
@@ -327,11 +333,11 @@ export function QuotesManager({
       const qty = updated[targetIdx].quantity || 1
       const isIncludeProd =
         updated[targetIdx].include_product_cost ?? (targetIdx === 0 ? includeProductCost : false)
-      const unitPrice = isIncludeProd ? servPrice + prod.basePrice : servPrice
+      const unitPrice = isIncludeProd ? prod.basePrice : 0
 
       updated[targetIdx] = {
         ...updated[targetIdx],
-        name: `Manutenção Especializada: ${prod.brand} ${prod.model || prod.code}`,
+        name: `Trocador de Calor: ${prod.brand} ${prod.model || prod.code}`,
         unit_price: unitPrice,
         total: unitPrice * qty,
         description: updated[targetIdx].description || methodName,
@@ -377,6 +383,7 @@ export function QuotesManager({
     const match = searchSupplierProduct(typedValue)
     if (match) {
       setMatchedSupplierInfo(match)
+      setSpecSource('local')
       setSelectedBermoCode(match.code)
       setProductBasePrice(match.basePrice)
       const servPrice = Math.round(match.basePrice * 0.4)
@@ -402,6 +409,7 @@ export function QuotesManager({
       }
     } else {
       setMatchedSupplierInfo(null)
+      setSpecSource('manual')
       setSelectedBermoCode(typedValue.toUpperCase())
       if (items.length > 0) {
         const updated = [...items]
@@ -416,6 +424,71 @@ export function QuotesManager({
         }
         setItems(updated)
       }
+    }
+  }
+
+  // Busca online de especificações técnicas do modelo (BERMO, Alfa Laval, etc.) via backend hook equipment_specs_search
+  const handleSearchOnlineSpecs = async () => {
+    const query = (modelSearchInput || selectedBermoCode || '').trim()
+    if (!query) return
+    setIsSearchingOnline(true)
+    try {
+      const res = await searchEquipmentSpecsOnline(query)
+      if (res && res.found && res.specs) {
+        setSpecSource('web')
+        setShowSupplierDropdown(false)
+        if (res.specs.connection) setEquipmentSize(res.specs.connection)
+        if (res.specs.pressure)
+          setOperatingPressure(res.specs.pressure.replace(/[^\d.]/g, '') || '16')
+        if (res.specs.material) setFrameMaterial(res.specs.material)
+        if (res.specs.gasketMaterial) setGasketType(res.specs.gasketMaterial)
+        if (res.specs.plateDimensions) setPlateDimensions(res.specs.plateDimensions)
+        if (res.specs.platesRange) {
+          const matchPlates = res.specs.platesRange.match(/(\d+)/)
+          if (matchPlates) {
+            setPlatesCount(matchPlates[1])
+            setGasketsCount(matchPlates[1])
+          }
+        }
+        if (res.specs.gasketsCount) {
+          const matchGaskets = res.specs.gasketsCount.match(/(\d+)/)
+          if (matchGaskets) setGasketsCount(matchGaskets[1])
+        }
+
+        // Atualiza item 0
+        if (items.length > 0) {
+          const updated = [...items]
+          const brand = res.brand || 'BERMO'
+          const servPrice = serviceBasePrice || 7400
+          updated[0] = {
+            ...updated[0],
+            name: `Manutenção Especializada: ${brand} ${res.model || query}`,
+            bermo_specs: {
+              ...(updated[0].bermo_specs || {}),
+              productCode: res.model || query,
+              productName: res.name || `Trocador ${brand} ${res.model || query}`,
+              productModel: res.model || query,
+              productBrand: brand,
+              equipmentSize: res.specs.connection || equipmentSize,
+              frameMaterial: res.specs.material || frameMaterial,
+              gasketType: res.specs.gasketMaterial || gasketType,
+              plateDimensions: res.specs.plateDimensions || plateDimensions,
+              platesCount: res.specs.platesRange?.match(/(\d+)/)?.[1] || platesCount,
+              gasketsCount: res.specs.gasketsCount?.match(/(\d+)/)?.[1] || gasketsCount,
+              operatingPressure: res.specs.pressure?.replace(/[^\d.]/g, '') || operatingPressure,
+              serviceBasePrice: servPrice,
+            },
+          }
+          setItems(updated)
+        }
+      } else {
+        setSpecSource('manual')
+      }
+    } catch (err) {
+      console.warn('Erro na busca online de specs:', err)
+      setSpecSource('manual')
+    } finally {
+      setIsSearchingOnline(false)
     }
   }
 
@@ -449,15 +522,14 @@ export function QuotesManager({
   const handleToggleItemIncludeProduct = (itemIdx: number, checked: boolean) => {
     const updated = [...items]
     const it = updated[itemIdx]
-    const servBase = it.bermo_specs?.serviceBasePrice || it.unit_price || 2500
     const prodBase = it.bermo_specs?.productBasePrice || 0
-    const newUnitPrice = checked ? servBase + prodBase : servBase
     const qty = it.quantity || 1
+    const unitPrice = checked ? prodBase : 0
 
     updated[itemIdx] = {
       ...it,
-      unit_price: newUnitPrice,
-      total: Math.max(0, qty * newUnitPrice - (it.discount || 0)),
+      unit_price: unitPrice,
+      total: Math.max(0, qty * unitPrice - (it.discount || 0)),
       include_product_cost: checked,
       bermo_specs: {
         ...(it.bermo_specs || {}),
@@ -489,6 +561,7 @@ export function QuotesManager({
     setSelectedBermoCode(defaultBermo.code)
     setModelSearchInput(defaultBermo.model)
     setMatchedSupplierInfo(defaultBermo)
+    setSpecSource('local')
     setProductBasePrice(defaultBermo.basePrice)
     const servPrice = Math.round(defaultBermo.basePrice * 0.4)
     setServiceBasePrice(servPrice)
@@ -509,11 +582,11 @@ export function QuotesManager({
     const initialMethodology = getStandardServiceMethodology([defaultBermo.brand])
     setItems([
       {
-        name: `Serviço Especializado BERMO: ${defaultBermo.name}`,
+        name: `Trocador de Calor BERMO: ${defaultBermo.name}`,
         quantity: 1,
-        unit_price: servPrice,
+        unit_price: 0,
         discount: 0,
-        total: servPrice,
+        total: 0,
         description: initialMethodology,
         include_product_cost: false,
         bermo_specs: {
@@ -563,6 +636,7 @@ export function QuotesManager({
       setModelSearchInput(specs.productModel || code)
       const found = searchSupplierProduct(code)
       setMatchedSupplierInfo(found || null)
+      setSpecSource(found ? 'local' : 'manual')
 
       if (specs.fluidType) setFluidType(specs.fluidType)
       if (specs.fluidName) setFluidName(specs.fluidName)
@@ -837,11 +911,11 @@ export function QuotesManager({
     const methodology = getStandardServiceMethodology([brand, ...distinctBrands])
 
     const newItem: QuoteItem = {
-      name: `Manutenção Especializada: ${targetProduct.brand} ${targetProduct.model || targetProduct.code}`,
+      name: `Trocador de Calor: ${targetProduct.brand} ${targetProduct.model || targetProduct.code}`,
       quantity: 1,
-      unit_price: servPrice,
+      unit_price: 0,
       discount: 0,
-      total: servPrice,
+      total: 0,
       description: methodology,
       include_product_cost: false,
       bermo_specs: {
@@ -892,9 +966,8 @@ export function QuotesManager({
     setIncludeProductCost(checked)
     if (items.length > 0) {
       const updated = [...items]
-      const servPrice = serviceBasePrice || 7400
-      const prodPrice = productBasePrice || 18500
-      const unit = checked ? servPrice + prodPrice : servPrice
+      const prodPrice = productBasePrice || updated[0].bermo_specs?.productBasePrice || 18500
+      const unit = checked ? prodPrice : 0
       updated[0] = {
         ...updated[0],
         unit_price: unit,
@@ -917,6 +990,7 @@ export function QuotesManager({
     setSelectedBermoCode(bermo.code)
     setModelSearchInput(bermo.model)
     setMatchedSupplierInfo(bermo)
+    setSpecSource('local')
     setProductBasePrice(bermo.basePrice)
     setServiceBasePrice(tpl.servicePrice)
     setIncludeProductCost(false)
@@ -939,11 +1013,11 @@ export function QuotesManager({
     const methodology = getStandardServiceMethodology([bermo.brand])
     setItems([
       {
-        name: `Serviço Especializado BERMO: ${bermo.name}`,
+        name: `Trocador de Calor BERMO: ${bermo.name}`,
         quantity: 1,
-        unit_price: tpl.servicePrice,
+        unit_price: 0,
         discount: 0,
-        total: tpl.servicePrice,
+        total: 0,
         description: methodology,
         include_product_cost: false,
         bermo_specs: {
@@ -955,6 +1029,8 @@ export function QuotesManager({
           frameMaterial: bermo.specs.material,
           gasketType: bermo.specs.gasketMaterial,
           plateDimensions: bermo.specs.plateDimensions,
+          platesCount: '40',
+          gasketsCount: '40',
           includeProductCost: false,
           productBasePrice: bermo.basePrice,
           serviceBasePrice: tpl.servicePrice,
@@ -1783,25 +1859,44 @@ export function QuotesManager({
                     3a. Produto BERMO / Alfa Laval & Parâmetros Técnicos do Serviço
                   </span>
                 </div>
+                {/* Badge indicando a origem: Base local / Busca web / Manual */}
                 <Badge
                   variant="outline"
-                  className="text-[10px] bg-teal-100 text-teal-800 border-teal-300 font-semibold"
+                  className={`text-[10px] font-semibold ${
+                    specSource === 'local'
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300'
+                      : specSource === 'web'
+                        ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300'
+                        : 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300'
+                  }`}
                 >
-                  {matchedSupplierInfo
-                    ? `Fornecedor: ${matchedSupplierInfo.brand}`
-                    : 'Modelo Customizado'}
+                  {specSource === 'local' && (
+                    <span className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      Origem: Base local ({matchedSupplierInfo?.brand || 'BERMO'})
+                    </span>
+                  )}
+                  {specSource === 'web' && (
+                    <span className="flex items-center gap-1">
+                      <Globe className="h-3 w-3 text-blue-600" />
+                      Origem: Busca web
+                    </span>
+                  )}
+                  {specSource === 'manual' && (
+                    <span className="flex items-center gap-1">Origem: Manual</span>
+                  )}
                 </Badge>
               </div>
 
-              {/* Combobox editável com busca na base de fornecedores */}
+              {/* Input com Autocomplete + Botão de Busca na Internet */}
               <div className="space-y-1.5 relative">
                 <div className="flex items-center justify-between">
                   <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                    Modelo do Equipamento (Editável - Selecione ou Digite o Modelo do Fabricante) *
+                    Modelo do Equipamento (Editável - Selecione ou Digite o Modelo) *
                   </Label>
                   <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                     <Search className="h-3 w-3 text-teal-600" />
-                    Busca em base BERMO & Alfa Laval
+                    Catálogo BERMO & Alfa Laval ({SUPPLIERS_DATABASE.length})
                   </span>
                 </div>
 
@@ -1816,19 +1911,44 @@ export function QuotesManager({
                         setShowSupplierDropdown(true)
                         setActiveItemIndexForDropdown(0)
                       }}
-                      placeholder="Digite ex: T5-BFG, BP30, M10-B, BL50 ou modelo customizado..."
+                      placeholder="Digite ex: T5-BFG, BP30, M10-B, BL50 ou qualquer modelo..."
                       className="text-xs h-9 bg-white dark:bg-slate-900 font-bold text-teal-900 dark:text-teal-100 pr-8"
                       required
                     />
                     {matchedSupplierInfo && (
                       <span
                         className="absolute right-2.5 top-2.5"
-                        title="Especificações técnicas encontradas na base do fornecedor"
+                        title="Especificações técnicas encontradas na base local"
                       >
                         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       </span>
                     )}
                   </div>
+
+                  {/* Se NÃO estiver na base local, mostra botão de Buscar na Internet */}
+                  {!matchedSupplierInfo && modelSearchInput.trim().length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSearchOnlineSpecs}
+                      disabled={isSearchingOnline}
+                      className="h-9 text-xs border-blue-400 text-blue-700 bg-blue-50/50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900 shrink-0 font-semibold"
+                    >
+                      {isSearchingOnline ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin text-blue-600" />
+                          Buscando specs...
+                        </>
+                      ) : (
+                        <>
+                          <Globe className="h-3.5 w-3.5 mr-1 text-blue-600" />
+                          Buscar na internet
+                        </>
+                      )}
+                    </Button>
+                  )}
+
                   <Button
                     type="button"
                     variant="outline"
@@ -1837,10 +1957,10 @@ export function QuotesManager({
                       setShowSupplierDropdown(!showSupplierDropdown)
                       setActiveItemIndexForDropdown(0)
                     }}
-                    className="h-9 text-xs border-teal-300 text-teal-700 bg-white dark:bg-slate-900 hover:bg-teal-50"
+                    className="h-9 text-xs border-teal-300 text-teal-700 bg-white dark:bg-slate-900 hover:bg-teal-50 shrink-0"
                   >
                     <Search className="h-3.5 w-3.5 mr-1" />
-                    Busca em base BERMO & Alfa Laval ({SUPPLIERS_DATABASE.length})
+                    Catálogo Local
                   </Button>
                 </div>
 
@@ -1848,9 +1968,7 @@ export function QuotesManager({
                 {showSupplierDropdown && (
                   <div className="absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 border border-teal-400 dark:border-teal-700 rounded-lg shadow-2xl p-1.5 space-y-1">
                     <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                      <span>
-                        Base de Fornecedores BERMO & Alfa Laval ({filteredSuppliers.length})
-                      </span>
+                      <span>Modelos na Base Local ({filteredSuppliers.length})</span>
                       <button
                         type="button"
                         onClick={() => setShowSupplierDropdown(false)}
@@ -1860,14 +1978,31 @@ export function QuotesManager({
                       </button>
                     </div>
                     {filteredSuppliers.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-muted-foreground bg-amber-50/50 dark:bg-amber-950/20 rounded">
+                      <div className="p-3 text-center text-xs text-muted-foreground bg-amber-50/50 dark:bg-amber-950/20 rounded space-y-2">
                         <p className="font-semibold text-amber-900 dark:text-amber-300">
-                          Modelo &ldquo;{modelSearchInput}&rdquo; não encontrado no catálogo.
+                          Modelo &ldquo;{modelSearchInput}&rdquo; não encontrado na base local.
                         </p>
-                        <p className="text-[11px] mt-0.5 text-amber-800/80 dark:text-amber-400/80">
-                          Você pode preencher as especificações técnicas manualmente nos campos
-                          abaixo (placas, conexões, materiais).
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                          Você pode buscar as especificações do fabricante online ou preencher
+                          manualmente abaixo.
                         </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            setShowSupplierDropdown(false)
+                            handleSearchOnlineSpecs()
+                          }}
+                          disabled={isSearchingOnline}
+                          className="h-7 text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold"
+                        >
+                          {isSearchingOnline ? (
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          ) : (
+                            <Globe className="h-3 w-3 mr-1" />
+                          )}
+                          Buscar &ldquo;{modelSearchInput}&rdquo; na Internet
+                        </Button>
                       </div>
                     ) : (
                       filteredSuppliers.map((p) => (
@@ -1919,8 +2054,26 @@ export function QuotesManager({
                     <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
                     <span>
                       Modelo reconhecido na base <strong>{matchedSupplierInfo.brand}</strong>:
-                      especificações técnicas de placas, gaxetas, dimensões e conexões
-                      auto-preenchidas!
+                      especificações técnicas auto-preenchidas! Todos os campos abaixo permanecem
+                      100% editáveis.
+                    </span>
+                  </div>
+                )}
+                {specSource === 'web' && (
+                  <div className="p-2 rounded bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 text-[11px] text-blue-900 dark:text-blue-300 flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-blue-600 shrink-0" />
+                    <span>
+                      Especificações obtidas via <strong>busca online</strong> nos dados do
+                      fabricante. Todos os campos técnicos abaixo estão editáveis.
+                    </span>
+                  </div>
+                )}
+                {specSource === 'manual' && !matchedSupplierInfo && (
+                  <div className="p-2 rounded bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-[11px] text-amber-900 dark:text-amber-300 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>
+                      Modelo em <strong>modo manual</strong>: informe as dimensões, quantidade de
+                      placas e dados técnicos nos campos abaixo.
                     </span>
                   </div>
                 )}
@@ -2249,70 +2402,121 @@ export function QuotesManager({
               </div>
             </div>
 
-            {/* SEÇÃO 2: ITENS & MÚLTIPLOS MODELOS/TOCADORES DE CALOR NO MESMO ORÇAMENTO */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+            {/* SEÇÃO 2: EQUIPAMENTOS & SERVIÇOS */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3.5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Wrench className="h-4 w-4 text-teal-600" />
                   <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    Equipamentos & Serviços no Orçamento ({items.length})
+                    Equipamentos & Serviços ({items.length})
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => handleAddEquipmentItem()}
-                    className="h-7 text-xs bg-teal-700 hover:bg-teal-600 text-white font-semibold shadow-xs"
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => handleAddEquipmentItem()}
+                  className="h-7 text-xs bg-teal-700 hover:bg-teal-600 text-white font-semibold shadow-xs"
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Adicionar Equipamento
+                </Button>
+              </div>
+
+              {/* METODOLOGIA PADRONIZADA (6 ETAPAS) — UMA ÚNICA VEZ NO TOPO DA SEÇÃO */}
+              <div className="p-3 rounded-lg bg-teal-50/70 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 text-teal-700 dark:text-teal-400" />
+                    <span className="text-xs font-bold text-teal-950 dark:text-teal-200">
+                      Metodologia Padronizada do Serviço (6 Etapas Técnicas)
+                    </span>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] bg-white dark:bg-slate-900 text-teal-800 border-teal-300 font-semibold"
                   >
-                    <Plus className="h-3 w-3 mr-1" /> Adicionar Equipamento
-                  </Button>
+                    Procedimento Unificado
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-[11px] text-slate-700 dark:text-slate-300">
+                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
+                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
+                      1. Desmontagem
+                    </strong>
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
+                      Abertura com registro da Medida A de aperto para referência.
+                    </p>
+                  </div>
+                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
+                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
+                      2. Limpeza
+                    </strong>
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
+                      Remoção mecânica manual e/ou química preservando as placas.
+                    </p>
+                  </div>
+                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
+                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
+                      3. Inspeção de Placas
+                    </strong>
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
+                      Análise visual/NDT para furos, trincas ou corrosão.
+                    </p>
+                  </div>
+                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
+                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
+                      4. Inspeção de Gaxetas
+                    </strong>
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
+                      Verificação de elasticidade, ressecamento e perfil de vedação.
+                    </p>
+                  </div>
+                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
+                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
+                      5. Montagem
+                    </strong>
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
+                      Fechamento com torque gradual e respeito à Medida A final.
+                    </p>
+                  </div>
+                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
+                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
+                      6. Teste de Estanqueidade
+                    </strong>
+                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
+                      Garantia pós-montagem de ausência de vazamentos sob pressão.
+                    </p>
+                  </div>
                 </div>
               </div>
 
+              {/* LISTA DE EQUIPAMENTOS ADICIONADOS */}
               <div className="space-y-3">
                 {items.map((it, idx) => (
                   <div
                     key={idx}
-                    className="p-3.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs"
+                    className="p-3 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-xs"
                   >
-                    {/* Header do Equipamento / Item */}
-                    <div className="flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                    {/* Header do Equipamento: Modelo e Botão Remover */}
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
                       <div className="flex items-center gap-2 flex-1">
                         <Badge className="bg-slate-800 text-white text-[10px] px-1.5 py-0">
-                          Item #{idx + 1}
+                          #{idx + 1}
                         </Badge>
-                        <div className="flex-1 space-y-1">
-                          <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                            Equipamento / Modelo BERMO & Alfa Laval *
+                        <div className="flex items-center gap-1.5">
+                          <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            Modelo:
                           </Label>
-                          <div className="flex items-center gap-2">
-                            <Select
-                              value={
-                                it.bermo_specs?.productCode || (idx === 0 ? selectedBermoCode : '')
-                              }
-                              onValueChange={(val) => {
-                                const found = SUPPLIERS_DATABASE.find(
-                                  (p) => p.code === val || p.id === val,
-                                )
-                                if (found) {
-                                  applySupplierProductToItem(found, idx)
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="text-xs h-8 font-semibold bg-slate-50 dark:bg-slate-900">
-                                <SelectValue placeholder="Selecione o modelo do fabricante..." />
-                              </SelectTrigger>
-                              <SelectContent className="max-h-56">
-                                {SUPPLIERS_DATABASE.map((p) => (
-                                  <SelectItem key={p.id} value={p.code} className="text-xs">
-                                    <span className="font-bold mr-1">[{p.brand}]</span> {p.model} (
-                                    {p.code}) - {p.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <span className="text-xs font-mono font-bold text-teal-800 dark:text-teal-300">
+                            {it.bermo_specs?.productModel ||
+                              it.bermo_specs?.productCode ||
+                              it.name ||
+                              `Equipamento ${idx + 1}`}
+                          </span>
+                          {it.bermo_specs?.productBrand && (
+                            <Badge variant="secondary" className="text-[9px] font-semibold">
+                              {it.bermo_specs.productBrand}
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
@@ -2322,7 +2526,7 @@ export function QuotesManager({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveItem(idx)}
-                          className="h-7 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                          className="h-6 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                           title="Remover Equipamento"
                         >
                           <Trash2 className="h-3.5 w-3.5 mr-1" />
@@ -2331,11 +2535,11 @@ export function QuotesManager({
                       )}
                     </div>
 
-                    {/* Especificações Técnicas do Equipamento Individual Carregadas Automaticamente */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-teal-50/50 dark:bg-teal-950/20 p-2.5 rounded-md border border-teal-100 dark:border-teal-900/40">
+                    {/* Especificações Técnicas do Equipamento */}
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-50/70 dark:bg-slate-900/60 p-2.5 rounded-md border border-slate-200 dark:border-slate-800">
                       <div className="space-y-1">
                         <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Nº de Placas
+                          Número de Placas
                         </Label>
                         <Input
                           value={it.bermo_specs?.platesCount || '40'}
@@ -2348,7 +2552,7 @@ export function QuotesManager({
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Dimensão Placas
+                          Dimensão das Placas
                         </Label>
                         <Input
                           value={it.bermo_specs?.plateDimensions || '680 x 280 mm'}
@@ -2361,7 +2565,7 @@ export function QuotesManager({
                       </div>
                       <div className="space-y-1">
                         <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Qtd Gaxetas / Vedação
+                          Quantidade de Gaxetas
                         </Label>
                         <Input
                           value={it.bermo_specs?.gasketsCount || '40'}
@@ -2385,23 +2589,7 @@ export function QuotesManager({
                           className="text-xs h-7 bg-white dark:bg-slate-900"
                         />
                       </div>
-                    </div>
-
-                    {/* Preços, Quantidade e Custo Individual de Manutenção */}
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end pt-1">
-                      <div className="sm:col-span-5 space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Título / Descrição Comercial do Item *
-                        </Label>
-                        <Input
-                          value={it.name}
-                          onChange={(e) => handleUpdateItem(idx, 'name', e.target.value)}
-                          className="text-xs font-semibold h-8"
-                          required
-                        />
-                      </div>
-
-                      <div className="sm:col-span-2 space-y-1">
+                      <div className="space-y-1">
                         <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
                           Quantidade
                         </Label>
@@ -2412,42 +2600,13 @@ export function QuotesManager({
                           onChange={(e) =>
                             handleUpdateItem(idx, 'quantity', Number(e.target.value))
                           }
-                          className="text-xs h-8 text-center font-bold"
+                          className="text-xs h-7 text-center font-bold bg-white dark:bg-slate-900"
                         />
-                      </div>
-
-                      <div className="sm:col-span-3 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                            Custo Unitário Manutenção (R$)
-                          </Label>
-                        </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={it.unit_price}
-                          onChange={(e) =>
-                            handleUpdateItem(idx, 'unit_price', Number(e.target.value))
-                          }
-                          className="text-xs h-8 text-right font-mono font-bold text-teal-800 dark:text-teal-200"
-                        />
-                      </div>
-
-                      <div className="sm:col-span-2 space-y-1 text-right">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Total do Item
-                        </Label>
-                        <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300 h-8 flex items-center justify-end font-mono bg-slate-50 dark:bg-slate-900 px-2 rounded border border-slate-200 dark:border-slate-800">
-                          {(it.total || 0).toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </div>
                       </div>
                     </div>
 
-                    {/* Checkbox de Fornecimento do Equipamento Novo para este item */}
-                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/60 p-2 rounded border border-slate-200 dark:border-slate-800 text-xs">
+                    {/* Toggle: Incluir custo do produto na proposta */}
+                    <div className="flex items-center justify-between bg-emerald-50/50 dark:bg-emerald-950/20 p-2 rounded border border-emerald-200 dark:border-emerald-900/40 text-xs">
                       <div className="flex items-center gap-2">
                         <Switch
                           id={`toggle-prod-item-${idx}`}
@@ -2456,54 +2615,28 @@ export function QuotesManager({
                         />
                         <Label
                           htmlFor={`toggle-prod-item-${idx}`}
-                          className="text-[11px] font-semibold cursor-pointer"
+                          className="text-[11px] font-semibold cursor-pointer text-emerald-950 dark:text-emerald-200"
                         >
-                          Incluir também fornecimento do equipamento novo (+{' '}
-                          {(it.bermo_specs?.productBasePrice || 18500).toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                          )
+                          Incluir custo do produto na proposta
+                          {it.bermo_specs?.productBasePrice ? (
+                            <span className="font-mono ml-1.5 font-bold text-emerald-800 dark:text-emerald-300">
+                              (+{' '}
+                              {(
+                                it.bermo_specs.productBasePrice * (it.quantity || 1)
+                              ).toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
+                              )
+                            </span>
+                          ) : null}
                         </Label>
                       </div>
-                      {it.bermo_specs?.productBrand && (
-                        <Badge variant="outline" className="text-[10px] font-mono">
-                          {it.bermo_specs.productBrand}
-                        </Badge>
-                      )}
-                    </div>
-
-                    {/* Metodologia de Engenharia do Item */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
-                          <CheckCircle2 className="h-3 w-3 text-teal-600" />
-                          Metodologia do Serviço para este Equipamento (Proposta do Cliente)
-                        </Label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const brand = it.bermo_specs?.productBrand || 'BERMO'
-                            handleUpdateItem(
-                              idx,
-                              'description',
-                              getStandardServiceMethodology([brand, ...distinctBrands]),
-                            )
-                          }}
-                          className="h-5 text-[10px] text-teal-700 hover:bg-teal-50 px-1.5"
-                        >
-                          Resetar Metodologia
-                        </Button>
-                      </div>
-                      <Textarea
-                        value={it.description || ''}
-                        onChange={(e) => handleUpdateItem(idx, 'description', e.target.value)}
-                        placeholder="Descreva a metodologia aplicada a este equipamento..."
-                        rows={3}
-                        className="text-xs font-mono bg-slate-50/70 dark:bg-slate-900 resize-y leading-relaxed"
-                      />
+                      <span className="text-[10px] text-muted-foreground">
+                        {it.include_product_cost
+                          ? 'Equipamento novo somado ao valor'
+                          : 'Apenas serviço calculado via M.O.'}
+                      </span>
                     </div>
                   </div>
                 ))}
