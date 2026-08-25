@@ -50,7 +50,10 @@ import {
   MapPin,
   HelpCircle,
   SlidersHorizontal,
+  FileText,
+  Info,
 } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
 import type {
   QuoteRecord,
   QuoteStatus,
@@ -73,6 +76,7 @@ import {
   DEFAULT_INDIRECT_TAXES,
   QuoteServiceComputation,
 } from '@/lib/quote-calculator'
+import { QuotePdfPreviewDialog } from '@/components/QuotePdfPreviewDialog'
 
 interface QuotesManagerProps {
   quotes: QuoteRecord[]
@@ -174,6 +178,10 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'client' | 'internal'>('client') // Proposta cliente vs Preview interno
 
+  // Estado para Visualização de PDF da Proposta (Modal Completo)
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false)
+  const [quoteForPdf, setQuoteForPdf] = useState<QuoteRecord | null>(null)
+
   // Estado para Modal de Criação Rápida de Cliente no Orçamento
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false)
   const [newClientName, setNewClientName] = useState('')
@@ -213,14 +221,20 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
   const [integrationObservations, setIntegrationObservations] = useState('')
   const [pipeMeasurement, setPipeMeasurement] = useState('DN50 (2 pol) - Schedule 40')
 
+  // Toggle: incluir custo de compra do produto na proposta (padrão FALSE: Assistência Técnica)
+  const [includeProductCost, setIncludeProductCost] = useState<boolean>(false)
+  const [productBasePrice, setProductBasePrice] = useState<number>(19800)
+  const [serviceBasePrice, setServiceBasePrice] = useState<number>(6500)
+
   // Form State - Itens e Serviços
   const [items, setItems] = useState<QuoteItem[]>([
     {
-      name: 'Prestação de Serviços Especializados em Equipamento BERMO',
+      name: 'Prestação de Serviços Especializados em Trocador a Placas BP6 Sanitário',
       quantity: 1,
       unit_price: 6500,
       discount: 0,
       total: 6500,
+      include_product_cost: false,
     },
   ])
 
@@ -372,6 +386,25 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
       setIntegrationObservations(specs.integrationObservations)
     if (specs.pipeMeasurement !== undefined) setPipeMeasurement(specs.pipeMeasurement)
 
+    // Toggle include product cost
+    const hasIncludedProductCost =
+      specs.includeProductCost ?? firstItem?.include_product_cost ?? false
+    setIncludeProductCost(hasIncludedProductCost)
+
+    const prd = BERMO_CATALOG.find((p) => p.code === (specs.productCode || selectedBermoCode))
+    if (prd) {
+      setProductBasePrice(specs.productBasePrice || prd.basePrice)
+    }
+    if (specs.serviceBasePrice !== undefined) {
+      setServiceBasePrice(specs.serviceBasePrice)
+    } else if (firstItem) {
+      setServiceBasePrice(
+        hasIncludedProductCost && prd
+          ? Math.max(0, firstItem.unit_price - prd.basePrice)
+          : firstItem.unit_price,
+      )
+    }
+
     if (quote.items && quote.items.length > 0) {
       setItems(quote.items)
     }
@@ -455,14 +488,25 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
     setIsEditMode(false)
     setEditingQuoteId(null)
     setQuoteNumber(`INT-2025-00${quotes.length + 1}`)
+    setIncludeProductCost(false) // Por padrão DESMARCADO (empresa é assistência técnica)
+    const prd = BERMO_CATALOG.find((p) => p.code === selectedBermoCode)
+    if (prd) {
+      setProductBasePrice(prd.basePrice)
+      setServiceBasePrice(Math.round(prd.basePrice * 0.45))
+    }
     setIsCreateModalOpen(true)
   }
 
   // Sincronizar dados ao selecionar produto BERMO (carrega automaticamente especificações técnicas)
+  // REGRA: Informações técnicas SEMPRE aparecem. Custo do produto NÃO é incluído automaticamente por padrão.
   const handleSelectBermoProduct = (code: string) => {
     setSelectedBermoCode(code)
     const prd = BERMO_CATALOG.find((p) => p.code === code)
     if (prd) {
+      setProductBasePrice(prd.basePrice)
+      const servicePrice = Math.round(prd.basePrice * 0.45)
+      setServiceBasePrice(servicePrice)
+
       // 1. Número de placas
       const autoPlates = prd.specs.platesCount !== undefined ? prd.specs.platesCount : ''
       setPlatesCount(autoPlates)
@@ -487,16 +531,21 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
       if (prd.specs.gaskets) setGasketType(prd.specs.gaskets.split('/')[0].trim())
       if (prd.specs.materials) setFrameMaterial(prd.specs.materials.split('/')[0].trim())
 
-      // Atualizar primeiro item da proposta
+      // Valor unitário do item: apenas serviço quando toggle = false; serviço + produto quando toggle = true
+      const finalUnitPrice = includeProductCost ? servicePrice + prd.basePrice : servicePrice
+
+      // Atualizar primeiro item da proposta com todas as especificações técnicas
       const updated = [...items]
       updated[0] = {
         name: `Prestação de Serviços em ${prd.name}`,
         quantity: 1,
-        unit_price: Math.round(prd.basePrice * 0.45),
+        unit_price: finalUnitPrice,
         discount: 0,
-        total: Math.round(prd.basePrice * 0.45),
+        total: finalUnitPrice,
+        include_product_cost: includeProductCost,
         bermo_specs: {
           productCode: prd.code,
+          productName: prd.name,
           productModel: prd.model,
           productBrand: prd.brand,
           serviceScope,
@@ -513,6 +562,38 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
             ? prd.specs.materials.split('/')[0].trim()
             : frameMaterial,
           gasketType: prd.specs.gaskets ? prd.specs.gaskets.split('/')[0].trim() : gasketType,
+          includeProductCost: includeProductCost,
+          productBasePrice: prd.basePrice,
+          serviceBasePrice: servicePrice,
+        },
+      }
+      setItems(updated)
+    }
+  }
+
+  // Handler para alternar a inclusão do custo de compra do produto
+  const handleToggleIncludeProductCost = (included: boolean) => {
+    setIncludeProductCost(included)
+    const prd = BERMO_CATALOG.find((p) => p.code === selectedBermoCode)
+    const baseP = productBasePrice || prd?.basePrice || 0
+    const srvP = serviceBasePrice || 6500
+
+    const finalUnitPrice = included ? srvP + baseP : srvP
+
+    const updated = [...items]
+    if (updated.length > 0) {
+      const qty = updated[0].quantity || 1
+      const disc = updated[0].discount || 0
+      updated[0] = {
+        ...updated[0],
+        unit_price: finalUnitPrice,
+        total: Math.max(0, qty * finalUnitPrice - disc),
+        include_product_cost: included,
+        bermo_specs: {
+          ...(updated[0].bermo_specs || {}),
+          includeProductCost: included,
+          productBasePrice: baseP,
+          serviceBasePrice: srvP,
         },
       }
       setItems(updated)
@@ -614,6 +695,12 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
       if (prd.specs.connection) setEquipmentSize(prd.specs.connection)
     }
 
+    setIncludeProductCost(false) // Padrão assistência técnica: não inclui custo do produto
+    if (prd) {
+      setProductBasePrice(prd.basePrice)
+      setServiceBasePrice(5800)
+    }
+
     setItems([
       {
         name: tpl.defaultItemName,
@@ -621,8 +708,10 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
         unit_price: 5800,
         discount: 0,
         total: 5800,
+        include_product_cost: false,
         bermo_specs: {
           productCode: tpl.productCode,
+          productName: prd?.name,
           productModel: prd?.model,
           productBrand: prd?.brand,
           serviceScope: tpl.serviceScope,
@@ -635,6 +724,9 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
           platesCount: prd?.specs.platesCount,
           plateDimensions: prd?.specs.plateDimensions || prd?.specs.dimensions,
           gasketsCount: prd?.specs.gasketsCount,
+          includeProductCost: false,
+          productBasePrice: prd?.basePrice,
+          serviceBasePrice: 5800,
         },
       },
     ])
@@ -739,19 +831,25 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
     if (productId) {
       const bermo = BERMO_CATALOG.find((p) => p.id === productId || p.code === productId)
       if (bermo) {
+        const servPrice = Math.round(bermo.basePrice * 0.4)
         setItems([
           ...items,
           {
             name: `Serviço Especializado BERMO: ${bermo.name}`,
             quantity: 1,
-            unit_price: Math.round(bermo.basePrice * 0.4),
+            unit_price: servPrice,
             discount: 0,
-            total: Math.round(bermo.basePrice * 0.4),
+            total: servPrice,
+            include_product_cost: false,
             bermo_specs: {
               productCode: bermo.code,
+              productName: bermo.name,
               productModel: bermo.model,
               productBrand: bermo.brand,
               equipmentSize: bermo.specs.connection,
+              includeProductCost: false,
+              productBasePrice: bermo.basePrice,
+              serviceBasePrice: servPrice,
             },
           },
         ])
@@ -766,6 +864,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
         unit_price: 1500,
         discount: 0,
         total: 1500,
+        include_product_cost: false,
       },
     ])
   }
@@ -820,9 +919,11 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
         if (idx === 0) {
           return {
             ...it,
+            include_product_cost: includeProductCost,
             bermo_specs: {
               ...(it.bermo_specs || {}),
               productCode: selectedBermoCode,
+              productName: prd?.name,
               productModel: prd?.model,
               productBrand: prd?.brand,
               serviceScope,
@@ -839,6 +940,16 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               platesCount,
               plateDimensions,
               gasketsCount,
+              workAreaDifficulty,
+              workAreaObservations,
+              needsIntegration,
+              integrationTiming: needsIntegration === 'Sim' ? integrationTiming : undefined,
+              integrationCost: computation.integrationTotal,
+              integrationObservations,
+              pipeMeasurement,
+              includeProductCost,
+              productBasePrice: productBasePrice || prd?.basePrice,
+              serviceBasePrice,
             },
           }
         }
@@ -851,11 +962,12 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
       valid_until: validUntilDate.toISOString(),
       notes:
         notes ||
-        `Orçamento de Prestação de Serviços BERMO (${prd?.name || 'Válvulas & Trocadores'}).`,
+        `Orçamento de Prestação de Serviços BERMO (${prd?.name || 'Válvulas & Trocadores'}). Assistência Técnica Especializada.`,
       assigned_to: 'Alex Nogueia - Especialista Técnico Intertermal',
       service_details: {
         service_technical_specs: {
           productCode: selectedBermoCode,
+          productName: prd?.name,
           productModel: prd?.model,
           productBrand: prd?.brand,
           serviceScope,
@@ -879,6 +991,9 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
           integrationCost: computation.integrationTotal,
           integrationObservations,
           pipeMeasurement,
+          includeProductCost,
+          productBasePrice: productBasePrice || prd?.basePrice,
+          serviceBasePrice,
         },
         labor_costs: laborCostsObj,
         travel_costs: travelCostsObj,
@@ -915,6 +1030,15 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
   }
 
   const currentViewQuote = selectedQuote || (quotes.length > 0 ? quotes[0] : null)
+  const currentClient = clients.find((c) => c.id === currentViewQuote?.client_id)
+
+  const handleOpenPdfPreview = (quoteToPreview?: QuoteRecord) => {
+    const q = quoteToPreview || currentViewQuote
+    if (q) {
+      setQuoteForPdf(q)
+      setIsPdfPreviewOpen(true)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -927,10 +1051,21 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
           </h2>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
             Gerador técnico de propostas com cálculo de mão de obra (3 funções), logística Mapeia,
-            hospedagem e precificação interna.
+            hospedagem e precificação interna da assistência técnica.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {currentViewQuote && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleOpenPdfPreview(currentViewQuote)}
+              className="border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold shadow-xs"
+            >
+              <FileText className="h-4 w-4 mr-1.5 text-teal-600 dark:text-teal-400" />
+              Visualizar PDF
+            </Button>
+          )}
           {onOpenCatalog && (
             <Button
               variant="outline"
@@ -944,7 +1079,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
           )}
           <Button
             onClick={handleOpenNewQuote}
-            className="bg-teal-700 hover:bg-teal-600 text-white shadow-sm text-xs"
+            className="bg-teal-700 hover:bg-teal-600 text-white shadow-sm text-xs font-semibold"
           >
             <Plus className="h-4 w-4 mr-1.5" />
             Novo Orçamento de Serviço
@@ -1039,9 +1174,22 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                   <span className="font-bold text-slate-900 dark:text-slate-100">
                     {(q.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </span>
-                  <span className="text-[11px] text-muted-foreground truncate max-w-[140px]">
-                    {q.payment_terms || '14 DDL'}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleOpenPdfPreview(q)
+                      }}
+                      className="p-1 text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      title="Visualizar PDF da Proposta"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="text-[11px] text-muted-foreground truncate max-w-[100px]">
+                      {q.payment_terms || '14 DDL'}
+                    </span>
+                  </div>
                 </div>
               </Card>
             )
@@ -1071,6 +1219,15 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     size="sm"
+                    onClick={() => handleOpenPdfPreview(currentViewQuote)}
+                    className="h-8 text-xs bg-emerald-700 hover:bg-emerald-600 text-white font-semibold shadow-xs"
+                    title="Abrir prévia formatada em PDF da proposta"
+                  >
+                    <FileText className="h-3.5 w-3.5 mr-1.5" /> Prévia em PDF
+                  </Button>
+
+                  <Button
+                    size="sm"
                     variant="outline"
                     onClick={() => handleOpenEditQuote(currentViewQuote)}
                     className="h-8 text-xs bg-teal-800/80 hover:bg-teal-700 border-teal-600 text-white font-medium"
@@ -1078,6 +1235,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                   >
                     <Wrench className="h-3.5 w-3.5 mr-1" /> Editar Proposta
                   </Button>
+
                   {/* Alternador de Visão: Cliente vs Interno */}
                   <div className="flex items-center rounded-lg bg-slate-800/90 p-1 border border-slate-700 text-xs">
                     <button
@@ -1127,7 +1285,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => window.print()}
+                    onClick={() => handleOpenPdfPreview(currentViewQuote)}
                     className="h-8 text-xs bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-white"
                   >
                     <Printer className="h-3.5 w-3.5 mr-1" /> Imprimir / PDF
@@ -1226,6 +1384,11 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                                       {item.bermo_specs.productCode && (
                                         <span>
                                           Ref: <strong>{item.bermo_specs.productCode}</strong>
+                                        </span>
+                                      )}
+                                      {item.bermo_specs.productBrand && (
+                                        <span>
+                                          Marca: <strong>{item.bermo_specs.productBrand}</strong>
                                         </span>
                                       )}
                                       {item.bermo_specs.platesCount && (
@@ -1700,6 +1863,53 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              {/* Opção de incluir ou não o custo de compra do produto na proposta */}
+              <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Package className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
+                    <Label
+                      htmlFor="toggle-include-product-cost"
+                      className="text-xs font-bold text-emerald-950 dark:text-emerald-200 cursor-pointer"
+                    >
+                      Incluir custo do produto na proposta
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] font-semibold ${
+                        includeProductCost
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-slate-100 text-slate-700 border-slate-300'
+                      }`}
+                    >
+                      {includeProductCost
+                        ? 'Custo Incluso no Item'
+                        : 'Desmarcado (Padrão Assistência)'}
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-emerald-900/80 dark:text-emerald-300/80">
+                    Empresa de assistência técnica: a venda do produto BERMO é direta pelo
+                    fabricante.{' '}
+                    <strong>As especificações técnicas sempre aparecem na proposta</strong>, mas o
+                    custo de compra só é somado ao marcar este item.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                  <span className="text-xs font-mono font-bold text-emerald-950 dark:text-emerald-200">
+                    {(productBasePrice || 0).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </span>
+                  <Switch
+                    id="toggle-include-product-cost"
+                    checked={includeProductCost}
+                    onCheckedChange={handleToggleIncludeProductCost}
+                  />
                 </div>
               </div>
 
@@ -2739,6 +2949,14 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Prévia em PDF da Proposta Técnica */}
+      <QuotePdfPreviewDialog
+        isOpen={isPdfPreviewOpen}
+        onClose={() => setIsPdfPreviewOpen(false)}
+        quote={quoteForPdf}
+        client={clients.find((c) => c.id === quoteForPdf?.client_id)}
+      />
     </div>
   )
 }

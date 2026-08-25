@@ -288,3 +288,33 @@
     animation: spotlight 2s ease forwards;
   }
 }
+
+/* Print styles para Prévia em PDF da Proposta Técnica */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Oculta toda a interface do CRM e exibe apenas o documento A4 */
+  body * {
+    visibility: hidden;
+  }
+
+  #quote-printable-document,
+  #quote-printable-document * {
+    visibility: visible;
+  }
+
+  #quote-printable-document {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}

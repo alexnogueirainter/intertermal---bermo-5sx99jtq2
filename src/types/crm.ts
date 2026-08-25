@@ -92,6 +92,7 @@ export type IntegrationTiming = 'same_day' | 'early' // 'same_day': No dia do in
 export interface ServiceTechnicalSpecs {
   productId?: string
   productCode?: string
+  productName?: string
   productModel?: string
   productBrand?: 'BERMO' | 'ARI Armaturen'
   category?: string
@@ -126,7 +127,8 @@ export interface ServiceTechnicalSpecs {
   integrationObservations?: string // Observações sobre a necessidade de integração
   pipeMeasurement?: string // Medida da tubulação (campo de texto editável)
   includeProductCost?: boolean // Toggle para incluir o valor do produto na proposta
-  productBasePrice?: number // Preço de lista do produto de referência BERMO
+  productBasePrice?: number // Preço de lista/compra do produto de referência BERMO
+  serviceBasePrice?: number // Valor de mão de obra/serviço desvinculado do custo do produto
 }
 
 // 3b. Mão de obra — 3 funções
