@@ -263,12 +263,13 @@ export interface EquipmentSpecsSearchResult {
 
 export async function searchEquipmentSpecsOnline(
   model: string,
+  brand?: string,
 ): Promise<EquipmentSpecsSearchResult> {
   const clean = (model || '').trim()
   if (!clean) {
     return {
       found: false,
-      brand: 'Outro',
+      brand: brand || 'Outro',
       model: '',
       specs: null,
       message: 'Modelo não informado.',
@@ -278,7 +279,7 @@ export async function searchEquipmentSpecsOnline(
   try {
     const res = await pb.send<EquipmentSpecsSearchResult>('/backend/v1/equipment/search-specs', {
       method: 'POST',
-      body: { model: clean },
+      body: { model: clean, brand: brand || '' },
       requestKey: null,
     })
     return res
@@ -286,7 +287,7 @@ export async function searchEquipmentSpecsOnline(
     console.warn('Erro ao consultar backend para specs do equipamento:', error)
     return {
       found: false,
-      brand: 'Outro',
+      brand: brand || 'Outro',
       model: clean,
       specs: null,
       message: 'Busca online indisponível no momento. Preencha manualmente os campos técnicos.',

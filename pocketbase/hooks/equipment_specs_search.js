@@ -1,6 +1,7 @@
 routerAdd('POST', '/backend/v1/equipment/search-specs', (e) => {
   const body = e.requestInfo().body || {}
   const modelQuery = (body.model || '').trim()
+  const manufacturerHint = (body.brand || body.manufacturer || '').trim()
 
   if (!modelQuery) {
     return e.json(400, { error: 'Modelo do equipamento é obrigatório para busca.' })
@@ -8,14 +9,14 @@ routerAdd('POST', '/backend/v1/equipment/search-specs', (e) => {
 
   try {
     const prompt = `Você é um engenheiro sênior especialista em trocadores de calor a placas, trocadores brasados e válvulas industriais.
-Sua principal base de conhecimento são os catálogos técnicos oficiais dos fabricantes BERMO (www.bermo.com.br) e Alfa Laval (www.alfalaval.com.br), bem como ARI Armaturen, Swep, Kelvion, Sondex, Danfoss, Tranter e APV.
+Sua principal base de conhecimento são os catálogos técnicos oficiais dos fabricantes BERMO (www.bermo.com.br) e Alfa Laval (www.alfalaval.com.br), além de Swep, Kelvion, Sondex, Danfoss, Tranter, APV e ARI Armaturen.
 
-O usuário pesquisou pelo modelo de equipamento: "${modelQuery}".
+O usuário pesquisou pelo modelo de equipamento: "${modelQuery}"${manufacturerHint ? ` (Fabricante sugerido: ${manufacturerHint})` : ''}.
 
 Sua tarefa:
 1. Priorize a identificação nos catálogos e literaturas técnicas da BERMO (www.bermo.com.br) e Alfa Laval (www.alfalaval.com.br).
-2. Se o modelo corresponder a um trocador de calor ou válvula industrial (ex: BP, BL, BM, BTL, T5, M6, M10, M15, TL10, TS6, CLIP, AQ4, etc.), forneça os dados técnicos oficiais e típicos.
-3. Se for encontrado, retorne estritamente um JSON no seguinte formato:
+2. Se o modelo corresponder a um trocador de calor ou válvula industrial (ex: BP, BL, BM, BTL, T2, T5, T8, T10, T20, M3, M6, M10, M15, TL6, TL10, TS6, CLIP, AQ4, etc.), forneça os dados técnicos oficiais e típicos.
+3. Se for identificado ou puder estimar tecnicamente os dados para este modelo, retorne estritamente um JSON no seguinte formato:
 {
   "found": true,
   "brand": "BERMO" | "Alfa Laval" | "Nome do Fabricante",
@@ -28,7 +29,7 @@ Sua tarefa:
     "temperature": "ex: -10°C a 160°C",
     "material": "ex: AISI 316L (0.5mm) ou Titânio",
     "gasketMaterial": "ex: EPDM Clip-on / NBR / Viton",
-    "platesRange": "ex: 40 ou 20 a 80 placas",
+    "platesRange": "ex: 40 ou 20 a 80",
     "plateDimensions": "ex: 680 x 280 mm",
     "gasketsCount": "ex: 40",
     "maxFlowRate": "ex: 35 m³/h",
@@ -37,7 +38,7 @@ Sua tarefa:
   "source": "Catálogo Fabricante (www.bermo.com.br / www.alfalaval.com.br)"
 }
 
-4. Se o modelo NÃO puder ser identificado como trocador ou válvula industrial, retorne:
+4. Se o modelo NÃO puder ser identificado de forma alguma como equipamento industrial de troca térmica ou válvula, retorne:
 {
   "found": false,
   "brand": "Outro",
@@ -46,7 +47,7 @@ Sua tarefa:
   "message": "Modelo não localizado nos catálogos oficiais BERMO / Alfa Laval na internet. Preenchimento manual disponível."
 }
 
-IMPORTANTE: Responda APENAS com o JSON válido, sem qualquer texto adicional antes ou depois, e sem markdown com crases.`
+IMPORTANTE: Responda APENAS com o JSON válido, sem qualquer texto adicional antes ou depois, e sem blocos markdown com crases.`
 
     const reply = $ai.chat({
       model: 'fast',
@@ -82,7 +83,9 @@ IMPORTANTE: Responda APENAS com o JSON válido, sem qualquer texto adicional ant
       const firstBrace = cleaned.indexOf('{')
       const lastBrace = cleaned.lastIndexOf('}')
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        parsed = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1))
+        try {
+          parsed = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1))
+        } catch (_) {}
       }
     }
 
@@ -92,7 +95,7 @@ IMPORTANTE: Responda APENAS com o JSON válido, sem qualquer texto adicional ant
 
     return e.json(200, {
       found: false,
-      brand: 'Outro',
+      brand: manufacturerHint || 'Outro',
       model: modelQuery,
       specs: null,
       message: 'Modelo não identificado automaticamente. Preenchimento manual liberado.',
@@ -100,10 +103,10 @@ IMPORTANTE: Responda APENAS com o JSON válido, sem qualquer texto adicional ant
   } catch (err) {
     return e.json(200, {
       found: false,
-      brand: 'Outro',
+      brand: manufacturerHint || 'Outro',
       model: modelQuery,
       specs: null,
-      message: 'Busca online indisponível. Preenchimento manual liberado.',
+      message: 'Busca online indisponível no momento. Preenchimento manual liberado.',
     })
   }
 })

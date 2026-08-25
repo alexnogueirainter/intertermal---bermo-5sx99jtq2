@@ -64,6 +64,7 @@ import {
   AlertCircle,
   Globe,
   Loader2,
+  ArrowLeftRight,
 } from 'lucide-react'
 
 interface QuotesManagerProps {
@@ -247,12 +248,14 @@ export function QuotesManager({
   const [destinationCep, setDestinationCep] = useState('')
   const [destinationAddress, setDestinationAddress] = useState('')
   const [distanceKm, setDistanceKm] = useState(85)
+  const [isRoundTrip, setIsRoundTrip] = useState(true)
   const [fuelPrice, setFuelPrice] = useState(5.89)
   const [consumptionKmL, setConsumptionKmL] = useState(9.5)
   const [tollRoadPercent, setTollRoadPercent] = useState(40)
   const [manualFuelAdj, setManualFuelAdj] = useState(0)
   const [manualTollAdj, setManualTollAdj] = useState(0)
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false)
+  const [manufacturerHint, setManufacturerHint] = useState<'BERMO' | 'Alfa Laval' | 'Outro'>('BERMO')
 
   // Seção 3D: Hospedagem & Alimentação
   const [hotelDays, setHotelDays] = useState(1)
@@ -379,11 +382,36 @@ export function QuotesManager({
     setShowSupplierDropdown(true)
     setActiveItemIndexForDropdown(0)
 
+    // Tenta inferir o fabricante se o usuário digitou padrões conhecidos
+    const upper = typedValue.toUpperCase()
+    if (upper.startsWith('BP') || upper.startsWith('BL') || upper.startsWith('BM') || upper.startsWith('BTL')) {
+      setManufacturerHint('BERMO')
+    } else if (
+      upper.startsWith('T2') ||
+      upper.startsWith('T5') ||
+      upper.startsWith('T8') ||
+      upper.startsWith('T10') ||
+      upper.startsWith('T20') ||
+      upper.startsWith('M3') ||
+      upper.startsWith('M6') ||
+      upper.startsWith('M10') ||
+      upper.startsWith('M15') ||
+      upper.startsWith('TL6') ||
+      upper.startsWith('TL10') ||
+      upper.startsWith('TS6') ||
+      upper.startsWith('CLIP')
+    ) {
+      setManufacturerHint('Alfa Laval')
+    }
+
     // Tenta encontrar match exato ou aproximado
     const match = searchSupplierProduct(typedValue)
     if (match) {
       setMatchedSupplierInfo(match)
       setSpecSource('local')
+      if (match.brand === 'BERMO' || match.brand === 'Alfa Laval') {
+        setManufacturerHint(match.brand)
+      }
       setSelectedBermoCode(match.code)
       setProductBasePrice(match.basePrice)
       const servPrice = Math.round(match.basePrice * 0.4)
@@ -415,11 +443,12 @@ export function QuotesManager({
         const updated = [...items]
         updated[0] = {
           ...updated[0],
-          name: `Manutenção Especializada: ${typedValue.toUpperCase()}`,
+          name: `Manutenção Especializada: ${manufacturerHint} ${typedValue.toUpperCase()}`,
           bermo_specs: {
             ...(updated[0].bermo_specs || {}),
             productCode: typedValue.toUpperCase(),
             productModel: typedValue,
+            productBrand: manufacturerHint,
           },
         }
         setItems(updated)
@@ -428,15 +457,19 @@ export function QuotesManager({
   }
 
   // Busca online de especificações técnicas do modelo (BERMO, Alfa Laval, etc.) via backend hook equipment_specs_search
-  const handleSearchOnlineSpecs = async () => {
-    const query = (modelSearchInput || selectedBermoCode || '').trim()
+  const handleSearchOnlineSpecs = async (customModel?: string, customBrand?: string) => {
+    const query = (customModel || modelSearchInput || selectedBermoCode || '').trim()
+    const targetBrand = customBrand || manufacturerHint
     if (!query) return
     setIsSearchingOnline(true)
     try {
-      const res = await searchEquipmentSpecsOnline(query)
+      const res = await searchEquipmentSpecsOnline(query, targetBrand)
       if (res && res.found && res.specs) {
         setSpecSource('web')
         setShowSupplierDropdown(false)
+        if (res.brand && (res.brand === 'BERMO' || res.brand === 'Alfa Laval' || res.brand === 'Outro')) {
+          setManufacturerHint(res.brand as any)
+        }
         if (res.specs.connection) setEquipmentSize(res.specs.connection)
         if (res.specs.pressure)
           setOperatingPressure(res.specs.pressure.replace(/[^\d.]/g, '') || '16')
@@ -458,7 +491,7 @@ export function QuotesManager({
         // Atualiza item 0
         if (items.length > 0) {
           const updated = [...items]
-          const brand = res.brand || 'BERMO'
+          const brand = res.brand || targetBrand || 'BERMO'
           const servPrice = serviceBasePrice || 7400
           updated[0] = {
             ...updated[0],
@@ -560,9 +593,11 @@ export function QuotesManager({
     const defaultBermo = BERMO_CATALOG.find((p) => p.code === 'BP30') || BERMO_CATALOG[0]
     setSelectedBermoCode(defaultBermo.code)
     setModelSearchInput(defaultBermo.model)
+    setManufacturerHint('BERMO')
     setMatchedSupplierInfo(defaultBermo)
     setSpecSource('local')
     setProductBasePrice(defaultBermo.basePrice)
+    setIsRoundTrip(true)
     const servPrice = Math.round(defaultBermo.basePrice * 0.4)
     setServiceBasePrice(servPrice)
     setIncludeProductCost(false)
@@ -633,10 +668,15 @@ export function QuotesManager({
     if (specs) {
       const code = specs.productCode || 'BP30'
       setSelectedBermoCode(code)
-      setModelSearchInput(specs.productModel || code)
-      const found = searchSupplierProduct(code)
+      setModelSearchInput(specs.productModel || specs.productName || code)
+      const found = searchSupplierProduct(code) || searchSupplierProduct(specs.productModel || '')
       setMatchedSupplierInfo(found || null)
       setSpecSource(found ? 'local' : 'manual')
+      if (specs.productBrand === 'Alfa Laval' || specs.productBrand === 'BERMO') {
+        setManufacturerHint(specs.productBrand)
+      } else if (found?.brand === 'Alfa Laval' || found?.brand === 'BERMO') {
+        setManufacturerHint(found.brand)
+      }
 
       if (specs.fluidType) setFluidType(specs.fluidType)
       if (specs.fluidName) setFluidName(specs.fluidName)
@@ -692,6 +732,7 @@ export function QuotesManager({
       setDestinationCep(t.destinationCep || '')
       setDestinationAddress(t.destinationAddress || '')
       setDistanceKm(t.distanceKm || 85)
+      setIsRoundTrip(t.isRoundTrip ?? true)
       setFuelPrice(t.fuelPrice || 5.89)
       setConsumptionKmL(t.consumptionKmL || 9.5)
       setTollRoadPercent(t.tollRoadPercent || 40)
@@ -760,11 +801,17 @@ export function QuotesManager({
     return maintenanceMaterials.reduce((sum, m) => sum + (m.amount || 0), 0)
   }, [maintenanceMaterials])
 
-  // Recalculo da rota via CEP (considerando Ida e Volta automaticamente)
-  const handleRecalculateRoute = async (destCep?: string, origCep?: string) => {
+  // Recalculo da rota via CEP (com suporte a Ida ou Ida e Volta)
+  const handleRecalculateRoute = async (
+    destCep?: string,
+    origCep?: string,
+    roundTripOverride?: boolean,
+  ) => {
     setIsCalculatingRoute(true)
-    const targetDest = destCep || destinationCep
-    const targetOrig = origCep || originCep
+    const targetDest = destCep !== undefined ? destCep : destinationCep
+    const targetOrig = origCep !== undefined ? origCep : originCep
+    const effectiveRoundTrip =
+      roundTripOverride !== undefined ? roundTripOverride : isRoundTrip
 
     try {
       const res = await calculateDistanceBetweenCeps(
@@ -773,9 +820,10 @@ export function QuotesManager({
         fuelPrice,
         consumptionKmL,
         tollRoadPercent,
+        effectiveRoundTrip,
       )
-      // res.roundTripKm é a distância total (ida e volta)
-      setDistanceKm(res.roundTripKm || res.distanceKm)
+      // res.distanceKm já aplica ida e volta (se true) ou somente ida (se false)
+      setDistanceKm(res.distanceKm)
       if (res.destinationAddress) {
         setDestinationAddress(res.destinationAddress)
       } else if (res.destinationCity) {
@@ -791,20 +839,36 @@ export function QuotesManager({
     }
   }
 
+  // Alterna toggle de Ida e Volta: dobra ou divide distância e custos mantendo a consistência
+  const handleToggleRoundTrip = (newIsRoundTrip: boolean) => {
+    setIsRoundTrip(newIsRoundTrip)
+    if (destinationCep && destinationCep.replace(/\D/g, '').length === 8) {
+      handleRecalculateRoute(destinationCep, originCep, newIsRoundTrip)
+    } else {
+      // Ajusta proporcionalmente a distância atual se não houver cálculo de CEP
+      if (newIsRoundTrip && !isRoundTrip) {
+        setDistanceKm((prev) => Math.round(prev * 2))
+      } else if (!newIsRoundTrip && isRoundTrip) {
+        setDistanceKm((prev) => Math.max(15, Math.round(prev / 2)))
+      }
+    }
+  }
+
   // Cálculos de Mão de Obra
   const laborTechTotal = techCount * techHours * techRate
   const laborHelperTotal = helperCount * helperHours * helperRate
   const laborInspectorTotal = inspectorCount * inspectorHours * inspectorRate
   const laborTotal = laborTechTotal + laborHelperTotal + laborInspectorTotal
 
-  // Cálculos de Logística (distanceKm já representa a distância total de IDA E VOLTA)
-  const totalDistanceRoundTrip = distanceKm
-  const litersNeeded = totalDistanceRoundTrip / (consumptionKmL || 9.5)
+  // Cálculos de Logística (distanceKm representa a distância considerada atual, ida ou ida e volta)
+  const effectiveDistanceForCalc = distanceKm
+  const litersNeeded = effectiveDistanceForCalc / (consumptionKmL || 9.5)
   const baseFuelCost = Math.round(litersNeeded * fuelPrice * 100) / 100
-  // Para pedágios: calcula com base na distância total ida e volta (pedágios distribuídos ao longo do percurso)
+  // Para pedágios: calcula com base na distância e nas praças estimadas
+  const minTollCount = isRoundTrip ? 2 : 1
   const estimatedTolls = Math.max(
-    2,
-    Math.round((totalDistanceRoundTrip / 80) * (tollRoadPercent / 100)),
+    minTollCount,
+    Math.round((effectiveDistanceForCalc / 80) * (tollRoadPercent / 100)),
   )
   const baseTollCost = estimatedTolls * 14.5
   const travelTotal = baseFuelCost + baseTollCost + manualFuelAdj + manualTollAdj
@@ -841,6 +905,7 @@ export function QuotesManager({
     destinationCep,
     destinationAddress,
     distanceKm,
+    isRoundTrip,
     fuelPrice,
     consumptionKmL,
     tollRoadPercent,
@@ -959,7 +1024,28 @@ export function QuotesManager({
   }
 
   const handleRemoveItem = (index: number) => {
-    setItems(items.filter((_, i) => i !== index))
+    const updated = items.filter((_, i) => i !== index)
+    setItems(updated)
+    // Se removeu o primeiro item e sobraram outros itens, atualiza o item 0 nos controles superiores
+    if (index === 0 && updated.length > 0) {
+      const nextFirst = updated[0]
+      const specs = nextFirst.bermo_specs
+      if (specs) {
+        if (specs.productCode) setSelectedBermoCode(specs.productCode)
+        if (specs.productModel || specs.productName) {
+          setModelSearchInput(specs.productModel || specs.productName || specs.productCode || '')
+        }
+        if (specs.productBrand === 'BERMO' || specs.productBrand === 'Alfa Laval') {
+          setManufacturerHint(specs.productBrand)
+        }
+        if (specs.platesCount) setPlatesCount(specs.platesCount)
+        if (specs.plateDimensions) setPlateDimensions(specs.plateDimensions)
+        if (specs.gasketsCount) setGasketsCount(specs.gasketsCount)
+        if (specs.equipmentSize) setEquipmentSize(specs.equipmentSize)
+        if (specs.frameMaterial) setFrameMaterial(specs.frameMaterial)
+        if (specs.gasketType) setGasketType(specs.gasketType)
+      }
+    }
   }
 
   const handleToggleIncludeProductCost = (checked: boolean) => {
@@ -1829,7 +1915,24 @@ export function QuotesManager({
                     </Button>
                   )}
                 </div>
-                <Select value={clientId} onValueChange={setClientId} required>
+                <Select
+                  value={clientId}
+                  onValueChange={(selectedId) => {
+                    setClientId(selectedId)
+                    const foundClient = clients.find((c) => c.id === selectedId)
+                    if (foundClient) {
+                      if (foundClient.city) {
+                        setDestinationAddress(
+                          `${foundClient.city} / ${foundClient.state || 'SC'}`
+                        )
+                      }
+                      if (foundClient.document && foundClient.document.replace(/\D/g, '').length === 8) {
+                        // caso tenha cep no documento
+                      }
+                    }
+                  }}
+                  required
+                >
                   <SelectTrigger className="text-xs">
                     <SelectValue placeholder="Selecione o cliente..." />
                   </SelectTrigger>
@@ -1862,7 +1965,7 @@ export function QuotesManager({
                 {/* Badge indicando a origem: Base local / Busca web / Manual */}
                 <Badge
                   variant="outline"
-                  className={`text-[10px] font-semibold ${
+                  className={`text-[10px] font-semibold transition-all ${
                     specSource === 'local'
                       ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300'
                       : specSource === 'web'
@@ -1873,34 +1976,68 @@ export function QuotesManager({
                   {specSource === 'local' && (
                     <span className="flex items-center gap-1">
                       <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                      Origem: Base local ({matchedSupplierInfo?.brand || 'BERMO'})
+                      Origem: Base local ({matchedSupplierInfo?.brand || manufacturerHint})
                     </span>
                   )}
                   {specSource === 'web' && (
                     <span className="flex items-center gap-1">
                       <Globe className="h-3 w-3 text-blue-600" />
-                      Origem: Busca web
+                      Origem: Busca web ({manufacturerHint})
                     </span>
                   )}
                   {specSource === 'manual' && (
-                    <span className="flex items-center gap-1">Origem: Manual</span>
+                    <span className="flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 text-amber-600" />
+                      Origem: Manual
+                    </span>
                   )}
                 </Badge>
               </div>
 
-              {/* Input com Autocomplete + Botão de Busca na Internet */}
-              <div className="space-y-1.5 relative">
-                <div className="flex items-center justify-between">
+              {/* Input de Modelo Livre + Seleção de Fabricante + Botão de Busca na Internet */}
+              <div className="space-y-2 relative">
+                <div className="flex items-center justify-between flex-wrap gap-1">
                   <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                    Modelo do Equipamento (Editável - Selecione ou Digite o Modelo) *
+                    Modelo do Equipamento (Input Livre — Digite qualquer modelo) *
                   </Label>
-                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <Search className="h-3 w-3 text-teal-600" />
-                    Catálogo BERMO & Alfa Laval ({SUPPLIERS_DATABASE.length})
-                  </span>
+                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                    <span>Fabricante:</span>
+                    <Select
+                      value={manufacturerHint}
+                      onValueChange={(val: any) => {
+                        setManufacturerHint(val)
+                        if (items.length > 0) {
+                          const updated = [...items]
+                          updated[0] = {
+                            ...updated[0],
+                            bermo_specs: {
+                              ...(updated[0].bermo_specs || {}),
+                              productBrand: val,
+                            },
+                          }
+                          setItems(updated)
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-6 text-[10px] w-28 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="BERMO" className="text-xs font-semibold text-teal-700">
+                          BERMO
+                        </SelectItem>
+                        <SelectItem value="Alfa Laval" className="text-xs font-semibold text-blue-700">
+                          Alfa Laval
+                        </SelectItem>
+                        <SelectItem value="Outro" className="text-xs">
+                          Outro / Genérico
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <div className="relative flex-1">
                     <Input
                       value={modelSearchInput}
@@ -1911,38 +2048,39 @@ export function QuotesManager({
                         setShowSupplierDropdown(true)
                         setActiveItemIndexForDropdown(0)
                       }}
-                      placeholder="Digite ex: T5-BFG, BP30, M10-B, BL50 ou qualquer modelo..."
-                      className="text-xs h-9 bg-white dark:bg-slate-900 font-bold text-teal-900 dark:text-teal-100 pr-8"
+                      placeholder="Digite QUALQUER modelo: ex: BP30, M10-B, T5-BFG, BL50, CLIP-8, Swep..."
+                      className="text-xs h-9 bg-white dark:bg-slate-900 font-bold text-teal-900 dark:text-teal-100 pr-8 shadow-inner"
                       required
                     />
                     {matchedSupplierInfo && (
                       <span
                         className="absolute right-2.5 top-2.5"
-                        title="Especificações técnicas encontradas na base local"
+                        title="Especificações encontradas na base local"
                       >
                         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       </span>
                     )}
                   </div>
 
-                  {/* Se NÃO estiver na base local, mostra botão de Buscar na Internet */}
-                  {!matchedSupplierInfo && modelSearchInput.trim().length > 1 && (
+                  {/* Se NÃO estiver na base local OU se usuário quiser forçar busca na web */}
+                  {!matchedSupplierInfo && (
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={handleSearchOnlineSpecs}
-                      disabled={isSearchingOnline}
-                      className="h-9 text-xs border-blue-400 text-blue-700 bg-blue-50/50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900 shrink-0 font-semibold"
+                      onClick={() => handleSearchOnlineSpecs()}
+                      disabled={isSearchingOnline || !modelSearchInput.trim()}
+                      className="h-9 text-xs border-blue-400 text-blue-700 bg-blue-50/60 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900 shrink-0 font-semibold shadow-xs"
+                      title="Pesquisar especificações técnicas deste modelo nos catálogos oficiais dos fabricantes na web"
                     >
                       {isSearchingOnline ? (
                         <>
-                          <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin text-blue-600" />
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin text-blue-600" />
                           Buscando specs...
                         </>
                       ) : (
                         <>
-                          <Globe className="h-3.5 w-3.5 mr-1 text-blue-600" />
+                          <Search className="h-3.5 w-3.5 mr-1.5 text-blue-600" />
                           Buscar na internet
                         </>
                       )}
@@ -1960,7 +2098,7 @@ export function QuotesManager({
                     className="h-9 text-xs border-teal-300 text-teal-700 bg-white dark:bg-slate-900 hover:bg-teal-50 shrink-0"
                   >
                     <Search className="h-3.5 w-3.5 mr-1" />
-                    Catálogo Local
+                    Base Local ({SUPPLIERS_DATABASE.length})
                   </Button>
                 </div>
 
@@ -1983,8 +2121,7 @@ export function QuotesManager({
                           Modelo &ldquo;{modelSearchInput}&rdquo; não encontrado na base local.
                         </p>
                         <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                          Você pode buscar as especificações do fabricante online ou preencher
-                          manualmente abaixo.
+                          Você pode buscar as especificações oficiais na internet via IA ou preencher manualmente.
                         </p>
                         <Button
                           type="button"
@@ -1999,9 +2136,9 @@ export function QuotesManager({
                           {isSearchingOnline ? (
                             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                           ) : (
-                            <Globe className="h-3 w-3 mr-1" />
+                            <Search className="h-3 w-3 mr-1" />
                           )}
-                          Buscar &ldquo;{modelSearchInput}&rdquo; na Internet
+                          Buscar &ldquo;{modelSearchInput}&rdquo; na Internet ({manufacturerHint})
                         </Button>
                       </div>
                     ) : (
@@ -2060,21 +2197,37 @@ export function QuotesManager({
                   </div>
                 )}
                 {specSource === 'web' && (
-                  <div className="p-2 rounded bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 text-[11px] text-blue-900 dark:text-blue-300 flex items-center gap-2">
-                    <Globe className="h-4 w-4 text-blue-600 shrink-0" />
-                    <span>
-                      Especificações obtidas via <strong>busca online</strong> nos dados do
-                      fabricante. Todos os campos técnicos abaixo estão editáveis.
-                    </span>
+                  <div className="p-2 rounded bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 text-[11px] text-blue-900 dark:text-blue-300 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-blue-600 shrink-0" />
+                      <span>
+                        Especificações obtidas via <strong>busca web ({manufacturerHint})</strong> nos catálogos oficiais. Todos os campos técnicos estão editáveis.
+                      </span>
+                    </div>
+                    <Badge variant="secondary" className="text-[9px] bg-blue-100 text-blue-800 font-bold shrink-0">
+                      Busca Web
+                    </Badge>
                   </div>
                 )}
                 {specSource === 'manual' && !matchedSupplierInfo && (
-                  <div className="p-2 rounded bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-[11px] text-amber-900 dark:text-amber-300 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                    <span>
-                      Modelo em <strong>modo manual</strong>: informe as dimensões, quantidade de
-                      placas e dados técnicos nos campos abaixo.
-                    </span>
+                  <div className="p-2 rounded bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-[11px] text-amber-900 dark:text-amber-300 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                      <span>
+                        Modelo personalizado (<strong>{modelSearchInput || 'Novo Modelo'}</strong>): informe as dimensões, quantidade de placas e dados técnicos nos campos abaixo, ou clique em &ldquo;Buscar na internet&rdquo;.
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleSearchOnlineSpecs()}
+                      disabled={isSearchingOnline || !modelSearchInput.trim()}
+                      className="h-6 text-[10px] text-blue-700 hover:text-blue-800 hover:bg-blue-50 font-bold shrink-0 px-2"
+                    >
+                      <Search className="h-3 w-3 mr-1" />
+                      Pesquisar especificações
+                    </Button>
                   </div>
                 )}
               </div>
@@ -2491,49 +2644,62 @@ export function QuotesManager({
 
               {/* LISTA DE EQUIPAMENTOS ADICIONADOS */}
               <div className="space-y-3">
-                {items.map((it, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-xs"
-                  >
-                    {/* Header do Equipamento: Modelo e Botão Remover */}
-                    <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                      <div className="flex items-center gap-2 flex-1">
-                        <Badge className="bg-slate-800 text-white text-[10px] px-1.5 py-0">
-                          #{idx + 1}
-                        </Badge>
-                        <div className="flex items-center gap-1.5">
-                          <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                            Modelo:
-                          </Label>
-                          <span className="text-xs font-mono font-bold text-teal-800 dark:text-teal-300">
-                            {it.bermo_specs?.productModel ||
-                              it.bermo_specs?.productCode ||
-                              it.name ||
-                              `Equipamento ${idx + 1}`}
-                          </span>
-                          {it.bermo_specs?.productBrand && (
-                            <Badge variant="secondary" className="text-[9px] font-semibold">
-                              {it.bermo_specs.productBrand}
-                            </Badge>
-                          )}
+                {items.length === 0 ? (
+                  <div className="p-6 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg space-y-2 bg-white/50 dark:bg-slate-950/50">
+                    <p className="text-xs text-muted-foreground">
+                      Nenhum equipamento adicionado nesta proposta.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => handleAddEquipmentItem()}
+                      className="h-8 text-xs bg-teal-700 hover:bg-teal-600 text-white font-semibold"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Primeiro Equipamento
+                    </Button>
+                  </div>
+                ) : (
+                  items.map((it, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-xs"
+                    >
+                      {/* Header do Equipamento: Modelo e Botão Remover (Disponível em TODOS os itens) */}
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Badge className="bg-slate-800 text-white text-[10px] px-1.5 py-0">
+                            #{idx + 1}
+                          </Badge>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                              Modelo:
+                            </Label>
+                            <span className="text-xs font-mono font-bold text-teal-800 dark:text-teal-300">
+                              {it.bermo_specs?.productModel ||
+                                it.bermo_specs?.productCode ||
+                                it.name ||
+                                `Equipamento ${idx + 1}`}
+                            </span>
+                            {it.bermo_specs?.productBrand && (
+                              <Badge variant="secondary" className="text-[9px] font-semibold">
+                                {it.bermo_specs.productBrand}
+                              </Badge>
+                            )}
+                          </div>
                         </div>
-                      </div>
 
-                      {items.length > 1 && (
                         <Button
                           type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => handleRemoveItem(idx)}
-                          className="h-6 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
-                          title="Remover Equipamento"
+                          className="h-7 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50 rounded transition-colors"
+                          title="Remover este equipamento específico da lista"
                         >
                           <Trash2 className="h-3.5 w-3.5 mr-1" />
-                          <span className="text-[11px]">Remover</span>
+                          <span className="text-[11px] font-medium">Remover</span>
                         </Button>
-                      )}
-                    </div>
+                      </div>
 
                     {/* Especificações Técnicas do Equipamento */}
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-50/70 dark:bg-slate-900/60 p-2.5 rounded-md border border-slate-200 dark:border-slate-800">
@@ -2861,6 +3027,286 @@ export function QuotesManager({
                   </div>
                 </div>
 
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+=======
+=======
+            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+                  </span>
+                </div>
+
+                {/* Toggle Ida e Volta com Ícone e Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <ArrowLeftRight className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <Label
+                      htmlFor="toggle-round-trip"
+                      className="text-xs font-semibold cursor-pointer select-none"
+                    >
+                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                    </Label>
+                    <Switch
+                      id="toggle-round-trip"
+                      checked={isRoundTrip}
+                      onCheckedChange={handleToggleRoundTrip}
+                    />
+                  </div>
+
+                  <span className="text-xs font-bold text-emerald-600 font-mono">
+                    Subtotal:{' '}
+                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Origem (CEP e Endereço da Base)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={originCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setOriginCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(destinationCep, val)
+                        }
+                      }}
+                      placeholder="89066-000"
+                      className="text-xs h-8 w-32 font-mono font-bold"
+                    />
+                    <Input
+                      value={originAddress}
+                      onChange={(e) => setOriginAddress(e.target.value)}
+                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Destino da Fábrica / Cliente (CEP e Cidade)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={destinationCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setDestinationCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(val, originCep)
+                        }
+                      }}
+                      placeholder="ex: 89801-000"
+                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                    />
+                    <Input
+                      value={destinationAddress}
+                      onChange={(e) => setDestinationAddress(e.target.value)}
+                      placeholder="Cidade/UF do Cliente"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parâmetros do Mapeia / Deslocamento */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] px-1 py-0 ${
+                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
+                      }`}
+                    >
+                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
+                    </Badge>
+                  </div>
+                  <Input
+                    type="number"
+                    value={distanceKm}
+                    onChange={(e) => setDistanceKm(Number(e.target.value))}
+                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    {isRoundTrip
+                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
+                      : `(Percurso unidirecional: ${distanceKm} km)`}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Consumo Veículo (km/L)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={consumptionKmL}
+                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L ({isRoundTrip ? 'ida+volta' : 'só ida'})
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Preço Litro Combustível (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={fuelPrice}
+                    onChange={(e) => setFuelPrice(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Combustível:{' '}
+                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
+                  <Input
+                    type="number"
+                    value={tollRoadPercent}
+                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Pedágios ({estimatedTolls} praças):{' '}
+                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+=======
+              {/* Ajustes Manuais de Combustível e Pedágio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Combustível (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualFuelAdj}
+                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Pedágio (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualTollAdj}
+                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * Campos calculados automaticamente via CEP permanecem 100% editáveis.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Calculando Rota...
+                    </>
+                  ) : (
+                    'Recalcular Rota Mapeia'
+                  )}
+                </Button>
+              </div>
+            </div>=======
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Hotel className="h-4 w-4 text-purple-600" />
+=======
                 {/* 3. Inspetor */}
                 <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
                   <div className="flex justify-between items-center">
@@ -2916,18 +3362,40 @@ export function QuotesManager({
 
             {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
             <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Truck className="h-4 w-4 text-emerald-600" />
                   <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    3c. Deslocamento & Rotas (Ref. Mapeia / Google Maps)
+                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
                   </span>
                 </div>
-                <span className="text-xs font-bold text-emerald-600 font-mono">
-                  Subtotal Deslocamento:{' '}
-                  {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
+
+                {/* Toggle Ida e Volta com Ícone e Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <ArrowLeftRight
+                      className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
+                    />
+                    <Label
+                      htmlFor="toggle-round-trip"
+                      className="text-xs font-semibold cursor-pointer select-none"
+                    >
+                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                    </Label>
+                    <Switch
+                      id="toggle-round-trip"
+                      checked={isRoundTrip}
+                      onCheckedChange={handleToggleRoundTrip}
+                    />
+                  </div>
+
+                  <span className="text-xs font-bold text-emerald-600 font-mono">
+                    Subtotal:{' '}
+                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
               </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
@@ -2941,7 +3409,7 @@ export function QuotesManager({
                         setOriginCep(val)
                         const clean = val.replace(/\D/g, '')
                         if (clean.length === 8) {
-                          handleRecalculateRoute(undefined, val)
+                          handleRecalculateRoute(destinationCep, val)
                         }
                       }}
                       placeholder="89066-000"
@@ -2968,10 +3436,10 @@ export function QuotesManager({
                         setDestinationCep(val)
                         const clean = val.replace(/\D/g, '')
                         if (clean.length === 8) {
-                          handleRecalculateRoute(val, undefined)
+                          handleRecalculateRoute(val, originCep)
                         }
                       }}
-                      placeholder="CEP Destino"
+                      placeholder="ex: 89801-000"
                       className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
                     />
                     <Input
@@ -2983,18 +3451,21 @@ export function QuotesManager({
                   </div>
                 </div>
               </div>
+
               {/* Parâmetros do Mapeia / Deslocamento */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <Label className="text-[10px] text-muted-foreground">
-                      Distância Total (Ida + Volta km)
+                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
                     </Label>
                     <Badge
                       variant="outline"
-                      className="text-[9px] px-1 py-0 text-emerald-700 bg-emerald-50"
+                      className={`text-[9px] px-1 py-0 ${
+                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
+                      }`}
                     >
-                      ×2 Ida/Volta
+                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
                     </Badge>
                   </div>
                   <Input
@@ -3004,8 +3475,9 @@ export function QuotesManager({
                     className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
                   />
                   <span className="text-[9px] text-muted-foreground block">
-                    (Ida: ~{Math.round(distanceKm / 2)} km | Volta: ~{Math.round(distanceKm / 2)}{' '}
-                    km)
+                    {isRoundTrip
+                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
+                      : `(Percurso unidirecional: ${distanceKm} km)`}
                   </span>
                 </div>
                 <div className="space-y-1">
@@ -3019,7 +3491,8 @@ export function QuotesManager({
                     className="text-xs h-8"
                   />
                   <span className="text-[9px] text-muted-foreground block">
-                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L (ida+volta)
+                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L (
+                    {isRoundTrip ? 'ida+volta' : 'só ida'})
                   </span>
                 </div>
                 <div className="space-y-1">
@@ -3047,11 +3520,12 @@ export function QuotesManager({
                     className="text-xs h-8"
                   />
                   <span className="text-[9px] text-muted-foreground block">
-                    Pedágios:{' '}
+                    Pedágios ({estimatedTolls} praças):{' '}
                     {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </span>
                 </div>
               </div>
+
               {/* Ajustes Manuais de Combustível e Pedágio */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                 <div className="space-y-1">
@@ -3081,7 +3555,296 @@ export function QuotesManager({
                   />
                 </div>
               </div>
-              =======
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine. Campos editáveis.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Calculando Rota...
+                    </>
+                  ) : (
+                    'Recalcular Rota Mapeia'
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Hotel className="h-4 w-4 text-purple-600" />=======
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+=======
+=======
+            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+                  </span>
+                </div>
+
+                {/* Toggle Ida e Volta com Ícone e Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <ArrowLeftRight className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <Label
+                      htmlFor="toggle-round-trip"
+                      className="text-xs font-semibold cursor-pointer select-none"
+                    >
+                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                    </Label>
+                    <Switch
+                      id="toggle-round-trip"
+                      checked={isRoundTrip}
+                      onCheckedChange={handleToggleRoundTrip}
+                    />
+                  </div>
+
+                  <span className="text-xs font-bold text-emerald-600 font-mono">
+                    Subtotal:{' '}
+                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Origem (CEP e Endereço da Base)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={originCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setOriginCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(destinationCep, val)
+                        }
+                      }}
+                      placeholder="89066-000"
+                      className="text-xs h-8 w-32 font-mono font-bold"
+                    />
+                    <Input
+                      value={originAddress}
+                      onChange={(e) => setOriginAddress(e.target.value)}
+                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Destino da Fábrica / Cliente (CEP e Cidade)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={destinationCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setDestinationCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(val, originCep)
+                        }
+                      }}
+                      placeholder="ex: 89801-000"
+                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                    />
+                    <Input
+                      value={destinationAddress}
+                      onChange={(e) => setDestinationAddress(e.target.value)}
+                      placeholder="Cidade/UF do Cliente"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parâmetros do Mapeia / Deslocamento */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] px-1 py-0 ${
+                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
+                      }`}
+                    >
+                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
+                    </Badge>
+                  </div>
+                  <Input
+                    type="number"
+                    value={distanceKm}
+                    onChange={(e) => setDistanceKm(Number(e.target.value))}
+                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    {isRoundTrip
+                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
+                      : `(Percurso unidirecional: ${distanceKm} km)`}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Consumo Veículo (km/L)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={consumptionKmL}
+                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L ({isRoundTrip ? 'ida+volta' : 'só ida'})
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Preço Litro Combustível (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={fuelPrice}
+                    onChange={(e) => setFuelPrice(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Combustível:{' '}
+                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
+                  <Input
+                    type="number"
+                    value={tollRoadPercent}
+                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Pedágios ({estimatedTolls} praças):{' '}
+                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+=======
+              {/* Ajustes Manuais de Combustível e Pedágio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Combustível (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualFuelAdj}
+                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Pedágio (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualTollAdj}
+                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * Campos calculados automaticamente via CEP permanecem 100% editáveis.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Calculando Rota...
+                    </>
+                  ) : (
+                    'Recalcular Rota Mapeia'
+                  )}
+                </Button>
+              </div>
+            </div>=======
               <div className="flex justify-end pt-1">
                 <Button
                   type="button"

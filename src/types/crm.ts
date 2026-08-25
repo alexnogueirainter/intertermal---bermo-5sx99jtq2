@@ -123,6 +123,7 @@ export interface TravelCostsState {
   destinationCep: string
   destinationAddress: string
   distanceKm: number
+  isRoundTrip?: boolean
   fuelPrice: number
   consumptionKmL: number
   tollRoadPercent: number

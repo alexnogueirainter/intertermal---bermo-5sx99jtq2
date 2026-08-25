@@ -4,12 +4,14 @@ export interface RouteCalculationInput {
   fuelPrice?: number
   consumptionKmL?: number
   tollRoadPercent?: number
+  isRoundTrip?: boolean
 }
 
 export interface RouteCalculationResult {
   distanceOneWayKm: number
   roundTripKm: number
-  distanceKm: number // Distância total considerada (ida e volta)
+  distanceKm: number // Distância considerada (ida ou ida e volta dependendo do parâmetro)
+  isRoundTrip: boolean
   destinationCity?: string
   destinationState?: string
   destinationAddress?: string
@@ -223,6 +225,7 @@ export async function calculateDistanceBetweenCeps(
   fuelPrice: number = 5.89,
   consumptionKmL: number = 9.5,
   tollRoadPercent: number = 40,
+  isRoundTrip: boolean = true,
 ): Promise<RouteCalculationResult> {
   const cleanOrig = (originCep || '89066-000').replace(/\D/g, '')
   const cleanDest = (destinationCep || '').replace(/\D/g, '')
@@ -242,20 +245,21 @@ export async function calculateDistanceBetweenCeps(
     haversineDistance(origInfo.lat, origInfo.lng, destInfo.lat, destInfo.lng),
   )
 
-  // DISTÂNCIA TOTAL (IDA E VOLTA = distância × 2)
+  // DISTÂNCIA TOTAL (se ida e volta, distância × 2; se apenas ida, distância × 1)
   const roundTripKm = distanceOneWayKm * 2
+  const effectiveDistanceKm = isRoundTrip ? roundTripKm : distanceOneWayKm
 
-  // Combustível para IDA E VOLTA
-  const liters = roundTripKm / (consumptionKmL > 0 ? consumptionKmL : 9.5)
+  // Combustível
+  const liters = effectiveDistanceKm / (consumptionKmL > 0 ? consumptionKmL : 9.5)
   const fuelCost = Math.round(liters * fuelPrice * 100) / 100
 
-  // Pedágio para IDA E VOLTA (pedágios de ida × 2)
+  // Pedágio (se ida e volta, praças × 2)
   const oneWayTollBooths = Math.max(
     1,
     Math.round((distanceOneWayKm / 80) * (tollRoadPercent / 100)),
   )
-  const roundTripTollBooths = oneWayTollBooths * 2
-  const tollCost = roundTripTollBooths * 14.5
+  const tollBoothsCount = isRoundTrip ? oneWayTollBooths * 2 : oneWayTollBooths
+  const tollCost = tollBoothsCount * 14.5
 
   const originFormatted = origInfo.address || `${origInfo.city}/${origInfo.state}`
   const destinationFormatted = destInfo.address || `${destInfo.city}/${destInfo.state}`
@@ -263,7 +267,8 @@ export async function calculateDistanceBetweenCeps(
   return {
     distanceOneWayKm,
     roundTripKm,
-    distanceKm: roundTripKm, // O sistema usa o total ida+volta
+    distanceKm: effectiveDistanceKm,
+    isRoundTrip,
     destinationCity: destInfo.city,
     destinationState: destInfo.state,
     destinationAddress: destinationFormatted,
