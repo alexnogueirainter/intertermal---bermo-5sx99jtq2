@@ -7,44 +7,46 @@ routerAdd('POST', '/backend/v1/equipment/search-specs', (e) => {
   }
 
   try {
-    const prompt = `Você é um especialista em engenharia de trocadores de calor a placas e válvulas industriais com foco técnico nas marcas BERMO (bermo.com.br), Alfa Laval (alfalaval.com.br), ARI Armaturen, Danfoss, Sondex, Kelvion, Swep, Tranter e APV.
+    const prompt = `Você é um engenheiro sênior especialista em trocadores de calor a placas, trocadores brasados e válvulas industriais.
+Sua principal base de conhecimento são os catálogos técnicos oficiais dos fabricantes BERMO (www.bermo.com.br) e Alfa Laval (www.alfalaval.com.br), bem como ARI Armaturen, Swep, Kelvion, Sondex, Danfoss, Tranter e APV.
 
-O usuário pesquisou pelo modelo de equipamento ou trocador de calor: "${modelQuery}".
+O usuário pesquisou pelo modelo de equipamento: "${modelQuery}".
 
 Sua tarefa:
-1. Identifique o fabricante mais provável (ex: BERMO, Alfa Laval, ARI Armaturen, Swep, Kelvion, etc.) e as especificações técnicas típicas deste modelo de acordo com a literatura técnica e catálogos oficiais do fabricante (bermo.com.br, alfalaval.com.br, etc.).
-2. Se você encontrar o modelo ou família correspondente, responda estritamente em formato JSON válido com as chaves:
+1. Priorize a identificação nos catálogos e literaturas técnicas da BERMO (www.bermo.com.br) e Alfa Laval (www.alfalaval.com.br).
+2. Se o modelo corresponder a um trocador de calor ou válvula industrial (ex: BP, BL, BM, BTL, T5, M6, M10, M15, TL10, TS6, CLIP, AQ4, etc.), forneça os dados técnicos oficiais e típicos.
+3. Se for encontrado, retorne estritamente um JSON no seguinte formato:
 {
   "found": true,
-  "brand": "BERMO" | "Alfa Laval" | "Outro fabricante",
-  "model": "Código/Modelo normalizado",
-  "name": "Nome técnico completo do equipamento",
-  "description": "Breve descrição técnica",
+  "brand": "BERMO" | "Alfa Laval" | "Nome do Fabricante",
+  "model": "Código/Modelo normalizado (ex: BP30, M10-B, T5-BFG)",
+  "name": "Nome técnico descritivo (ex: Trocador de Calor a Placas BERMO BP30)",
+  "description": "Breve descrição técnica das aplicações e características",
   "specs": {
-    "connection": "ex: DN50 (2 pol) Flangeado ou 2 pol BSP ou Tri-Clamp",
-    "pressure": "ex: 16 bar ou 10 bar ou 25 bar",
+    "connection": "ex: DN50 (2 pol) Flangeado / Roscado BSP",
+    "pressure": "ex: 16 bar ou 10 bar",
     "temperature": "ex: -10°C a 160°C",
     "material": "ex: AISI 316L (0.5mm) ou Titânio",
-    "gasketMaterial": "ex: EPDM Clip-on / NBR ou Viton",
-    "platesRange": "ex: 20 a 100 placas",
+    "gasketMaterial": "ex: EPDM Clip-on / NBR / Viton",
+    "platesRange": "ex: 40 ou 20 a 80 placas",
     "plateDimensions": "ex: 680 x 280 mm",
     "gasketsCount": "ex: 40",
     "maxFlowRate": "ex: 35 m³/h",
-    "applications": "ex: Vapor, condensado, CIP, alimentício ou industrial"
+    "applications": "ex: Vapor, condensado, CIP, alimentício ou utilidades"
   },
-  "source": "Catálogo do Fabricante (ex: bermo.com.br / alfalaval.com.br)"
+  "source": "Catálogo Fabricante (www.bermo.com.br / www.alfalaval.com.br)"
 }
 
-3. Se o modelo não for reconhecido como nenhum equipamento conhecido de trocadores ou válvulas industriais mesmo após busca profunda, retorne:
+4. Se o modelo NÃO puder ser identificado como trocador ou válvula industrial, retorne:
 {
   "found": false,
   "brand": "Outro",
   "model": "${modelQuery}",
   "specs": null,
-  "message": "Modelo não localizado nos catálogos técnicos online. Campos abertos para preenchimento manual."
+  "message": "Modelo não localizado nos catálogos oficiais BERMO / Alfa Laval na internet. Preenchimento manual disponível."
 }
 
-IMPORTANTE: Responda APENAS com o objeto JSON válido, sem crases de markdown e sem texto antes ou depois.`
+IMPORTANTE: Responda APENAS com o JSON válido, sem qualquer texto adicional antes ou depois, e sem markdown com crases.`
 
     const reply = $ai.chat({
       model: 'fast',
@@ -52,7 +54,7 @@ IMPORTANTE: Responda APENAS com o objeto JSON válido, sem crases de markdown e 
         {
           role: 'system',
           content:
-            'Você é um assistente técnico que retorna única e exclusivamente dados em formato JSON estrito para integração de sistemas de engenharia.',
+            'Você é um assistente técnico que retorna única e exclusivamente dados em formato JSON estrito para integração de sistemas de engenharia térmica e industrial.',
         },
         {
           role: 'user',
@@ -77,7 +79,6 @@ IMPORTANTE: Responda APENAS com o objeto JSON válido, sem crases de markdown e 
     try {
       parsed = JSON.parse(cleaned)
     } catch (parseErr) {
-      // Se não conseguiu parsear direto, tenta extrair bloco JSON
       const firstBrace = cleaned.indexOf('{')
       const lastBrace = cleaned.lastIndexOf('}')
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
@@ -94,7 +95,7 @@ IMPORTANTE: Responda APENAS com o objeto JSON válido, sem crases de markdown e 
       brand: 'Outro',
       model: modelQuery,
       specs: null,
-      message: 'Modelo não identificado automaticamente. Preenchimento manual disponível.',
+      message: 'Modelo não identificado automaticamente. Preenchimento manual liberado.',
     })
   } catch (err) {
     return e.json(200, {
@@ -102,7 +103,7 @@ IMPORTANTE: Responda APENAS com o objeto JSON válido, sem crases de markdown e 
       brand: 'Outro',
       model: modelQuery,
       specs: null,
-      message: 'Busca online indisponível no momento. Preencha manualmente os campos técnicos.',
+      message: 'Busca online indisponível. Preenchimento manual liberado.',
     })
   }
 })
