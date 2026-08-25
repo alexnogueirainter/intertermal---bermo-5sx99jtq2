@@ -296,9 +296,6 @@ export function QuotesManager({
     setWorkingPressureBar(item.maxPressureBar || 10)
     setDimensions(`${item.widthMm || 480} x ${item.heightMm || 1450} x ${item.depthMm || 1120} mm`)
     setWeightKg(item.weightKg || 480)
-    if (item.basePriceBrl && materialsCost === 0) {
-      setMaterialsCost(Math.round(item.basePriceBrl * 0.35))
-    }
   }
 
   const selectSuggestion = (item: SupplierPlateHeatExchanger) => {
