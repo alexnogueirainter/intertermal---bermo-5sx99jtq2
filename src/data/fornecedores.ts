@@ -1,302 +1,187 @@
-export interface SupplierProductSpecs {
-  connection: string // ex: 1", 2", 3", 4", 6", 3/4", 1.5", 2.5"
-  pressure: string // ex: 16 bar, 10 bar
-  temperature: string // ex: -10°C a 150°C
-  material?: string // ex: AISI 316 / Titânio
-  gasketMaterial: string // ex: NBR/EPDM, NBR/EPDM/Viton
-  platesRange: string // ex: 20-60, 40-120
-  plateDimensions: string // ex: 310x140mm
-  platesCountDefault?: number // valor numérico sugerido
-}
-
-export interface SupplierProductItem {
+export interface SupplierPlateHeatExchanger {
   id: string
-  code: string
-  model: string
-  name: string
-  brand: 'Alfa Laval' | 'BERMO' | 'Outro'
-  category: string
-  description: string
-  basePrice: number
-  specs: SupplierProductSpecs
+  brand: string
+  modelCode: string
+  modelSeries?: string
+  plateCount: number
+  plateMaterial: string
+  plateThicknessMm: number
+  gasketMaterial: string
+  connectionSize: string
+  testPressureBar: number
+  maxPressureBar: number
+  widthMm: number
+  heightMm: number
+  depthMm: number
+  weightKg: number
+  basePriceBrl?: number
+  description?: string
 }
 
-import { BERMO_CATALOG, BermoProductItem } from './bermo-catalog'
-
-export { BERMO_CATALOG }
-export const SUPPLIERS_DATABASE = BERMO_CATALOG
-
-export const ALFA_LAVAL_SUPPLIERS: SupplierProductItem[] = [
+export const SUPPLIERS_DATABASE: SupplierPlateHeatExchanger[] = [
   {
-    id: 'alfa-t2-bfg',
-    code: 'T2-BFG',
-    model: 'T2-BFG',
-    name: 'Trocador de Calor Alfa Laval T2-BFG',
-    brand: 'Alfa Laval',
-    category: 'Trocadores de Calor a Placas Gaxetados',
-    description:
-      'Trocador Alfa Laval T2-BFG: placas 20-60, dimensão 310x140mm, gaxetas NBR/EPDM, conexões 1", 16 bar, -10°C a 150°C',
-    basePrice: 11800,
-    specs: {
-      platesRange: '20-60',
-      plateDimensions: '310x140mm',
-      gasketMaterial: 'NBR/EPDM',
-      connection: '1"',
-      pressure: '16 bar',
-      temperature: '-10°C a 150°C',
-      material: 'AISI 316L / Titânio',
-      platesCountDefault: 40,
-    },
+    id: 'alf-m10-bfg',
+    brand: 'Alfa Laval / BERMO',
+    modelCode: 'M10-BFG',
+    modelSeries: 'Industrial Line M',
+    plateCount: 55,
+    plateMaterial: 'AISI 316L',
+    plateThicknessMm: 0.5,
+    gasketMaterial: 'EPDM Clip-on',
+    connectionSize: 'DN100 (4")',
+    testPressureBar: 16,
+    maxPressureBar: 10,
+    widthMm: 480,
+    heightMm: 1450,
+    depthMm: 1120,
+    weightKg: 520,
+    basePriceBrl: 48500,
+    description: 'Trocador de calor a placas desmontável industrial Alfa Laval M10-BFG',
   },
   {
-    id: 'alfa-t5-bfg',
-    code: 'T5-BFG',
-    model: 'T5-BFG',
-    name: 'Trocador de Calor Alfa Laval T5-BFG',
-    brand: 'Alfa Laval',
-    category: 'Trocadores de Calor a Placas Gaxetados',
-    description:
-      'Trocador Alfa Laval T5-BFG: placas 40-120, dimensão 500x210mm, gaxetas NBR/EPDM/Viton, conexões 2", 16 bar, -10°C a 180°C',
-    basePrice: 19500,
-    specs: {
-      platesRange: '40-120',
-      plateDimensions: '500x210mm',
-      gasketMaterial: 'NBR/EPDM/Viton',
-      connection: '2"',
-      pressure: '16 bar',
-      temperature: '-10°C a 180°C',
-      material: 'AISI 316L / Titânio',
-      platesCountDefault: 80,
-    },
+    id: 'alf-tl10-p',
+    brand: 'Alfa Laval / BERMO',
+    modelCode: 'TL10-P',
+    modelSeries: 'TL Standard Line',
+    plateCount: 65,
+    plateMaterial: 'AISI 316L',
+    plateThicknessMm: 0.5,
+    gasketMaterial: 'EPDM Clip-on',
+    connectionSize: 'DN100 (4")',
+    testPressureBar: 16,
+    maxPressureBar: 10,
+    widthMm: 500,
+    heightMm: 1520,
+    depthMm: 1250,
+    weightKg: 580,
+    basePriceBrl: 54000,
+    description: 'Trocador de calor Alfa Laval TL10-P alta eficiência térmica',
   },
   {
-    id: 'alfa-t8-bfg',
-    code: 'T8-BFG',
-    model: 'T8-BFG',
-    name: 'Trocador de Calor Alfa Laval T8-BFG',
-    brand: 'Alfa Laval',
-    category: 'Trocadores de Calor a Placas Gaxetados',
-    description:
-      'Trocador Alfa Laval T8-BFG: placas 60-200, dimensão 750x310mm, gaxetas NBR/EPDM/Viton, conexões 3", 16 bar, -10°C a 180°C',
-    basePrice: 28900,
-    specs: {
-      platesRange: '60-200',
-      plateDimensions: '750x310mm',
-      gasketMaterial: 'NBR/EPDM/Viton',
-      connection: '3"',
-      pressure: '16 bar',
-      temperature: '-10°C a 180°C',
-      material: 'AISI 316L / Titânio',
-      platesCountDefault: 130,
-    },
+    id: 'alf-m6-mfg',
+    brand: 'Alfa Laval / BERMO',
+    modelCode: 'M6-MFG',
+    modelSeries: 'Industrial Line M',
+    plateCount: 40,
+    plateMaterial: 'AISI 316',
+    plateThicknessMm: 0.5,
+    gasketMaterial: 'NBR Clip-on',
+    connectionSize: 'DN65 (2.1/2")',
+    testPressureBar: 16,
+    maxPressureBar: 10,
+    widthMm: 340,
+    heightMm: 980,
+    depthMm: 780,
+    weightKg: 240,
+    basePriceBrl: 29500,
+    description: 'Trocador de calor compacto desmontável Alfa Laval M6-MFG',
   },
   {
-    id: 'alfa-t10-bfg',
-    code: 'T10-BFG',
-    model: 'T10-BFG',
-    name: 'Trocador de Calor Alfa Laval T10-BFG',
-    brand: 'Alfa Laval',
-    category: 'Trocadores de Calor a Placas Gaxetados',
-    description:
-      'Trocador Alfa Laval T10-BFG: placas 80-300, dimensão 980x380mm, gaxetas NBR/EPDM/Viton, conexões 4", 16 bar, -10°C a 180°C',
-    basePrice: 39500,
-    specs: {
-      platesRange: '80-300',
-      plateDimensions: '980x380mm',
-      gasketMaterial: 'NBR/EPDM/Viton',
-      connection: '4"',
-      pressure: '16 bar',
-      temperature: '-10°C a 180°C',
-      material: 'AISI 316L / Titânio',
-      platesCountDefault: 190,
-    },
+    id: 'alf-m15-bfg',
+    brand: 'Alfa Laval / BERMO',
+    modelCode: 'M15-BFG',
+    modelSeries: 'Industrial Line M',
+    plateCount: 85,
+    plateMaterial: 'AISI 316L',
+    plateThicknessMm: 0.6,
+    gasketMaterial: 'EPDM Clip-on',
+    connectionSize: 'DN150 (6")',
+    testPressureBar: 16,
+    maxPressureBar: 12,
+    widthMm: 620,
+    heightMm: 1850,
+    depthMm: 1450,
+    weightKg: 950,
+    basePriceBrl: 89000,
+    description: 'Trocador de grande porte Alfa Laval M15-BFG',
   },
   {
-    id: 'alfa-t20-bfg',
-    code: 'T20-BFG',
-    model: 'T20-BFG',
-    name: 'Trocador de Calor Alfa Laval T20-BFG',
-    brand: 'Alfa Laval',
-    category: 'Trocadores de Calor a Placas Gaxetados',
-    description:
-      'Trocador Alfa Laval T20-BFG: placas 120-450, dimensão 1200x480mm, gaxetas NBR/EPDM/Viton, conexões 6", 16 bar, -10°C a 180°C',
-    basePrice: 54000,
-    specs: {
-      platesRange: '120-450',
-      plateDimensions: '1200x480mm',
-      gasketMaterial: 'NBR/EPDM/Viton',
-      connection: '6"',
-      pressure: '16 bar',
-      temperature: '-10°C a 180°C',
-      material: 'AISI 316L / Titânio',
-      platesCountDefault: 280,
-    },
+    id: 'alf-t20-m',
+    brand: 'Alfa Laval / BERMO',
+    modelCode: 'T20-M',
+    modelSeries: 'Industrial Line T',
+    plateCount: 110,
+    plateMaterial: 'AISI 316L',
+    plateThicknessMm: 0.6,
+    gasketMaterial: 'NBR Glued',
+    connectionSize: 'DN200 (8")',
+    testPressureBar: 20,
+    maxPressureBar: 16,
+    widthMm: 780,
+    heightMm: 2200,
+    depthMm: 1800,
+    weightKg: 1650,
+    basePriceBrl: 145000,
+    description: 'Trocador de alto volume e vazão Alfa Laval T20-M',
   },
   {
-    id: 'alfa-m3',
-    code: 'M3',
-    model: 'M3',
-    name: 'Trocador de Calor Alfa Laval M3',
-    brand: 'Alfa Laval',
-    category: 'Trocadores de Calor a Placas Gaxetados',
-    description:
-      'Trocador Alfa Laval M3: placas 10-30, dimensão 280x110mm, gaxetas NBR/EPDM, conexões 3/4", 10 bar, -10°C a 130°C',
-    basePrice: 8900,
-    specs: {
-      platesRange: '10-30',
-      plateDimensions: '280x110mm',
-      gasketMaterial: 'NBR/EPDM',
-      connection: '3/4"',
-      pressure: '10 bar',
-      temperature: '-10°C a 130°C',
-      material: 'AISI 316 / Titânio',
-      platesCountDefault: 20,
-    },
+    id: 'kel-nt100m',
+    brand: 'Kelvion / GEA',
+    modelCode: 'NT100M',
+    modelSeries: 'NT Series OptiWave',
+    plateCount: 50,
+    plateMaterial: 'AISI 316L',
+    plateThicknessMm: 0.5,
+    gasketMaterial: 'EPDM EcoLoc',
+    connectionSize: 'DN100 (4")',
+    testPressureBar: 16,
+    maxPressureBar: 10,
+    widthMm: 460,
+    heightMm: 1400,
+    depthMm: 1050,
+    weightKg: 490,
+    basePriceBrl: 46000,
+    description: 'Trocador Kelvion NT100M com canal de fluxo OptiWave',
   },
   {
-    id: 'alfa-m6',
-    code: 'M6',
-    model: 'M6',
-    name: 'Trocador de Calor Alfa Laval M6',
-    brand: 'Alfa Laval',
-    category: 'Trocadores de Calor a Placas Gaxetados',
-    description:
-      'Trocador Alfa Laval M6: placas 20-60, dimensão 400x180mm, gaxetas NBR/EPDM/Viton, conexões 1.5", 16 bar, -10°C a 160°C',
-    basePrice: 16200,
-    specs: {
-      platesRange: '20-60',
-      plateDimensions: '400x180mm',
-      gasketMaterial: 'NBR/EPDM/Viton',
-      connection: '1.5"',
-      pressure: '16 bar',
-      temperature: '-10°C a 160°C',
-      material: 'AISI 316L',
-      platesCountDefault: 40,
-    },
-  },
-  {
-    id: 'alfa-m10-b',
-    code: 'M10-B',
-    model: 'M10-B',
-    name: 'Trocador de Calor Alfa Laval M10-B',
-    brand: 'Alfa Laval',
-    category: 'Trocadores de Calor a Placas Gaxetados',
-    description:
-      'Trocador Alfa Laval M10-B: placas 40-150, dimensão 680x310mm, gaxetas NBR/EPDM/Viton, conexões 2.5", 16 bar, -10°C a 180°C',
-    basePrice: 24500,
-    specs: {
-      platesRange: '40-150',
-      plateDimensions: '680x310mm',
-      gasketMaterial: 'NBR/EPDM/Viton',
-      connection: '2.5"',
-      pressure: '16 bar',
-      temperature: '-10°C a 180°C',
-      material: 'AISI 316L / Titânio',
-      platesCountDefault: 95,
-    },
-  },
-  {
-    id: 'alfa-m15-b',
-    code: 'M15-B',
-    model: 'M15-B',
-    name: 'Trocador de Calor Alfa Laval M15-B',
-    brand: 'Alfa Laval',
-    category: 'Trocadores de Calor a Placas Gaxetados',
-    description:
-      'Trocador Alfa Laval M15-B: placas 60-250, dimensão 920x380mm, gaxetas NBR/EPDM/Viton, conexões 4", 16 bar, -10°C a 180°C',
-    basePrice: 36800,
-    specs: {
-      platesRange: '60-250',
-      plateDimensions: '920x380mm',
-      gasketMaterial: 'NBR/EPDM/Viton',
-      connection: '4"',
-      pressure: '16 bar',
-      temperature: '-10°C a 180°C',
-      material: 'AISI 316L / Titânio',
-      platesCountDefault: 155,
-    },
+    id: 'dan-xg10',
+    brand: 'Danfoss / Sondex',
+    modelCode: 'Sondex S14A',
+    modelSeries: 'Standard Plate',
+    plateCount: 45,
+    plateMaterial: 'AISI 316L',
+    plateThicknessMm: 0.5,
+    gasketMaterial: 'SonderLock EPDM',
+    connectionSize: 'DN65 (2.1/2")',
+    testPressureBar: 16,
+    maxPressureBar: 10,
+    widthMm: 380,
+    heightMm: 1150,
+    depthMm: 850,
+    weightKg: 310,
+    basePriceBrl: 34000,
+    description: 'Trocador Sondex S14A desmontável com travamento SonderLock',
   },
 ]
 
-/**
- * Busca por modelo na base de fornecedores (Alfa Laval e outros)
- */
-export function searchSupplierProduct(
-  query: string,
-): BermoProductItem | SupplierProductItem | undefined {
-  if (!query) return undefined
-  const clean = query.trim().toLowerCase().replace(/\s+/g, '')
-
-  // Primeiro busca no catálogo unificado BERMO / Alfa Laval
-  const foundBermo = BERMO_CATALOG.find((p) => {
-    const codeClean = p.code.toLowerCase().replace(/\s+/g, '')
-    const modelClean = p.model.toLowerCase().replace(/\s+/g, '')
-    const nameClean = p.name.toLowerCase().replace(/\s+/g, '')
-    return (
-      codeClean === clean ||
-      modelClean === clean ||
-      codeClean.includes(clean) ||
-      clean.includes(codeClean) ||
-      nameClean.includes(clean)
-    )
-  })
-  if (foundBermo) return foundBermo
-
-  return ALFA_LAVAL_SUPPLIERS.find((p) => {
-    const codeClean = p.code.toLowerCase().replace(/\s+/g, '')
-    const modelClean = p.model.toLowerCase().replace(/\s+/g, '')
-    const nameClean = p.name.toLowerCase().replace(/\s+/g, '')
-    return (
-      codeClean === clean ||
-      modelClean === clean ||
-      codeClean.includes(clean) ||
-      clean.includes(codeClean) ||
-      nameClean.includes(clean)
-    )
-  })
-}
-
-/**
- * Retorna o texto padronizado da metodologia técnica na descrição do serviço com fabricante dinâmico
- * @param brands Marcas ou itens selecionados no orçamento
- */
-export function getStandardServiceMethodology(brands?: (string | undefined)[]): string {
-  let manufacturerLabel = 'Bermo e Alfa Laval'
-  if (brands && brands.length > 0) {
-    const validBrands = brands.filter(Boolean) as string[]
-    const hasBermo = validBrands.some((b) => {
-      const u = b.toUpperCase()
-      return u.includes('BERMO') || u.includes('ARI')
-    })
-    const hasAlfaLaval = validBrands.some((b) => {
-      const u = b.toUpperCase()
-      return u.includes('ALFA') || u.includes('LAVAL')
-    })
-
-    if (hasBermo && !hasAlfaLaval) {
-      manufacturerLabel = 'Bermo'
-    } else if (hasAlfaLaval && !hasBermo) {
-      manufacturerLabel = 'Alfa Laval'
-    } else if (hasBermo && hasAlfaLaval) {
-      manufacturerLabel = 'Bermo e Alfa Laval'
-    } else if (!hasBermo && !hasAlfaLaval) {
-      // Se tiver marca não reconhecida, padrão Bermo e Alfa Laval
-      manufacturerLabel = 'Bermo e Alfa Laval'
-    }
+export function registerSupplierEquipment(equipment: SupplierPlateHeatExchanger): void {
+  const existingIndex = SUPPLIERS_DATABASE.findIndex(
+    (item) => item.modelCode.toLowerCase() === equipment.modelCode.toLowerCase(),
+  )
+  if (existingIndex >= 0) {
+    SUPPLIERS_DATABASE[existingIndex] = { ...SUPPLIERS_DATABASE[existingIndex], ...equipment }
+  } else {
+    SUPPLIERS_DATABASE.unshift(equipment)
   }
-
-  return `A metodologia aplicada seguiu rigorosamente as normas técnicas de manutenção industrial e as recomendações dos fabricantes (${manufacturerLabel}), consistindo nas seguintes etapas:
-
-1. Desmontagem: Abertura do feixe de placas com registro prévio da Medida A (distância entre as placas de aperto) para referência de remontagem.
-2. Limpeza: Remoção de incrustações e resíduos de processo através de limpeza mecânica manual e/ou química, preservando a integridade do material das placas.
-3. Inspeção de Placas: Análise visual individualizada para detecção de furos, deformações, pontos de corrosão ou desgaste prematuro.
-4. Inspeção de Gaxetas: Verificação da elasticidade, presença de trincas, ressecamento ou perda de perfil de vedação.
-5. Montagem: Fechamento do equipamento com aplicação de torque gradual e uniforme, respeitando a Medida A final especificada.
-6. Teste de Estanqueidade: Verificação pós-montagem para garantia de ausência de vazamentos externos sob pressão de operação.`
 }
 
-/**
- * Texto obrigatório e exato da seção "Incluso no valor" da proposta (PDF e Modal)
- */
-export const PROPOSAL_INCLUSIONS_TEXT =
-  'O valor da presente proposta inclui todos os impostos incidentes sobre serviços (ISS, PIS, COFINS, CSLL e IRPJ), mão de obra especializada com profissionais habilitados e capacitados para execução dos serviços técnicos descritos, deslocamento e despesas diversas com funcionários (transporte, alimentação e hospedagem quando aplicável), e todo material de consumo necessário para realização dos procedimentos de limpeza e manutenção (produtos químicos, ferramentas, EPIs e equipamentos de aplicação). As peças de reposição necessárias (placas, gaxetas, parafusos e componentes) são de responsabilidade do cliente, podendo ser fornecidas mediante orçamento complementar.'
+export function lookupEquipmentSpecs(query: string): SupplierPlateHeatExchanger | undefined {
+  if (!query || !query.trim()) return undefined
+  const clean = query.trim().toLowerCase()
+  return SUPPLIERS_DATABASE.find(
+    (item) =>
+      item.modelCode.toLowerCase() === clean ||
+      item.modelCode.toLowerCase().replace(/[-_ ]/g, '') === clean.replace(/[-_ ]/g, ''),
+  )
+}
+
+export function searchEquipmentModel(query: string): SupplierPlateHeatExchanger[] {
+  if (!query || !query.trim()) return []
+  const clean = query.trim().toLowerCase()
+  return SUPPLIERS_DATABASE.filter(
+    (item) =>
+      item.modelCode.toLowerCase().includes(clean) ||
+      item.brand.toLowerCase().includes(clean) ||
+      (item.modelSeries && item.modelSeries.toLowerCase().includes(clean)),
+  )
+}

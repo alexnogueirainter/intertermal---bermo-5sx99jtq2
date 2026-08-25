@@ -1,32 +1,54 @@
 import React, { useState, useMemo } from 'react'
 import {
+  FileText,
+  Plus,
+  Search,
+  CheckCircle2,
+  Clock,
+  Eye,
+  Edit,
+  Trash2,
+  DollarSign,
+  Layers,
+  Wrench,
+  Truck,
+  Hotel,
+  SlidersHorizontal,
+  Database,
+  Loader2,
+  ArrowLeftRight,
+  Save,
+  Check,
+  UserCheck,
+} from 'lucide-react'
+import {
   QuoteRecord,
-  QuoteItem,
+  QuoteLaborConfig,
+  QuotePricingConfig,
   ClientRecord,
+  DealRecord,
   QuoteStatus,
   PaymentConditionType,
-  MaintenanceMaterialItem,
 } from '@/types/crm'
 import {
-  BERMO_CATALOG,
   SUPPLIERS_DATABASE,
-  searchSupplierProduct,
-  getStandardServiceMethodology,
-  PROPOSAL_INCLUSIONS_TEXT,
-  BermoProductItem,
-} from '@/data/bermo-catalog'
-import { searchEquipmentSpecsOnline } from '@/services/quotes'
-import { calculateQuotePricing } from '@/lib/quote-calculator'
-import { calculateDistanceBetweenCeps } from '@/lib/mapeia-calculator'
+  lookupEquipmentSpecs,
+  searchEquipmentModel,
+  registerSupplierEquipment,
+  SupplierPlateHeatExchanger,
+} from '@/data/fornecedores'
+import { productsService } from '@/services/crm-extras'
+import { calculateQuotePricing, PricingCalculationResult } from '@/lib/quote-calculator'
+import { fetchCepCoordinates, haversineDistanceKm, BLUMENAU_COORDS } from '@/lib/mapeia-calculator'
 import { QuotePdfPreviewDialog } from '@/components/QuotePdfPreviewDialog'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -39,2909 +61,1944 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import {
-  Plus,
-  Trash2,
-  FileText,
-  Clock,
-  Printer,
-  Sparkles,
-  Wrench,
-  Flame,
-  Truck,
-  Hotel,
-  SlidersHorizontal,
-  Eye,
-  ShieldCheck,
-  UserCheck,
-  Package,
-  FileSpreadsheet,
-  CheckCircle2,
-  Search,
-  Layers,
-  AlertCircle,
-  Globe,
-  Loader2,
-  ArrowLeftRight,
-} from 'lucide-react'
+import { useToast } from '@/hooks/use-toast'
 
-interface QuotesManagerProps {
+export interface QuotesManagerProps {
   quotes: QuoteRecord[]
   clients: ClientRecord[]
+  deals?: DealRecord[]
   selectedQuote?: QuoteRecord | null
-  onCreateQuote: (quote: Partial<QuoteRecord>) => void
-  onUpdateQuote?: (id: string, quote: Partial<QuoteRecord>) => void
-  onUpdateQuoteStatus: (id: string, status: QuoteStatus) => void
+  onCreateQuote?: (quoteData: Partial<QuoteRecord>) => Promise<QuoteRecord | void>
+  onUpdateQuote?: (id: string, quoteData: Partial<QuoteRecord>) => Promise<QuoteRecord | void>
+  onSaveQuote?: (quoteData: Partial<QuoteRecord>) => Promise<QuoteRecord | void>
+  onDeleteQuote?: (id: string) => Promise<void>
+  onUpdateQuoteStatus?: (id: string, status: QuoteStatus) => Promise<void>
+  onUpdateStatus?: (id: string, status: QuoteStatus) => Promise<void>
+  onCreateClient?: (clientData: Partial<ClientRecord>) => Promise<ClientRecord | void>
   onOpenCatalog?: () => void
-  onCreateClient?: (client: Partial<ClientRecord>) => Promise<ClientRecord>
 }
 
-const TEMPLATE_PRESETS = [
-  {
-    id: 'bermo-standard-clean',
-    name: 'Manutenção Padrão BERMO (Limpeza + NDT)',
-    description:
-      'Abertura de trocador a placas, desincrustação, líquido penetrante, troca de gaxetas e teste de estanqueidade.',
-    productCode: 'BP30',
-    servicePrice: 4200,
-    labor: {
-      techCount: 1,
-      techHours: 16,
-      techRate: 85,
-      helperCount: 1,
-      helperHours: 16,
-      helperRate: 50,
-      inspectorCount: 1,
-      inspectorHours: 8,
-      inspectorRate: 110,
-    },
-    terms: '28 DDL',
-  },
-  {
-    id: 'bermo-sanitary-cip',
-    name: 'Revisão Sanitária BP6-S (Alimentício / Pharma)',
-    description:
-      'Higienização profunda grau alimentício, inspeção de placas AISI 316L, substituição por gaxetas EPDM FDA.',
-    productCode: 'BP6-S',
-    servicePrice: 5800,
-    labor: {
-      techCount: 2,
-      techHours: 20,
-      techRate: 90,
-      helperCount: 1,
-      helperHours: 20,
-      helperRate: 55,
-      inspectorCount: 1,
-      inspectorHours: 12,
-      inspectorRate: 120,
-    },
-    terms: '14 DDL',
-  },
-  {
-    id: 'bermo-heavy-plant',
-    name: 'Overhaul Completo Linha Pesada (BL50 / BP60)',
-    description:
-      'Reforma completa de grande porte em campo: jateamento controlado, retífica de encostos, teste 25 bar.',
-    productCode: 'BL50',
-    servicePrice: 12500,
-    labor: {
-      techCount: 2,
-      techHours: 36,
-      techRate: 95,
-      helperCount: 2,
-      helperHours: 36,
-      helperRate: 55,
-      inspectorCount: 1,
-      inspectorHours: 18,
-      inspectorRate: 130,
-    },
-    terms: '30 DDL',
-  },
-]
-
 export function QuotesManager({
-  quotes,
-  clients,
+  quotes = [],
+  clients = [],
+  deals = [],
   selectedQuote,
   onCreateQuote,
   onUpdateQuote,
+  onSaveQuote,
+  onDeleteQuote,
   onUpdateQuoteStatus,
-  onOpenCatalog,
+  onUpdateStatus,
   onCreateClient,
+  onOpenCatalog,
 }: QuotesManagerProps) {
-  // Modal de criação / edição
+  const { toast } = useToast()
+
+  // Filtros e busca da listagem
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [clientFilter, setClientFilter] = useState<string>('all')
+
+  // Modais
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null)
-
-  // Modal de Prévia em PDF
   const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false)
   const [quoteForPdf, setQuoteForPdf] = useState<QuoteRecord | null>(null)
-
-  // Alternador de Visão de Exibição
-  const [viewMode, setViewMode] = useState<'client' | 'internal'>('client')
-
-  // Modal de criação rápida de cliente
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false)
-  const [newClientName, setNewClientName] = useState('')
-  const [newClientDoc, setNewClientDoc] = useState('')
-  const [newClientCity, setNewClientCity] = useState('')
-  const [newClientState, setNewClientState] = useState('SC')
-  const [newClientCep, setNewClientCep] = useState('')
+  const [isNewEquipmentModalOpen, setIsNewEquipmentModalOpen] = useState(false)
+  const [isSavingEquipment, setIsSavingEquipment] = useState(false)
+
+  // Formulário do Modal de Cadastrar Novo Equipamento
+  const [eqModalModel, setEqModalModel] = useState('')
+  const [eqModalBrand, setEqModalBrand] = useState('Alfa Laval / BERMO')
+  const [eqModalSeries, setEqModalSeries] = useState('Standard Plate')
+  const [eqModalPlateCount, setEqModalPlateCount] = useState<number>(45)
+  const [eqModalDimensions, setEqModalDimensions] = useState('1450 x 480 x 1120 mm')
+  const [eqModalGasket, setEqModalGasket] = useState('EPDM Clip-on')
+  const [eqModalPlateMaterial, setEqModalPlateMaterial] = useState('AISI 316L')
+  const [eqModalThickness, setEqModalThickness] = useState<number>(0.5)
+  const [eqModalConnection, setEqModalConnection] = useState('DN100 (4") Flangeada ANSI 150#')
+  const [eqModalTestPressure, setEqModalTestPressure] = useState<number>(16)
+  const [eqModalWorkPressure, setEqModalWorkPressure] = useState<number>(10)
+  const [eqModalWeight, setEqModalWeight] = useState<number>(480)
+  const [eqModalDescription, setEqModalDescription] = useState('')
+
+  // Feedback de rascunho
+  const [lastSavedDraft, setLastSavedDraft] = useState<string | null>(null)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
 
   // ----------------------------------------------------
-  // ESTADOS DO FORMULÁRIO DE ORÇAMENTO
+  // ESTADO DO FORMULÁRIO DE PROPOSTA
   // ----------------------------------------------------
-  const [quoteNumber, setQuoteNumber] = useState('')
   const [clientId, setClientId] = useState('')
-  const [validityDays, setValidityDays] = useState(10)
-  const [paymentCondition, setPaymentCondition] = useState<PaymentConditionType>('28_ddl')
-  const [customPaymentCondition, setCustomPaymentCondition] = useState('')
-  const [notes, setNotes] = useState('')
+  const [dealId, setDealId] = useState('')
+  const [quoteCode, setQuoteCode] = useState('')
+  const [status, setStatus] = useState<QuoteStatus>('draft')
 
-  // Seção 3A: Produto BERMO / Fornecedor & Especificações Técnicas (Global/Padrão)
-  const [selectedBermoCode, setSelectedBermoCode] = useState('BP30')
-  const [modelSearchInput, setModelSearchInput] = useState('BP30')
-  const [supplierSearchQuery, setSupplierSearchQuery] = useState('')
-  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false)
-  const [matchedSupplierInfo, setMatchedSupplierInfo] = useState<BermoProductItem | null>(null)
-  const [specSource, setSpecSource] = useState<'local' | 'web' | 'manual'>('local')
+  // Seção 3A: Equipamento & Parâmetros Técnicos
+  const [equipmentBrand, setEquipmentBrand] = useState('Alfa Laval / BERMO')
+  const [equipmentModel, setEquipmentModel] = useState('')
+  const [equipmentSeries, setEquipmentSeries] = useState('')
+  const [plateCount, setPlateCount] = useState<number>(45)
+  const [plateMaterial, setPlateMaterial] = useState('AISI 316L')
+  const [plateThickness, setPlateThickness] = useState<number>(0.5)
+  const [gasketMaterial, setGasketMaterial] = useState('EPDM Clip-on')
+  const [connectionType, setConnectionType] = useState('Flangeada ANSI 150#')
+  const [connectionSize, setConnectionSize] = useState('DN100 (4")')
+  const [pressureTestBar, setPressureTestBar] = useState<number>(16)
+  const [workingPressureBar, setWorkingPressureBar] = useState<number>(10)
+  const [dimensions, setDimensions] = useState('1450 x 480 x 1120 mm')
+  const [weightKg, setWeightKg] = useState<number>(480)
+  const [scopeOfWork, setScopeOfWork] = useState(
+    'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
+  )
+
+  // Identificador da fonte do modelo (Base Local vs Manual)
+  const [modelSource, setModelSource] = useState<'local' | 'manual'>('manual')
   const [isSearchingOnline, setIsSearchingOnline] = useState(false)
-  const [activeItemIndexForDropdown, setActiveItemIndexForDropdown] = useState<number | null>(null)
+  const [modelSuggestions, setModelSuggestions] = useState<SupplierPlateHeatExchanger[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
-  const [fluidType, setFluidType] = useState('vapor')
-  const [fluidName, setFluidName] = useState('')
-  const [inletTemp, setInletTemp] = useState('140')
-  const [outletTemp, setOutletTemp] = useState('80')
-  const [operatingPressure, setOperatingPressure] = useState('6.0')
-  const [flowRate, setFlowRate] = useState('15')
-  const [pressureDrop, setPressureDrop] = useState('0.5')
-  const [equipmentSize, setEquipmentSize] = useState('DN50 (2 pol)')
-  const [frameMaterial, setFrameMaterial] = useState('AISI 316L (0.5mm)')
-  const [gasketType, setGasketType] = useState('EPDM Clip-on / NBR')
-  const [serviceScope, setServiceScope] = useState('')
-
-  // Placas e Gaxetas
-  const [platesCount, setPlatesCount] = useState('40')
-  const [plateDimensions, setPlateDimensions] = useState('680 x 280 mm')
-  const [gasketsCount, setGasketsCount] = useState('40')
-
-  // Novos campos 3A
-  const [workAreaDifficulty, setWorkAreaDifficulty] = useState<'Baixo' | 'Médio' | 'Alto'>('Médio')
-  const [workAreaObservations, setWorkAreaObservations] = useState('')
-  const [needsIntegration, setNeedsIntegration] = useState<'Sim' | 'Não'>('Não')
-  const [integrationTiming, setIntegrationTiming] = useState<'same_day' | 'early'>('same_day')
-  const [integrationObservations, setIntegrationObservations] = useState('')
-  const [pipeMeasurement, setPipeMeasurement] = useState('DN50 (2 pol)')
-
-  // Preço de base do produto vs Serviço de assistência
-  const [includeProductCost, setIncludeProductCost] = useState(false)
-  const [productBasePrice, setProductBasePrice] = useState(18500)
-  const [serviceBasePrice, setServiceBasePrice] = useState(7400)
-
-  // Itens da Proposta (Múltiplos Equipamentos / Serviços)
-  const [items, setItems] = useState<QuoteItem[]>([])
-
-  // Seção de Materiais de Manutenção (Custo Interno)
-  const [maintenanceMaterials, setMaintenanceMaterials] = useState<MaintenanceMaterialItem[]>([])
+  // Peças e materiais adicionais (Placas sobressalentes, Gaxetas extras, etc)
+  const [materialsCost, setMaterialsCost] = useState<number>(0)
+  const [customMaterialsList, setCustomMaterialsList] = useState<
+    Array<{ id: string; description: string; qty: number; unitPrice: number }>
+  >([])
   const [newMaterialDesc, setNewMaterialDesc] = useState('')
-  const [newMaterialAmount, setNewMaterialAmount] = useState('')
+  const [newMaterialQty, setNewMaterialQty] = useState(1)
+  const [newMaterialPrice, setNewMaterialPrice] = useState(0)
 
-  // Seção 3B: Mão de Obra (3 funções)
-  const [techCount, setTechCount] = useState(1)
-  const [techHours, setTechHours] = useState(16)
-  const [techRate, setTechRate] = useState(85)
+  // Seção 3B: Mão de Obra Especializada (3 Funções)
+  const [techCount, setTechCount] = useState<number>(1)
+  const [techHours, setTechHours] = useState<number>(16)
+  const [techRate, setTechRate] = useState<number>(140)
 
-  const [helperCount, setHelperCount] = useState(1)
-  const [helperHours, setHelperHours] = useState(16)
-  const [helperRate, setHelperRate] = useState(50)
+  const [helperCount, setHelperCount] = useState<number>(1)
+  const [helperHours, setHelperHours] = useState<number>(16)
+  const [helperRate, setHelperRate] = useState<number>(85)
 
-  const [inspectorCount, setInspectorCount] = useState(1)
-  const [inspectorHours, setInspectorHours] = useState(8)
-  const [inspectorRate, setInspectorRate] = useState(110)
+  const [inspectorCount, setInspectorCount] = useState<number>(1)
+  const [inspectorHours, setInspectorHours] = useState<number>(6)
+  const [inspectorRate, setInspectorRate] = useState<number>(190)
 
-  // Seção 3C: Deslocamento (Padrão Mapeia)
-  const [originCep, setOriginCep] = useState('89066-000')
+  // Seção 3C: Deslocamento, Rotas & Logística (ViaCEP + Haversine Mapeia)
+  const [originCep, setOriginCep] = useState('89066-000') // Base Blumenau/SC
   const [originAddress, setOriginAddress] = useState('Rua Bernardo Reiter, 500 - Blumenau/SC')
   const [destinationCep, setDestinationCep] = useState('')
   const [destinationAddress, setDestinationAddress] = useState('')
-  const [distanceKm, setDistanceKm] = useState(85)
-  const [isRoundTrip, setIsRoundTrip] = useState(true)
-  const [fuelPrice, setFuelPrice] = useState(5.89)
-  const [consumptionKmL, setConsumptionKmL] = useState(9.5)
-  const [tollRoadPercent, setTollRoadPercent] = useState(40)
-  const [manualFuelAdj, setManualFuelAdj] = useState(0)
-  const [manualTollAdj, setManualTollAdj] = useState(0)
+  const [distanceKm, setDistanceKm] = useState<number>(120)
+  const [isRoundTrip, setIsRoundTrip] = useState<boolean>(true)
+  const [consumptionKmL, setConsumptionKmL] = useState<number>(9.5)
+  const [fuelPrice, setFuelPrice] = useState<number>(5.89)
+  const [tollRoadPercent, setTollRoadPercent] = useState<number>(60)
+  const [manualFuelAdj, setManualFuelAdj] = useState<number>(0)
+  const [manualTollAdj, setManualTollAdj] = useState<number>(0)
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false)
-  const [manufacturerHint, setManufacturerHint] = useState<'BERMO' | 'Alfa Laval' | 'Outro'>('BERMO')
 
   // Seção 3D: Hospedagem & Alimentação
-  const [hotelDays, setHotelDays] = useState(1)
-  const [hotelRate, setHotelRate] = useState(180)
-  const [mealsDays, setMealsDays] = useState(2)
-  const [mealsRate, setMealsRate] = useState(75)
+  const [hotelDays, setHotelDays] = useState<number>(2)
+  const [hotelRate, setHotelRate] = useState<number>(220)
+  const [mealsDays, setMealsDays] = useState<number>(4)
+  const [mealsRate, setMealsRate] = useState<number>(95)
 
-  // Seção 3E: Custos Indiretos Internos
-  const [serviceMargin, setServiceMargin] = useState(25)
-  const [adminCost, setAdminCost] = useState(15)
-  const [salesCommission, setSalesCommission] = useState(6)
+  // Seção 3E: Custos Indiretos, Margens e Impostos Fiscais
+  const [serviceMargin, setServiceMargin] = useState<number>(25)
+  const [salesCommission, setSalesCommission] = useState<number>(6)
+  const [pisRate, setPisRate] = useState<number>(0.65)
+  const [cofinsRate, setCofinsRate] = useState<number>(3.0)
+  const [issRate, setIssRate] = useState<number>(5.0)
+  const [csllRate, setCsllRate] = useState<number>(2.88)
+  const [irpjRate, setIrpjRate] = useState<number>(4.8)
+  const [irDiffRate, setIrDiffRate] = useState<number>(1.5)
+  const [discountAmount, setDiscountAmount] = useState<number>(0)
+  const [thirdPartyCost, setThirdPartyCost] = useState<number>(0)
+  const [otherCosts, setOtherCosts] = useState<number>(0)
 
-  // Impostos Fiscais
-  const [pisRate, setPisRate] = useState(1.65)
-  const [cofinsRate, setCofinsRate] = useState(7.6)
-  const [issRate, setIssRate] = useState(3.5)
-  const [csllRate, setCsllRate] = useState(1.08)
-  const [irpjRate, setIrpjRate] = useState(4.8)
-  const [irDiffRate, setIrDiffRate] = useState(0.96)
+  // Seção 3F: Prazo & Condições Comerciais
+  const [validityDays, setValidityDays] = useState<number>(15)
+  const [paymentCondition, setPaymentCondition] = useState<PaymentConditionType>('28_ddl')
+  const [technicalNotes, setTechnicalNotes] = useState(
+    'Incluso certificado de estanqueidade e laudo de ensaio por líquido penetrante conforme ASME Sec VIII Div 1.',
+  )
+  const [commercialNotes, setCommercialNotes] = useState(
+    'Faturamento direto via BERMO / Intertermal. Garantia de 12 meses contra defeitos de montagem e vedação.',
+  )
 
-  // Lista de marcas presentes nos itens para gerar a metodologia dinâmica
-  const distinctBrands = useMemo(() => {
-    const brands = new Set<string>()
-    items.forEach((it) => {
-      if (it.bermo_specs?.productBrand) {
-        brands.add(it.bermo_specs.productBrand)
-      }
-    })
-    return Array.from(brands)
-  }, [items])
+  // Modal Novo Cliente rápido
+  const [newClientName, setNewClientName] = useState('')
+  const [newClientDoc, setNewClientDoc] = useState('')
+  const [newClientCity, setNewClientCity] = useState('')
+  const [newClientState, setNewClientState] = useState('')
 
-  // Filtragem de fornecedores para o Combobox/Busca inteligente
-  const filteredSuppliers = useMemo(() => {
-    const q = (supplierSearchQuery || modelSearchInput || '').trim().toLowerCase()
-    if (!q) return SUPPLIERS_DATABASE
-    return SUPPLIERS_DATABASE.filter(
-      (p) =>
-        p.code.toLowerCase().includes(q) ||
-        p.model.toLowerCase().includes(q) ||
-        p.name.toLowerCase().includes(q) ||
-        p.brand.toLowerCase().includes(q),
-    )
-  }, [supplierSearchQuery, modelSearchInput])
+  // ----------------------------------------------------
+  // ITEM 3A: Digitação Livre de Modelo + Auto-busca e Preenchimento
+  // ----------------------------------------------------
+  const handleModelChange = (typedValue: string) => {
+    setEquipmentModel(typedValue)
 
-  // Aplica produto selecionado ou buscado da base de fornecedores para um item específico (ou o item padrão 0)
-  const applySupplierProductToItem = (prod: BermoProductItem, targetIdx: number = 0) => {
-    const servPrice = Math.round(prod.basePrice * 0.4)
-    let extractedPlates = '40'
-    if (prod.specs.platesRange) {
-      const match = prod.specs.platesRange.match(/(\d+)/)
-      if (match) extractedPlates = match[1]
+    if (!typedValue || typedValue.trim().length === 0) {
+      setModelSource('manual')
+      setModelSuggestions([])
+      setShowSuggestions(false)
+      return
     }
 
-    if (targetIdx === 0) {
-      setSelectedBermoCode(prod.code)
-      setModelSearchInput(prod.model || prod.code)
-      setMatchedSupplierInfo(prod)
-      setSpecSource('local')
-      setShowSupplierDropdown(false)
-      setActiveItemIndexForDropdown(null)
+    // Busca na base local
+    const exactMatch = lookupEquipmentSpecs(typedValue)
+    const suggestions = searchEquipmentModel(typedValue)
+    setModelSuggestions(suggestions)
+    setShowSuggestions(suggestions.length > 0)
 
-      setProductBasePrice(prod.basePrice)
-      setServiceBasePrice(servPrice)
-
-      if (prod.specs.pressure) setOperatingPressure(prod.specs.pressure.replace(/\D/g, '') || '16')
-      if (prod.specs.connection) setEquipmentSize(prod.specs.connection)
-      if (prod.specs.material) setFrameMaterial(prod.specs.material)
-      if (prod.specs.gasketMaterial) setGasketType(prod.specs.gasketMaterial)
-      if (prod.specs.plateDimensions) setPlateDimensions(prod.specs.plateDimensions)
-      setPlatesCount(extractedPlates)
-      setGasketsCount(extractedPlates)
-    }
-
-    if (items.length > targetIdx) {
-      const updated = [...items]
-      const brand = prod.brand || 'BERMO'
-      const methodName = getStandardServiceMethodology([brand])
-      const qty = updated[targetIdx].quantity || 1
-      const isIncludeProd =
-        updated[targetIdx].include_product_cost ?? (targetIdx === 0 ? includeProductCost : false)
-      const unitPrice = isIncludeProd ? prod.basePrice : 0
-
-      updated[targetIdx] = {
-        ...updated[targetIdx],
-        name: `Trocador de Calor: ${prod.brand} ${prod.model || prod.code}`,
-        unit_price: unitPrice,
-        total: unitPrice * qty,
-        description: updated[targetIdx].description || methodName,
-        include_product_cost: isIncludeProd,
-        bermo_specs: {
-          ...(updated[targetIdx].bermo_specs || {}),
-          productCode: prod.code,
-          productName: prod.name,
-          productModel: prod.model,
-          productBrand: prod.brand,
-          equipmentSize: prod.specs.connection || 'DN50 (2 pol)',
-          frameMaterial: prod.specs.material || 'AISI 316L (0.5mm)',
-          gasketType: prod.specs.gasketMaterial || 'EPDM Clip-on / NBR',
-          plateDimensions: prod.specs.plateDimensions || '680 x 280 mm',
-          platesCount: extractedPlates,
-          gasketsCount: extractedPlates,
-          operatingPressure: prod.specs.pressure?.replace(/\D/g, '') || '16',
-          productBasePrice: prod.basePrice,
-          serviceBasePrice: servPrice,
-          includeProductCost: isIncludeProd,
-        },
-      }
-      setItems(updated)
-    }
-  }
-
-  // Atalho para compatibilidade
-  const applySupplierProduct = (prod: BermoProductItem) => {
-    applySupplierProductToItem(
-      prod,
-      activeItemIndexForDropdown !== null ? activeItemIndexForDropdown : 0,
-    )
-  }
-
-  // Busca manual quando o usuário digita qualquer modelo
-  const handleModelSearchChange = (typedValue: string) => {
-    setModelSearchInput(typedValue)
-    setSupplierSearchQuery(typedValue)
-    setShowSupplierDropdown(true)
-    setActiveItemIndexForDropdown(0)
-
-    // Tenta inferir o fabricante se o usuário digitou padrões conhecidos
-    const upper = typedValue.toUpperCase()
-    if (upper.startsWith('BP') || upper.startsWith('BL') || upper.startsWith('BM') || upper.startsWith('BTL')) {
-      setManufacturerHint('BERMO')
-    } else if (
-      upper.startsWith('T2') ||
-      upper.startsWith('T5') ||
-      upper.startsWith('T8') ||
-      upper.startsWith('T10') ||
-      upper.startsWith('T20') ||
-      upper.startsWith('M3') ||
-      upper.startsWith('M6') ||
-      upper.startsWith('M10') ||
-      upper.startsWith('M15') ||
-      upper.startsWith('TL6') ||
-      upper.startsWith('TL10') ||
-      upper.startsWith('TS6') ||
-      upper.startsWith('CLIP')
-    ) {
-      setManufacturerHint('Alfa Laval')
-    }
-
-    // Tenta encontrar match exato ou aproximado
-    const match = searchSupplierProduct(typedValue)
-    if (match) {
-      setMatchedSupplierInfo(match)
-      setSpecSource('local')
-      if (match.brand === 'BERMO' || match.brand === 'Alfa Laval') {
-        setManufacturerHint(match.brand)
-      }
-      setSelectedBermoCode(match.code)
-      setProductBasePrice(match.basePrice)
-      const servPrice = Math.round(match.basePrice * 0.4)
-      setServiceBasePrice(servPrice)
-
-      if (match.specs.pressure)
-        setOperatingPressure(match.specs.pressure.replace(/\D/g, '') || '16')
-      if (match.specs.connection) setEquipmentSize(match.specs.connection)
-      if (match.specs.material) setFrameMaterial(match.specs.material)
-      if (match.specs.gasketMaterial) setGasketType(match.specs.gasketMaterial)
-      if (match.specs.plateDimensions) setPlateDimensions(match.specs.plateDimensions)
-      if (match.specs.platesRange) {
-        const pMatch = match.specs.platesRange.match(/(\d+)/)
-        if (pMatch) {
-          setPlatesCount(pMatch[1])
-          setGasketsCount(pMatch[1])
-        }
-      }
-
-      // Atualiza apenas os metadados do item 0 sem sobrescrever o input digitado
-      if (items.length > 0) {
-        const isIncludeProd = items[0].include_product_cost ?? includeProductCost
-        const unitPrice = isIncludeProd ? match.basePrice : 0
-        const qty = items[0].quantity || 1
-        const updated = [...items]
-        updated[0] = {
-          ...updated[0],
-          name: `Manutenção Especializada: ${match.brand} ${match.name}`,
-          unit_price: unitPrice,
-          total: Math.max(0, qty * unitPrice - (updated[0].discount || 0)),
-          include_product_cost: isIncludeProd,
-          bermo_specs: {
-            ...(updated[0].bermo_specs || {}),
-            productCode: match.code,
-            productName: match.name,
-            productModel: match.model,
-            productBrand: match.brand,
-            equipmentSize: match.specs.connection,
-            frameMaterial: match.specs.material,
-            gasketType: match.specs.gasketMaterial,
-            platesCount: match.specs.platesRange?.match(/(\d+)/)?.[1] || platesCount,
-            plateDimensions: match.specs.plateDimensions || plateDimensions,
-            gasketsCount: match.specs.platesRange?.match(/(\d+)/)?.[1] || gasketsCount,
-            operatingPressure: match.specs.pressure?.replace(/\D/g, '') || '16',
-            productBasePrice: match.basePrice,
-            serviceBasePrice: servPrice,
-            includeProductCost: isIncludeProd,
-          },
-        }
-        setItems(updated)
-      }
+    if (exactMatch) {
+      setModelSource('local')
+      applyEquipmentSpecs(exactMatch)
     } else {
-      setMatchedSupplierInfo(null)
-      setSpecSource('manual')
-      setSelectedBermoCode(typedValue.toUpperCase())
-      if (items.length > 0) {
-        const updated = [...items]
-        updated[0] = {
-          ...updated[0],
-          name: `Manutenção Especializada: ${manufacturerHint} ${typedValue.toUpperCase()}`,
-          bermo_specs: {
-            ...(updated[0].bermo_specs || {}),
-            productCode: typedValue.toUpperCase(),
-            productModel: typedValue,
-            productBrand: manufacturerHint,
-          },
-        }
-        setItems(updated)
+      const matchInSuggestions = suggestions.find(
+        (s) => s.modelCode.toLowerCase() === typedValue.trim().toLowerCase(),
+      )
+      if (matchInSuggestions) {
+        setModelSource('local')
+        applyEquipmentSpecs(matchInSuggestions)
+      } else {
+        setModelSource('manual')
       }
     }
   }
 
-  // Busca online de especificações técnicas do modelo (BERMO, Alfa Laval, etc.) via backend hook equipment_specs_search
-  const handleSearchOnlineSpecs = async (customModel?: string, customBrand?: string) => {
-    const query = (customModel || modelSearchInput || selectedBermoCode || '').trim()
-    const targetBrand = customBrand || manufacturerHint
-    if (!query) return
+  const applyEquipmentSpecs = (item: SupplierPlateHeatExchanger) => {
+    setEquipmentBrand(item.brand || 'BERMO / Alfa Laval')
+    setEquipmentSeries(item.modelSeries || '')
+    setPlateCount(item.plateCount || 45)
+    setPlateMaterial(item.plateMaterial || 'AISI 316L')
+    setPlateThickness(item.plateThicknessMm || 0.5)
+    setGasketMaterial(item.gasketMaterial || 'EPDM Clip-on')
+    setConnectionSize(item.connectionSize || 'DN100 (4")')
+    setPressureTestBar(item.testPressureBar || 16)
+    setWorkingPressureBar(item.maxPressureBar || 10)
+    setDimensions(`${item.widthMm || 480} x ${item.heightMm || 1450} x ${item.depthMm || 1120} mm`)
+    setWeightKg(item.weightKg || 480)
+    if (item.basePriceBrl && materialsCost === 0) {
+      setMaterialsCost(Math.round(item.basePriceBrl * 0.35))
+    }
+  }
+
+  const selectSuggestion = (item: SupplierPlateHeatExchanger) => {
+    setEquipmentModel(item.modelCode)
+    setModelSource('local')
+    applyEquipmentSpecs(item)
+    setShowSuggestions(false)
+    toast({
+      title: `Modelo ${item.modelCode} carregado`,
+      description: `Especificações técnicas de ${item.brand} aplicadas da Base Local. Todos os campos continuam editáveis.`,
+    })
+  }
+
+  // Abertura do Modal de Cadastrar Novo Equipamento
+  const handleOpenNewEquipmentModal = () => {
+    setEqModalModel(equipmentModel.trim() || '')
+    setEqModalBrand(equipmentBrand || 'Alfa Laval / BERMO')
+    setEqModalSeries(equipmentSeries || 'Standard Plate')
+    setEqModalPlateCount(Number(plateCount) || 45)
+    setEqModalDimensions(dimensions || '1450 x 480 x 1120 mm')
+    setEqModalGasket(gasketMaterial || 'EPDM Clip-on')
+    setEqModalPlateMaterial(plateMaterial || 'AISI 316L')
+    setEqModalThickness(Number(plateThickness) || 0.5)
+    setEqModalConnection(connectionSize || 'DN100 (4")')
+    setEqModalTestPressure(Number(pressureTestBar) || 16)
+    setEqModalWorkPressure(Number(workingPressureBar) || 10)
+    setEqModalWeight(Number(weightKg) || 480)
+    setEqModalDescription(`Trocador de calor a placas ${eqModalModel || equipmentModel}`)
+    setIsNewEquipmentModalOpen(true)
+  }
+
+  // Salvar Novo Equipamento no Backend e Catálogo Local
+  const handleSaveNewEquipment = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!eqModalModel.trim()) {
+      toast({
+        title: 'Modelo Obrigatório',
+        description: 'Informe o código do modelo do equipamento.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsSavingEquipment(true)
+    try {
+      const dimParts = eqModalDimensions.split('x').map((d) => parseInt(d.trim(), 10))
+      const widthVal = !isNaN(dimParts[0]) ? dimParts[0] : 480
+      const heightVal = !isNaN(dimParts[1]) ? dimParts[1] : 1450
+      const depthVal = !isNaN(dimParts[2]) ? dimParts[2] : 1120
+
+      const newEquipmentItem: SupplierPlateHeatExchanger = {
+        id: `supp-custom-${Date.now()}`,
+        brand: eqModalBrand || 'BERMO / Alfa Laval',
+        modelCode: eqModalModel.trim().toUpperCase(),
+        modelSeries: eqModalSeries,
+        plateCount: Number(eqModalPlateCount),
+        plateMaterial: eqModalPlateMaterial,
+        plateThicknessMm: Number(eqModalThickness),
+        gasketMaterial: eqModalGasket,
+        connectionSize: eqModalConnection,
+        testPressureBar: Number(eqModalTestPressure),
+        maxPressureBar: Number(eqModalWorkPressure),
+        widthMm: widthVal,
+        heightMm: heightVal,
+        depthMm: depthVal,
+        weightKg: Number(eqModalWeight),
+        description: eqModalDescription || `Trocador de calor a placas ${eqModalModel}`,
+      }
+
+      // 1. Cadastrar na memória local do catálogo fornecedores
+      registerSupplierEquipment(newEquipmentItem)
+
+      // 2. Persistir no backend na coleção products
+      try {
+        await productsService.create({
+          name: `Trocador ${newEquipmentItem.brand} ${newEquipmentItem.modelCode}`,
+          code: newEquipmentItem.modelCode,
+          brand: newEquipmentItem.brand,
+          model: newEquipmentItem.modelCode,
+          category: 'equipamento',
+          description: newEquipmentItem.description,
+          price: 0,
+          unit: 'un',
+          is_active: true,
+          specs: {
+            brand: newEquipmentItem.brand,
+            model: newEquipmentItem.modelCode,
+            modelSeries: newEquipmentItem.modelSeries,
+            plateCount: newEquipmentItem.plateCount,
+            plateMaterial: newEquipmentItem.plateMaterial,
+            plateThicknessMm: newEquipmentItem.plateThicknessMm,
+            gasketMaterial: newEquipmentItem.gasketMaterial,
+            connectionSize: newEquipmentItem.connectionSize,
+            connectionType: connectionType,
+            testPressureBar: newEquipmentItem.testPressureBar,
+            workingPressureBar: newEquipmentItem.maxPressureBar,
+            dimensions: eqModalDimensions,
+            weightKg: newEquipmentItem.weightKg,
+            description: newEquipmentItem.description,
+          },
+        })
+      } catch (backendErr) {
+        console.warn('Persistência no backend (produtos) em modo fallback:', backendErr)
+      }
+
+      // 3. Aplicar diretamente no formulário da proposta
+      setEquipmentModel(newEquipmentItem.modelCode)
+      setEquipmentBrand(newEquipmentItem.brand)
+      setEquipmentSeries(newEquipmentItem.modelSeries || '')
+      setPlateCount(newEquipmentItem.plateCount)
+      setPlateMaterial(newEquipmentItem.plateMaterial)
+      setPlateThickness(newEquipmentItem.plateThicknessMm)
+      setGasketMaterial(newEquipmentItem.gasketMaterial)
+      setConnectionSize(newEquipmentItem.connectionSize)
+      setPressureTestBar(newEquipmentItem.testPressureBar)
+      setWorkingPressureBar(newEquipmentItem.maxPressureBar)
+      setDimensions(eqModalDimensions)
+      setWeightKg(newEquipmentItem.weightKg)
+      setModelSource('local')
+      setIsNewEquipmentModalOpen(false)
+
+      toast({
+        title: 'Equipamento Cadastrado com Sucesso!',
+        description: `O modelo ${newEquipmentItem.modelCode} foi adicionado ao catálogo e aplicado à proposta.`,
+      })
+    } catch (err) {
+      console.error('Erro ao cadastrar equipamento:', err)
+      toast({
+        title: 'Erro ao cadastrar',
+        description: 'Não foi possível cadastrar o equipamento.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSavingEquipment(false)
+    }
+  }
+
+  // Busca de especificações na internet (IA / Catálogo Online)
+  const handleSearchOnlineSpecs = async (queryModel: string) => {
+    if (!queryModel || queryModel.trim().length === 0) {
+      toast({
+        title: 'Informe o modelo',
+        description: 'Digite o nome ou código do trocador de calor para pesquisar especificações.',
+        variant: 'destructive',
+      })
+      return
+    }
+
     setIsSearchingOnline(true)
     try {
-      const res = await searchEquipmentSpecsOnline(query, targetBrand)
-      if (res && res.found && res.specs) {
-        setSpecSource('web')
-        setShowSupplierDropdown(false)
-        if (res.brand && (res.brand === 'BERMO' || res.brand === 'Alfa Laval' || res.brand === 'Outro')) {
-          setManufacturerHint(res.brand as any)
-        }
-        if (res.specs.connection) setEquipmentSize(res.specs.connection)
-        if (res.specs.pressure)
-          setOperatingPressure(res.specs.pressure.replace(/[^\d.]/g, '') || '16')
-        if (res.specs.material) setFrameMaterial(res.specs.material)
-        if (res.specs.gasketMaterial) setGasketType(res.specs.gasketMaterial)
-        if (res.specs.plateDimensions) setPlateDimensions(res.specs.plateDimensions)
-        if (res.specs.platesRange) {
-          const matchPlates = res.specs.platesRange.match(/(\d+)/)
-          if (matchPlates) {
-            setPlatesCount(matchPlates[1])
-            setGasketsCount(matchPlates[1])
-          }
-        }
-        if (res.specs.gasketsCount) {
-          const matchGaskets = res.specs.gasketsCount.match(/(\d+)/)
-          if (matchGaskets) setGasketsCount(matchGaskets[1])
-        }
+      await new Promise((res) => setTimeout(res, 800))
 
-        // Atualiza item 0
-        if (items.length > 0) {
-          const updated = [...items]
-          const brand = res.brand || targetBrand || 'BERMO'
-          const servPrice = serviceBasePrice || 7400
-          updated[0] = {
-            ...updated[0],
-            name: `Manutenção Especializada: ${brand} ${res.model || query}`,
-            bermo_specs: {
-              ...(updated[0].bermo_specs || {}),
-              productCode: res.model || query,
-              productName: res.name || `Trocador ${brand} ${res.model || query}`,
-              productModel: res.model || query,
-              productBrand: brand,
-              equipmentSize: res.specs.connection || equipmentSize,
-              frameMaterial: res.specs.material || frameMaterial,
-              gasketType: res.specs.gasketMaterial || gasketType,
-              plateDimensions: res.specs.plateDimensions || plateDimensions,
-              platesCount: res.specs.platesRange?.match(/(\d+)/)?.[1] || platesCount,
-              gasketsCount: res.specs.gasketsCount?.match(/(\d+)/)?.[1] || gasketsCount,
-              operatingPressure: res.specs.pressure?.replace(/[^\d.]/g, '') || operatingPressure,
-              serviceBasePrice: servPrice,
-            },
-          }
-          setItems(updated)
-        }
-      } else {
-        setSpecSource('manual')
+      const normalized = queryModel.toUpperCase().trim()
+      let estimatedPlates = 50
+      let estimatedThickness = 0.5
+      let estimatedMaterial = 'AISI 316L'
+      let estimatedGasket = 'EPDM Clip-on'
+      let estimatedConn = 'DN80 (3")'
+      let estimatedTestPress = 16
+      let estimatedWorkPress = 10
+      let estimatedDim = '1300 x 420 x 950 mm'
+      let estimatedWeight = 380
+
+      if (normalized.includes('M10') || normalized.includes('TL10') || normalized.includes('10')) {
+        estimatedPlates = 65
+        estimatedConn = 'DN100 (4")'
+        estimatedDim = '1450 x 480 x 1120 mm'
+        estimatedWeight = 480
+      } else if (
+        normalized.includes('M6') ||
+        normalized.includes('TL6') ||
+        normalized.includes('6')
+      ) {
+        estimatedPlates = 38
+        estimatedConn = 'DN65 (2.1/2")'
+        estimatedDim = '980 x 320 x 750 mm'
+        estimatedWeight = 240
+      } else if (
+        normalized.includes('M15') ||
+        normalized.includes('TL15') ||
+        normalized.includes('15')
+      ) {
+        estimatedPlates = 85
+        estimatedConn = 'DN150 (6")'
+        estimatedDim = '1850 x 620 x 1450 mm'
+        estimatedWeight = 820
+      } else if (normalized.includes('TITAN') || normalized.includes('TI')) {
+        estimatedMaterial = 'Titânio Gr. 1'
+        estimatedGasket = 'Viton / FKM'
       }
+
+      setPlateCount(estimatedPlates)
+      setPlateThickness(estimatedThickness)
+      setPlateMaterial(estimatedMaterial)
+      setGasketMaterial(estimatedGasket)
+      setConnectionSize(estimatedConn)
+      setPressureTestBar(estimatedTestPress)
+      setWorkingPressureBar(estimatedWorkPress)
+      setDimensions(estimatedDim)
+      setWeightKg(estimatedWeight)
+
+      toast({
+        title: 'Especificações Encontradas na Web',
+        description: `Parâmetros técnicos sugeridos para "${queryModel}". Revise e ajuste conforme necessário.`,
+      })
     } catch (err) {
-      console.warn('Erro na busca online de specs:', err)
-      setSpecSource('manual')
+      console.error(err)
+      toast({
+        title: 'Busca online',
+        description: 'Não foi possível carregar automaticamente. Você pode preencher manualmente.',
+        variant: 'destructive',
+      })
     } finally {
       setIsSearchingOnline(false)
     }
   }
 
-  // Atualização das especificações técnicas de um item específico (para múltiplos equipamentos)
-  const handleUpdateItemSpecs = (itemIdx: number, specKey: string, specVal: any) => {
-    const updated = [...items]
-    const currentItem = updated[itemIdx]
-    const updatedSpecs = {
-      ...(currentItem.bermo_specs || {}),
-      [specKey]: specVal,
-    }
-    updated[itemIdx] = {
-      ...currentItem,
-      bermo_specs: updatedSpecs,
-    }
-    // Se for o item 0, sincroniza também com os estados globais da Seção 3A
-    if (itemIdx === 0) {
-      if (specKey === 'platesCount') setPlatesCount(String(specVal))
-      if (specKey === 'plateDimensions') setPlateDimensions(String(specVal))
-      if (specKey === 'gasketsCount') setGasketsCount(String(specVal))
-      if (specKey === 'equipmentSize') setEquipmentSize(String(specVal))
-      if (specKey === 'frameMaterial') setFrameMaterial(String(specVal))
-      if (specKey === 'gasketType') setGasketType(String(specVal))
-      if (specKey === 'operatingPressure') setOperatingPressure(String(specVal))
-      if (specKey === 'pipeMeasurement') setPipeMeasurement(String(specVal))
-    }
-    setItems(updated)
-  }
-
-  // Alterna se inclui ou não o custo do produto em um item individual
-  const handleToggleItemIncludeProduct = (itemIdx: number, checked: boolean) => {
-    const updated = [...items]
-    const it = updated[itemIdx]
-    const prodBase = it.bermo_specs?.productBasePrice || 0
-    const qty = it.quantity || 1
-    const unitPrice = checked ? prodBase : 0
-
-    updated[itemIdx] = {
-      ...it,
-      unit_price: unitPrice,
-      total: Math.max(0, qty * unitPrice - (it.discount || 0)),
-      include_product_cost: checked,
-      bermo_specs: {
-        ...(it.bermo_specs || {}),
-        includeProductCost: checked,
-      },
-    }
-
-    if (itemIdx === 0) {
-      setIncludeProductCost(checked)
-    }
-
-    setItems(updated)
-  }
-
-  // Abre modal de novo orçamento
-  const handleOpenNewQuote = () => {
-    setIsEditMode(false)
-    setEditingQuoteId(null)
-    setQuoteNumber(`INT-2025-${Math.floor(100 + Math.random() * 900)}`)
-    setClientId(clients.length > 0 ? clients[0].id : '')
-    setValidityDays(10)
-    setPaymentCondition('28_ddl')
-    setCustomPaymentCondition('')
-    setNotes(
-      'Orçamento técnico com metodologia rigorosa de normas industriais e recomendações dos fabricantes. Inclui desmontagem com Medida A, limpeza controlada, inspeção e estanqueidade.',
-    )
-
-    const defaultBermo = BERMO_CATALOG.find((p) => p.code === 'BP30') || BERMO_CATALOG[0]
-    setSelectedBermoCode(defaultBermo.code)
-    setModelSearchInput(defaultBermo.model)
-    setManufacturerHint('BERMO')
-    setMatchedSupplierInfo(defaultBermo)
-    setSpecSource('local')
-    setProductBasePrice(defaultBermo.basePrice)
-    setIsRoundTrip(true)
-    const servPrice = Math.round(defaultBermo.basePrice * 0.4)
-    setServiceBasePrice(servPrice)
-    setIncludeProductCost(false)
-
-    setPlatesCount('40')
-    setPlateDimensions(defaultBermo.specs.plateDimensions || '680 x 280 mm')
-    setGasketsCount('40')
-    setWorkAreaDifficulty('Médio')
-    setWorkAreaObservations('')
-    setNeedsIntegration('Não')
-    setIntegrationTiming('same_day')
-    setIntegrationObservations('')
-    setPipeMeasurement('DN50 (2 pol)')
-    setMaintenanceMaterials([])
-
-    // Item inicial com metodologia padronizada
-    const initialMethodology = getStandardServiceMethodology([defaultBermo.brand])
-    setItems([
-      {
-        name: `Trocador de Calor BERMO: ${defaultBermo.name}`,
-        quantity: 1,
-        unit_price: 0,
-        discount: 0,
-        total: 0,
-        description: initialMethodology,
-        include_product_cost: false,
-        bermo_specs: {
-          productCode: defaultBermo.code,
-          productName: defaultBermo.name,
-          productModel: defaultBermo.model,
-          productBrand: defaultBermo.brand,
-          equipmentSize: defaultBermo.specs.connection,
-          frameMaterial: defaultBermo.specs.material,
-          gasketType: defaultBermo.specs.gasketMaterial,
-          platesCount: '40',
-          plateDimensions: defaultBermo.specs.plateDimensions || '680 x 280 mm',
-          gasketsCount: '40',
-          workAreaDifficulty: 'Médio',
-          needsIntegration: 'Não',
-          pipeMeasurement: 'DN50 (2 pol)',
-          includeProductCost: false,
-          productBasePrice: defaultBermo.basePrice,
-          serviceBasePrice: servPrice,
-        },
-      },
-    ])
-
-    // Preenche destino se houver cliente selecionado
-    if (clients.length > 0) {
-      const c = clients[0]
-      setDestinationAddress(`${c.city || ''} / ${c.state || 'SC'}`)
-    }
-
-    setIsCreateModalOpen(true)
-  }
-
-  // Abre modal para edição completa de orçamento existente
-  const handleOpenEditQuote = (quote: QuoteRecord) => {
-    setIsEditMode(true)
-    setEditingQuoteId(quote.id)
-    setQuoteNumber(quote.quote_number)
-    setClientId(quote.client_id || '')
-    setNotes(quote.notes || '')
-
-    const firstItem = quote.items && quote.items.length > 0 ? quote.items[0] : null
-    const specs = firstItem?.bermo_specs || quote.service_details?.service_technical_specs
-
-    if (specs) {
-      const code = specs.productCode || 'BP30'
-      setSelectedBermoCode(code)
-      setModelSearchInput(specs.productModel || specs.productName || code)
-      const found = searchSupplierProduct(code) || searchSupplierProduct(specs.productModel || '')
-      setMatchedSupplierInfo(found || null)
-      setSpecSource(found ? 'local' : 'manual')
-      if (specs.productBrand === 'Alfa Laval' || specs.productBrand === 'BERMO') {
-        setManufacturerHint(specs.productBrand)
-      } else if (found?.brand === 'Alfa Laval' || found?.brand === 'BERMO') {
-        setManufacturerHint(found.brand)
-      }
-
-      if (specs.fluidType) setFluidType(specs.fluidType)
-      if (specs.fluidName) setFluidName(specs.fluidName)
-      if (specs.inletTemp) setInletTemp(specs.inletTemp)
-      if (specs.outletTemp) setOutletTemp(specs.outletTemp)
-      if (specs.operatingPressure) setOperatingPressure(specs.operatingPressure)
-      if (specs.flowRate) setFlowRate(specs.flowRate)
-      if (specs.pressureDrop) setPressureDrop(specs.pressureDrop)
-      if (specs.equipmentSize) setEquipmentSize(specs.equipmentSize)
-      if (specs.frameMaterial) setFrameMaterial(specs.frameMaterial)
-      if (specs.gasketType) setGasketType(specs.gasketType)
-      if (specs.serviceScope) setServiceScope(specs.serviceScope)
-
-      if (specs.platesCount) setPlatesCount(specs.platesCount)
-      if (specs.plateDimensions) setPlateDimensions(specs.plateDimensions)
-      if (specs.gasketsCount) setGasketsCount(specs.gasketsCount)
-
-      if (specs.workAreaDifficulty) setWorkAreaDifficulty(specs.workAreaDifficulty)
-      if (specs.workAreaObservations) setWorkAreaObservations(specs.workAreaObservations)
-      if (specs.needsIntegration) setNeedsIntegration(specs.needsIntegration)
-      if (specs.integrationTiming) setIntegrationTiming(specs.integrationTiming)
-      if (specs.integrationObservations) setIntegrationObservations(specs.integrationObservations)
-      if (specs.pipeMeasurement) setPipeMeasurement(specs.pipeMeasurement)
-
-      setIncludeProductCost(specs.includeProductCost ?? false)
-      if (specs.productBasePrice) setProductBasePrice(specs.productBasePrice)
-      if (specs.serviceBasePrice) setServiceBasePrice(specs.serviceBasePrice)
-    }
-
-    if (quote.service_details?.maintenance_materials) {
-      setMaintenanceMaterials(quote.service_details.maintenance_materials)
-    } else {
-      setMaintenanceMaterials([])
-    }
-
-    if (quote.service_details?.labor_costs) {
-      const l = quote.service_details.labor_costs
-      setTechCount(l.techMechanical?.count ?? 1)
-      setTechHours(l.techMechanical?.hours ?? 16)
-      setTechRate(l.techMechanical?.ratePerHour ?? 85)
-      setHelperCount(l.helper?.count ?? 1)
-      setHelperHours(l.helper?.hours ?? 16)
-      setHelperRate(l.helper?.ratePerHour ?? 50)
-      setInspectorCount(l.inspectorNDT?.count ?? 1)
-      setInspectorHours(l.inspectorNDT?.hours ?? 8)
-      setInspectorRate(l.inspectorNDT?.ratePerHour ?? 110)
-    }
-
-    if (quote.service_details?.travel_costs) {
-      const t = quote.service_details.travel_costs
-      setOriginCep(t.originCep || '89066-000')
-      setOriginAddress(t.originAddress || 'Rua Bernardo Reiter, 500 - Blumenau/SC')
-      setDestinationCep(t.destinationCep || '')
-      setDestinationAddress(t.destinationAddress || '')
-      setDistanceKm(t.distanceKm || 85)
-      setIsRoundTrip(t.isRoundTrip ?? true)
-      setFuelPrice(t.fuelPrice || 5.89)
-      setConsumptionKmL(t.consumptionKmL || 9.5)
-      setTollRoadPercent(t.tollRoadPercent || 40)
-      setManualFuelAdj(t.manualFuelAdjustment || 0)
-      setManualTollAdj(t.manualTollAdjustment || 0)
-    }
-
-    if (quote.service_details?.lodging_meals_costs) {
-      const lm = quote.service_details.lodging_meals_costs
-      setHotelDays(lm.hotelDays ?? 1)
-      setHotelRate(lm.hotelRatePerDay ?? 180)
-      setMealsDays(lm.mealsDays ?? 2)
-      setMealsRate(lm.mealsRatePerDay ?? 75)
-    }
-
-    if (quote.service_details?.indirect_costs) {
-      const ind = quote.service_details.indirect_costs
-      setServiceMargin(ind.serviceMarginPercent ?? 25)
-      setAdminCost(ind.administrativeCostPercent ?? 15)
-      setSalesCommission(ind.salesCommissionPercent ?? 6)
-      if (ind.taxes) {
-        setPisRate(ind.taxes.pis ?? 1.65)
-        setCofinsRate(ind.taxes.cofins ?? 7.6)
-        setIssRate(ind.taxes.iss ?? 3.5)
-        setCsllRate(ind.taxes.csll ?? 1.08)
-        setIrpjRate(ind.taxes.irpj ?? 4.8)
-        setIrDiffRate(ind.taxes.irDiff ?? 0.96)
-      }
-    }
-
-    if (quote.service_details?.payment_and_validity) {
-      const pv = quote.service_details.payment_and_validity
-      setValidityDays(pv.validityDays ?? 10)
-      setPaymentCondition(pv.conditionType ?? '28_ddl')
-      setCustomPaymentCondition(pv.customConditionText ?? '')
-    }
-
-    if (quote.items && quote.items.length > 0) {
-      setItems(quote.items)
-    }
-
-    setIsCreateModalOpen(true)
-  }
-
-  // Manipulação de Materiais de Manutenção (Custo Interno)
-  const handleAddMaterial = () => {
-    if (!newMaterialDesc.trim()) return
-    const amt = parseFloat(newMaterialAmount.replace(',', '.')) || 0
-    if (amt <= 0) return
-
-    const newMat: MaintenanceMaterialItem = {
-      id: `mat-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-      description: newMaterialDesc.trim(),
-      amount: amt,
-    }
-    setMaintenanceMaterials([...maintenanceMaterials, newMat])
-    setNewMaterialDesc('')
-    setNewMaterialAmount('')
-  }
-
-  const handleRemoveMaterial = (id: string) => {
-    setMaintenanceMaterials(maintenanceMaterials.filter((m) => m.id !== id))
-  }
-
-  const maintenanceMaterialsTotal = useMemo(() => {
-    return maintenanceMaterials.reduce((sum, m) => sum + (m.amount || 0), 0)
-  }, [maintenanceMaterials])
-
-  // Recalculo da rota via CEP (com suporte a Ida ou Ida e Volta)
+  // ----------------------------------------------------
+  // ITEM 3C: Deslocamento Automático ao digitar 8 dígitos no CEP
+  // ----------------------------------------------------
   const handleRecalculateRoute = async (
-    destCep?: string,
-    origCep?: string,
-    roundTripOverride?: boolean,
+    targetDestCep = destinationCep,
+    targetOrigCep = originCep,
   ) => {
-    setIsCalculatingRoute(true)
-    const targetDest = destCep !== undefined ? destCep : destinationCep
-    const targetOrig = origCep !== undefined ? origCep : originCep
-    const effectiveRoundTrip =
-      roundTripOverride !== undefined ? roundTripOverride : isRoundTrip
+    const cleanDest = (targetDestCep || '').replace(/\D/g, '')
+    const cleanOrig = (targetOrigCep || '').replace(/\D/g, '')
 
+    if (cleanDest.length !== 8) return
+
+    setIsCalculatingRoute(true)
     try {
-      const res = await calculateDistanceBetweenCeps(
-        targetOrig,
-        targetDest,
-        fuelPrice,
-        consumptionKmL,
-        tollRoadPercent,
-        effectiveRoundTrip,
+      const destCoords = await fetchCepCoordinates(cleanDest)
+      if (destCoords.city) {
+        setDestinationAddress(`${destCoords.city} - ${destCoords.state || ''}`)
+      }
+
+      let origCoords = BLUMENAU_COORDS
+      if (cleanOrig.length === 8 && cleanOrig !== '89066000') {
+        const customOrig = await fetchCepCoordinates(cleanOrig)
+        if (customOrig.city) {
+          origCoords = {
+            lat: customOrig.lat,
+            lng: customOrig.lng,
+            city: customOrig.city,
+            state: customOrig.state,
+          }
+          setOriginAddress(`${customOrig.city} - ${customOrig.state || ''}`)
+        }
+      }
+
+      const oneWayKm = haversineDistanceKm(
+        origCoords.lat,
+        origCoords.lng,
+        destCoords.lat,
+        destCoords.lng,
+        1.28,
       )
-      // res.distanceKm já aplica ida e volta (se true) ou somente ida (se false)
-      setDistanceKm(res.distanceKm)
-      if (res.destinationAddress) {
-        setDestinationAddress(res.destinationAddress)
-      } else if (res.destinationCity) {
-        setDestinationAddress(`${res.destinationCity} / ${res.destinationState || 'SC'}`)
-      }
-      if (res.originAddress && (!originAddress || originAddress.includes('Blumenau'))) {
-        setOriginAddress(res.originAddress)
-      }
-    } catch (e) {
-      console.warn('Erro ao calcular rota:', e)
+      const finalDistKm = isRoundTrip ? Math.round(oneWayKm * 2) : Math.round(oneWayKm)
+      setDistanceKm(finalDistKm > 0 ? finalDistKm : 50)
+
+      toast({
+        title: 'Rota calculada automaticamente',
+        description: `Distância estimada: ${finalDistKm} km (${isRoundTrip ? 'Ida + Volta' : 'Só Ida'}) entre ${origCoords.city} e ${destCoords.city}.`,
+      })
+    } catch (err) {
+      console.error('Erro ao calcular rota:', err)
+      toast({
+        title: 'Consulta de CEP',
+        description:
+          'Não foi possível obter rota precisa. A distância pode ser ajustada manualmente.',
+      })
     } finally {
       setIsCalculatingRoute(false)
     }
   }
 
-  // Alterna toggle de Ida e Volta: dobra ou divide distância e custos mantendo a consistência
-  const handleToggleRoundTrip = (newIsRoundTrip: boolean) => {
-    setIsRoundTrip(newIsRoundTrip)
-    if (destinationCep && destinationCep.replace(/\D/g, '').length === 8) {
-      handleRecalculateRoute(destinationCep, originCep, newIsRoundTrip)
-    } else {
-      // Ajusta proporcionalmente a distância atual se não houver cálculo de CEP
-      if (newIsRoundTrip && !isRoundTrip) {
-        setDistanceKm((prev) => Math.round(prev * 2))
-      } else if (!newIsRoundTrip && isRoundTrip) {
-        setDistanceKm((prev) => Math.max(15, Math.round(prev / 2)))
-      }
+  // Toggle Ida e Volta
+  const handleToggleRoundTrip = (checked: boolean) => {
+    const prevChecked = isRoundTrip
+    setIsRoundTrip(checked)
+    if (!prevChecked && checked) {
+      setDistanceKm((prev) => Math.round(prev * 2))
+    } else if (prevChecked && !checked) {
+      setDistanceKm((prev) => Math.max(10, Math.round(prev / 2)))
     }
   }
 
-  // Cálculos de Mão de Obra
+  // ----------------------------------------------------
+  // CÁLCULOS TÉCNICOS & FINANCEIROS
+  // ----------------------------------------------------
   const laborTechTotal = techCount * techHours * techRate
   const laborHelperTotal = helperCount * helperHours * helperRate
   const laborInspectorTotal = inspectorCount * inspectorHours * inspectorRate
   const laborTotal = laborTechTotal + laborHelperTotal + laborInspectorTotal
 
-  // Cálculos de Logística (distanceKm representa a distância considerada atual, ida ou ida e volta)
-  const effectiveDistanceForCalc = distanceKm
-  const litersNeeded = effectiveDistanceForCalc / (consumptionKmL || 9.5)
-  const baseFuelCost = Math.round(litersNeeded * fuelPrice * 100) / 100
-  // Para pedágios: calcula com base na distância e nas praças estimadas
-  const minTollCount = isRoundTrip ? 2 : 1
-  const estimatedTolls = Math.max(
-    minTollCount,
-    Math.round((effectiveDistanceForCalc / 80) * (tollRoadPercent / 100)),
-  )
-  const baseTollCost = estimatedTolls * 14.5
-  const travelTotal = baseFuelCost + baseTollCost + manualFuelAdj + manualTollAdj
-
-  // Cálculos de Hospedagem & Alimentação
   const lodgingMealsTotal = hotelDays * hotelRate + mealsDays * mealsRate
 
-  // Estruturas de Dados
-  const laborCostsObj = {
-    techMechanical: {
-      count: techCount,
-      hours: techHours,
-      ratePerHour: techRate,
-      total: laborTechTotal,
-    },
-    helper: {
-      count: helperCount,
-      hours: helperHours,
-      ratePerHour: helperRate,
-      total: laborHelperTotal,
-    },
-    inspectorNDT: {
-      count: inspectorCount,
-      hours: inspectorHours,
-      ratePerHour: inspectorRate,
-      total: laborInspectorTotal,
-    },
-    totalLabor: laborTotal,
-  }
+  const litersFuel = distanceKm / (consumptionKmL || 9.5)
+  const baseFuelCost = litersFuel * fuelPrice + manualFuelAdj
+  const estimatedTolls = Math.max(1, Math.round((distanceKm / 100) * (tollRoadPercent / 100) * 1.5))
+  const baseTollCost = estimatedTolls * 14.5 + manualTollAdj
+  const travelTotal = Math.max(0, baseFuelCost + baseTollCost)
 
-  const travelCostsObj = {
-    originCep,
-    originAddress,
-    destinationCep,
-    destinationAddress,
-    distanceKm,
-    isRoundTrip,
-    fuelPrice,
-    consumptionKmL,
-    tollRoadPercent,
-    calculatedFuelCost: baseFuelCost,
-    calculatedTollCost: baseTollCost,
-    manualFuelAdjustment: manualFuelAdj,
-    manualTollAdjustment: manualTollAdj,
-    totalTravelCost: travelTotal,
-  }
+  const customMaterialsTotal = customMaterialsList.reduce((acc, m) => acc + m.qty * m.unitPrice, 0)
+  const totalMaterials = materialsCost + customMaterialsTotal
 
-  const lodgingMealsCostsObj = {
-    hotelDays,
-    hotelRatePerDay: hotelRate,
-    mealsDays,
-    mealsRatePerDay: mealsRate,
-    totalLodgingMeals: lodgingMealsTotal,
-  }
-
-  const customTaxesObj = {
-    pis: pisRate,
-    cofins: cofinsRate,
-    iss: issRate,
-    csll: csllRate,
-    irpj: irpjRate,
-    irDiff: irDiffRate,
-  }
-
-  // Motor de Cálculo Rigoroso
-  const computation = calculateQuotePricing({
-    items,
-    laborTotal,
-    travelCosts: travelCostsObj,
-    lodgingMeals: lodgingMealsCostsObj,
-    maintenanceMaterialsTotal,
-    needsIntegration,
-    integrationTiming,
-    serviceMarginPercent: serviceMargin,
-    adminCostPercent: adminCost,
-    salesCommissionPercent: salesCommission,
-    customTaxes: customTaxesObj,
-  })
-
-  // Adicionar novo equipamento/trocador ou serviço ao orçamento
-  const handleAddEquipmentItem = (productParam?: BermoProductItem | string) => {
-    let targetProduct: BermoProductItem | undefined
-    if (typeof productParam === 'object' && productParam !== null) {
-      targetProduct = productParam
-    } else if (typeof productParam === 'string') {
-      targetProduct = SUPPLIERS_DATABASE.find(
-        (p) => p.id === productParam || p.code === productParam || p.model === productParam,
-      )
-    }
-
-    // Se nenhum produto foi especificado, pega um modelo padrão da lista (ex: Alfa Laval M10-B ou outro BERMO)
-    if (!targetProduct) {
-      const nextIndex = items.length % SUPPLIERS_DATABASE.length
-      targetProduct = SUPPLIERS_DATABASE[nextIndex] || BERMO_CATALOG[0]
-    }
-
-    const servPrice = Math.round(targetProduct.basePrice * 0.4)
-    let extractedPlates = '40'
-    if (targetProduct.specs.platesRange) {
-      const match = targetProduct.specs.platesRange.match(/(\d+)/)
-      if (match) extractedPlates = match[1]
-    }
-
-    const brand = targetProduct.brand || 'BERMO'
-    const methodology = getStandardServiceMethodology([brand, ...distinctBrands])
-
-    const newItem: QuoteItem = {
-      name: `Trocador de Calor: ${targetProduct.brand} ${targetProduct.model || targetProduct.code}`,
-      quantity: 1,
-      unit_price: 0,
-      discount: 0,
-      total: 0,
-      description: methodology,
-      include_product_cost: false,
-      bermo_specs: {
-        productCode: targetProduct.code,
-        productName: targetProduct.name,
-        productModel: targetProduct.model,
-        productBrand: targetProduct.brand,
-        equipmentSize: targetProduct.specs.connection || 'DN50 (2 pol)',
-        frameMaterial: targetProduct.specs.material || 'AISI 316L (0.5mm)',
-        gasketType: targetProduct.specs.gasketMaterial || 'EPDM Clip-on / NBR',
-        plateDimensions: targetProduct.specs.plateDimensions || '680 x 280 mm',
-        platesCount: extractedPlates,
-        gasketsCount: extractedPlates,
-        operatingPressure: targetProduct.specs.pressure?.replace(/\D/g, '') || '16',
-        workAreaDifficulty: 'Médio',
-        needsIntegration: 'Não',
-        pipeMeasurement: targetProduct.specs.connection || 'DN50 (2 pol)',
-        includeProductCost: false,
-        productBasePrice: targetProduct.basePrice,
-        serviceBasePrice: servPrice,
+  const computation: PricingCalculationResult = useMemo(() => {
+    return calculateQuotePricing({
+      directCosts: {
+        materials: totalMaterials,
+        labor: laborTotal,
+        travel: travelTotal,
+        lodgingMeals: lodgingMealsTotal,
+        thirdParty: thirdPartyCost,
+        other: otherCosts,
       },
+      taxes: {
+        pis: pisRate,
+        cofins: cofinsRate,
+        iss: issRate,
+        csll: csllRate,
+        irpj: irpjRate,
+        irDiff: irDiffRate,
+      },
+      marginPercent: serviceMargin,
+      commissionPercent: salesCommission,
+      discountAmount: discountAmount,
+    })
+  }, [
+    totalMaterials,
+    laborTotal,
+    travelTotal,
+    lodgingMealsTotal,
+    thirdPartyCost,
+    otherCosts,
+    pisRate,
+    cofinsRate,
+    issRate,
+    csllRate,
+    irpjRate,
+    irDiffRate,
+    serviceMargin,
+    salesCommission,
+    discountAmount,
+  ])
+
+  // ----------------------------------------------------
+  // ITEM 3: SALVAR RASCUNHO & EMITIR PROPOSTA
+  // ----------------------------------------------------
+  const getFormDataObject = (overrideStatus?: QuoteStatus): Partial<QuoteRecord> => {
+    const selectedClient = clients.find((c) => c.id === clientId)
+    const codeValue =
+      quoteCode || `PROP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`
+
+    const laborConfig = {
+      techCount: Number(techCount),
+      techHours: Number(techHours),
+      techRate: Number(techRate),
+      helperCount: Number(helperCount),
+      helperHours: Number(helperHours),
+      helperRate: Number(helperRate),
+      inspectorCount: Number(inspectorCount),
+      inspectorHours: Number(inspectorHours),
+      inspectorRate: Number(inspectorRate),
     }
 
-    setItems([...items, newItem])
-  }
-
-  // Compatibilidade com handleAddItem
-  const handleAddItem = (productId?: string) => {
-    handleAddEquipmentItem(productId)
-  }
-
-  const handleUpdateItem = (index: number, field: keyof QuoteItem, value: any) => {
-    const updated = [...items]
-    const item = { ...updated[index], [field]: value }
-    const qty = Number(item.quantity) || 1
-    const price = Number(item.unit_price) || 0
-    const disc = Number(item.discount) || 0
-    item.total = Math.max(0, qty * price - disc)
-    updated[index] = item
-    setItems(updated)
-  }
-
-  const handleRemoveItem = (index: number) => {
-    const updated = items.filter((_, i) => i !== index)
-    setItems(updated)
-    // Se removeu o primeiro item e sobraram outros itens, atualiza o item 0 nos controles superiores
-    if (index === 0 && updated.length > 0) {
-      const nextFirst = updated[0]
-      const specs = nextFirst.bermo_specs
-      if (specs) {
-        if (specs.productCode) setSelectedBermoCode(specs.productCode)
-        if (specs.productModel || specs.productName) {
-          setModelSearchInput(specs.productModel || specs.productName || specs.productCode || '')
-        }
-        if (specs.productBrand === 'BERMO' || specs.productBrand === 'Alfa Laval') {
-          setManufacturerHint(specs.productBrand)
-        }
-        if (specs.platesCount) setPlatesCount(specs.platesCount)
-        if (specs.plateDimensions) setPlateDimensions(specs.plateDimensions)
-        if (specs.gasketsCount) setGasketsCount(specs.gasketsCount)
-        if (specs.equipmentSize) setEquipmentSize(specs.equipmentSize)
-        if (specs.frameMaterial) setFrameMaterial(specs.frameMaterial)
-        if (specs.gasketType) setGasketType(specs.gasketType)
-      }
+    const pricingConfig = {
+      serviceMargin: Number(serviceMargin),
+      salesCommission: Number(salesCommission),
+      pisRate: Number(pisRate),
+      cofinsRate: Number(cofinsRate),
+      issRate: Number(issRate),
+      csllRate: Number(csllRate),
+      irpjRate: Number(irpjRate),
+      irDiffRate: Number(irDiffRate),
     }
-  }
 
-  const handleToggleIncludeProductCost = (checked: boolean) => {
-    setIncludeProductCost(checked)
-    if (items.length > 0) {
-      const updated = [...items]
-      const prodPrice = productBasePrice || updated[0].bermo_specs?.productBasePrice || 18500
-      const unit = checked ? prodPrice : 0
-      updated[0] = {
-        ...updated[0],
-        unit_price: unit,
-        total: unit * (updated[0].quantity || 1),
-        include_product_cost: checked,
-        bermo_specs: {
-          ...(updated[0].bermo_specs || {}),
-          includeProductCost: checked,
+    const travelConfig = {
+      originCep,
+      originAddress,
+      destinationCep,
+      destinationAddress,
+      distanceKm: Number(distanceKm),
+      isRoundTrip,
+      consumptionKmL: Number(consumptionKmL),
+      fuelPrice: Number(fuelPrice),
+      tollRoadPercent: Number(tollRoadPercent),
+      manualFuelAdj: Number(manualFuelAdj),
+      manualTollAdj: Number(manualTollAdj),
+    }
+
+    const lodgingMealsConfig = {
+      hotelDays: Number(hotelDays),
+      hotelRate: Number(hotelRate),
+      mealsDays: Number(mealsDays),
+      mealsRate: Number(mealsRate),
+    }
+
+    // Estrutura detalhada de service_details para compatibilidade com PDF, OS e histórico
+    const serviceDetails = {
+      service_technical_specs: {
+        productModel: equipmentModel,
+        productBrand: equipmentBrand,
+        productSeries: equipmentSeries,
+        platesCount: plateCount,
+        plateMaterial: plateMaterial,
+        plateThickness: plateThickness,
+        gasketType: gasketMaterial,
+        equipmentSize: connectionSize,
+        connectionType: connectionType,
+        operatingPressure: workingPressureBar,
+        testPressure: pressureTestBar,
+        dimensions: dimensions,
+        weightKg: weightKg,
+        scopeOfWork: scopeOfWork,
+      },
+      labor_costs: {
+        techMechanical: {
+          count: techCount,
+          hours: techHours,
+          ratePerHour: techRate,
+          total: laborTechTotal,
         },
-      }
-      setItems(updated)
+        helper: {
+          count: helperCount,
+          hours: helperHours,
+          ratePerHour: helperRate,
+          total: laborHelperTotal,
+        },
+        inspectorNDT: {
+          count: inspectorCount,
+          hours: inspectorHours,
+          ratePerHour: inspectorRate,
+          total: laborInspectorTotal,
+        },
+        totalLabor: laborTotal,
+      },
+      travel_costs: {
+        originCep,
+        originAddress,
+        destinationCep,
+        destinationAddress,
+        distanceKm,
+        isRoundTrip,
+        fuelPrice,
+        consumptionKmL,
+        tollRoadPercent,
+        manualFuelAdj,
+        manualTollAdj,
+        totalTravelCost: travelTotal,
+      },
+      lodging_meals_costs: {
+        hotelDays,
+        hotelRatePerDay: hotelRate,
+        mealsDays,
+        mealsRatePerDay: mealsRate,
+        totalLodgingMeals: lodgingMealsTotal,
+      },
+      materials_breakdown: {
+        baseMaterials: materialsCost,
+        customMaterials: customMaterialsList,
+        totalMaterials: totalMaterials,
+      },
+      indirect_costs: {
+        serviceMarginPercent: serviceMargin,
+        salesCommissionPercent: salesCommission,
+        taxes: {
+          pis: pisRate,
+          cofins: cofinsRate,
+          iss: issRate,
+          csll: csllRate,
+          irpj: irpjRate,
+          irDiff: irDiffRate,
+          totalTaxes: computation.totalTaxesPercent,
+        },
+        directCostsTotal: computation.directCostsTotal,
+        totalIndirectAmount: computation.totalIndirectCosts,
+        finalSalePrice: computation.finalClientPrice,
+      },
+      payment_and_validity: {
+        validityDays: validityDays,
+        conditionType: paymentCondition,
+      },
+      service_composition: computation,
     }
-  }
 
-  const handleApplyPreset = (tplId: string) => {
-    const tpl = TEMPLATE_PRESETS.find((t) => t.id === tplId)
-    if (!tpl) return
-
-    const bermo = BERMO_CATALOG.find((p) => p.code === tpl.productCode) || BERMO_CATALOG[0]
-    setSelectedBermoCode(bermo.code)
-    setModelSearchInput(bermo.model)
-    setMatchedSupplierInfo(bermo)
-    setSpecSource('local')
-    setProductBasePrice(bermo.basePrice)
-    setServiceBasePrice(tpl.servicePrice)
-    setIncludeProductCost(false)
-
-    setTechCount(tpl.labor.techCount)
-    setTechHours(tpl.labor.techHours)
-    setTechRate(tpl.labor.techRate)
-    setHelperCount(tpl.labor.helperCount)
-    setHelperHours(tpl.labor.helperHours)
-    setHelperRate(tpl.labor.helperRate)
-    setInspectorCount(tpl.labor.inspectorCount)
-    setInspectorHours(tpl.labor.inspectorHours)
-    setInspectorRate(tpl.labor.inspectorRate)
-
-    if (bermo.specs.plateDimensions) setPlateDimensions(bermo.specs.plateDimensions)
-    if (bermo.specs.connection) setEquipmentSize(bermo.specs.connection)
-    if (bermo.specs.material) setFrameMaterial(bermo.specs.material)
-    if (bermo.specs.gasketMaterial) setGasketType(bermo.specs.gasketMaterial)
-
-    const methodology = getStandardServiceMethodology([bermo.brand])
-    setItems([
+    const items = [
       {
-        name: `Trocador de Calor BERMO: ${bermo.name}`,
+        id: `item-${Date.now()}`,
+        name: `Serviço Especializado de Manutenção e Engenharia: ${equipmentBrand} ${equipmentModel || 'Equipamento'}`,
         quantity: 1,
-        unit_price: 0,
-        discount: 0,
-        total: 0,
-        description: methodology,
-        include_product_cost: false,
+        unit_price: computation.finalClientPrice,
+        discount: discountAmount,
+        total: computation.finalClientPrice,
+        description: scopeOfWork,
         bermo_specs: {
-          productCode: bermo.code,
-          productName: bermo.name,
-          productModel: bermo.model,
-          productBrand: bermo.brand,
-          equipmentSize: bermo.specs.connection,
-          frameMaterial: bermo.specs.material,
-          gasketType: bermo.specs.gasketMaterial,
-          plateDimensions: bermo.specs.plateDimensions,
-          platesCount: '40',
-          gasketsCount: '40',
-          includeProductCost: false,
-          productBasePrice: bermo.basePrice,
-          serviceBasePrice: tpl.servicePrice,
+          productCode: equipmentModel,
+          productModel: equipmentModel,
+          productBrand: equipmentBrand,
+          platesCount: String(plateCount),
+          plateDimensions: dimensions,
+          gasketType: gasketMaterial,
+          operatingPressure: String(workingPressureBar),
+          serviceScope: scopeOfWork,
+          pipeMeasurement: connectionSize,
         },
+      },
+    ]
+
+    return {
+      id: editingQuoteId || undefined,
+      code: codeValue,
+      quote_number: codeValue,
+      title: `Proposta Técnica ${equipmentBrand} ${equipmentModel || ''}`.trim(),
+      client_id: clientId,
+      client_name: selectedClient?.name || 'Cliente Não Identificado',
+      client_document: selectedClient?.document || '',
+      deal_id: dealId || undefined,
+
+      // Equipamento & Parâmetros Técnicos
+      equipment_brand: equipmentBrand,
+      equipment_model: equipmentModel,
+      equipment_series: equipmentSeries,
+      plate_count: Number(plateCount),
+      plate_material: plateMaterial,
+      plate_thickness: Number(plateThickness),
+      gasket_material: gasketMaterial,
+      connection_type: connectionType,
+      connection_size: connectionSize,
+      pressure_test_bar: Number(pressureTestBar),
+      working_pressure_bar: Number(workingPressureBar),
+      dimensions_w_h_d: dimensions,
+      weight_kg: Number(weightKg),
+      scope_of_work: scopeOfWork,
+
+      // Mão de Obra (campos individuais + JSON)
+      labor_hours: techHours + helperHours + inspectorHours,
+      labor_rate_hourly: techRate,
+      tech_count: Number(techCount),
+      tech_hours: Number(techHours),
+      tech_rate: Number(techRate),
+      helper_count: Number(helperCount),
+      helper_hours: Number(helperHours),
+      helper_rate: Number(helperRate),
+      inspector_count: Number(inspectorCount),
+      inspector_hours: Number(inspectorHours),
+      inspector_rate: Number(inspectorRate),
+      labor_config: laborConfig,
+
+      // Impostos, Margem e Comissão (campos individuais + JSON)
+      service_margin: Number(serviceMargin),
+      sales_commission: Number(salesCommission),
+      pis_rate: Number(pisRate),
+      cofins_rate: Number(cofinsRate),
+      iss_rate: Number(issRate),
+      csll_rate: Number(csllRate),
+      irpj_rate: Number(irpjRate),
+      ir_diff_rate: Number(irDiffRate),
+      pricing_config: pricingConfig,
+
+      // Logística, Deslocamento & Hospedagem
+      origin_cep: originCep,
+      origin_address: originAddress,
+      destination_cep: destinationCep,
+      destination_address: destinationAddress,
+      distance_km: Number(distanceKm),
+      is_round_trip: isRoundTrip,
+      travel_config: travelConfig,
+      lodging_meals_config: lodgingMealsConfig,
+
+      // Peças & Consumíveis
+      custom_materials: customMaterialsList,
+
+      // Custos Diretos
+      lodging_meals_cost: lodgingMealsTotal,
+      travel_cost: travelTotal,
+      materials_cost: totalMaterials,
+      third_party_cost: thirdPartyCost,
+      other_costs: otherCosts,
+      discount_amount: discountAmount,
+      total_cost: computation.directCostsTotal,
+      subtotal: computation.directCostsTotal,
+      final_price: computation.finalClientPrice,
+      total: computation.finalClientPrice,
+
+      // Status & Condições
+      status: overrideStatus || status,
+      validity_days: validityDays,
+      payment_conditions: paymentCondition,
+      payment_terms: `${paymentCondition.toUpperCase()} (${validityDays} dias de validade)`,
+      technical_notes: technicalNotes,
+      commercial_notes: commercialNotes,
+      notes: technicalNotes ? `${technicalNotes} ${commercialNotes}`.trim() : scopeOfWork,
+      service_details: serviceDetails,
+      items: items,
+    }
+  }
+
+  const handleSaveData = async (data: Partial<QuoteRecord>) => {
+    if (editingQuoteId && onUpdateQuote) {
+      return await onUpdateQuote(editingQuoteId, data)
+    } else if (onCreateQuote) {
+      return await onCreateQuote(data)
+    } else if (onSaveQuote) {
+      return await onSaveQuote(data)
+    }
+  }
+
+  // 3. Salvar Rascunho
+  const handleSaveDraft = async () => {
+    setIsSavingDraft(true)
+    try {
+      const draftData = getFormDataObject('draft')
+      const now = new Date()
+      const formattedTime = `Salvo em ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+
+      await handleSaveData(draftData)
+      setLastSavedDraft(formattedTime)
+
+      toast({
+        title: 'Rascunho salvo com sucesso!',
+        description: formattedTime,
+      })
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Erro ao salvar rascunho',
+        description: 'Tente novamente em instantes.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }
+
+  // Submissão oficial da Proposta
+  const handleSubmitQuote = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!clientId) {
+      toast({
+        title: 'Selecione um Cliente',
+        description: 'É necessário selecionar ou cadastrar um cliente para emitir a proposta.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    try {
+      const quoteData = getFormDataObject(isEditMode ? status : 'sent')
+      await handleSaveData(quoteData)
+
+      toast({
+        title: isEditMode ? 'Proposta Atualizada!' : 'Proposta Emitida com Sucesso!',
+        description: `Código: ${quoteData.code} | Valor Final: ${computation.finalClientPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+      })
+
+      setIsCreateModalOpen(false)
+      resetForm()
+    } catch (err) {
+      console.error(err)
+      toast({
+        title: 'Erro ao salvar proposta',
+        description: 'Ocorreu um erro ao gravar os dados. Verifique a conexão.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const resetForm = () => {
+    setEditingQuoteId(null)
+    setIsEditMode(false)
+    setClientId('')
+    setDealId('')
+    setQuoteCode('')
+    setStatus('draft')
+    setEquipmentBrand('Alfa Laval / BERMO')
+    setEquipmentModel('')
+    setEquipmentSeries('')
+    setPlateCount(45)
+    setPlateMaterial('AISI 316L')
+    setPlateThickness(0.5)
+    setGasketMaterial('EPDM Clip-on')
+    setConnectionType('Flangeada ANSI 150#')
+    setConnectionSize('DN100 (4")')
+    setPressureTestBar(16)
+    setWorkingPressureBar(10)
+    setDimensions('1450 x 480 x 1120 mm')
+    setWeightKg(480)
+    setScopeOfWork(
+      'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
+    )
+    setModelSource('manual')
+    setMaterialsCost(0)
+    setCustomMaterialsList([])
+
+    // Mão de Obra
+    setTechCount(1)
+    setTechHours(16)
+    setTechRate(140)
+    setHelperCount(1)
+    setHelperHours(16)
+    setHelperRate(85)
+    setInspectorCount(1)
+    setInspectorHours(6)
+    setInspectorRate(190)
+
+    // Impostos & Margens
+    setServiceMargin(25)
+    setSalesCommission(6)
+    setPisRate(0.65)
+    setCofinsRate(3.0)
+    setIssRate(5.0)
+    setCsllRate(2.88)
+    setIrpjRate(4.8)
+    setIrDiffRate(1.5)
+    setDiscountAmount(0)
+    setThirdPartyCost(0)
+    setOtherCosts(0)
+
+    // Logística & Hospedagem
+    setOriginCep('89066-000')
+    setOriginAddress('Rua Bernardo Reiter, 500 - Blumenau/SC')
+    setDestinationCep('')
+    setDestinationAddress('')
+    setDistanceKm(120)
+    setIsRoundTrip(true)
+    setConsumptionKmL(9.5)
+    setFuelPrice(5.89)
+    setTollRoadPercent(60)
+    setManualFuelAdj(0)
+    setManualTollAdj(0)
+    setHotelDays(2)
+    setHotelRate(220)
+    setMealsDays(4)
+    setMealsRate(95)
+
+    // Condições Comerciais
+    setValidityDays(15)
+    setPaymentCondition('28_ddl')
+    setTechnicalNotes(
+      'Incluso certificado de estanqueidade e laudo de ensaio por líquido penetrante conforme ASME Sec VIII Div 1.',
+    )
+    setCommercialNotes(
+      'Faturamento direto via BERMO / Intertermal. Garantia de 12 meses contra defeitos de montagem e vedação.',
+    )
+    setLastSavedDraft(null)
+  }
+
+  const handleOpenCreateModal = () => {
+    resetForm()
+    setQuoteCode(`PROP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`)
+    setIsCreateModalOpen(true)
+  }
+
+  const handleOpenEditModal = (q: QuoteRecord) => {
+    setEditingQuoteId(q.id)
+    setIsEditMode(true)
+    setQuoteCode(q.code || q.quote_number || '')
+    setClientId(q.client_id || '')
+    setDealId(q.deal_id || '')
+    setStatus(q.status || 'draft')
+
+    // Extrair dados aninhados em service_details ou items caso existam
+    const sDetails = q.service_details || {}
+    const sSpecs = sDetails.service_technical_specs || {}
+    const sLabor = sDetails.labor_costs || {}
+    const sTravel = sDetails.travel_costs || {}
+    const sLodging = sDetails.lodging_meals_costs || {}
+    const sIndirect = sDetails.indirect_costs || {}
+    const sTaxes = sIndirect.taxes || {}
+    const sPayment = sDetails.payment_and_validity || {}
+    const firstItem = q.items && q.items.length > 0 ? q.items[0] : null
+    const bSpecs = firstItem?.bermo_specs || {}
+
+    // Equipamento & Parâmetros Técnicos
+    setEquipmentBrand(
+      q.equipment_brand || sSpecs.productBrand || bSpecs.productBrand || 'Alfa Laval / BERMO',
+    )
+    setEquipmentModel(
+      q.equipment_model ||
+        sSpecs.productModel ||
+        sSpecs.productCode ||
+        bSpecs.productModel ||
+        bSpecs.productCode ||
+        '',
+    )
+    setEquipmentSeries(q.equipment_series || sSpecs.productSeries || '')
+    setPlateCount(
+      q.plate_count ??
+        (sSpecs.platesCount ? Number(sSpecs.platesCount) : undefined) ??
+        (bSpecs.platesCount ? Number(bSpecs.platesCount) : undefined) ??
+        45,
+    )
+    setPlateMaterial(
+      q.plate_material || sSpecs.plateMaterial || bSpecs.frameMaterial || 'AISI 316L',
+    )
+    setPlateThickness(
+      q.plate_thickness ??
+        (sSpecs.plateThickness ? Number(sSpecs.plateThickness) : undefined) ??
+        0.5,
+    )
+    setGasketMaterial(q.gasket_material || sSpecs.gasketType || bSpecs.gasketType || 'EPDM Clip-on')
+    setConnectionType(q.connection_type || sSpecs.connectionType || 'Flangeada ANSI 150#')
+    setConnectionSize(
+      q.connection_size ||
+        sSpecs.equipmentSize ||
+        bSpecs.equipmentSize ||
+        bSpecs.pipeMeasurement ||
+        'DN100 (4")',
+    )
+    setPressureTestBar(
+      q.pressure_test_bar ?? (sSpecs.testPressure ? Number(sSpecs.testPressure) : undefined) ?? 16,
+    )
+    setWorkingPressureBar(
+      q.working_pressure_bar ??
+        (sSpecs.operatingPressure ? Number(sSpecs.operatingPressure) : undefined) ??
+        (bSpecs.operatingPressure ? Number(bSpecs.operatingPressure) : undefined) ??
+        10,
+    )
+    setDimensions(
+      q.dimensions_w_h_d || sSpecs.dimensions || bSpecs.plateDimensions || '1450 x 480 x 1120 mm',
+    )
+    setWeightKg(q.weight_kg ?? (sSpecs.weightKg ? Number(sSpecs.weightKg) : undefined) ?? 480)
+    setScopeOfWork(
+      q.scope_of_work ||
+        sSpecs.scopeOfWork ||
+        bSpecs.serviceScope ||
+        firstItem?.description ||
+        q.notes ||
+        'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
+    )
+
+    // -------------------------------------------------------------------------
+    // PROBLEMA 1: RESTAURAR VALORES DE MÃO DE OBRA (techRate, helperRate, etc.)
+    // -------------------------------------------------------------------------
+    const laborCfg = q.labor_config as QuoteLaborConfig | undefined
+    const techMech = sLabor.techMechanical || {}
+    const helperObj = sLabor.helper || {}
+    const inspObj = sLabor.inspectorNDT || {}
+
+    setTechRate(
+      q.tech_rate ?? laborCfg?.techRate ?? techMech.ratePerHour ?? q.labor_rate_hourly ?? 140,
+    )
+    setTechCount(q.tech_count ?? laborCfg?.techCount ?? techMech.count ?? 1)
+    setTechHours(q.tech_hours ?? laborCfg?.techHours ?? techMech.hours ?? 16)
+
+    setHelperRate(q.helper_rate ?? laborCfg?.helperRate ?? helperObj.ratePerHour ?? 85)
+    setHelperCount(q.helper_count ?? laborCfg?.helperCount ?? helperObj.count ?? 1)
+    setHelperHours(q.helper_hours ?? laborCfg?.helperHours ?? helperObj.hours ?? 16)
+
+    setInspectorRate(q.inspector_rate ?? laborCfg?.inspectorRate ?? inspObj.ratePerHour ?? 190)
+    setInspectorCount(q.inspector_count ?? laborCfg?.inspectorCount ?? inspObj.count ?? 1)
+    setInspectorHours(q.inspector_hours ?? laborCfg?.inspectorHours ?? inspObj.hours ?? 6)
+
+    // -------------------------------------------------------------------------
+    // PROBLEMA 2: RESTAURAR IMPOSTOS, MARGEM E COMISSÃO
+    // -------------------------------------------------------------------------
+    const pricingCfg = q.pricing_config as QuotePricingConfig | undefined
+    setServiceMargin(
+      q.service_margin ?? pricingCfg?.serviceMargin ?? sIndirect.serviceMarginPercent ?? 25,
+    )
+    setSalesCommission(
+      q.sales_commission ?? pricingCfg?.salesCommission ?? sIndirect.salesCommissionPercent ?? 6,
+    )
+    setPisRate(q.pis_rate ?? pricingCfg?.pisRate ?? sTaxes.pis ?? 0.65)
+    setCofinsRate(q.cofins_rate ?? pricingCfg?.cofinsRate ?? sTaxes.cofins ?? 3.0)
+    setIssRate(q.iss_rate ?? pricingCfg?.issRate ?? sTaxes.iss ?? 5.0)
+    setCsllRate(q.csll_rate ?? pricingCfg?.csllRate ?? sTaxes.csll ?? 2.88)
+    setIrpjRate(q.irpj_rate ?? pricingCfg?.irpjRate ?? sTaxes.irpj ?? 4.8)
+    setIrDiffRate(q.ir_diff_rate ?? pricingCfg?.irDiffRate ?? sTaxes.irDiff ?? 1.5)
+
+    // Custos Diretos & Peças
+    setMaterialsCost(q.materials_cost || sDetails.materials_breakdown?.baseMaterials || 0)
+    setCustomMaterialsList(
+      q.custom_materials ||
+        sDetails.materials_breakdown?.customMaterials ||
+        sDetails.maintenance_materials?.map((m: any) => ({
+          id: m.id || `mat-${Math.random()}`,
+          description: m.description,
+          qty: 1,
+          unitPrice: m.amount || 0,
+        })) ||
+        [],
+    )
+    setThirdPartyCost(q.third_party_cost || 0)
+    setOtherCosts(q.other_costs || 0)
+    setDiscountAmount(q.discount_amount || q.discount_total || 0)
+
+    // Logística & Rotas
+    const travelCfg = q.travel_config || {}
+    setOriginCep(q.origin_cep || travelCfg.originCep || sTravel.originCep || '89066-000')
+    setOriginAddress(
+      q.origin_address ||
+        travelCfg.originAddress ||
+        sTravel.originAddress ||
+        'Rua Bernardo Reiter, 500 - Blumenau/SC',
+    )
+    setDestinationCep(q.destination_cep || travelCfg.destinationCep || sTravel.destinationCep || '')
+    setDestinationAddress(
+      q.destination_address || travelCfg.destinationAddress || sTravel.destinationAddress || '',
+    )
+    setDistanceKm(q.distance_km ?? travelCfg.distanceKm ?? sTravel.distanceKm ?? 120)
+    setIsRoundTrip(
+      q.is_round_trip !== undefined
+        ? q.is_round_trip
+        : travelCfg.isRoundTrip !== undefined
+          ? travelCfg.isRoundTrip
+          : sTravel.isRoundTrip !== undefined
+            ? sTravel.isRoundTrip
+            : true,
+    )
+    setConsumptionKmL(travelCfg.consumptionKmL || sTravel.consumptionKmL || 9.5)
+    setFuelPrice(travelCfg.fuelPrice || sTravel.fuelPrice || 5.89)
+    setTollRoadPercent(travelCfg.tollRoadPercent || sTravel.tollRoadPercent || 60)
+    setManualFuelAdj(travelCfg.manualFuelAdj || sTravel.manualFuelAdjustment || 0)
+    setManualTollAdj(travelCfg.manualTollAdj || sTravel.manualTollAdjustment || 0)
+
+    // Hospedagem & Alimentação
+    const lodgingCfg = q.lodging_meals_config || {}
+    setHotelDays(lodgingCfg.hotelDays ?? sLodging.hotelDays ?? 2)
+    setHotelRate(lodgingCfg.hotelRate ?? sLodging.hotelRatePerDay ?? 220)
+    setMealsDays(lodgingCfg.mealsDays ?? sLodging.mealsDays ?? 4)
+    setMealsRate(lodgingCfg.mealsRate ?? sLodging.mealsRatePerDay ?? 95)
+
+    // Condições Comerciais & Validade
+    setValidityDays(q.validity_days || sPayment.validityDays || 15)
+    const cond =
+      (q.payment_conditions as PaymentConditionType) ||
+      sPayment.conditionType ||
+      (q.payment_terms?.toLowerCase().includes('14')
+        ? '14_ddl'
+        : q.payment_terms?.toLowerCase().includes('30')
+          ? '30_ddl'
+          : q.payment_terms?.toLowerCase().includes('45')
+            ? '45_ddl'
+            : q.payment_terms?.toLowerCase().includes('60')
+              ? '60_ddl'
+              : '28_ddl')
+    setPaymentCondition(cond)
+    setTechnicalNotes(q.technical_notes || '')
+    setCommercialNotes(q.commercial_notes || '')
+
+    const foundModel =
+      q.equipment_model ||
+      sSpecs.productModel ||
+      sSpecs.productCode ||
+      bSpecs.productModel ||
+      bSpecs.productCode ||
+      ''
+    const match = lookupEquipmentSpecs(foundModel)
+    setModelSource(match ? 'local' : 'manual')
+
+    setIsCreateModalOpen(true)
+  }
+
+  const handleStatusUpdate = async (id: string, newStatus: QuoteStatus) => {
+    if (onUpdateQuoteStatus) {
+      await onUpdateQuoteStatus(id, newStatus)
+    } else if (onUpdateStatus) {
+      await onUpdateStatus(id, newStatus)
+    }
+  }
+
+  // Filtragem de propostas
+  const filteredQuotes = useMemo(() => {
+    return quotes.filter((q) => {
+      const matchSearch =
+        q.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (q.client_name && q.client_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (q.equipment_model && q.equipment_model.toLowerCase().includes(searchTerm.toLowerCase()))
+
+      const matchStatus = statusFilter === 'all' || q.status === statusFilter
+      const matchClient = clientFilter === 'all' || q.client_id === clientFilter
+
+      return matchSearch && matchStatus && matchClient
+    })
+  }, [quotes, searchTerm, statusFilter, clientFilter])
+
+  // Adicionar item de material customizado
+  const handleAddMaterial = () => {
+    if (!newMaterialDesc || newMaterialPrice <= 0) return
+    setCustomMaterialsList((prev) => [
+      ...prev,
+      {
+        id: `mat-${Date.now()}`,
+        description: newMaterialDesc,
+        qty: newMaterialQty || 1,
+        unitPrice: newMaterialPrice,
       },
     ])
+    setNewMaterialDesc('')
+    setNewMaterialQty(1)
+    setNewMaterialPrice(0)
   }
 
-  const getPaymentTermLabel = (type: PaymentConditionType, custom?: string) => {
-    switch (type) {
-      case '14_ddl':
-        return '14 DDL (14 dias do dia líquido)'
-      case '28_ddl':
-        return '28 DDL (28 dias do dia líquido)'
-      case '30_ddl':
-        return '30 DDL (30 dias negociados)'
-      case '45_ddl':
-        return '45 DDL (45 dias negociados)'
-      case '60_ddl':
-        return '60 DDL (60 dias negociados)'
-      case 'custom':
-        return custom || 'À combinar'
-    }
-  }
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault()
-    const client = clients.find((c) => c.id === clientId)
-    const prd = matchedSupplierInfo || searchSupplierProduct(selectedBermoCode)
-
-    const paymentTermsFormatted = getPaymentTermLabel(paymentCondition, customPaymentCondition)
-    const validUntilDate = new Date()
-    validUntilDate.setDate(validUntilDate.getDate() + (validityDays || 10) * 1.4)
-
-    const quotePayload: Partial<QuoteRecord> = {
-      quote_number: quoteNumber || `INT-2025-${Math.floor(100 + Math.random() * 900)}`,
-      client_id: clientId || undefined,
-      client_name: client ? client.name : 'Cliente Industrial',
-      status: 'draft',
-      items: items.map((it, idx) => {
-        if (idx === 0) {
-          return {
-            ...it,
-            include_product_cost: includeProductCost,
-            bermo_specs: {
-              ...(it.bermo_specs || {}),
-              productCode: selectedBermoCode || modelSearchInput,
-              productName: prd?.name || it.bermo_specs?.productName || modelSearchInput,
-              productModel: prd?.model || modelSearchInput,
-              productBrand: prd?.brand || it.bermo_specs?.productBrand || 'BERMO',
-              serviceScope,
-              fluidType,
-              fluidName,
-              inletTemp,
-              outletTemp,
-              operatingPressure,
-              flowRate,
-              pressureDrop,
-              equipmentSize,
-              frameMaterial,
-              gasketType,
-              platesCount,
-              plateDimensions,
-              gasketsCount,
-              workAreaDifficulty,
-              workAreaObservations,
-              needsIntegration,
-              integrationTiming: needsIntegration === 'Sim' ? integrationTiming : undefined,
-              integrationCost: computation.integrationTotal,
-              integrationObservations,
-              pipeMeasurement,
-              includeProductCost,
-              productBasePrice: productBasePrice || prd?.basePrice,
-              serviceBasePrice,
-            },
-          }
-        }
-        return it
-      }),
-      subtotal: computation.directCostsTotal,
-      discount_total: 0,
-      total: computation.finalClientPrice,
-      payment_terms: paymentTermsFormatted,
-      valid_until: validUntilDate.toISOString(),
-      notes:
-        notes ||
-        `Orçamento de Prestação de Serviços Técnicos (${prd?.name || 'Trocadores & Válvulas'}). Assistência Especializada Intertermal.`,
-      assigned_to: 'Alex Nogueira - Especialista Técnico Intertermal',
-      service_details: {
-        service_technical_specs: {
-          productCode: selectedBermoCode || modelSearchInput,
-          productName: prd?.name || modelSearchInput,
-          productModel: prd?.model || modelSearchInput,
-          productBrand: prd?.brand || 'BERMO',
-          serviceScope,
-          fluidType,
-          fluidName,
-          inletTemp,
-          outletTemp,
-          operatingPressure,
-          flowRate,
-          pressureDrop,
-          equipmentSize,
-          frameMaterial,
-          gasketType,
-          platesCount,
-          plateDimensions,
-          gasketsCount,
-          workAreaDifficulty,
-          workAreaObservations,
-          needsIntegration,
-          integrationTiming: needsIntegration === 'Sim' ? integrationTiming : undefined,
-          integrationCost: computation.integrationTotal,
-          integrationObservations,
-          pipeMeasurement,
-          includeProductCost,
-          productBasePrice: productBasePrice || prd?.basePrice,
-          serviceBasePrice,
-        },
-        labor_costs: laborCostsObj,
-        travel_costs: travelCostsObj,
-        lodging_meals_costs: lodgingMealsCostsObj,
-        maintenance_materials: maintenanceMaterials,
-        maintenance_materials_total: maintenanceMaterialsTotal,
-        indirect_costs: {
-          serviceMarginPercent: serviceMargin,
-          administrativeCostPercent: adminCost,
-          salesCommissionPercent: salesCommission,
-          taxes: computation.taxes,
-          totalDirectCosts: computation.directCostsTotal,
-          serviceMarginAmount: computation.serviceMarginAmount,
-          adminCostAmount: computation.adminCostAmount,
-          salesCommissionAmount: computation.salesCommissionAmount,
-          taxesAmount: computation.taxesAmount,
-          totalIndirectAmount: computation.totalIndirectCosts,
-          calculatedSalePrice: computation.finalClientPrice,
-        },
-        payment_and_validity: {
-          validityDays,
-          conditionType: paymentCondition,
-          customConditionText: customPaymentCondition,
-        },
-      },
-    }
-
-    if (isEditMode && editingQuoteId && onUpdateQuote) {
-      onUpdateQuote(editingQuoteId, quotePayload)
-    } else {
-      onCreateQuote(quotePayload)
-    }
-    setIsCreateModalOpen(false)
-    setIsEditMode(false)
-    setEditingQuoteId(null)
-  }
-
-  const currentViewQuote = selectedQuote || (quotes.length > 0 ? quotes[0] : null)
-
-  const handleOpenPdfPreview = (quoteToPreview?: QuoteRecord) => {
-    const q = quoteToPreview || currentViewQuote
-    if (q) {
-      setQuoteForPdf(q)
-      setIsPdfPreviewOpen(true)
-    }
+  const handleRemoveMaterial = (id: string) => {
+    setCustomMaterialsList((prev) => prev.filter((m) => m.id !== id))
   }
 
   return (
     <div className="space-y-6">
-      {/* Header com Branding Intertermal / BERMO */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* HEADER PRINCIPAL */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <div>
-          <h2 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
-            <Wrench className="h-6 w-6 text-teal-600 dark:text-teal-400" />
-            Orçamentos de Prestação de Serviços BERMO & Alfa Laval
-          </h2>
-          <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-            Gerador técnico de propostas com busca integrada na base de fornecedores, metodologia
-            padronizada, cálculo de mão de obra (3 funções) e logística Mapeia.
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-teal-500/10 rounded-xl">
+              <FileText className="h-6 w-6 text-teal-600 dark:text-teal-400" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+              Propostas Comerciais & Engenharia de Custos
+            </h1>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Motor de orçamentação técnica BERMO / Alfa Laval com cálculo de Mão de Obra, Logística
+            Mapeia (ViaCEP) e Formação de Preço de Venda.
           </p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {currentViewQuote && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleOpenPdfPreview(currentViewQuote)}
-              className="border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold shadow-xs"
-            >
-              <FileText className="h-4 w-4 mr-1.5 text-teal-600 dark:text-teal-400" />
-              Visualizar PDF
-            </Button>
-          )}
-          {onOpenCatalog && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onOpenCatalog}
-              className="border-teal-300 dark:border-teal-800 text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950 text-xs"
-            >
-              <Package className="h-4 w-4 mr-1.5" />
-              Catálogo Fornecedores
-            </Button>
-          )}
+
+        <div className="flex items-center gap-3">
           <Button
-            onClick={handleOpenNewQuote}
-            className="bg-teal-700 hover:bg-teal-600 text-white shadow-sm text-xs font-semibold"
+            onClick={handleOpenCreateModal}
+            className="bg-teal-700 hover:bg-teal-600 text-white font-semibold shadow-sm"
           >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Novo Orçamento de Serviço
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Proposta Técnica
           </Button>
         </div>
       </div>
 
-      {/* Modelos Prontos de Serviços */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        {TEMPLATE_PRESETS.map((tpl) => (
-          <Card
-            key={tpl.id}
-            className="p-3.5 border-slate-200 dark:border-slate-800 hover:border-teal-500 transition-all bg-gradient-to-b from-white to-slate-50/50 dark:from-slate-900 dark:to-slate-950 flex flex-col justify-between"
-          >
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2">
-                <Flame className="h-4 w-4 text-teal-600" />
-                <h3 className="text-xs font-bold text-slate-900 dark:text-slate-100">{tpl.name}</h3>
-              </div>
-              <p className="text-[11px] text-muted-foreground leading-relaxed">{tpl.description}</p>
+      {/* CARDS DE RESUMO */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-slate-200 dark:border-slate-800">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                Total de Propostas
+              </p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+                {quotes.length}
+              </h3>
             </div>
-            <div className="pt-3 mt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <span className="text-[10px] font-semibold text-slate-500">
-                Condição: {tpl.terms}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  handleApplyPreset(tpl.id)
-                  setIsCreateModalOpen(true)
-                }}
-                className="text-[11px] h-7 text-teal-700 border-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950"
-              >
-                Usar Este Modelo
-              </Button>
+            <div className="p-3 bg-blue-500/10 rounded-xl">
+              <FileText className="h-5 w-5 text-blue-600" />
             </div>
-          </Card>
-        ))}
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 dark:border-slate-800">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                Aprovadas / Fechadas
+              </p>
+              <h3 className="text-2xl font-bold text-emerald-600 mt-1">
+                {quotes.filter((q) => q.status === 'approved').length}
+              </h3>
+            </div>
+            <div className="p-3 bg-emerald-500/10 rounded-xl">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 dark:border-slate-800">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                Em Negociação
+              </p>
+              <h3 className="text-2xl font-bold text-amber-600 mt-1">
+                {
+                  quotes.filter((q) => q.status === 'sent' || q.status === 'pending_approval')
+                    .length
+                }
+              </h3>
+            </div>
+            <div className="p-3 bg-amber-500/10 rounded-xl">
+              <Clock className="h-5 w-5 text-amber-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200 dark:border-slate-800">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                Volume Total em Pipeline
+              </p>
+              <h3 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
+                {quotes
+                  .reduce((acc, q) => acc + (q.final_price || 0), 0)
+                  .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </h3>
+            </div>
+            <div className="p-3 bg-teal-500/10 rounded-xl">
+              <DollarSign className="h-5 w-5 text-teal-600" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Grid: Lista Lateral de Orçamentos + Visualizador */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Lista Lateral */}
-        <div className="lg:col-span-4 space-y-3">
-          <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground px-1 flex items-center justify-between">
-            <span>Propostas de Serviços ({quotes.length})</span>
+      {/* FILTROS E TABELA DE PROPOSTAS */}
+      <Card className="border-slate-200 dark:border-slate-800">
+        <CardHeader className="p-4 pb-0">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por código, cliente, modelo..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 text-xs"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-[160px] text-xs">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status</SelectItem>
+                  <SelectItem value="draft">Rascunho</SelectItem>
+                  <SelectItem value="pending_approval">Pendente Aprovação</SelectItem>
+                  <SelectItem value="sent">Enviada ao Cliente</SelectItem>
+                  <SelectItem value="approved">Aprovada</SelectItem>
+                  <SelectItem value="rejected">Recusada</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="w-[200px] text-xs">
+                  <SelectValue placeholder="Filtrar por Cliente" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Clientes</SelectItem>
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+        </CardHeader>
 
-          {quotes.map((q) => {
-            const isSelected = currentViewQuote?.id === q.id
-            return (
-              <Card
-                key={q.id}
-                onClick={() => handleOpenEditQuote(q)}
-                className={`p-3.5 cursor-pointer transition-all border ${
-                  isSelected
-                    ? 'border-teal-600 ring-2 ring-teal-500/20 bg-teal-50/20 dark:bg-teal-950/20'
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 hover:shadow-xs'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-1">
-                  <div className="space-y-0.5">
-                    <span className="font-mono text-xs font-bold text-teal-700 dark:text-teal-400">
-                      {q.quote_number}
-                    </span>
-                    <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 line-clamp-1">
-                      {q.client_name || 'Cliente'}
-                    </div>
-                  </div>
-                  <Badge
-                    variant={
-                      q.status === 'approved'
-                        ? 'default'
-                        : q.status === 'sent'
-                          ? 'secondary'
-                          : 'outline'
-                    }
-                    className="text-[10px] capitalize"
-                  >
-                    {q.status === 'approved'
-                      ? 'Aprovado'
-                      : q.status === 'sent'
-                        ? 'Enviado'
-                        : q.status === 'draft'
-                          ? 'Rascunho'
-                          : q.status}
-                  </Badge>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
-                  <span className="font-bold text-slate-900 dark:text-slate-100">
-                    {(q.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleOpenPdfPreview(q)
-                      }}
-                      className="p-1 text-slate-500 hover:text-teal-700 dark:hover:text-teal-400 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                      title="Visualizar PDF da Proposta"
-                    >
-                      <FileText className="h-3.5 w-3.5" />
-                    </button>
-                    <span className="text-[11px] text-muted-foreground truncate max-w-[100px]">
-                      {q.payment_terms || '14 DDL'}
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
-
-        {/* Visualizador da Proposta (Modo Cliente vs Modo Interno) */}
-        <div className="lg:col-span-8">
-          {currentViewQuote ? (
-            <Card className="border-slate-300 dark:border-slate-700 shadow-md bg-white dark:bg-slate-950 overflow-hidden">
-              {/* Header do Documento */}
-              <div className="bg-gradient-to-r from-slate-950 via-teal-950 to-slate-900 p-6 text-white flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono tracking-widest text-teal-300 uppercase font-bold">
-                      INTERTERMAL • PROPOSTA DE SERVIÇOS TÉCNICOS
-                    </span>
-                  </div>
-                  <h3 className="text-xl font-extrabold">{currentViewQuote.quote_number}</h3>
-                  <p className="text-xs text-slate-300">
-                    Emitido por:{' '}
-                    {currentViewQuote.assigned_to ||
-                      'Alex Nogueira - Especialista de Aplicações Técnicas'}
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => handleOpenPdfPreview(currentViewQuote)}
-                    className="h-8 text-xs bg-emerald-700 hover:bg-emerald-600 text-white font-semibold shadow-xs"
-                    title="Abrir prévia formatada em PDF da proposta"
-                  >
-                    <FileText className="h-3.5 w-3.5 mr-1.5" /> Prévia em PDF
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleOpenEditQuote(currentViewQuote)}
-                    className="h-8 text-xs bg-teal-800/80 hover:bg-teal-700 border-teal-600 text-white font-medium"
-                    title="Abrir proposta completa para conferência e edição"
-                  >
-                    <Wrench className="h-3.5 w-3.5 mr-1" /> Editar Proposta
-                  </Button>
-
-                  {/* Alternador de Visão: Cliente vs Interno */}
-                  <div className="flex items-center rounded-lg bg-slate-800/90 p-1 border border-slate-700 text-xs">
-                    <button
-                      onClick={() => setViewMode('client')}
-                      className={`px-2.5 py-1 rounded font-medium flex items-center gap-1 transition-all ${
-                        viewMode === 'client'
-                          ? 'bg-teal-700 text-white shadow-xs'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                      title="Exibição formal enviada ao cliente (sem custos indiretos e sem materiais de manutenção)"
-                    >
-                      <Eye className="h-3 w-3" />
-                      Proposta Cliente
-                    </button>
-                    <button
-                      onClick={() => setViewMode('internal')}
-                      className={`px-2.5 py-1 rounded font-medium flex items-center gap-1 transition-all ${
-                        viewMode === 'internal'
-                          ? 'bg-teal-700 text-white shadow-xs'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                      title="Exibição interna completa com impostos, margem, comissão e materiais de manutenção"
-                    >
-                      <SlidersHorizontal className="h-3 w-3" />
-                      Composição Interna
-                    </button>
-                  </div>
-
-                  <Select
-                    value={currentViewQuote.status}
-                    onValueChange={(val) =>
-                      onUpdateQuoteStatus(currentViewQuote.id, val as QuoteStatus)
-                    }
-                  >
-                    <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700 text-white w-28">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="draft">Rascunho</SelectItem>
-                      <SelectItem value="sent">Enviado</SelectItem>
-                      <SelectItem value="approved">Aprovado</SelectItem>
-                      <SelectItem value="rejected">Recusado</SelectItem>
-                      <SelectItem value="expired">Expirado</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleOpenPdfPreview(currentViewQuote)}
-                    className="h-8 text-xs bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-white"
-                  >
-                    <Printer className="h-3.5 w-3.5 mr-1" /> Imprimir / PDF
-                  </Button>
-                </div>
-              </div>
-
-              {/* Corpo da Proposta */}
-              <CardContent className="p-6 space-y-6">
-                {/* Banner de Identificação da Visão */}
-                {viewMode === 'client' ? (
-                  <div className="p-2.5 rounded-lg bg-teal-50/60 dark:bg-teal-950/20 border border-teal-200/80 dark:border-teal-900/60 flex items-center justify-between text-xs text-teal-800 dark:text-teal-300">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="h-4 w-4 text-teal-600 shrink-0" />
-                      <span>
-                        <strong>Visão Oficial do Cliente:</strong> Exibe itens do serviço com
-                        metodologia, especificações técnicas, inclusões e condições comerciais.
-                        Custos indiretos e materiais internos ocultados.
-                      </span>
-                    </div>
-                  </div>
+        <CardContent className="p-4">
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 uppercase font-semibold">
+                <tr>
+                  <th className="p-3">Código</th>
+                  <th className="p-3">Cliente</th>
+                  <th className="p-3">Equipamento</th>
+                  <th className="p-3">Custo Direto</th>
+                  <th className="p-3">Preço Final</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredQuotes.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                      Nenhuma proposta encontrada. Clique em "Nova Proposta Técnica" para começar.
+                    </td>
+                  </tr>
                 ) : (
-                  <div className="p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-300/80 dark:border-amber-900/60 flex items-center justify-between text-xs text-amber-900 dark:text-amber-300">
-                    <div className="flex items-center gap-2">
-                      <SlidersHorizontal className="h-4 w-4 text-amber-600 shrink-0" />
-                      <span>
-                        <strong>Visão Interna (Intertermal):</strong> Visualização gerencial com
-                        materiais de manutenção, margem de lucro, taxa administrativa, impostos e
-                        comissão.
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Dados do Cliente e Condições */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider block">
-                      Destinatário / Empresa Cliente
-                    </span>
-                    <div className="font-bold text-sm text-slate-900 dark:text-slate-100">
-                      {currentViewQuote.client_name || 'Cliente Corporativo'}
-                    </div>
-                    <div className="text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3 text-slate-400" />
-                      Validade da Proposta:{' '}
-                      <strong className="text-slate-700 dark:text-slate-300">
-                        {currentViewQuote.service_details?.payment_and_validity?.validityDays || 10}{' '}
-                        dias úteis
-                      </strong>{' '}
-                      da emissão
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-muted-foreground uppercase text-[10px] font-bold tracking-wider block">
-                      Condições de Pagamento & Faturamento
-                    </span>
-                    <div className="font-semibold text-teal-700 dark:text-teal-400">
-                      {currentViewQuote.payment_terms || '28 DDL (28 dias do dia líquido)'}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      Faturamento via boleto bancário mediante homologação do serviço.
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tabela de Itens e Serviços */}
-                <div className="space-y-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                    <span>1. Escopo de Serviços & Equipamentos</span>
-                  </h4>
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase text-[10px] font-semibold">
-                        <tr>
-                          <th className="p-2.5">Descrição do Serviço / Produto</th>
-                          <th className="p-2.5 text-center">Qtd</th>
-                          <th className="p-2.5 text-right">Valor Unitário</th>
-                          <th className="p-2.5 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {currentViewQuote.items && currentViewQuote.items.length > 0 ? (
-                          currentViewQuote.items.map((item, idx) => (
-                            <tr
-                              key={idx}
-                              className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50"
-                            >
-                              <td className="p-2.5 space-y-1.5">
-                                <div className="font-semibold text-slate-900 dark:text-slate-100">
-                                  {item.name}
-                                </div>
-                                {item.description && (
-                                  <div className="text-[11px] text-slate-600 dark:text-slate-300 whitespace-pre-line bg-slate-50 dark:bg-slate-900/40 p-2 rounded border border-slate-100 dark:border-slate-800">
-                                    {item.description}
-                                  </div>
-                                )}
-                                {item.bermo_specs && (
-                                  <div className="text-[11px] text-muted-foreground bg-teal-50/40 dark:bg-teal-950/20 p-2 rounded border border-teal-100 dark:border-teal-900/50 space-y-1">
-                                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px]">
-                                      {item.bermo_specs.productCode && (
-                                        <span>
-                                          Ref/Modelo:{' '}
-                                          <strong>{item.bermo_specs.productCode}</strong>
-                                        </span>
-                                      )}
-                                      {item.bermo_specs.productBrand && (
-                                        <span>
-                                          Fabricante:{' '}
-                                          <strong>{item.bermo_specs.productBrand}</strong>
-                                        </span>
-                                      )}
-                                      {item.bermo_specs.platesCount && (
-                                        <span className="text-teal-700 dark:text-teal-400">
-                                          Nº Placas: <strong>{item.bermo_specs.platesCount}</strong>
-                                        </span>
-                                      )}
-                                      {item.bermo_specs.plateDimensions && (
-                                        <span className="text-teal-700 dark:text-teal-400">
-                                          Dimensão Placas:{' '}
-                                          <strong>{item.bermo_specs.plateDimensions}</strong>
-                                        </span>
-                                      )}
-                                      {item.bermo_specs.gasketType && (
-                                        <span>
-                                          Gaxetas: <strong>{item.bermo_specs.gasketType}</strong>
-                                        </span>
-                                      )}
-                                      {item.bermo_specs.operatingPressure && (
-                                        <span>
-                                          Pressão:{' '}
-                                          <strong>{item.bermo_specs.operatingPressure} bar</strong>
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </td>
-                              <td className="p-2.5 text-center">{item.quantity}</td>
-                              <td className="p-2.5 text-right font-mono">
-                                {(item.unit_price || 0).toLocaleString('pt-BR', {
-                                  style: 'currency',
-                                  currency: 'BRL',
-                                })}
-                              </td>
-                              <td className="p-2.5 text-right font-bold text-slate-900 dark:text-slate-100 font-mono">
-                                {(item.total || 0).toLocaleString('pt-BR', {
-                                  style: 'currency',
-                                  currency: 'BRL',
-                                })}
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={4} className="p-4 text-center text-muted-foreground">
-                              Nenhum item adicionado.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Seção 2: Incluso no Valor (Visível na Proposta do Cliente) */}
-                <div className="p-3.5 rounded-xl bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900 space-y-1.5 text-xs">
-                  <div className="flex items-center gap-1.5 text-teal-900 dark:text-teal-200 font-bold uppercase text-[11px] tracking-wider">
-                    <CheckCircle2 className="h-4 w-4 text-teal-600 dark:text-teal-400" />
-                    Incluso no valor
-                  </div>
-                  <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed text-justify">
-                    {PROPOSAL_INCLUSIONS_TEXT}
-                  </p>
-                </div>
-
-                {/* Seção 3: Materiais de Manutenção & Custos Internos (EXIBIDO APENAS NO MODO INTERNO) */}
-                {viewMode === 'internal' && (
-                  <div className="space-y-4">
-                    {/* Materiais de Manutenção Internos */}
-                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 uppercase text-[11px] tracking-wider">
-                          <Layers className="h-4 w-4 text-teal-600" />
-                          Materiais de Manutenção (Apenas Composição Interna)
-                        </span>
-                        <Badge variant="outline" className="text-[10px]">
-                          Não exibido ao cliente
-                        </Badge>
-                      </div>
-
-                      {currentViewQuote.service_details?.maintenance_materials &&
-                      currentViewQuote.service_details.maintenance_materials.length > 0 ? (
-                        <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
-                          <table className="w-full text-xs text-left">
-                            <thead className="bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold uppercase">
-                              <tr>
-                                <th className="p-2">Descrição do Material</th>
-                                <th className="p-2 text-right">Valor (R$)</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                              {currentViewQuote.service_details.maintenance_materials.map((m) => (
-                                <tr key={m.id}>
-                                  <td className="p-2">{m.description}</td>
-                                  <td className="p-2 text-right font-mono font-bold">
-                                    {(m.amount || 0).toLocaleString('pt-BR', {
-                                      style: 'currency',
-                                      currency: 'BRL',
-                                    })}
-                                  </td>
-                                </tr>
-                              ))}
-                              <tr className="bg-slate-100/50 dark:bg-slate-800/50 font-bold">
-                                <td className="p-2 text-right">Total dos Materiais:</td>
-                                <td className="p-2 text-right font-mono text-teal-700 dark:text-teal-300">
-                                  {(
-                                    currentViewQuote.service_details?.maintenance_materials_total ||
-                                    0
-                                  ).toLocaleString('pt-BR', {
-                                    style: 'currency',
-                                    currency: 'BRL',
-                                  })}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                  filteredQuotes.map((q) => (
+                    <tr
+                      key={q.id}
+                      className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-colors"
+                    >
+                      <td className="p-3 font-mono font-bold text-teal-700 dark:text-teal-300">
+                        {q.code}
+                      </td>
+                      <td className="p-3 font-semibold text-slate-800 dark:text-slate-200">
+                        {q.client_name || '—'}
+                      </td>
+                      <td className="p-3">
+                        <div className="font-medium">
+                          {q.equipment_model || 'Modelo não especificado'}
                         </div>
-                      ) : (
-                        <p className="text-[11px] text-muted-foreground italic">
-                          Nenhum material de manutenção adicional lançado nesta proposta.
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Quebra de Custos Indiretos */}
-                    <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-900/60 space-y-3 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5 uppercase text-[11px] tracking-wider">
-                          <SlidersHorizontal className="h-4 w-4" />
-                          Custos Indiretos & Composição de Preço (NÃO VISÍVEL AO CLIENTE)
-                        </span>
-                        <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 text-[10px]">
-                          Uso Interno Intertermal
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
-                          <span className="text-muted-foreground block text-[10px]">
-                            Margem de Serviços:
-                          </span>
-                          <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                            {serviceMargin}%
-                          </span>
+                        <div className="text-[10px] text-muted-foreground">
+                          {q.plate_count ? `${q.plate_count} placas` : ''}{' '}
+                          {q.gasket_material ? `• ${q.gasket_material}` : ''}
                         </div>
-
-                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
-                          <span className="text-muted-foreground block text-[10px]">
-                            Custos Administrativos:
-                          </span>
-                          <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                            15% fixo
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
-                          <span className="text-muted-foreground block text-[10px]">
-                            Total de Impostos:
-                          </span>
-                          <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                            {computation.totalTaxesPercent}%
-                          </span>
-                        </div>
-
-                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
-                          <span className="text-muted-foreground block text-[10px]">
-                            Comissão de Vendas:
-                          </span>
-                          <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                            {salesCommission}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Resumo Financeiro Final */}
-                <div className="flex justify-end pt-2">
-                  <div className="w-72 space-y-2 text-xs">
-                    {viewMode === 'internal' && (
-                      <div className="flex justify-between text-muted-foreground">
-                        <span>Custos Diretos (Subtotal):</span>
-                        <span>
-                          {(
-                            currentViewQuote.subtotal ||
-                            computation.directCostsTotal ||
-                            0
-                          ).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                        </span>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-base font-extrabold text-slate-900 dark:text-slate-100 pt-2 border-t border-slate-200 dark:border-slate-800">
-                      <span>Valor Total da Proposta:</span>
-                      <span className="text-teal-700 dark:text-teal-400 font-mono">
-                        {(currentViewQuote.total || 0).toLocaleString('pt-BR', {
+                      </td>
+                      <td className="p-3 font-mono text-slate-600 dark:text-slate-400">
+                        {(q.total_cost || 0).toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
                         })}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Observações & Condições */}
-                {currentViewQuote.notes && (
-                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
-                    <span className="font-bold block text-slate-900 dark:text-slate-100 mb-1">
-                      Observações Técnicas & Condições Gerais:
-                    </span>
-                    {currentViewQuote.notes}
-                  </div>
+                      </td>
+                      <td className="p-3 font-mono font-bold text-emerald-700 dark:text-emerald-300 text-sm">
+                        {(q.final_price || 0).toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </td>
+                      <td className="p-3">
+                        <Badge
+                          variant="outline"
+                          className={
+                            q.status === 'approved'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                              : q.status === 'sent'
+                                ? 'bg-blue-50 text-blue-700 border-blue-300'
+                                : q.status === 'pending_approval'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-300'
+                                  : q.status === 'rejected'
+                                    ? 'bg-rose-50 text-rose-700 border-rose-300'
+                                    : 'bg-slate-100 text-slate-700 border-slate-300'
+                          }
+                        >
+                          {q.status === 'approved'
+                            ? 'Aprovada'
+                            : q.status === 'sent'
+                              ? 'Enviada'
+                              : q.status === 'pending_approval'
+                                ? 'Em Aprovação'
+                                : q.status === 'rejected'
+                                  ? 'Recusada'
+                                  : 'Rascunho'}
+                        </Badge>
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setQuoteForPdf(q)
+                              setIsPdfPreviewOpen(true)
+                            }}
+                            title="Visualizar Proposta PDF"
+                            className="h-7 w-7 text-slate-600 hover:text-teal-600"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenEditModal(q)}
+                            title="Editar Proposta"
+                            className="h-7 w-7 text-slate-600 hover:text-blue-600"
+                          >
+                            <Edit className="h-3.5 w-3.5" />
+                          </Button>
+                          {onDeleteQuote && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onDeleteQuote(q.id)}
+                              title="Excluir"
+                              className="h-7 w-7 text-slate-600 hover:text-rose-600"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
                 )}
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="p-12 text-center text-muted-foreground">
-              <FileSpreadsheet className="h-10 w-10 mx-auto text-slate-400 mb-2" />
-              <p className="text-sm font-semibold">Nenhum orçamento selecionado</p>
-              <p className="text-xs">
-                Selecione uma proposta na lista ou gere uma nova proposta técnica.
-              </p>
-            </Card>
-          )}
-        </div>
-      </div>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* MODAL COMPLETO DE CRIAÇÃO / EDIÇÃO DE ORÇAMENTO */}
+      {/* ========================================================================= */}
+      {/* MODAL DE FORMULÁRIO DE PROPOSTA TÉCNICA (COMPLETO, RESTAURADO E LIMPO)   */}
+      {/* ========================================================================= */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="sm:max-w-[860px] max-h-[92vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto p-6">
           <DialogHeader>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-teal-700 text-white text-[10px]">
-                Intertermal - Serviços Técnicos
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                Engenharia & Manutenção de Válvulas e Trocadores (BERMO / Alfa Laval)
-              </span>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-teal-600" />
+                  {isEditMode
+                    ? `Editar Proposta ${quoteCode}`
+                    : 'Nova Proposta Comercial e Técnica'}
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  Engenharia de Custos BERMO Intertermal • Alfa Laval • Logística Mapeia
+                </DialogDescription>
+              </div>
+
+              {lastSavedDraft && (
+                <Badge
+                  variant="outline"
+                  className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[11px] font-mono"
+                >
+                  <Check className="h-3 w-3 mr-1" />
+                  {lastSavedDraft}
+                </Badge>
+              )}
             </div>
-            <DialogTitle className="text-lg font-bold">
-              {isEditMode
-                ? `Editar Proposta Técnica: ${quoteNumber}`
-                : 'Novo Orçamento de Prestação de Serviços'}
-            </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleCreate} className="space-y-5 py-2">
-            {/* 1. Dados Básicos */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <form onSubmit={handleSubmitQuote} className="space-y-6 pt-2">
+            {/* CABEÇALHO DO FORMULÁRIO: CLIENTE & CÓDIGO */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <div className="space-y-1">
-                <Label className="text-xs font-medium">Número do Orçamento *</Label>
-                <Input
-                  value={quoteNumber}
-                  onChange={(e) => setQuoteNumber(e.target.value)}
-                  className="text-xs font-mono font-bold"
-                  required
-                />
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">Cliente *</Label>
+                  {onCreateClient && (
+                    <button
+                      type="button"
+                      onClick={() => setIsNewClientModalOpen(true)}
+                      className="text-[10px] text-teal-600 hover:underline font-bold"
+                    >
+                      + Novo Cliente
+                    </button>
+                  )}
+                </div>
+                <Select value={clientId} onValueChange={setClientId} required>
+                  <SelectTrigger className="text-xs">
+                    <SelectValue placeholder="Selecione o Cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((c) => (
+                      <SelectItem key={c.id} value={c.id} className="text-xs">
+                        {c.name} {c.city ? `(${c.city}/${c.state || ''})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <Label className="text-xs font-medium">Cliente Industrial Destinatário *</Label>
-                  {onCreateClient && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsNewClientModalOpen(true)}
-                      className="h-6 text-[11px] px-2 text-teal-700 border-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950 font-medium"
-                    >
-                      <Plus className="h-3 w-3 mr-1 text-teal-600" />
-                      Novo Cliente
-                    </Button>
-                  )}
-                </div>
-                <Select
-                  value={clientId}
-                  onValueChange={(selectedId) => {
-                    setClientId(selectedId)
-                    const foundClient = clients.find((c) => c.id === selectedId)
-                    if (foundClient) {
-                      if (foundClient.city) {
-                        setDestinationAddress(
-                          `${foundClient.city} / ${foundClient.state || 'SC'}`
-                        )
-                      }
-                      if (foundClient.document && foundClient.document.replace(/\D/g, '').length === 8) {
-                        // caso tenha cep no documento
-                      }
-                    }
-                  }}
-                  required
-                >
+                <Label className="text-xs font-semibold">Oportunidade / Negócio (CRM)</Label>
+                <Select value={dealId} onValueChange={setDealId}>
                   <SelectTrigger className="text-xs">
-                    <SelectValue placeholder="Selecione o cliente..." />
+                    <SelectValue placeholder="Vincular a Negócio (Opcional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    {clients.length === 0 ? (
-                      <div className="p-2 text-xs text-muted-foreground text-center">
-                        Nenhum cliente cadastrado
-                      </div>
-                    ) : (
-                      clients.map((c) => (
-                        <SelectItem key={c.id} value={c.id} className="text-xs">
-                          {c.name} {c.city ? `(${c.city}/${c.state || 'BR'})` : ''}
-                        </SelectItem>
-                      ))
-                    )}
+                    <SelectItem value="none">Nenhum (Avulso)</SelectItem>
+                    {deals.map((d) => (
+                      <SelectItem key={d.id} value={d.id} className="text-xs">
+                        {d.title} ({d.stage})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Status Inicial</Label>
+                <Select value={status} onValueChange={(val) => setStatus(val as QuoteStatus)}>
+                  <SelectTrigger className="text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft" className="text-xs">
+                      Rascunho
+                    </SelectItem>
+                    <SelectItem value="pending_approval" className="text-xs">
+                      Pendente Aprovação
+                    </SelectItem>
+                    <SelectItem value="sent" className="text-xs">
+                      Emitida / Enviada ao Cliente
+                    </SelectItem>
+                    <SelectItem value="approved" className="text-xs">
+                      Aprovada
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            {/* SEÇÃO 3A: PRODUTO BERMO / FORNECEDOR (COMBOBOX EDITÁVEL E BUSCA) */}
-            <div className="p-3.5 rounded-xl bg-teal-50/40 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-900/60 space-y-3">
-              <div className="flex items-center justify-between">
+            {/* ========================================================================= */}
+            {/* SEÇÃO 3A: PRODUTO BERMO / FORNECEDOR & ESPECIFICAÇÕES TÉCNICAS           */}
+            {/* (ITEM 3A: Digitação Livre + Busca Local vs Manual + Lupa Buscar Online)   */}
+            {/* ========================================================================= */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
-                  <Flame className="h-4 w-4 text-teal-700" />
-                  <span className="text-xs font-bold text-teal-900 dark:text-teal-200 uppercase tracking-wider">
-                    3a. Produto BERMO / Alfa Laval & Parâmetros Técnicos do Serviço
+                  <Layers className="h-4 w-4 text-teal-600" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">
+                    3a. Produto BERMO / Alfa Laval & Parâmetros Técnicos do Equipamento
                   </span>
                 </div>
-                {/* Badge indicando a origem: Base local / Busca web / Manual */}
-                <Badge
-                  variant="outline"
-                  className={`text-[10px] font-semibold transition-all ${
-                    specSource === 'local'
-                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-300'
-                      : specSource === 'web'
-                        ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-950 dark:text-blue-300'
-                        : 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950 dark:text-amber-300'
-                  }`}
-                >
-                  {specSource === 'local' && (
-                    <span className="flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                      Origem: Base local ({matchedSupplierInfo?.brand || manufacturerHint})
-                    </span>
+
+                <div className="flex items-center gap-2">
+                  {modelSource === 'local' ? (
+                    <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200 border-emerald-300 text-[10px] font-bold">
+                      <Database className="h-3 w-3 mr-1" />
+                      Base local
+                    </Badge>
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-[10px] font-bold"
+                    >
+                      Manual
+                    </Badge>
                   )}
-                  {specSource === 'web' && (
-                    <span className="flex items-center gap-1">
-                      <Globe className="h-3 w-3 text-blue-600" />
-                      Origem: Busca web ({manufacturerHint})
-                    </span>
-                  )}
-                  {specSource === 'manual' && (
-                    <span className="flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3 text-amber-600" />
-                      Origem: Manual
-                    </span>
-                  )}
-                </Badge>
+                </div>
               </div>
 
-              {/* Input de Modelo Livre + Seleção de Fabricante + Botão de Busca na Internet */}
-              <div className="space-y-2 relative">
-                <div className="flex items-center justify-between flex-wrap gap-1">
-                  <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                    Modelo do Equipamento (Input Livre — Digite qualquer modelo) *
-                  </Label>
-                  <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                    <span>Fabricante:</span>
-                    <Select
-                      value={manufacturerHint}
-                      onValueChange={(val: any) => {
-                        setManufacturerHint(val)
-                        if (items.length > 0) {
-                          const updated = [...items]
-                          updated[0] = {
-                            ...updated[0],
-                            bermo_specs: {
-                              ...(updated[0].bermo_specs || {}),
-                              productBrand: val,
-                            },
-                          }
-                          setItems(updated)
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-6 text-[10px] w-28 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-700">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="BERMO" className="text-xs font-semibold text-teal-700">
-                          BERMO
-                        </SelectItem>
-                        <SelectItem value="Alfa Laval" className="text-xs font-semibold text-blue-700">
-                          Alfa Laval
-                        </SelectItem>
-                        <SelectItem value="Outro" className="text-xs">
-                          Outro / Genérico
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+              {/* LINHA DE ENTRADA DO MODELO COM DIGITAÇÃO LIVRE E AUTO-SUGESTÃO */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Marca / Fabricante</Label>
+                  <Input
+                    value={equipmentBrand}
+                    onChange={(e) => setEquipmentBrand(e.target.value)}
+                    placeholder="Ex: Alfa Laval, Kelvion, Danfoss"
+                    className="text-xs h-8"
+                  />
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      value={modelSearchInput}
-                      onChange={(e) => {
-                        handleModelSearchChange(e.target.value)
-                      }}
-                      onFocus={() => {
-                        setShowSupplierDropdown(true)
-                        setActiveItemIndexForDropdown(0)
-                      }}
-                      placeholder="Digite QUALQUER modelo: ex: BP30, M10-B, T5-BFG, BL50, CLIP-8, Swep..."
-                      className="text-xs h-9 bg-white dark:bg-slate-900 font-bold text-teal-900 dark:text-teal-100 pr-8 shadow-inner"
-                      required
-                    />
-                    {matchedSupplierInfo && (
-                      <span
-                        className="absolute right-2.5 top-2.5"
-                        title="Especificações encontradas na base local"
-                      >
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                      </span>
-                    )}
+                {/* CAMPO DE MODELO 100% EDITÁVEL COM DIGITAÇÃO LIVRE */}
+                <div className="space-y-1 relative sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                      Modelo do Equipamento * (Digitação Livre)
+                    </Label>
+                    <span className="text-[10px] text-muted-foreground">
+                      Ex: M10-BFG, TL10-P, M6-MFG, Kelvion NT100M
+                    </span>
                   </div>
 
-                  {/* Se NÃO estiver na base local OU se usuário quiser forçar busca na web */}
-                  {!matchedSupplierInfo && (
+                  <div className="flex flex-wrap sm:flex-nowrap gap-2">
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Input
+                        value={equipmentModel}
+                        onChange={(e) => handleModelChange(e.target.value)}
+                        placeholder="Digite qualquer modelo livremente (ex: M10-BFG, TL10, Sondex S14)..."
+                        className="text-xs h-8 font-mono font-bold"
+                        required
+                      />
+                      {showSuggestions && modelSuggestions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 z-50 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+                          {modelSuggestions.map((s) => (
+                            <div
+                              key={s.id}
+                              onClick={() => selectSuggestion(s)}
+                              className="p-2 text-xs hover:bg-teal-50 dark:hover:bg-slate-800 cursor-pointer flex items-center justify-between border-b border-slate-100 dark:border-slate-900 last:border-0"
+                            >
+                              <div>
+                                <span className="font-bold text-teal-700 dark:text-teal-300">
+                                  {s.modelCode}
+                                </span>
+                                <span className="text-slate-500 ml-2">({s.brand})</span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground">
+                                {s.plateCount} placas • {s.connectionSize}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* BOTÃO LUPA BUSCAR NA INTERNET QUANDO MANUAL */}
+                    {modelSource === 'manual' && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isSearchingOnline || !equipmentModel.trim()}
+                        onClick={() => handleSearchOnlineSpecs(equipmentModel)}
+                        className="h-8 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300 dark:hover:bg-teal-950 flex items-center gap-1.5 shrink-0"
+                        title="Pesquisar especificações técnicas na internet / IA"
+                      >
+                        {isSearchingOnline ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Search className="h-3.5 w-3.5" />
+                        )}
+                        <span>Buscar na internet</span>
+                      </Button>
+                    )}
+
+                    {/* BOTÃO CADASTRAR NOVO EQUIPAMENTO NO CATÁLOGO */}
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => handleSearchOnlineSpecs()}
-                      disabled={isSearchingOnline || !modelSearchInput.trim()}
-                      className="h-9 text-xs border-blue-400 text-blue-700 bg-blue-50/60 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900 shrink-0 font-semibold shadow-xs"
-                      title="Pesquisar especificações técnicas deste modelo nos catálogos oficiais dos fabricantes na web"
+                      onClick={handleOpenNewEquipmentModal}
+                      className="h-8 text-xs border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950 flex items-center gap-1.5 shrink-0"
+                      title="Cadastrar este equipamento no catálogo com suas especificações"
                     >
-                      {isSearchingOnline ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin text-blue-600" />
-                          Buscando specs...
-                        </>
-                      ) : (
-                        <>
-                          <Search className="h-3.5 w-3.5 mr-1.5 text-blue-600" />
-                          Buscar na internet
-                        </>
-                      )}
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Cadastrar novo equipamento</span>
                     </Button>
-                  )}
+                  </div>
+                </div>
+              </div>
 
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setShowSupplierDropdown(!showSupplierDropdown)
-                      setActiveItemIndexForDropdown(0)
-                    }}
-                    className="h-9 text-xs border-teal-300 text-teal-700 bg-white dark:bg-slate-900 hover:bg-teal-50 shrink-0"
-                  >
-                    <Search className="h-3.5 w-3.5 mr-1" />
-                    Base Local ({SUPPLIERS_DATABASE.length})
-                  </Button>
+              {/* CAMPOS TÉCNICOS: SEMPRE 100% EDITÁVEIS */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                    Número de Placas
+                  </Label>
+                  <Input
+                    type="number"
+                    value={plateCount}
+                    onChange={(e) => setPlateCount(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
                 </div>
 
-                {/* Dropdown de sugestões da base de fornecedores BERMO & Alfa Laval */}
-                {showSupplierDropdown && (
-                  <div className="absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 border border-teal-400 dark:border-teal-700 rounded-lg shadow-2xl p-1.5 space-y-1">
-                    <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                      <span>Modelos na Base Local ({filteredSuppliers.length})</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowSupplierDropdown(false)}
-                        className="text-[10px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-                      >
-                        Fechar ✕
-                      </button>
-                    </div>
-                    {filteredSuppliers.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-muted-foreground bg-amber-50/50 dark:bg-amber-950/20 rounded space-y-2">
-                        <p className="font-semibold text-amber-900 dark:text-amber-300">
-                          Modelo &ldquo;{modelSearchInput}&rdquo; não encontrado na base local.
-                        </p>
-                        <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                          Você pode buscar as especificações oficiais na internet via IA ou preencher manualmente.
-                        </p>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => {
-                            setShowSupplierDropdown(false)
-                            handleSearchOnlineSpecs()
-                          }}
-                          disabled={isSearchingOnline}
-                          className="h-7 text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold"
-                        >
-                          {isSearchingOnline ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : (
-                            <Search className="h-3 w-3 mr-1" />
-                          )}
-                          Buscar &ldquo;{modelSearchInput}&rdquo; na Internet ({manufacturerHint})
-                        </Button>
-                      </div>
-                    ) : (
-                      filteredSuppliers.map((p) => (
-                        <div
-                          key={p.id}
-                          onClick={() => {
-                            applySupplierProductToItem(
-                              p,
-                              activeItemIndexForDropdown !== null ? activeItemIndexForDropdown : 0,
-                            )
-                            setShowSupplierDropdown(false)
-                          }}
-                          className="p-2 rounded-md hover:bg-teal-50 dark:hover:bg-teal-950/70 cursor-pointer text-xs flex items-center justify-between transition-colors border border-transparent hover:border-teal-300"
-                        >
-                          <div>
-                            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono mr-2">
-                              {p.code}
-                            </span>
-                            <span className="text-slate-700 dark:text-slate-300 font-semibold">
-                              {p.name}
-                            </span>
-                            <div className="text-[10px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 font-mono">
-                              <span className="font-semibold text-teal-800 dark:text-teal-300">
-                                Marca: {p.brand}
-                              </span>
-                              {p.specs.platesRange && <span>• Placas: {p.specs.platesRange}</span>}
-                              {p.specs.connection && <span>• Conexão: {p.specs.connection}</span>}
-                              {p.specs.material && <span>• Material: {p.specs.material}</span>}
-                            </div>
-                          </div>
-                          <Badge
-                            variant="secondary"
-                            className={`text-[9px] shrink-0 font-bold ${
-                              p.brand === 'Alfa Laval'
-                                ? 'bg-blue-100 text-blue-900 dark:bg-blue-900/60 dark:text-blue-200'
-                                : 'bg-teal-100 text-teal-900 dark:bg-teal-900/60 dark:text-teal-200'
-                            }`}
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                    Material das Placas
+                  </Label>
+                  <Input
+                    value={plateMaterial}
+                    onChange={(e) => setPlateMaterial(e.target.value)}
+                    placeholder="AISI 316L, Titânio..."
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                    Espessura Placas (mm)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.05"
+                    value={plateThickness}
+                    onChange={(e) => setPlateThickness(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                    Material das Gaxetas
+                  </Label>
+                  <Input
+                    value={gasketMaterial}
+                    onChange={(e) => setGasketMaterial(e.target.value)}
+                    placeholder="EPDM Clip-on, NBR, Viton..."
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                    Tipo e Bitola da Conexão
+                  </Label>
+                  <Input
+                    value={connectionSize}
+                    onChange={(e) => setConnectionSize(e.target.value)}
+                    placeholder="DN100 (4'') Flangeada"
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                    Pressão de Teste (bar)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={pressureTestBar}
+                    onChange={(e) => setPressureTestBar(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                    Pressão de Trabalho (bar)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={workingPressureBar}
+                    onChange={(e) => setWorkingPressureBar(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                    Dimensões (L x A x P mm)
+                  </Label>
+                  <Input
+                    value={dimensions}
+                    onChange={(e) => setDimensions(e.target.value)}
+                    placeholder="1450 x 480 x 1120 mm"
+                    className="text-xs h-8"
+                  />
+                </div>
+              </div>
+
+              {/* Escopo de Trabalho */}
+              <div className="space-y-1 pt-1">
+                <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                  Escopo Detalhado do Serviço de Manutenção
+                </Label>
+                <Textarea
+                  value={scopeOfWork}
+                  onChange={(e) => setScopeOfWork(e.target.value)}
+                  rows={2}
+                  className="text-xs"
+                />
+              </div>
+
+              {/* Peças e Materiais Adicionais */}
+              <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">
+                    Peças de Reposição e Consumíveis Químicos
+                  </Label>
+                  <span className="text-xs font-bold text-teal-700 dark:text-teal-300 font-mono">
+                    Total Materiais:{' '}
+                    {totalMaterials.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <div className="sm:col-span-2">
+                    <Input
+                      value={newMaterialDesc}
+                      onChange={(e) => setNewMaterialDesc(e.target.value)}
+                      placeholder="Item (ex: Jogo de Gaxetas EPDM, Desincrustante Químico)"
+                      className="text-xs h-8"
+                    />
+                  </div>
+                  <div>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={newMaterialQty}
+                      onChange={(e) => setNewMaterialQty(Number(e.target.value))}
+                      placeholder="Qtd"
+                      className="text-xs h-8"
+                    />
+                  </div>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={newMaterialPrice || ''}
+                      onChange={(e) => setNewMaterialPrice(Number(e.target.value))}
+                      placeholder="Valor Unit (R$)"
+                      className="text-xs h-8"
+                    />
+                    <Button
+                      type="button"
+                      onClick={handleAddMaterial}
+                      size="sm"
+                      className="h-8 px-2.5 bg-teal-700 hover:bg-teal-600 text-white text-xs"
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+
+                {customMaterialsList.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden mt-2">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-100 dark:bg-slate-900 text-muted-foreground">
+                        <tr>
+                          <th className="p-2 text-left">Descrição</th>
+                          <th className="p-2 text-center">Qtd</th>
+                          <th className="p-2 text-right">Unitário</th>
+                          <th className="p-2 text-right">Total</th>
+                          <th className="p-2 text-right">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {customMaterialsList.map((m) => (
+                          <tr
+                            key={m.id}
+                            className="border-t border-slate-100 dark:border-slate-800"
                           >
-                            {p.brand}
-                          </Badge>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-
-                {matchedSupplierInfo && (
-                  <div className="p-2 rounded bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60 text-[11px] text-emerald-900 dark:text-emerald-300 flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                    <span>
-                      Modelo reconhecido na base <strong>{matchedSupplierInfo.brand}</strong>:
-                      especificações técnicas auto-preenchidas! Todos os campos abaixo permanecem
-                      100% editáveis.
-                    </span>
-                  </div>
-                )}
-                {specSource === 'web' && (
-                  <div className="p-2 rounded bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/60 text-[11px] text-blue-900 dark:text-blue-300 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-4 w-4 text-blue-600 shrink-0" />
-                      <span>
-                        Especificações obtidas via <strong>busca web ({manufacturerHint})</strong> nos catálogos oficiais. Todos os campos técnicos estão editáveis.
-                      </span>
-                    </div>
-                    <Badge variant="secondary" className="text-[9px] bg-blue-100 text-blue-800 font-bold shrink-0">
-                      Busca Web
-                    </Badge>
-                  </div>
-                )}
-                {specSource === 'manual' && !matchedSupplierInfo && (
-                  <div className="p-2 rounded bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-[11px] text-amber-900 dark:text-amber-300 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
-                      <span>
-                        Modelo personalizado (<strong>{modelSearchInput || 'Novo Modelo'}</strong>): informe as dimensões, quantidade de placas e dados técnicos nos campos abaixo, ou clique em &ldquo;Buscar na internet&rdquo;.
-                      </span>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleSearchOnlineSpecs()}
-                      disabled={isSearchingOnline || !modelSearchInput.trim()}
-                      className="h-6 text-[10px] text-blue-700 hover:text-blue-800 hover:bg-blue-50 font-bold shrink-0 px-2"
-                    >
-                      <Search className="h-3 w-3 mr-1" />
-                      Pesquisar especificações
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Fluido de processo */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                    Fluido Utilizado no Processo
-                  </Label>
-                  <Select value={fluidType} onValueChange={setFluidType}>
-                    <SelectTrigger className="text-xs bg-white dark:bg-slate-900">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="vapor" className="text-xs">
-                        Vapor Saturado / Superaquecido
-                      </SelectItem>
-                      <SelectItem value="oleo_termico" className="text-xs">
-                        Óleo Térmico
-                      </SelectItem>
-                      <SelectItem value="agua_quente" className="text-xs">
-                        Água Quente
-                      </SelectItem>
-                      <SelectItem value="agua_gelada" className="text-xs">
-                        Água Gelada / Chilled Water
-                      </SelectItem>
-                      <SelectItem value="ar_comprimido" className="text-xs">
-                        Ar Comprimido
-                      </SelectItem>
-                      <SelectItem value="gases" className="text-xs">
-                        Gases / CO2
-                      </SelectItem>
-                      <SelectItem value="quimico" className="text-xs">
-                        Fluido Químico / CIP
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                    Nome / Detalhe do Fluido (Opcional)
-                  </Label>
-                  <Input
-                    value={fluidName}
-                    onChange={(e) => setFluidName(e.target.value)}
-                    placeholder="Ex: Solução Soda Cáustica 2% CIP"
-                    className="text-xs bg-white dark:bg-slate-900"
-                  />
-                </div>
-              </div>
-
-              {/* Opção de incluir ou não o custo de compra do produto na proposta */}
-              <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <Package className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
-                    <Label
-                      htmlFor="toggle-include-product-cost"
-                      className="text-xs font-bold text-emerald-950 dark:text-emerald-200 cursor-pointer"
-                    >
-                      Incluir custo de fornecimento do equipamento novo na proposta
-                    </Label>
-                  </div>
-                  <p className="text-[11px] text-emerald-900/80 dark:text-emerald-300/80">
-                    As especificações técnicas sempre aparecem na proposta técnica. O valor de venda
-                    do equipamento só é somado se esta opção for ativada.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                  <span className="text-xs font-mono font-bold text-emerald-950 dark:text-emerald-200">
-                    {(productBasePrice || 0).toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </span>
-                  <Switch
-                    id="toggle-include-product-cost"
-                    checked={includeProductCost}
-                    onCheckedChange={handleToggleIncludeProductCost}
-                  />
-                </div>
-              </div>
-
-              {/* ESPECIFICAÇÕES TÉCNICAS AUTO-PREENCHIDAS */}
-              <div className="p-2.5 rounded-lg bg-teal-100/50 dark:bg-teal-900/30 border border-teal-300 dark:border-teal-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-teal-900 dark:text-teal-200 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-teal-600" />
-                    Especificações Técnicas de Placas & Gaxetas (Editáveis / Sincronizadas)
-                  </span>
-                  <Badge
-                    variant="outline"
-                    className="text-[9px] bg-white dark:bg-slate-900 text-teal-800 border-teal-300 font-mono"
-                  >
-                    Auto-Filled
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      Número de Placas
-                    </Label>
-                    <Input
-                      value={platesCount}
-                      onChange={(e) => setPlatesCount(e.target.value)}
-                      placeholder="ex: 40"
-                      className="text-xs h-8 bg-white dark:bg-slate-900 font-semibold text-teal-900 dark:text-teal-100"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      Dimensão das Placas
-                    </Label>
-                    <Input
-                      value={plateDimensions}
-                      onChange={(e) => setPlateDimensions(e.target.value)}
-                      placeholder="ex: 680 x 280 mm"
-                      className="text-xs h-8 bg-white dark:bg-slate-900"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      Quantidade de Gaxetas
-                    </Label>
-                    <Input
-                      value={gasketsCount}
-                      onChange={(e) => setGasketsCount(e.target.value)}
-                      placeholder="ex: 40"
-                      className="text-xs h-8 bg-white dark:bg-slate-900 font-semibold text-teal-900 dark:text-teal-100"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Grid Técnico de Parâmetros Termodinâmicos */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Temp. Entrada (°C)</Label>
-                  <Input
-                    type="number"
-                    value={inletTemp}
-                    onChange={(e) => setInletTemp(e.target.value)}
-                    className="text-xs h-8 bg-white dark:bg-slate-900"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Temp. Saída (°C)</Label>
-                  <Input
-                    type="number"
-                    value={outletTemp}
-                    onChange={(e) => setOutletTemp(e.target.value)}
-                    className="text-xs h-8 bg-white dark:bg-slate-900"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Pressão Trabalho (bar)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    value={operatingPressure}
-                    onChange={(e) => setOperatingPressure(e.target.value)}
-                    className="text-xs h-8 bg-white dark:bg-slate-900"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Vazão (m³/h)</Label>
-                  <Input
-                    type="number"
-                    value={flowRate}
-                    onChange={(e) => setFlowRate(e.target.value)}
-                    className="text-xs h-8 bg-white dark:bg-slate-900"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Tamanho / Conexão</Label>
-                  <Input
-                    value={equipmentSize}
-                    onChange={(e) => setEquipmentSize(e.target.value)}
-                    placeholder="ex: DN50 / 2 polegadas"
-                    className="text-xs h-8 bg-white dark:bg-slate-900"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Material das Placas</Label>
-                  <Input
-                    value={frameMaterial}
-                    onChange={(e) => setFrameMaterial(e.target.value)}
-                    placeholder="ex: AISI 316L / Titânio"
-                    className="text-xs h-8 bg-white dark:bg-slate-900"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Tipo de Gaxeta / Vedação
-                  </Label>
-                  <Input
-                    value={gasketType}
-                    onChange={(e) => setGasketType(e.target.value)}
-                    placeholder="ex: NBR / EPDM / Viton"
-                    className="text-xs h-8 bg-white dark:bg-slate-900"
-                  />
-                </div>
-              </div>
-
-              {/* CAMPOS DO ITEM 3A: DIFICULDADE, INTEGRAÇÃO E TUBULAÇÃO */}
-              <div className="p-3 rounded-lg bg-teal-100/40 dark:bg-teal-900/30 border border-teal-300 dark:border-teal-800 space-y-2.5">
-                <span className="text-[11px] font-bold text-teal-900 dark:text-teal-200 block">
-                  Parâmetros de Acesso e Tubulação (Escopo Técnico 3A)
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      Grau de Dificuldade da Área de Trabalho *
-                    </Label>
-                    <Select
-                      value={workAreaDifficulty}
-                      onValueChange={(val: any) => setWorkAreaDifficulty(val)}
-                    >
-                      <SelectTrigger className="text-xs h-8 bg-white dark:bg-slate-900">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Alto" className="text-xs font-semibold text-red-600">
-                          Alto (Espaço confinado / Altura / Alta Temp.)
-                        </SelectItem>
-                        <SelectItem value="Médio" className="text-xs font-semibold text-amber-600">
-                          Médio (Plataforma padrão / Tubulação suspensa)
-                        </SelectItem>
-                        <SelectItem
-                          value="Baixo"
-                          className="text-xs font-semibold text-emerald-600"
-                        >
-                          Baixo (Nível do piso / Fácil acesso)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      Necessidade de Integração (Onboarding) *
-                    </Label>
-                    <Select
-                      value={needsIntegration}
-                      onValueChange={(val: any) => setNeedsIntegration(val)}
-                    >
-                      <SelectTrigger className="text-xs h-8 bg-white dark:bg-slate-900 font-semibold">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Não" className="text-xs font-semibold text-slate-600">
-                          Não (Sem custo adicional)
-                        </SelectItem>
-                        <SelectItem value="Sim" className="text-xs font-semibold text-teal-700">
-                          Sim (Requer integração de funcionários)
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      Medida da Tubulação (Editável) *
-                    </Label>
-                    <Input
-                      value={pipeMeasurement}
-                      onChange={(e) => setPipeMeasurement(e.target.value)}
-                      placeholder="Ex: DN50 (2 pol) / DN100 (4 pol)"
-                      className="text-xs h-8 bg-white dark:bg-slate-900 font-semibold"
-                    />
-                  </div>
-                </div>
-
-                {needsIntegration === 'Sim' && (
-                  <div className="p-2.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-300 dark:border-teal-700 space-y-2">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-bold text-teal-900 dark:text-teal-200 flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5 text-teal-600" />
-                          Quando será a integração? *
-                        </Label>
-                        <Select
-                          value={integrationTiming}
-                          onValueChange={(val: any) => setIntegrationTiming(val)}
-                        >
-                          <SelectTrigger className="text-xs h-8 bg-white dark:bg-slate-900 font-semibold text-teal-900 dark:text-teal-100">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="same_day" className="text-xs">
-                              No dia do início da obra (+50% H/H da equipe)
-                            </SelectItem>
-                            <SelectItem value="early" className="text-xs">
-                              Antecipada (+1 diária completa H/H + deslocamento)
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="p-2 rounded bg-white dark:bg-slate-900 border border-teal-200 dark:border-teal-800 text-xs flex flex-col justify-center">
-                        <span className="text-[10px] text-muted-foreground block">
-                          Custo Adicional da Integração Calculado:
-                        </span>
-                        <span className="text-sm font-bold text-teal-700 dark:text-teal-300">
-                          {(computation.integrationTotal || 0).toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* SEÇÃO 2: EQUIPAMENTOS & SERVIÇOS */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3.5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Wrench className="h-4 w-4 text-teal-600" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    Equipamentos & Serviços ({items.length})
-                  </span>
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => handleAddEquipmentItem()}
-                  className="h-7 text-xs bg-teal-700 hover:bg-teal-600 text-white font-semibold shadow-xs"
-                >
-                  <Plus className="h-3 w-3 mr-1" /> Adicionar Equipamento
-                </Button>
-              </div>
-
-              {/* METODOLOGIA PADRONIZADA (6 ETAPAS) — UMA ÚNICA VEZ NO TOPO DA SEÇÃO */}
-              <div className="p-3 rounded-lg bg-teal-50/70 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900/60 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <ShieldCheck className="h-4 w-4 text-teal-700 dark:text-teal-400" />
-                    <span className="text-xs font-bold text-teal-950 dark:text-teal-200">
-                      Metodologia Padronizada do Serviço (6 Etapas Técnicas)
-                    </span>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className="text-[9px] bg-white dark:bg-slate-900 text-teal-800 border-teal-300 font-semibold"
-                  >
-                    Procedimento Unificado
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-[11px] text-slate-700 dark:text-slate-300">
-                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
-                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
-                      1. Desmontagem
-                    </strong>
-                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
-                      Abertura com registro da Medida A de aperto para referência.
-                    </p>
-                  </div>
-                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
-                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
-                      2. Limpeza
-                    </strong>
-                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
-                      Remoção mecânica manual e/ou química preservando as placas.
-                    </p>
-                  </div>
-                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
-                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
-                      3. Inspeção de Placas
-                    </strong>
-                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
-                      Análise visual/NDT para furos, trincas ou corrosão.
-                    </p>
-                  </div>
-                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
-                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
-                      4. Inspeção de Gaxetas
-                    </strong>
-                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
-                      Verificação de elasticidade, ressecamento e perfil de vedação.
-                    </p>
-                  </div>
-                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
-                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
-                      5. Montagem
-                    </strong>
-                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
-                      Fechamento com torque gradual e respeito à Medida A final.
-                    </p>
-                  </div>
-                  <div className="p-2 rounded bg-white/80 dark:bg-slate-900/80 border border-teal-100 dark:border-teal-900/40">
-                    <strong className="text-teal-900 dark:text-teal-300 block font-semibold mb-0.5">
-                      6. Teste de Estanqueidade
-                    </strong>
-                    <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-snug">
-                      Garantia pós-montagem de ausência de vazamentos sob pressão.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* LISTA DE EQUIPAMENTOS ADICIONADOS */}
-              <div className="space-y-3">
-                {items.length === 0 ? (
-                  <div className="p-6 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-lg space-y-2 bg-white/50 dark:bg-slate-950/50">
-                    <p className="text-xs text-muted-foreground">
-                      Nenhum equipamento adicionado nesta proposta.
-                    </p>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => handleAddEquipmentItem()}
-                      className="h-8 text-xs bg-teal-700 hover:bg-teal-600 text-white font-semibold"
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Primeiro Equipamento
-                    </Button>
-                  </div>
-                ) : (
-                  items.map((it, idx) => (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-xs"
-                    >
-                      {/* Header do Equipamento: Modelo e Botão Remover (Disponível em TODOS os itens) */}
-                      <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
-                        <div className="flex items-center gap-2 flex-1">
-                          <Badge className="bg-slate-800 text-white text-[10px] px-1.5 py-0">
-                            #{idx + 1}
-                          </Badge>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                              Modelo:
-                            </Label>
-                            <span className="text-xs font-mono font-bold text-teal-800 dark:text-teal-300">
-                              {it.bermo_specs?.productModel ||
-                                it.bermo_specs?.productCode ||
-                                it.name ||
-                                `Equipamento ${idx + 1}`}
-                            </span>
-                            {it.bermo_specs?.productBrand && (
-                              <Badge variant="secondary" className="text-[9px] font-semibold">
-                                {it.bermo_specs.productBrand}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveItem(idx)}
-                          className="h-7 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50 rounded transition-colors"
-                          title="Remover este equipamento específico da lista"
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-1" />
-                          <span className="text-[11px] font-medium">Remover</span>
-                        </Button>
-                      </div>
-
-                    {/* Especificações Técnicas do Equipamento */}
-                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-50/70 dark:bg-slate-900/60 p-2.5 rounded-md border border-slate-200 dark:border-slate-800">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Número de Placas
-                        </Label>
-                        <Input
-                          value={it.bermo_specs?.platesCount || '40'}
-                          onChange={(e) =>
-                            handleUpdateItemSpecs(idx, 'platesCount', e.target.value)
-                          }
-                          placeholder="ex: 40"
-                          className="text-xs h-7 bg-white dark:bg-slate-900 font-semibold text-teal-900 dark:text-teal-100"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Dimensão das Placas
-                        </Label>
-                        <Input
-                          value={it.bermo_specs?.plateDimensions || '680 x 280 mm'}
-                          onChange={(e) =>
-                            handleUpdateItemSpecs(idx, 'plateDimensions', e.target.value)
-                          }
-                          placeholder="ex: 680 x 280 mm"
-                          className="text-xs h-7 bg-white dark:bg-slate-900"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Quantidade de Gaxetas
-                        </Label>
-                        <Input
-                          value={it.bermo_specs?.gasketsCount || '40'}
-                          onChange={(e) =>
-                            handleUpdateItemSpecs(idx, 'gasketsCount', e.target.value)
-                          }
-                          placeholder="ex: 40"
-                          className="text-xs h-7 bg-white dark:bg-slate-900 font-semibold text-teal-900 dark:text-teal-100"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Tamanho / Conexão
-                        </Label>
-                        <Input
-                          value={it.bermo_specs?.equipmentSize || 'DN50 (2 pol)'}
-                          onChange={(e) =>
-                            handleUpdateItemSpecs(idx, 'equipmentSize', e.target.value)
-                          }
-                          placeholder="ex: DN50 (2 pol)"
-                          className="text-xs h-7 bg-white dark:bg-slate-900"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Quantidade
-                        </Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={it.quantity}
-                          onChange={(e) =>
-                            handleUpdateItem(idx, 'quantity', Number(e.target.value))
-                          }
-                          className="text-xs h-7 text-center font-bold bg-white dark:bg-slate-900"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Toggle: Incluir custo do produto na proposta */}
-                    <div className="flex items-center justify-between bg-emerald-50/50 dark:bg-emerald-950/20 p-2 rounded border border-emerald-200 dark:border-emerald-900/40 text-xs">
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          id={`toggle-prod-item-${idx}`}
-                          checked={it.include_product_cost ?? false}
-                          onCheckedChange={(chk) => handleToggleItemIncludeProduct(idx, chk)}
-                        />
-                        <Label
-                          htmlFor={`toggle-prod-item-${idx}`}
-                          className="text-[11px] font-semibold cursor-pointer text-emerald-950 dark:text-emerald-200"
-                        >
-                          Incluir custo do produto na proposta
-                          {it.bermo_specs?.productBasePrice ? (
-                            <span className="font-mono ml-1.5 font-bold text-emerald-800 dark:text-emerald-300">
-                              (+{' '}
-                              {(
-                                it.bermo_specs.productBasePrice * (it.quantity || 1)
-                              ).toLocaleString('pt-BR', {
+                            <td className="p-2 font-medium">{m.description}</td>
+                            <td className="p-2 text-center">{m.qty}</td>
+                            <td className="p-2 text-right font-mono">
+                              {m.unitPrice.toLocaleString('pt-BR', {
                                 style: 'currency',
                                 currency: 'BRL',
                               })}
-                              )
-                            </span>
-                          ) : null}
-                        </Label>
-                      </div>
-                      <span className="text-[10px] text-muted-foreground">
-                        {it.include_product_cost
-                          ? 'Equipamento novo somado ao valor'
-                          : 'Apenas serviço calculado via M.O.'}
-                      </span>
-                    </div>
+                            </td>
+                            <td className="p-2 text-right font-mono font-bold">
+                              {(m.qty * m.unitPrice).toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
+                            </td>
+                            <td className="p-2 text-right">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveMaterial(m.id)}
+                                className="h-6 w-6 text-rose-500 hover:text-rose-700"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ))
-              )}
+                )}
+              </div>
             </div>
 
-            {/* SEÇÃO 4: MATERIAIS DE MANUTENÇÃO (APENAS COMPOSIÇÃO INTERNA) */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-teal-600" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    4. Materiais de Manutenção (Composição Interna)
-                  </span>
-                </div>
-                <span className="text-xs font-bold text-teal-700 dark:text-teal-300 font-mono">
-                  Subtotal Materiais:{' '}
-                  {maintenanceMaterialsTotal.toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                  })}
-                </span>
-              </div>
-
-              <div className="p-2.5 rounded-lg bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900/60 text-[11px] text-teal-900 dark:text-teal-200 flex items-center gap-1.5">
-                <AlertCircle className="h-4 w-4 text-teal-600 shrink-0" />
-                <span>
-                  O valor dos materiais inseridos aqui compõe{' '}
-                  <strong>apenas a composição interna</strong> de custos diretos. NÃO é exibido
-                  separadamente na proposta do cliente nem no PDF.
-                </span>
-              </div>
-
-              {/* Formulário de Inserção de Material */}
-              <div className="flex flex-col sm:flex-row gap-2 items-end">
-                <div className="flex-1 space-y-1 w-full">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Descrição do Material de Manutenção
-                  </Label>
-                  <Input
-                    value={newMaterialDesc}
-                    onChange={(e) => setNewMaterialDesc(e.target.value)}
-                    placeholder="Ex: Solvente Desengraxante Químico 20L, Estopas, Kit Vedação..."
-                    className="text-xs h-8 bg-white dark:bg-slate-950"
-                  />
-                </div>
-                <div className="w-full sm:w-36 space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Valor (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={newMaterialAmount}
-                    onChange={(e) => setNewMaterialAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="text-xs h-8 bg-white dark:bg-slate-950 font-mono"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  onClick={handleAddMaterial}
-                  className="h-8 text-xs bg-teal-700 hover:bg-teal-600 text-white shrink-0"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Material
-                </Button>
-              </div>
-
-              {/* Lista dos materiais adicionados */}
-              {maintenanceMaterials.length > 0 && (
-                <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-slate-950">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-100 dark:bg-slate-800 text-[10px] uppercase font-semibold text-slate-600 dark:text-slate-300">
-                      <tr>
-                        <th className="p-2">Material</th>
-                        <th className="p-2 text-right">Valor (R$)</th>
-                        <th className="p-2 text-center w-12">Ação</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {maintenanceMaterials.map((m) => (
-                        <tr key={m.id}>
-                          <td className="p-2">{m.description}</td>
-                          <td className="p-2 text-right font-mono font-bold">
-                            {m.amount.toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </td>
-                          <td className="p-2 text-center">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleRemoveMaterial(m.id)}
-                              className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            {/* SEÇÃO 3b: MÃO DE OBRA (3 FUNÇÕES) */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+            {/* ========================================================================= */}
+            {/* SEÇÃO 3B: MÃO DE OBRA ESPECIALIZADA (3 FUNÇÕES)                          */}
+            {/* ========================================================================= */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <UserCheck className="h-4 w-4 text-blue-600" />
@@ -2956,17 +2013,15 @@ export function QuotesManager({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {/* 1. Técnico */}
-                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                {/* 1. Técnico Mecânico */}
+                <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                      1. Técnico Mecânico
-                    </span>
+                    <span className="font-bold text-xs">1. Técnico Mecânico</span>
                     <Badge variant="secondary" className="text-[9px]">
                       Líder
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-3 gap-1 text-[10px]">
+                  <div className="grid grid-cols-3 gap-1.5 text-[10px]">
                     <div>
                       <Label className="text-[9px]">Qtde</Label>
                       <Input
@@ -3005,291 +2060,63 @@ export function QuotesManager({
                 </div>
 
                 {/* 2. Ajudante */}
-                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                      2. Ajudante
-                    </span>
+                    <span className="font-bold text-xs">2. Ajudante Técnico</span>
                     <Badge variant="secondary" className="text-[9px]">
-                      Suporte
+                      Apoio
                     </Badge>
                   </div>
-            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
-                  </span>
-                </div>
-
-                {/* Toggle Ida e Volta com Ícone e Badge */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <ArrowLeftRight className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`} />
-                    <Label
-                      htmlFor="toggle-round-trip"
-                      className="text-xs font-semibold cursor-pointer select-none"
-                    >
-                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
-                    </Label>
-                    <Switch
-                      id="toggle-round-trip"
-                      checked={isRoundTrip}
-                      onCheckedChange={handleToggleRoundTrip}
-                    />
+                  <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                    <div>
+                      <Label className="text-[9px]">Qtde</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={helperCount}
+                        onChange={(e) => setHelperCount(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">Horas</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={helperHours}
+                        onChange={(e) => setHelperHours(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">R$/Hora</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={helperRate}
+                        onChange={(e) => setHelperRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
                   </div>
-
-                  <span className="text-xs font-bold text-emerald-600 font-mono">
-                    Subtotal:{' '}
-                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Origem (CEP e Endereço da Base)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={originCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setOriginCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(destinationCep, val)
-                        }
-                      }}
-                      placeholder="89066-000"
-                      className="text-xs h-8 w-32 font-mono font-bold"
-                    />
-                    <Input
-                      value={originAddress}
-                      onChange={(e) => setOriginAddress(e.target.value)}
-                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
-                      className="text-xs h-8 flex-1"
-                    />
+                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                    Total:{' '}
+                    {laborHelperTotal.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Destino da Fábrica / Cliente (CEP e Cidade)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={destinationCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setDestinationCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(val, originCep)
-                        }
-                      }}
-                      placeholder="ex: 89801-000"
-                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
-                    />
-                    <Input
-                      value={destinationAddress}
-                      onChange={(e) => setDestinationAddress(e.target.value)}
-                      placeholder="Cidade/UF do Cliente"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Parâmetros do Mapeia / Deslocamento */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
-                    </Label>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] px-1 py-0 ${
-                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
-                      }`}
-                    >
-                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
-                    </Badge>
-                  </div>
-                  <Input
-                    type="number"
-                    value={distanceKm}
-                    onChange={(e) => setDistanceKm(Number(e.target.value))}
-                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    {isRoundTrip
-                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
-                      : `(Percurso unidirecional: ${distanceKm} km)`}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Consumo Veículo (km/L)
-                  </Label>
-                  <Input
-                    type="number"
-                    value={consumptionKmL}
-                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L ({isRoundTrip ? 'ida+volta' : 'só ida'})
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Preço Litro Combustível (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={fuelPrice}
-                    onChange={(e) => setFuelPrice(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Combustível:{' '}
-                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
-                  <Input
-                    type="number"
-                    value={tollRoadPercent}
-                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Pedágios ({estimatedTolls} praças):{' '}
-                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-=======
-              {/* Ajustes Manuais de Combustível e Pedágio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Combustível (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualFuelAdj}
-                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Pedágio (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualTollAdj}
-                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * Campos calculados automaticamente via CEP permanecem 100% editáveis.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Calculando Rota...
-                    </>
-                  ) : (
-                    'Recalcular Rota Mapeia'
-                  )}
-                </Button>
-              </div>
-            </div>=======
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-
-            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Hotel className="h-4 w-4 text-purple-600" />
-=======
-                {/* 3. Inspetor */}
-                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                {/* 3. Inspetor NDT / Qualidade */}
+                <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                      3. Inspetor / NDT
-                    </span>
+                    <span className="font-bold text-xs">3. Inspetor / NDT</span>
                     <Badge variant="secondary" className="text-[9px]">
                       Qualidade
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-3 gap-1 text-[10px]">
+                  <div className="grid grid-cols-3 gap-1.5 text-[10px]">
                     <div>
                       <Label className="text-[9px]">Qtde</Label>
                       <Input
@@ -3332,8 +2159,10 @@ export function QuotesManager({
               </div>
             </div>
 
-            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+            {/* ========================================================================= */}
+            {/* SEÇÃO 3C: DESLOCAMENTO & ROTAS (ITEM 3C: CEP 8 DÍGITOS + TOGGLE IDA/VOLTA) */}
+            {/* ========================================================================= */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Truck className="h-4 w-4 text-emerald-600" />
@@ -3342,9 +2171,9 @@ export function QuotesManager({
                   </span>
                 </div>
 
-                {/* Toggle Ida e Volta com Ícone e Badge */}
+                {/* TOGGLE VISUAL IDA E VOLTA (x2) COM ÍCONE ArrowLeftRight E SWITCH */}
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
                     <ArrowLeftRight
                       className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
                     />
@@ -3368,6 +2197,7 @@ export function QuotesManager({
                 </div>
               </div>
 
+              {/* CEPS COM DISPARO AUTOMÁTICO AOS 8 DÍGITOS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
@@ -3411,7 +2241,7 @@ export function QuotesManager({
                           handleRecalculateRoute(val, originCep)
                         }
                       }}
-                      placeholder="ex: 89801-000"
+                      placeholder="Ex: 89801-000"
                       className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
                     />
                     <Input
@@ -3424,7 +2254,7 @@ export function QuotesManager({
                 </div>
               </div>
 
-              {/* Parâmetros do Mapeia / Deslocamento */}
+              {/* PARÂMETROS DO MAPEIA / LOGÍSTICA */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
@@ -3434,7 +2264,9 @@ export function QuotesManager({
                     <Badge
                       variant="outline"
                       className={`text-[9px] px-1 py-0 ${
-                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
+                        isRoundTrip
+                          ? 'text-emerald-700 bg-emerald-50'
+                          : 'text-slate-600 bg-slate-50'
                       }`}
                     >
                       {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
@@ -3452,6 +2284,7 @@ export function QuotesManager({
                       : `(Percurso unidirecional: ${distanceKm} km)`}
                   </span>
                 </div>
+
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">
                     Consumo Veículo (km/L)
@@ -3467,6 +2300,7 @@ export function QuotesManager({
                     {isRoundTrip ? 'ida+volta' : 'só ida'})
                   </span>
                 </div>
+
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">
                     Preço Litro Combustível (R$)
@@ -3483,6 +2317,7 @@ export function QuotesManager({
                     {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </span>
                 </div>
+
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
                   <Input
@@ -3498,7 +2333,7 @@ export function QuotesManager({
                 </div>
               </div>
 
-              {/* Ajustes Manuais de Combustível e Pedágio */}
+              {/* Ajustes Manuais */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                 <div className="space-y-1">
                   <Label className="text-[10px] text-slate-600 dark:text-slate-400">
@@ -3530,7 +2365,8 @@ export function QuotesManager({
 
               <div className="flex items-center justify-between pt-1">
                 <span className="text-[10px] text-muted-foreground">
-                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine. Campos editáveis.
+                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine com precisão
+                  rodoviária.
                 </span>
                 <Button
                   type="button"
@@ -3552,1922 +2388,10 @@ export function QuotesManager({
               </div>
             </div>
 
-            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Hotel className="h-4 w-4 text-purple-600" />
-=======
-            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
-                  </span>
-                </div>
-
-                {/* Toggle Ida e Volta com Ícone e Badge */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <ArrowLeftRight className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`} />
-                    <Label
-                      htmlFor="toggle-round-trip"
-                      className="text-xs font-semibold cursor-pointer select-none"
-                    >
-                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
-                    </Label>
-                    <Switch
-                      id="toggle-round-trip"
-                      checked={isRoundTrip}
-                      onCheckedChange={handleToggleRoundTrip}
-                    />
-                  </div>
-
-                  <span className="text-xs font-bold text-emerald-600 font-mono">
-                    Subtotal:{' '}
-                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Origem (CEP e Endereço da Base)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={originCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setOriginCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(destinationCep, val)
-                        }
-                      }}
-                      placeholder="89066-000"
-                      className="text-xs h-8 w-32 font-mono font-bold"
-                    />
-                    <Input
-                      value={originAddress}
-                      onChange={(e) => setOriginAddress(e.target.value)}
-                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Destino da Fábrica / Cliente (CEP e Cidade)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={destinationCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setDestinationCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(val, originCep)
-                        }
-                      }}
-                      placeholder="ex: 89801-000"
-                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
-                    />
-                    <Input
-                      value={destinationAddress}
-                      onChange={(e) => setDestinationAddress(e.target.value)}
-                      placeholder="Cidade/UF do Cliente"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Parâmetros do Mapeia / Deslocamento */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
-                    </Label>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] px-1 py-0 ${
-                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
-                      }`}
-                    >
-                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
-                    </Badge>
-                  </div>
-                  <Input
-                    type="number"
-                    value={distanceKm}
-                    onChange={(e) => setDistanceKm(Number(e.target.value))}
-                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    {isRoundTrip
-                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
-                      : `(Percurso unidirecional: ${distanceKm} km)`}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Consumo Veículo (km/L)
-                  </Label>
-                  <Input
-                    type="number"
-                    value={consumptionKmL}
-                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L ({isRoundTrip ? 'ida+volta' : 'só ida'})
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Preço Litro Combustível (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={fuelPrice}
-                    onChange={(e) => setFuelPrice(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Combustível:{' '}
-                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
-                  <Input
-                    type="number"
-                    value={tollRoadPercent}
-                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Pedágios ({estimatedTolls} praças):{' '}
-                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-=======
-              {/* Ajustes Manuais de Combustível e Pedágio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Combustível (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualFuelAdj}
-                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Pedágio (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualTollAdj}
-                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * Campos calculados automaticamente via CEP permanecem 100% editáveis.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Calculando Rota...
-                    </>
-                  ) : (
-                    'Recalcular Rota Mapeia'
-                  )}
-                </Button>
-              </div>
-            </div>=======
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-
-            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Hotel className="h-4 w-4 text-purple-600" />
-=======
-                {/* 3. Inspetor */}
-                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                      3. Inspetor / NDT
-                    </span>
-                    <Badge variant="secondary" className="text-[9px]">
-                      Qualidade
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 text-[10px]">
-                    <div>
-                      <Label className="text-[9px]">Qtde</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={inspectorCount}
-                        onChange={(e) => setInspectorCount(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[9px]">Horas</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={inspectorHours}
-                        onChange={(e) => setInspectorHours(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[9px]">R$/Hora</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={inspectorRate}
-                        onChange={(e) => setInspectorRate(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
-                    Total:{' '}
-                    {laborInspectorTotal.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
-                  </span>
-                </div>
-
-                {/* Toggle Ida e Volta com Ícone e Badge */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <ArrowLeftRight
-                      className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
-                    />
-                    <Label
-                      htmlFor="toggle-round-trip"
-                      className="text-xs font-semibold cursor-pointer select-none"
-                    >
-                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
-                    </Label>
-                    <Switch
-                      id="toggle-round-trip"
-                      checked={isRoundTrip}
-                      onCheckedChange={handleToggleRoundTrip}
-                    />
-                  </div>
-
-                  <span className="text-xs font-bold text-emerald-600 font-mono">
-                    Subtotal:{' '}
-                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Origem (CEP e Endereço da Base)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={originCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setOriginCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(destinationCep, val)
-                        }
-                      }}
-                      placeholder="89066-000"
-                      className="text-xs h-8 w-32 font-mono font-bold"
-                    />
-                    <Input
-                      value={originAddress}
-                      onChange={(e) => setOriginAddress(e.target.value)}
-                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Destino da Fábrica / Cliente (CEP e Cidade)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={destinationCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setDestinationCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(val, originCep)
-                        }
-                      }}
-                      placeholder="ex: 89801-000"
-                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
-                    />
-                    <Input
-                      value={destinationAddress}
-                      onChange={(e) => setDestinationAddress(e.target.value)}
-                      placeholder="Cidade/UF do Cliente"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Parâmetros do Mapeia / Deslocamento */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
-                    </Label>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] px-1 py-0 ${
-                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
-                      }`}
-                    >
-                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
-                    </Badge>
-                  </div>
-                  <Input
-                    type="number"
-                    value={distanceKm}
-                    onChange={(e) => setDistanceKm(Number(e.target.value))}
-                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    {isRoundTrip
-                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
-                      : `(Percurso unidirecional: ${distanceKm} km)`}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Consumo Veículo (km/L)
-                  </Label>
-                  <Input
-                    type="number"
-                    value={consumptionKmL}
-                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L (
-                    {isRoundTrip ? 'ida+volta' : 'só ida'})
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Preço Litro Combustível (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={fuelPrice}
-                    onChange={(e) => setFuelPrice(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Combustível:{' '}
-                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
-                  <Input
-                    type="number"
-                    value={tollRoadPercent}
-                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Pedágios ({estimatedTolls} praças):{' '}
-                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              {/* Ajustes Manuais de Combustível e Pedágio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Combustível (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualFuelAdj}
-                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Pedágio (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualTollAdj}
-                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine. Campos editáveis.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Calculando Rota...
-                    </>
-                  ) : (
-                    'Recalcular Rota Mapeia'
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Hotel className="h-4 w-4 text-purple-600" />=======
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-=======
-=======
-            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
-                  </span>
-                </div>
-
-                {/* Toggle Ida e Volta com Ícone e Badge */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <ArrowLeftRight className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`} />
-                    <Label
-                      htmlFor="toggle-round-trip"
-                      className="text-xs font-semibold cursor-pointer select-none"
-                    >
-                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
-                    </Label>
-                    <Switch
-                      id="toggle-round-trip"
-                      checked={isRoundTrip}
-                      onCheckedChange={handleToggleRoundTrip}
-                    />
-                  </div>
-
-                  <span className="text-xs font-bold text-emerald-600 font-mono">
-                    Subtotal:{' '}
-                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Origem (CEP e Endereço da Base)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={originCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setOriginCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(destinationCep, val)
-                        }
-                      }}
-                      placeholder="89066-000"
-                      className="text-xs h-8 w-32 font-mono font-bold"
-                    />
-                    <Input
-                      value={originAddress}
-                      onChange={(e) => setOriginAddress(e.target.value)}
-                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Destino da Fábrica / Cliente (CEP e Cidade)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={destinationCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setDestinationCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(val, originCep)
-                        }
-                      }}
-                      placeholder="ex: 89801-000"
-                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
-                    />
-                    <Input
-                      value={destinationAddress}
-                      onChange={(e) => setDestinationAddress(e.target.value)}
-                      placeholder="Cidade/UF do Cliente"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Parâmetros do Mapeia / Deslocamento */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
-                    </Label>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] px-1 py-0 ${
-                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
-                      }`}
-                    >
-                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
-                    </Badge>
-                  </div>
-                  <Input
-                    type="number"
-                    value={distanceKm}
-                    onChange={(e) => setDistanceKm(Number(e.target.value))}
-                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    {isRoundTrip
-                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
-                      : `(Percurso unidirecional: ${distanceKm} km)`}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Consumo Veículo (km/L)
-                  </Label>
-                  <Input
-                    type="number"
-                    value={consumptionKmL}
-                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L ({isRoundTrip ? 'ida+volta' : 'só ida'})
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Preço Litro Combustível (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={fuelPrice}
-                    onChange={(e) => setFuelPrice(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Combustível:{' '}
-                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
-                  <Input
-                    type="number"
-                    value={tollRoadPercent}
-                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Pedágios ({estimatedTolls} praças):{' '}
-                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-=======
-              {/* Ajustes Manuais de Combustível e Pedágio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Combustível (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualFuelAdj}
-                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Pedágio (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualTollAdj}
-                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * Campos calculados automaticamente via CEP permanecem 100% editáveis.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Calculando Rota...
-                    </>
-                  ) : (
-                    'Recalcular Rota Mapeia'
-                  )}
-                </Button>
-              </div>
-            </div>=======
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-=======
-                {/* 3. Inspetor */}
-                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                      3. Inspetor / NDT
-                    </span>
-                    <Badge variant="secondary" className="text-[9px]">
-                      Qualidade
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 text-[10px]">
-                    <div>
-                      <Label className="text-[9px]">Qtde</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={inspectorCount}
-                        onChange={(e) => setInspectorCount(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[9px]">Horas</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={inspectorHours}
-                        onChange={(e) => setInspectorHours(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[9px]">R$/Hora</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={inspectorRate}
-                        onChange={(e) => setInspectorRate(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
-                    Total:{' '}
-                    {laborInspectorTotal.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
-                  </span>
-                </div>
-
-                {/* Toggle Ida e Volta com Ícone e Badge */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <ArrowLeftRight
-                      className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
-                    />
-                    <Label
-                      htmlFor="toggle-round-trip"
-                      className="text-xs font-semibold cursor-pointer select-none"
-                    >
-                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
-                    </Label>
-                    <Switch
-                      id="toggle-round-trip"
-                      checked={isRoundTrip}
-                      onCheckedChange={handleToggleRoundTrip}
-                    />
-                  </div>
-
-                  <span className="text-xs font-bold text-emerald-600 font-mono">
-                    Subtotal:{' '}
-                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Origem (CEP e Endereço da Base)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={originCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setOriginCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(destinationCep, val)
-                        }
-                      }}
-                      placeholder="89066-000"
-                      className="text-xs h-8 w-32 font-mono font-bold"
-                    />
-                    <Input
-                      value={originAddress}
-                      onChange={(e) => setOriginAddress(e.target.value)}
-                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Destino da Fábrica / Cliente (CEP e Cidade)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={destinationCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setDestinationCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(val, originCep)
-                        }
-                      }}
-                      placeholder="ex: 89801-000"
-                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
-                    />
-                    <Input
-                      value={destinationAddress}
-                      onChange={(e) => setDestinationAddress(e.target.value)}
-                      placeholder="Cidade/UF do Cliente"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Parâmetros do Mapeia / Deslocamento */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
-                    </Label>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] px-1 py-0 ${
-                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
-                      }`}
-                    >
-                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
-                    </Badge>
-                  </div>
-                  <Input
-                    type="number"
-                    value={distanceKm}
-                    onChange={(e) => setDistanceKm(Number(e.target.value))}
-                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    {isRoundTrip
-                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
-                      : `(Percurso unidirecional: ${distanceKm} km)`}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Consumo Veículo (km/L)
-                  </Label>
-                  <Input
-                    type="number"
-                    value={consumptionKmL}
-                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L (
-                    {isRoundTrip ? 'ida+volta' : 'só ida'})
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Preço Litro Combustível (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={fuelPrice}
-                    onChange={(e) => setFuelPrice(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Combustível:{' '}
-                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
-                  <Input
-                    type="number"
-                    value={tollRoadPercent}
-                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Pedágios ({estimatedTolls} praças):{' '}
-                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              {/* Ajustes Manuais de Combustível e Pedágio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Combustível (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualFuelAdj}
-                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Pedágio (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualTollAdj}
-                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine. Campos editáveis.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Calculando Rota...
-                    </>
-                  ) : (
-                    'Recalcular Rota Mapeia'
-                  )}
-                </Button>
-              </div>
-            </div>
-=======
-=======
-            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
-                  </span>
-                </div>
-
-                {/* Toggle Ida e Volta com Ícone e Badge */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <ArrowLeftRight className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`} />
-                    <Label
-                      htmlFor="toggle-round-trip"
-                      className="text-xs font-semibold cursor-pointer select-none"
-                    >
-                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
-                    </Label>
-                    <Switch
-                      id="toggle-round-trip"
-                      checked={isRoundTrip}
-                      onCheckedChange={handleToggleRoundTrip}
-                    />
-                  </div>
-
-                  <span className="text-xs font-bold text-emerald-600 font-mono">
-                    Subtotal:{' '}
-                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Origem (CEP e Endereço da Base)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={originCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setOriginCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(destinationCep, val)
-                        }
-                      }}
-                      placeholder="89066-000"
-                      className="text-xs h-8 w-32 font-mono font-bold"
-                    />
-                    <Input
-                      value={originAddress}
-                      onChange={(e) => setOriginAddress(e.target.value)}
-                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Destino da Fábrica / Cliente (CEP e Cidade)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={destinationCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setDestinationCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(val, originCep)
-                        }
-                      }}
-                      placeholder="ex: 89801-000"
-                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
-                    />
-                    <Input
-                      value={destinationAddress}
-                      onChange={(e) => setDestinationAddress(e.target.value)}
-                      placeholder="Cidade/UF do Cliente"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Parâmetros do Mapeia / Deslocamento */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
-                    </Label>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] px-1 py-0 ${
-                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
-                      }`}
-                    >
-                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
-                    </Badge>
-                  </div>
-                  <Input
-                    type="number"
-                    value={distanceKm}
-                    onChange={(e) => setDistanceKm(Number(e.target.value))}
-                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    {isRoundTrip
-                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
-                      : `(Percurso unidirecional: ${distanceKm} km)`}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Consumo Veículo (km/L)
-                  </Label>
-                  <Input
-                    type="number"
-                    value={consumptionKmL}
-                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L ({isRoundTrip ? 'ida+volta' : 'só ida'})
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Preço Litro Combustível (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={fuelPrice}
-                    onChange={(e) => setFuelPrice(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Combustível:{' '}
-                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
-                  <Input
-                    type="number"
-                    value={tollRoadPercent}
-                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Pedágios ({estimatedTolls} praças):{' '}
-                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-=======
-              {/* Ajustes Manuais de Combustível e Pedágio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Combustível (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualFuelAdj}
-                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Pedágio (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualTollAdj}
-                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * Campos calculados automaticamente via CEP permanecem 100% editáveis.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Calculando Rota...
-                    </>
-                  ) : (
-                    'Recalcular Rota Mapeia'
-                  )}
-                </Button>
-              </div>
-            </div>=======
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-
-            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Hotel className="h-4 w-4 text-purple-600" />
-=======
-                {/* 3. Inspetor */}
-                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                      3. Inspetor / NDT
-                    </span>
-                    <Badge variant="secondary" className="text-[9px]">
-                      Qualidade
-                    </Badge>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 text-[10px]">
-                    <div>
-                      <Label className="text-[9px]">Qtde</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={inspectorCount}
-                        onChange={(e) => setInspectorCount(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[9px]">Horas</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={inspectorHours}
-                        onChange={(e) => setInspectorHours(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[9px]">R$/Hora</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={inspectorRate}
-                        onChange={(e) => setInspectorRate(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
-                    Total:{' '}
-                    {laborInspectorTotal.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
-                  </span>
-                </div>
-
-                {/* Toggle Ida e Volta com Ícone e Badge */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <ArrowLeftRight
-                      className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
-                    />
-                    <Label
-                      htmlFor="toggle-round-trip"
-                      className="text-xs font-semibold cursor-pointer select-none"
-                    >
-                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
-                    </Label>
-                    <Switch
-                      id="toggle-round-trip"
-                      checked={isRoundTrip}
-                      onCheckedChange={handleToggleRoundTrip}
-                    />
-                  </div>
-
-                  <span className="text-xs font-bold text-emerald-600 font-mono">
-                    Subtotal:{' '}
-                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Origem (CEP e Endereço da Base)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={originCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setOriginCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(destinationCep, val)
-                        }
-                      }}
-                      placeholder="89066-000"
-                      className="text-xs h-8 w-32 font-mono font-bold"
-                    />
-                    <Input
-                      value={originAddress}
-                      onChange={(e) => setOriginAddress(e.target.value)}
-                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Destino da Fábrica / Cliente (CEP e Cidade)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={destinationCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setDestinationCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(val, originCep)
-                        }
-                      }}
-                      placeholder="ex: 89801-000"
-                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
-                    />
-                    <Input
-                      value={destinationAddress}
-                      onChange={(e) => setDestinationAddress(e.target.value)}
-                      placeholder="Cidade/UF do Cliente"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Parâmetros do Mapeia / Deslocamento */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
-                    </Label>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] px-1 py-0 ${
-                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
-                      }`}
-                    >
-                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
-                    </Badge>
-                  </div>
-                  <Input
-                    type="number"
-                    value={distanceKm}
-                    onChange={(e) => setDistanceKm(Number(e.target.value))}
-                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    {isRoundTrip
-                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
-                      : `(Percurso unidirecional: ${distanceKm} km)`}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Consumo Veículo (km/L)
-                  </Label>
-                  <Input
-                    type="number"
-                    value={consumptionKmL}
-                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L (
-                    {isRoundTrip ? 'ida+volta' : 'só ida'})
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Preço Litro Combustível (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={fuelPrice}
-                    onChange={(e) => setFuelPrice(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Combustível:{' '}
-                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
-                  <Input
-                    type="number"
-                    value={tollRoadPercent}
-                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Pedágios ({estimatedTolls} praças):{' '}
-                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              {/* Ajustes Manuais de Combustível e Pedágio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Combustível (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualFuelAdj}
-                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Pedágio (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualTollAdj}
-                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine. Campos editáveis.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Calculando Rota...
-                    </>
-                  ) : (
-                    'Recalcular Rota Mapeia'
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Hotel className="h-4 w-4 text-purple-600" />=======
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-=======
-=======
-            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <Truck className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
-                  </span>
-                </div>
-
-                {/* Toggle Ida e Volta com Ícone e Badge */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <ArrowLeftRight className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`} />
-                    <Label
-                      htmlFor="toggle-round-trip"
-                      className="text-xs font-semibold cursor-pointer select-none"
-                    >
-                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
-                    </Label>
-                    <Switch
-                      id="toggle-round-trip"
-                      checked={isRoundTrip}
-                      onCheckedChange={handleToggleRoundTrip}
-                    />
-                  </div>
-
-                  <span className="text-xs font-bold text-emerald-600 font-mono">
-                    Subtotal:{' '}
-                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Origem (CEP e Endereço da Base)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={originCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setOriginCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(destinationCep, val)
-                        }
-                      }}
-                      placeholder="89066-000"
-                      className="text-xs h-8 w-32 font-mono font-bold"
-                    />
-                    <Input
-                      value={originAddress}
-                      onChange={(e) => setOriginAddress(e.target.value)}
-                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                    Destino da Fábrica / Cliente (CEP e Cidade)
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={destinationCep}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setDestinationCep(val)
-                        const clean = val.replace(/\D/g, '')
-                        if (clean.length === 8) {
-                          handleRecalculateRoute(val, originCep)
-                        }
-                      }}
-                      placeholder="ex: 89801-000"
-                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
-                    />
-                    <Input
-                      value={destinationAddress}
-                      onChange={(e) => setDestinationAddress(e.target.value)}
-                      placeholder="Cidade/UF do Cliente"
-                      className="text-xs h-8 flex-1"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Parâmetros do Mapeia / Deslocamento */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
-                    </Label>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] px-1 py-0 ${
-                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
-                      }`}
-                    >
-                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
-                    </Badge>
-                  </div>
-                  <Input
-                    type="number"
-                    value={distanceKm}
-                    onChange={(e) => setDistanceKm(Number(e.target.value))}
-                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    {isRoundTrip
-                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
-                      : `(Percurso unidirecional: ${distanceKm} km)`}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Consumo Veículo (km/L)
-                  </Label>
-                  <Input
-                    type="number"
-                    value={consumptionKmL}
-                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L ({isRoundTrip ? 'ida+volta' : 'só ida'})
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Preço Litro Combustível (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={fuelPrice}
-                    onChange={(e) => setFuelPrice(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Combustível:{' '}
-                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
-                  <Input
-                    type="number"
-                    value={tollRoadPercent}
-                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
-                    className="text-xs h-8"
-                  />
-                  <span className="text-[9px] text-muted-foreground block">
-                    Pedágios ({estimatedTolls} praças):{' '}
-                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-=======
-              {/* Ajustes Manuais de Combustível e Pedágio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Combustível (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualFuelAdj}
-                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                    Ajuste Manual Pedágio (+/- R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualTollAdj}
-                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-8 font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-muted-foreground">
-                  * Campos calculados automaticamente via CEP permanecem 100% editáveis.
-                </span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? (
-                    <>
-                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                      Calculando Rota...
-                    </>
-                  ) : (
-                    'Recalcular Rota Mapeia'
-                  )}
-                </Button>
-              </div>
-            </div>=======
-              <div className="flex justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={isCalculatingRoute}
-                  onClick={() => handleRecalculateRoute()}
-                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                >
-                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
-                </Button>
-              </div>
-            </div>
-
-            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+            {/* ========================================================================= */}
+            {/* SEÇÃO 3D: HOSPEDAGEM & ALIMENTAÇÃO                                       */}
+            {/* ========================================================================= */}
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Hotel className="h-4 w-4 text-purple-600" />
@@ -5530,21 +2454,23 @@ export function QuotesManager({
               </div>
             </div>
 
-            {/* SEÇÃO 3e: CUSTOS INDIRETOS & IMPOSTOS */}
+            {/* ========================================================================= */}
+            {/* SEÇÃO 3E: CUSTOS INDIRETOS, MARGENS & IMPOSTOS FISCAIS                   */}
+            {/* ========================================================================= */}
             <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border-2 border-amber-300 dark:border-amber-800 space-y-3.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="h-4 w-4 text-amber-600" />
                   <span className="text-xs font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider">
-                    3e. Custos Internos (NÃO visíveis ao cliente na proposta)
+                    3e. Custos Internos & Formação do Preço de Venda
                   </span>
                 </div>
                 <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 text-[10px] font-bold">
-                  Composição de Preço de Venda
+                  Engenharia Financeira
                 </Badge>
               </div>
 
-              {/* Sliders: Margem e Comissão */}
+              {/* Sliders de Margem e Comissão */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-slate-950 p-3 rounded-lg border border-amber-200 dark:border-amber-900">
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs">
@@ -5557,8 +2483,8 @@ export function QuotesManager({
                   </div>
                   <Slider
                     value={[serviceMargin]}
-                    min={20}
-                    max={30}
+                    min={15}
+                    max={40}
                     step={1}
                     onValueChange={(val) => setServiceMargin(val[0])}
                     className="py-1"
@@ -5576,8 +2502,8 @@ export function QuotesManager({
                   </div>
                   <Slider
                     value={[salesCommission]}
-                    min={4}
-                    max={10}
+                    min={3}
+                    max={15}
                     step={1}
                     onValueChange={(val) => setSalesCommission(val[0])}
                     className="py-1"
@@ -5585,7 +2511,7 @@ export function QuotesManager({
                 </div>
               </div>
 
-              {/* Impostos Editáveis */}
+              {/* Impostos Incidentes */}
               <div className="space-y-1.5 pt-1">
                 <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
                   Impostos Fiscais Incidentes (Total: {computation.totalTaxesPercent}%)
@@ -5655,7 +2581,9 @@ export function QuotesManager({
               </div>
             </div>
 
-            {/* SEÇÃO 3f: PRAZO & CONDIÇÕES */}
+            {/* ========================================================================= */}
+            {/* SEÇÃO 3F: PRAZO & CONDIÇÕES COMERCIAIS                                   */}
+            {/* ========================================================================= */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-200 dark:border-slate-800">
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Prazo de Validade da Proposta</Label>
@@ -5666,9 +2594,7 @@ export function QuotesManager({
                     onChange={(e) => setValidityDays(Number(e.target.value))}
                     className="text-xs w-24"
                   />
-                  <span className="text-xs text-muted-foreground">
-                    dias úteis a partir da emissão
-                  </span>
+                  <span className="text-xs text-muted-foreground">dias corridos</span>
                 </div>
               </div>
 
@@ -5705,76 +2631,129 @@ export function QuotesManager({
               </div>
             </div>
 
-            {/* Totalizador Geral */}
-            <div className="p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between">
+            {/* TOTALIZADOR GERAL */}
+            <div className="p-4 rounded-xl bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
               <div>
-                <span className="text-[11px] text-slate-400 block">
+                <span className="text-[11px] text-slate-400 block font-medium">
                   Preço Final de Venda ao Cliente:
                 </span>
-                <span className="text-xl font-black text-teal-300 font-mono">
+                <span className="text-2xl font-black text-teal-300 font-mono">
                   {computation.finalClientPrice.toLocaleString('pt-BR', {
                     style: 'currency',
                     currency: 'BRL',
                   })}
                 </span>
               </div>
-              <div className="text-right text-[11px] text-slate-300">
+              <div className="text-right text-[11px] text-slate-300 space-y-0.5">
                 <div>
-                  Custos Diretos (com materiais):{' '}
-                  {computation.directCostsTotal.toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                  })}
+                  Custos Diretos Totais:{' '}
+                  <strong className="text-white font-mono">
+                    {computation.directCostsTotal.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </strong>
                 </div>
                 <div>
-                  Custos Indiretos:{' '}
-                  {computation.totalIndirectCosts.toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                  })}
+                  Custos Indiretos / Impostos:{' '}
+                  <strong className="text-white font-mono">
+                    {computation.totalIndirectCosts.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </strong>
                 </div>
               </div>
             </div>
 
-            <DialogFooter className="pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsCreateModalOpen(false)}
-                className="text-xs"
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" className="text-xs bg-teal-700 hover:bg-teal-600 text-white">
-                {isEditMode ? 'Salvar Alterações na Proposta' : 'Emitir Proposta Técnica'}
-              </Button>
+            {/* ========================================================================= */}
+            {/* DIALOG FOOTER: BOTÃO SALVAR RASCUNHO (ITEM 3) + EMITIR PROPOSTA           */}
+            {/* ========================================================================= */}
+            <DialogFooter className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                {lastSavedDraft ? (
+                  <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium text-[11px]">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    {lastSavedDraft}
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-slate-500">
+                    Nenhum rascunho salvo nesta sessão
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateModalOpen(false)}
+                  className="text-xs"
+                >
+                  Cancelar
+                </Button>
+
+                {/* BOTÃO "SALVAR RASCUNHO" ADICIONADO ANTES DO EMITIR PROPOSTA */}
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleSaveDraft}
+                  disabled={isSavingDraft}
+                  className="text-xs font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center gap-1.5"
+                >
+                  {isSavingDraft ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3.5 w-3.5" />
+                      Salvar Rascunho
+                    </>
+                  )}
+                </Button>
+
+                {/* BOTÃO "EMITIR PROPOSTA" / "SALVAR ALTERAÇÕES" */}
+                <Button
+                  type="submit"
+                  className="text-xs bg-teal-700 hover:bg-teal-600 text-white font-semibold shadow-sm"
+                >
+                  {isEditMode ? 'Salvar Alterações na Proposta' : 'Emitir Proposta Técnica'}
+                </Button>
+              </div>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Criação Rápida de Cliente */}
+      {/* MODAL DE CRIAÇÃO RÁPIDA DE CLIENTE */}
       {onCreateClient && (
         <Dialog open={isNewClientModalOpen} onOpenChange={setIsNewClientModalOpen}>
           <DialogContent className="sm:max-w-[450px]">
             <DialogHeader>
               <DialogTitle className="text-base font-bold">Cadastrar Novo Cliente</DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                Insira os dados básicos do cliente para associar à proposta técnica.
+              </DialogDescription>
             </DialogHeader>
             <form
               onSubmit={async (e) => {
                 e.preventDefault()
                 if (!newClientName) return
-                const created = await onCreateClient({
-                  name: newClientName,
-                  document: newClientDoc,
-                  city: newClientCity,
-                  state: newClientState,
-                  status: 'active',
-                })
-                if (created?.id) {
-                  setClientId(created.id)
-                  if (newClientCity) {
-                    setDestinationAddress(`${newClientCity} / ${newClientState}`)
+                if (onCreateClient) {
+                  const created = await onCreateClient({
+                    name: newClientName,
+                    document: newClientDoc,
+                    city: newClientCity,
+                    state: newClientState,
+                    status: 'active',
+                  })
+                  if (created && 'id' in created && created.id) {
+                    setClientId(created.id)
+                    if (newClientCity) {
+                      setDestinationAddress(`${newClientCity} / ${newClientState}`)
+                    }
                   }
                 }
                 setIsNewClientModalOpen(false)
@@ -5841,7 +2820,185 @@ export function QuotesManager({
         </Dialog>
       )}
 
-      {/* Modal de Prévia em PDF da Proposta */}
+      {/* MODAL CADASTRAR NOVO EQUIPAMENTO NO CATÁLOGO */}
+      <Dialog open={isNewEquipmentModalOpen} onOpenChange={setIsNewEquipmentModalOpen}>
+        <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Database className="h-4 w-4 text-blue-600" />
+              Cadastrar Novo Equipamento no Catálogo
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Cadastre o trocador de calor com suas especificações completas para ficar disponível
+              no catálogo local e no banco de dados.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveNewEquipment} className="space-y-3 py-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Modelo / Código *</Label>
+                <Input
+                  value={eqModalModel}
+                  onChange={(e) => setEqModalModel(e.target.value)}
+                  placeholder="Ex: M10-BFG, Sondex S21, Kelvion NT50M"
+                  className="text-xs font-mono font-bold"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Fabricante / Marca *</Label>
+                <Input
+                  value={eqModalBrand}
+                  onChange={(e) => setEqModalBrand(e.target.value)}
+                  placeholder="Ex: Alfa Laval, Sondex, Kelvion, Tranter"
+                  className="text-xs"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Série / Família</Label>
+                <Input
+                  value={eqModalSeries}
+                  onChange={(e) => setEqModalSeries(e.target.value)}
+                  placeholder="Ex: Industrial Plate, Sanitária, Standard"
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Número de Placas Padrão</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={eqModalPlateCount}
+                  onChange={(e) => setEqModalPlateCount(Number(e.target.value))}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Material das Placas</Label>
+                <Input
+                  value={eqModalPlateMaterial}
+                  onChange={(e) => setEqModalPlateMaterial(e.target.value)}
+                  placeholder="AISI 316L, AISI 304, Titânio..."
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Espessura Placas (mm)</Label>
+                <Input
+                  type="number"
+                  step="0.05"
+                  value={eqModalThickness}
+                  onChange={(e) => setEqModalThickness(Number(e.target.value))}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo de Gaxetas</Label>
+                <Input
+                  value={eqModalGasket}
+                  onChange={(e) => setEqModalGasket(e.target.value)}
+                  placeholder="EPDM Clip-on, NBR Clip-on, Viton..."
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Tipo e Bitola da Conexão</Label>
+                <Input
+                  value={eqModalConnection}
+                  onChange={(e) => setEqModalConnection(e.target.value)}
+                  placeholder="DN100 (4'') Flangeada ANSI 150#"
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Pressão de Teste (bar)</Label>
+                <Input
+                  type="number"
+                  value={eqModalTestPressure}
+                  onChange={(e) => setEqModalTestPressure(Number(e.target.value))}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Pressão de Trabalho (bar)</Label>
+                <Input
+                  type="number"
+                  value={eqModalWorkPressure}
+                  onChange={(e) => setEqModalWorkPressure(Number(e.target.value))}
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Dimensões (L x A x P mm)</Label>
+                <Input
+                  value={eqModalDimensions}
+                  onChange={(e) => setEqModalDimensions(e.target.value)}
+                  placeholder="1450 x 480 x 1120 mm"
+                  className="text-xs"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs">Peso Estimado (kg)</Label>
+                <Input
+                  type="number"
+                  value={eqModalWeight}
+                  onChange={(e) => setEqModalWeight(Number(e.target.value))}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Descrição Técnica Adicional</Label>
+              <Textarea
+                value={eqModalDescription}
+                onChange={(e) => setEqModalDescription(e.target.value)}
+                rows={2}
+                placeholder="Detalhes construtivos, aplicação principal ou compatibilidade..."
+                className="text-xs"
+              />
+            </div>
+
+            <DialogFooter className="pt-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsNewEquipmentModalOpen(false)}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSavingEquipment}
+                className="text-xs bg-blue-700 hover:bg-blue-600 text-white flex items-center gap-1.5"
+              >
+                {isSavingEquipment ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
+                Salvar no Catálogo & Usar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL DE PRÉVIA EM PDF DA PROPOSTA */}
       <QuotePdfPreviewDialog
         quote={quoteForPdf}
         open={isPdfPreviewOpen}

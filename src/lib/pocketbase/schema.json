@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-25T18:54:03.337Z",
+  "generatedAt": "2026-08-25T19:38:38.781Z",
   "collections": [
     {
       "name": "users",
@@ -253,6 +253,24 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "specs",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "brand",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "model",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -472,6 +490,348 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "tech_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tech_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tech_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "helper_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "helper_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "helper_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inspector_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inspector_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inspector_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "labor_config",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "service_margin",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sales_commission",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pis_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cofins_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "iss_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "csll_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "irpj_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ir_diff_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pricing_config",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origin_cep",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origin_address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "destination_cep",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "destination_address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "distance_km",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_round_trip",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "travel_config",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_brand",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_model",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_series",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plate_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plate_material",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plate_thickness",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "gasket_material",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "connection_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "connection_size",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pressure_test_bar",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "working_pressure_bar",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dimensions_w_h_d",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "weight_kg",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "scope_of_work",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "labor_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "labor_rate_hourly",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "lodging_meals_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "travel_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "materials_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "third_party_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "other_costs",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "discount_amount",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "final_price",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "validity_days",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "payment_conditions",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "technical_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "commercial_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "service_details",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "custom_materials",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

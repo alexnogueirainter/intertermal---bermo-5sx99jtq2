@@ -176,21 +176,32 @@ export async function getQuotes(): Promise<QuoteRecord[]> {
 
 export async function createQuote(data: Partial<QuoteRecord>): Promise<QuoteRecord> {
   try {
-    return await pb.collection(QUOTES_COLLECTION).create<QuoteRecord>(data)
+    const payload = {
+      ...data,
+      quote_number: data.quote_number || data.code || `INT-${Date.now().toString().slice(-4)}`,
+      total: data.total || data.final_price || 0,
+      subtotal: data.subtotal || data.total_cost || 0,
+      payment_terms:
+        data.payment_terms || (data.payment_conditions ? `${data.payment_conditions}` : '28 DDL'),
+    }
+    return await pb.collection(QUOTES_COLLECTION).create<QuoteRecord>(payload)
   } catch (error) {
     console.warn('Erro ao criar quote no backend:', error)
     return {
+      ...data,
       id: `quote-${Date.now()}`,
-      quote_number: data.quote_number || `INT-${Date.now()}`,
+      code:
+        data.code || `PROP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      quote_number: data.quote_number || data.code || `INT-${Date.now()}`,
       title: data.title || data.quote_number || 'Proposta de Serviço',
-      client_id: data.client_id,
+      client_id: data.client_id || '',
       client_name: data.client_name,
       deal_id: data.deal_id,
       status: data.status || 'draft',
       items: data.items || [],
-      subtotal: data.subtotal || 0,
-      discount_total: data.discount_total || 0,
-      total: data.total || 0,
+      subtotal: data.subtotal || data.total_cost || 0,
+      discount_total: data.discount_total || data.discount_amount || 0,
+      total: data.total || data.final_price || 0,
       payment_terms: data.payment_terms || '28 DDL',
       valid_until: data.valid_until,
       notes: data.notes,
@@ -198,27 +209,35 @@ export async function createQuote(data: Partial<QuoteRecord>): Promise<QuoteReco
       service_details: data.service_details,
       created: new Date().toISOString(),
       updated: new Date().toISOString(),
-    }
+    } as QuoteRecord
   }
 }
 
 export async function updateQuote(id: string, data: Partial<QuoteRecord>): Promise<QuoteRecord> {
   try {
-    return await pb.collection(QUOTES_COLLECTION).update<QuoteRecord>(id, data)
+    const payload = {
+      ...data,
+      total: data.total !== undefined ? data.total : data.final_price,
+      subtotal: data.subtotal !== undefined ? data.subtotal : data.total_cost,
+      payment_terms:
+        data.payment_terms || (data.payment_conditions ? `${data.payment_conditions}` : undefined),
+    }
+    return await pb.collection(QUOTES_COLLECTION).update<QuoteRecord>(id, payload)
   } catch (error) {
     console.warn('Erro ao atualizar quote no backend:', error)
     return {
       id,
+      ...data,
       quote_number: data.quote_number || 'INT-2025',
       title: data.title,
-      client_id: data.client_id,
+      client_id: data.client_id || '',
       client_name: data.client_name,
       deal_id: data.deal_id,
       status: data.status || 'draft',
       items: data.items || [],
-      subtotal: data.subtotal || 0,
+      subtotal: data.subtotal || data.total_cost || 0,
       discount_total: data.discount_total || 0,
-      total: data.total || 0,
+      total: data.total || data.final_price || 0,
       payment_terms: data.payment_terms,
       valid_until: data.valid_until,
       notes: data.notes,
@@ -226,7 +245,7 @@ export async function updateQuote(id: string, data: Partial<QuoteRecord>): Promi
       service_details: data.service_details,
       created: data.created || new Date().toISOString(),
       updated: new Date().toISOString(),
-    }
+    } as QuoteRecord
   }
 }
 

@@ -128,7 +128,7 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
     setMonthlyValue(0)
   }
 
-  const getStatusBadge = (status?: ServiceStatus) => {
+  const getStatusBadge = (status?: ServiceStatus | string) => {
     switch (status) {
       case 'in_progress':
         return <Badge className="bg-blue-600 text-white text-[10px]">Em Execução</Badge>

@@ -94,6 +94,10 @@ const STATUS_MAP: Record<ClientStatus, { label: string; color: string }> = {
     label: 'Cliente Ativo',
     color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
   },
+  inactive: {
+    label: 'Inativo',
+    color: 'bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-300',
+  },
   churned: {
     label: 'Inativo/Churned',
     color: 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300',
@@ -245,7 +249,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
     setPhone(client.phone || '')
     setWhatsapp(client.whatsapp || '')
     setSegment(client.segment || '')
-    setStatus(client.status || 'prospect')
+    setStatus((client.status as ClientStatus) || 'prospect')
     setScore(String(client.score || 80))
     setCity(client.city || '')
     setState(client.state || '')
