@@ -20,6 +20,8 @@ import {
   Save,
   Check,
   UserCheck,
+  ShieldCheck,
+  Calculator,
 } from 'lucide-react'
 import {
   QuoteRecord,
@@ -205,9 +207,13 @@ export function QuotesManager({
   const [mealsDays, setMealsDays] = useState<number>(4)
   const [mealsRate, setMealsRate] = useState<number>(95)
 
+  // Toggle de Visão do Modal: "client" (Proposta do Cliente) vs "internal" (Composição Interna)
+  const [quoteViewMode, setQuoteViewMode] = useState<'client' | 'internal'>('internal')
+
   // Seção 3E: Custos Indiretos, Margens e Impostos Fiscais
   const [serviceMargin, setServiceMargin] = useState<number>(25)
   const [salesCommission, setSalesCommission] = useState<number>(6)
+  const [adminOverheadRate, setAdminOverheadRate] = useState<number>(0)
   const [pisRate, setPisRate] = useState<number>(0.65)
   const [cofinsRate, setCofinsRate] = useState<number>(3.0)
   const [issRate, setIssRate] = useState<number>(5.0)
@@ -219,7 +225,7 @@ export function QuotesManager({
   const [otherCosts, setOtherCosts] = useState<number>(0)
 
   // Seção 3F: Prazo & Condições Comerciais
-  const [validityDays, setValidityDays] = useState<number>(15)
+  const [validityDays, setValidityDays] = useState<number>(10)
   const [paymentCondition, setPaymentCondition] = useState<PaymentConditionType>('28_ddl')
   const [technicalNotes, setTechnicalNotes] = useState(
     'Incluso certificado de estanqueidade e laudo de ensaio por líquido penetrante conforme ASME Sec VIII Div 1.',
@@ -600,6 +606,9 @@ export function QuotesManager({
         thirdParty: thirdPartyCost,
         other: otherCosts,
       },
+      indirectCosts: {
+        adminOverheadRate: adminOverheadRate,
+      },
       taxes: {
         pis: pisRate,
         cofins: cofinsRate,
@@ -619,6 +628,7 @@ export function QuotesManager({
     lodgingMealsTotal,
     thirdPartyCost,
     otherCosts,
+    adminOverheadRate,
     pisRate,
     cofinsRate,
     issRate,
@@ -653,6 +663,7 @@ export function QuotesManager({
     const pricingConfig = {
       serviceMargin: Number(serviceMargin),
       salesCommission: Number(salesCommission),
+      adminRate: Number(adminOverheadRate),
       pisRate: Number(pisRate),
       cofinsRate: Number(cofinsRate),
       issRate: Number(issRate),
@@ -750,6 +761,7 @@ export function QuotesManager({
       indirect_costs: {
         serviceMarginPercent: serviceMargin,
         salesCommissionPercent: salesCommission,
+        administrativeCostPercent: adminOverheadRate,
         taxes: {
           pis: pisRate,
           cofins: cofinsRate,
@@ -760,7 +772,9 @@ export function QuotesManager({
           totalTaxes: computation.totalTaxesPercent,
         },
         directCostsTotal: computation.directCostsTotal,
+        adminCostAmount: computation.adminOverheadAmount,
         totalIndirectAmount: computation.totalIndirectCosts,
+        totalIndirectMarkupSum: computation.totalIndirectMarkupSum,
         finalSalePrice: computation.finalClientPrice,
       },
       payment_and_validity: {
@@ -836,6 +850,8 @@ export function QuotesManager({
       // Impostos, Margem e Comissão (campos individuais + JSON)
       service_margin: Number(serviceMargin),
       sales_commission: Number(salesCommission),
+      admin_rate: Number(adminOverheadRate),
+      admin_cost: Number(computation.adminOverheadAmount),
       pis_rate: Number(pisRate),
       cofins_rate: Number(cofinsRate),
       iss_rate: Number(issRate),
@@ -993,6 +1009,7 @@ export function QuotesManager({
     // Impostos & Margens
     setServiceMargin(25)
     setSalesCommission(6)
+    setAdminOverheadRate(0)
     setPisRate(0.65)
     setCofinsRate(3.0)
     setIssRate(5.0)
@@ -1021,7 +1038,7 @@ export function QuotesManager({
     setMealsRate(95)
 
     // Condições Comerciais
-    setValidityDays(15)
+    setValidityDays(10)
     setPaymentCondition('28_ddl')
     setTechnicalNotes(
       'Incluso certificado de estanqueidade e laudo de ensaio por líquido penetrante conforme ASME Sec VIII Div 1.',
@@ -1034,6 +1051,7 @@ export function QuotesManager({
 
   const handleOpenCreateModal = () => {
     resetForm()
+    setQuoteViewMode('internal')
     setQuoteCode(`PROP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`)
     setIsCreateModalOpen(true)
   }
@@ -1041,6 +1059,7 @@ export function QuotesManager({
   const handleOpenEditModal = (q: QuoteRecord) => {
     setEditingQuoteId(q.id)
     setIsEditMode(true)
+    setQuoteViewMode('internal')
     setQuoteCode(q.code || q.quote_number || '')
     setClientId(q.client_id || '')
     setDealId(q.deal_id || '')
@@ -1148,6 +1167,9 @@ export function QuotesManager({
     setSalesCommission(
       q.sales_commission ?? pricingCfg?.salesCommission ?? sIndirect.salesCommissionPercent ?? 6,
     )
+    setAdminOverheadRate(
+      q.admin_rate ?? pricingCfg?.adminRate ?? sIndirect.administrativeCostPercent ?? 0,
+    )
     setPisRate(q.pis_rate ?? pricingCfg?.pisRate ?? sTaxes.pis ?? 0.65)
     setCofinsRate(q.cofins_rate ?? pricingCfg?.cofinsRate ?? sTaxes.cofins ?? 3.0)
     setIssRate(q.iss_rate ?? pricingCfg?.issRate ?? sTaxes.iss ?? 5.0)
@@ -1209,7 +1231,7 @@ export function QuotesManager({
     setMealsRate(lodgingCfg.mealsRate ?? sLodging.mealsRatePerDay ?? 95)
 
     // Condições Comerciais & Validade
-    setValidityDays(q.validity_days || sPayment.validityDays || 15)
+    setValidityDays(q.validity_days || sPayment.validityDays || 10)
     const cond =
       (q.payment_conditions as PaymentConditionType) ||
       sPayment.conditionType ||
@@ -1562,7 +1584,7 @@ export function QuotesManager({
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
         <DialogContent className="max-w-5xl max-h-[92vh] overflow-y-auto p-6">
           <DialogHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <DialogTitle className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Wrench className="h-5 w-5 text-teal-600" />
@@ -1575,15 +1597,65 @@ export function QuotesManager({
                 </DialogDescription>
               </div>
 
-              {lastSavedDraft && (
-                <Badge
+              <div className="flex items-center flex-wrap gap-2">
+                {/* TOGGLE VISÃO CLIENTE / VISÃO INTERNA */}
+                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                  <Button
+                    type="button"
+                    variant={quoteViewMode === 'client' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setQuoteViewMode('client')}
+                    className={`h-7 px-2.5 text-xs font-semibold ${
+                      quoteViewMode === 'client'
+                        ? 'bg-teal-700 hover:bg-teal-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1" />
+                    Proposta do Cliente
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={quoteViewMode === 'internal' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setQuoteViewMode('internal')}
+                    className={`h-7 px-2.5 text-xs font-semibold ${
+                      quoteViewMode === 'internal'
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
+                    }`}
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5 mr-1" />
+                    Composição Interna
+                  </Button>
+                </div>
+
+                {/* BOTÃO VISUALIZAR PDF DA PROPOSTA ATUAL */}
+                <Button
+                  type="button"
                   variant="outline"
-                  className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[11px] font-mono"
+                  size="sm"
+                  onClick={() => {
+                    const currentQuoteData = getFormDataObject(status)
+                    setQuoteForPdf(currentQuoteData as QuoteRecord)
+                    setIsPdfPreviewOpen(true)
+                  }}
+                  className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300 dark:hover:bg-teal-950 font-semibold"
                 >
-                  <Check className="h-3 w-3 mr-1" />
-                  {lastSavedDraft}
-                </Badge>
-              )}
+                  <FileText className="h-3.5 w-3.5 mr-1" />
+                  Visualizar PDF
+                </Button>
+
+                {lastSavedDraft && (
+                  <Badge
+                    variant="outline"
+                    className="bg-emerald-50 text-emerald-700 border-emerald-300 text-[10px] font-mono"
+                  >
+                    <Check className="h-3 w-3 mr-1" />
+                    {lastSavedDraft}
+                  </Badge>
+                )}
+              </div>
             </div>
           </DialogHeader>
 
@@ -1663,6 +1735,78 @@ export function QuotesManager({
             {/* (ITEM 3A: Digitação Livre + Busca Local vs Manual + Lupa Buscar Online)   */}
             {/* ========================================================================= */}
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+              {/* METODOLOGIA TÉCNICA DAS 6 ETAPAS NO TOPO DA SEÇÃO DE EQUIPAMENTOS */}
+              <div className="p-3.5 rounded-xl bg-gradient-to-r from-teal-500/10 via-emerald-500/10 to-teal-500/5 border border-teal-200 dark:border-teal-900/60 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-teal-900 dark:text-teal-300 font-bold text-xs">
+                    <ShieldCheck className="h-4 w-4 text-teal-600" />
+                    <span>Metodologia Padrão de Manutenção Técnica (6 Etapas Especializadas)</span>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="text-[10px] bg-teal-50 dark:bg-teal-950 text-teal-700 border-teal-300 font-semibold"
+                  >
+                    Procedimento Homologado BERMO
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-1 text-[11px]">
+                  <div className="p-2 rounded-lg bg-white dark:bg-slate-950 border border-teal-100 dark:border-slate-800 space-y-0.5">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-xs block">
+                      1. Desmontagem
+                    </span>
+                    <p className="text-[10.5px] text-muted-foreground leading-tight">
+                      Abertura do feixe de placas com registro prévio da Medida A (distância entre
+                      placas de aperto).
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white dark:bg-slate-950 border border-teal-100 dark:border-slate-800 space-y-0.5">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-xs block">
+                      2. Limpeza
+                    </span>
+                    <p className="text-[10.5px] text-muted-foreground leading-tight">
+                      Remoção de incrustações e resíduos através de limpeza mecânica manual e/ou
+                      química preservando o inox.
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white dark:bg-slate-950 border border-teal-100 dark:border-slate-800 space-y-0.5">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-xs block">
+                      3. Inspeção de Placas
+                    </span>
+                    <p className="text-[10.5px] text-muted-foreground leading-tight">
+                      Análise visual e ensaio não destrutivo para detecção de furos, deformações ou
+                      corrosão.
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white dark:bg-slate-950 border border-teal-100 dark:border-slate-800 space-y-0.5">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-xs block">
+                      4. Inspeção de Gaxetas
+                    </span>
+                    <p className="text-[10.5px] text-muted-foreground leading-tight">
+                      Verificação da elasticidade, trincas, ressecamento ou perda de perfil de
+                      vedação.
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white dark:bg-slate-950 border border-teal-100 dark:border-slate-800 space-y-0.5">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-xs block">
+                      5. Montagem
+                    </span>
+                    <p className="text-[10.5px] text-muted-foreground leading-tight">
+                      Fechamento com torque gradual e uniforme cruzado respeitando a Medida A final
+                      especificada.
+                    </p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white dark:bg-slate-950 border border-teal-100 dark:border-slate-800 space-y-0.5">
+                    <span className="font-bold text-slate-900 dark:text-slate-100 text-xs block">
+                      6. Teste de Estanqueidade
+                    </span>
+                    <p className="text-[10.5px] text-muted-foreground leading-tight">
+                      Verificação pós-montagem com ensaio de pressão para garantia de estanqueidade
+                      absoluta.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
                 <div className="flex items-center gap-2">
                   <Layers className="h-4 w-4 text-teal-600" />
@@ -2455,131 +2599,333 @@ export function QuotesManager({
             </div>
 
             {/* ========================================================================= */}
-            {/* SEÇÃO 3E: CUSTOS INDIRETOS, MARGENS & IMPOSTOS FISCAIS                   */}
+            {/* SEÇÃO 3E: CUSTOS INDIRETOS, MARGENS & IMPOSTOS FISCAIS (VISÃO CONDICIONAL) */}
             {/* ========================================================================= */}
-            <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border-2 border-amber-300 dark:border-amber-800 space-y-3.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal className="h-4 w-4 text-amber-600" />
-                  <span className="text-xs font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider">
-                    3e. Custos Internos & Formação do Preço de Venda
-                  </span>
-                </div>
-                <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 text-[10px] font-bold">
-                  Engenharia Financeira
-                </Badge>
-              </div>
-
-              {/* Sliders de Margem e Comissão */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white dark:bg-slate-950 p-3 rounded-lg border border-amber-200 dark:border-amber-900">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <Label className="font-semibold text-slate-900 dark:text-slate-100">
-                      Margem de Serviços: <strong>{serviceMargin}%</strong>
-                    </Label>
-                    <span className="text-[11px] text-muted-foreground">
-                      (20% a 30% - Padrão 25%)
+            {quoteViewMode === 'internal' ? (
+              <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border-2 border-amber-300 dark:border-amber-800 space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <SlidersHorizontal className="h-4 w-4 text-amber-600" />
+                    <span className="text-xs font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider">
+                      3e. Custos Internos & Formação do Preço de Venda (Composição Interna)
                     </span>
                   </div>
-                  <Slider
-                    value={[serviceMargin]}
-                    min={15}
-                    max={40}
-                    step={1}
-                    onValueChange={(val) => setServiceMargin(val[0])}
-                    className="py-1"
-                  />
+                  <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100 text-[10px] font-bold">
+                    Visão Gerencial / Markup
+                  </Badge>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <Label className="font-semibold text-slate-900 dark:text-slate-100">
-                      Comissão de Vendas: <strong>{salesCommission}%</strong>
+                {/* Sliders de Margem, Comissão e Taxa Administrativa */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white dark:bg-slate-950 p-3 rounded-lg border border-amber-200 dark:border-amber-900">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <Label className="font-semibold text-slate-900 dark:text-slate-100">
+                        Margem de Serviços: <strong>{serviceMargin}%</strong>
+                      </Label>
+                    </div>
+                    <Slider
+                      value={[serviceMargin]}
+                      min={15}
+                      max={40}
+                      step={1}
+                      onValueChange={(val) => setServiceMargin(val[0])}
+                      className="py-1"
+                    />
+                    <div className="text-[10px] text-amber-700 dark:text-amber-300 font-mono text-right">
+                      Valor:{' '}
+                      {computation.marginAmount.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <Label className="font-semibold text-slate-900 dark:text-slate-100">
+                        Comissão de Vendas: <strong>{salesCommission}%</strong>
+                      </Label>
+                    </div>
+                    <Slider
+                      value={[salesCommission]}
+                      min={0}
+                      max={15}
+                      step={1}
+                      onValueChange={(val) => setSalesCommission(val[0])}
+                      className="py-1"
+                    />
+                    <div className="text-[10px] text-amber-700 dark:text-amber-300 font-mono text-right">
+                      Valor:{' '}
+                      {computation.commissionAmount.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <Label className="font-semibold text-slate-900 dark:text-slate-100">
+                        Taxa Admin / Overhead: <strong>{adminOverheadRate}%</strong>
+                      </Label>
+                    </div>
+                    <Slider
+                      value={[adminOverheadRate]}
+                      min={0}
+                      max={25}
+                      step={1}
+                      onValueChange={(val) => setAdminOverheadRate(val[0])}
+                      className="py-1"
+                    />
+                    <div className="text-[10px] text-amber-700 dark:text-amber-300 font-mono text-right">
+                      Valor:{' '}
+                      {computation.adminOverheadAmount.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Impostos Incidentes */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex justify-between items-center">
+                    <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                      Impostos Fiscais Incidentes (Total: {computation.totalTaxesPercent}%)
                     </Label>
-                    <span className="text-[11px] text-muted-foreground">
-                      (4% a 10% - Padrão 6%)
+                    <span className="text-[11px] font-mono text-slate-600 dark:text-slate-400 font-bold">
+                      Total Impostos:{' '}
+                      {computation.totalTaxesAmount.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
                     </span>
                   </div>
-                  <Slider
-                    value={[salesCommission]}
-                    min={3}
-                    max={15}
-                    step={1}
-                    onValueChange={(val) => setSalesCommission(val[0])}
-                    className="py-1"
-                  />
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
+                    <div>
+                      <div className="flex justify-between text-[9px] text-muted-foreground">
+                        <span>PIS (%)</span>
+                        <span className="font-mono">
+                          {computation.pisAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={pisRate}
+                        onChange={(e) => setPisRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[9px] text-muted-foreground">
+                        <span>COFINS (%)</span>
+                        <span className="font-mono">
+                          {computation.cofinsAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={cofinsRate}
+                        onChange={(e) => setCofinsRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[9px] text-muted-foreground">
+                        <span>ISS (%)</span>
+                        <span className="font-mono">
+                          {computation.issAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={issRate}
+                        onChange={(e) => setIssRate(Number(e.target.value))}
+                        className="text-xs h-7 bg-amber-50/60 dark:bg-amber-950/40"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[9px] text-muted-foreground">
+                        <span>CSLL (%)</span>
+                        <span className="font-mono">
+                          {computation.csllAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={csllRate}
+                        onChange={(e) => setCsllRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[9px] text-muted-foreground">
+                        <span>IRPJ (%)</span>
+                        <span className="font-mono">
+                          {computation.irpjAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={irpjRate}
+                        onChange={(e) => setIrpjRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-[9px] text-muted-foreground">
+                        <span>Dif. IR (%)</span>
+                        <span className="font-mono">
+                          {computation.irDiffAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
+                      </div>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={irDiffRate}
+                        onChange={(e) => setIrDiffRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {/* Impostos Incidentes */}
-              <div className="space-y-1.5 pt-1">
-                <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                  Impostos Fiscais Incidentes (Total: {computation.totalTaxesPercent}%)
-                </Label>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-xs">
-                  <div>
-                    <Label className="text-[9px] text-muted-foreground">PIS (%)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={pisRate}
-                      onChange={(e) => setPisRate(Number(e.target.value))}
-                      className="text-xs h-7"
-                    />
+                {/* SOMA DETALHADA DOS CUSTOS INTERNOS / MARGEM / IMPOSTOS */}
+                <div className="p-3 rounded-lg bg-amber-100/70 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-xs space-y-2">
+                  <div className="flex items-center justify-between font-bold text-amber-900 dark:text-amber-200">
+                    <span className="flex items-center gap-1.5">
+                      <Calculator className="h-4 w-4" />
+                      Soma dos Custos Internos Indiretos & Formação de Preço
+                    </span>
+                    <span className="font-mono text-sm">
+                      Total Indireto:{' '}
+                      {computation.totalIndirectMarkupSum.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
                   </div>
-                  <div>
-                    <Label className="text-[9px] text-muted-foreground">COFINS (%)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={cofinsRate}
-                      onChange={(e) => setCofinsRate(Number(e.target.value))}
-                      className="text-xs h-7"
-                    />
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[11px] border-t border-amber-200 dark:border-amber-900 text-amber-950 dark:text-amber-100">
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">
+                        Custo Direto Base:
+                      </span>
+                      <strong className="font-mono">
+                        {computation.directCostsTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">
+                        Margem ({serviceMargin}%):
+                      </span>
+                      <strong className="font-mono text-emerald-700 dark:text-emerald-400">
+                        +
+                        {computation.marginAmount.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">
+                        Comissão ({salesCommission}%):
+                      </span>
+                      <strong className="font-mono text-blue-700 dark:text-blue-400">
+                        +
+                        {computation.commissionAmount.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-[10px]">
+                        Impostos Totais ({computation.totalTaxesPercent}%):
+                      </span>
+                      <strong className="font-mono text-purple-700 dark:text-purple-400">
+                        +
+                        {computation.totalTaxesAmount.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </strong>
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-[9px] text-muted-foreground">ISS (%)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={issRate}
-                      onChange={(e) => setIssRate(Number(e.target.value))}
-                      className="text-xs h-7 bg-amber-50/60 dark:bg-amber-950/40"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[9px] text-muted-foreground">CSLL (%)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={csllRate}
-                      onChange={(e) => setCsllRate(Number(e.target.value))}
-                      className="text-xs h-7"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[9px] text-muted-foreground">IRPJ (%)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={irpjRate}
-                      onChange={(e) => setIrpjRate(Number(e.target.value))}
-                      className="text-xs h-7"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[9px] text-muted-foreground">Dif. IR (%)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={irDiffRate}
-                      onChange={(e) => setIrDiffRate(Number(e.target.value))}
-                      className="text-xs h-7"
-                    />
+
+                  <div className="flex items-center justify-between pt-1 border-t border-amber-200 dark:border-amber-900 text-xs font-semibold">
+                    <span className="text-slate-700 dark:text-slate-300">
+                      Preço Final Calculado com Markup Aplicado:
+                    </span>
+                    <span className="text-base font-black text-teal-800 dark:text-teal-300 font-mono">
+                      {computation.finalClientPrice.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
                   </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              /* MODO PROPOSTA DO CLIENTE: APENAS ESCOPO E VALOR LÍQUIDO DOS SERVIÇOS */
+              <div className="p-4 rounded-xl bg-teal-50/60 dark:bg-teal-950/20 border-2 border-teal-300 dark:border-teal-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Eye className="h-4 w-4 text-teal-700 dark:text-teal-400" />
+                    <span className="text-xs font-bold text-teal-900 dark:text-teal-200 uppercase tracking-wider">
+                      Visão da Proposta do Cliente (Sem Custos Internos)
+                    </span>
+                  </div>
+                  <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200 text-[10px] font-bold">
+                    Apresentação Comercial
+                  </Badge>
+                </div>
+                <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-teal-100 dark:border-slate-800 text-xs text-slate-700 dark:text-slate-300 space-y-2">
+                  <p className="text-[11px] leading-relaxed">
+                    Nesta visão comercial destinada à apresentação direta ao cliente, os custos
+                    internos (margem de contribuição, alíquotas fiscais de impostos, comissões de
+                    venda e taxas administrativas) são mantidos confidenciais.
+                  </p>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                    <span className="font-semibold text-xs">
+                      Valor Total dos Serviços Especializados de Engenharia:
+                    </span>
+                    <span className="text-lg font-black text-teal-800 dark:text-teal-300 font-mono">
+                      {computation.finalClientPrice.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* ========================================================================= */}
             {/* SEÇÃO 3F: PRAZO & CONDIÇÕES COMERCIAIS                                   */}
@@ -2693,7 +3039,22 @@ export function QuotesManager({
                   Cancelar
                 </Button>
 
-                {/* BOTÃO "SALVAR RASCUNHO" ADICIONADO ANTES DO EMITIR PROPOSTA */}
+                {/* BOTÃO "VISUALIZAR PDF" */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const currentQuoteData = getFormDataObject(status)
+                    setQuoteForPdf(currentQuoteData as QuoteRecord)
+                    setIsPdfPreviewOpen(true)
+                  }}
+                  className="text-xs font-semibold border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300 dark:hover:bg-teal-950 flex items-center gap-1.5"
+                >
+                  <FileText className="h-3.5 w-3.5 text-teal-600" />
+                  Visualizar PDF
+                </Button>
+
+                {/* BOTÃO "SALVAR RASCUNHO" */}
                 <Button
                   type="button"
                   variant="secondary"

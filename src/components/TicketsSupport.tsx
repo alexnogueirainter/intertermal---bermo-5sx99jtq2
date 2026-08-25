@@ -31,6 +31,8 @@ import {
   Send,
   Building2,
   LifeBuoy,
+  Globe,
+  HelpCircle,
 } from 'lucide-react'
 import type { TicketRecord, TicketStatus, TicketChannel, ClientRecord } from '@/types/crm'
 
@@ -67,8 +69,10 @@ const CHANNEL_CONFIG: Record<TicketChannel, { label: string; icon: any }> = {
   whatsapp: { label: 'WhatsApp', icon: MessageSquare },
   email: { label: 'E-mail', icon: Mail },
   phone: { label: 'Telefone', icon: Phone },
+  portal: { label: 'Portal Web', icon: Globe },
   chat: { label: 'Chat Online', icon: MessageSquare },
   in_person: { label: 'Presencial', icon: User },
+  other: { label: 'Outro', icon: HelpCircle },
 }
 
 export const TicketsSupport: React.FC<TicketsSupportProps> = ({

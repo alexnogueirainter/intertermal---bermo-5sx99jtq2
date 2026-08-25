@@ -37,7 +37,14 @@ export type ServiceType =
   | 'consulting'
   | 'other'
 export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'resolved' | 'closed'
-export type TicketChannel = 'email' | 'whatsapp' | 'phone' | 'portal' | 'chat' | 'in_person' | 'other'
+export type TicketChannel =
+  | 'email'
+  | 'whatsapp'
+  | 'phone'
+  | 'portal'
+  | 'chat'
+  | 'in_person'
+  | 'other'
 
 export type PaymentConditionType = '14_ddl' | '28_ddl' | '30_ddl' | '45_ddl' | '60_ddl' | 'custom'
 
@@ -109,6 +116,7 @@ export interface QuoteLaborConfig {
 export interface QuotePricingConfig {
   serviceMargin: number
   salesCommission: number
+  adminRate?: number
   pisRate: number
   cofinsRate: number
   issRate: number
@@ -237,6 +245,8 @@ export interface QuoteRecord {
   // Impostos & Margens (Individuais e JSON)
   service_margin?: number
   sales_commission?: number
+  admin_rate?: number
+  admin_cost?: number
   pis_rate?: number
   cofins_rate?: number
   iss_rate?: number

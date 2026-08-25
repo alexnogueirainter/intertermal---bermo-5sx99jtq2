@@ -40,13 +40,22 @@ export interface QuoteCalculationInput {
 export interface PricingCalculationResult {
   directCostsTotal: number
   totalIndirectCosts: number
+  adminOverheadRate: number
+  adminOverheadAmount: number
   totalTaxesPercent: number
   totalTaxesAmount: number
+  pisAmount: number
+  cofinsAmount: number
+  issAmount: number
+  csllAmount: number
+  irpjAmount: number
+  irDiffAmount: number
   marginAmount: number
   commissionAmount: number
   discountAmount: number
   subtotalBeforeTaxes: number
   finalClientPrice: number
+  totalIndirectMarkupSum: number
 }
 
 export function calculateDirectCosts(
@@ -131,16 +140,37 @@ export function calculateQuotePricing(input: QuoteCalculationInput): PricingCalc
   const taxAmount = finalPrice * (taxPct / 100)
   const commissionAmount = finalPrice * (commissionPct / 100)
   const marginAmount = finalPrice * (marginPct / 100)
+  const adminAmount = indirectTotal // Custos de administração / indiretos sobre custo direto
+  const adminRate = input.indirectCosts?.adminOverheadRate || 0
+
+  const pisAmount = input.taxes?.pis ? (finalPrice * input.taxes.pis) / 100 : 0
+  const cofinsAmount = input.taxes?.cofins ? (finalPrice * input.taxes.cofins) / 100 : 0
+  const issAmount = input.taxes?.iss ? (finalPrice * input.taxes.iss) / 100 : 0
+  const csllAmount = input.taxes?.csll ? (finalPrice * input.taxes.csll) / 100 : 0
+  const irpjAmount = input.taxes?.irpj ? (finalPrice * input.taxes.irpj) / 100 : 0
+  const irDiffAmount = input.taxes?.irDiff ? (finalPrice * input.taxes.irDiff) / 100 : 0
+
+  // Total de custos indiretos/adicionais aplicados sobre o custo direto
+  const totalIndirectMarkupSum = marginAmount + commissionAmount + taxAmount + adminAmount
 
   return {
     directCostsTotal: Math.round(directTotal * 100) / 100,
     totalIndirectCosts: Math.round(indirectTotal * 100) / 100,
+    adminOverheadRate: adminRate,
+    adminOverheadAmount: Math.round(adminAmount * 100) / 100,
     totalTaxesPercent: Math.round(taxPct * 100) / 100,
     totalTaxesAmount: Math.round(taxAmount * 100) / 100,
+    pisAmount: Math.round(pisAmount * 100) / 100,
+    cofinsAmount: Math.round(cofinsAmount * 100) / 100,
+    issAmount: Math.round(issAmount * 100) / 100,
+    csllAmount: Math.round(csllAmount * 100) / 100,
+    irpjAmount: Math.round(irpjAmount * 100) / 100,
+    irDiffAmount: Math.round(irDiffAmount * 100) / 100,
     marginAmount: Math.round(marginAmount * 100) / 100,
     commissionAmount: Math.round(commissionAmount * 100) / 100,
     discountAmount: discount,
     subtotalBeforeTaxes: Math.round((finalPrice - taxAmount) * 100) / 100,
     finalClientPrice: Math.round(finalPrice * 100) / 100,
+    totalIndirectMarkupSum: Math.round(totalIndirectMarkupSum * 100) / 100,
   }
 }

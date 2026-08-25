@@ -23,7 +23,7 @@ import {
   User,
   Info,
 } from 'lucide-react'
-import { PROPOSAL_INCLUSIONS_TEXT } from '@/data/bermo-catalog'
+import { PROPOSAL_INCLUSIONS_TEXT, getStandardServiceMethodology } from '@/data/bermo-catalog'
 
 interface QuotePdfPreviewDialogProps {
   quote: QuoteRecord | null
@@ -46,7 +46,8 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
   const laborDetails = quote.service_details?.labor_costs
   const travelDetails = quote.service_details?.travel_costs
   const lodgingDetails = quote.service_details?.lodging_meals_costs
-  const validityDays = quote.service_details?.payment_and_validity?.validityDays || 10
+  const validityDays =
+    quote.validity_days || quote.service_details?.payment_and_validity?.validityDays || 10
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -282,26 +283,50 @@ export function QuotePdfPreviewDialog({ quote, open, onOpenChange }: QuotePdfPre
             <div className="flex items-center justify-between border-b border-slate-200 pb-1">
               <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
                 <ShieldCheck className="h-3.5 w-3.5 text-teal-700" />
-                2. Metodologia de Execução Técnica & Segurança
+                2. Metodologia de Execução Técnica em 6 Etapas & Segurança
               </h3>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] text-slate-700">
-              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                <span className="font-bold text-slate-900 block">
-                  Desmontagem, Limpeza e Verificação
-                </span>
-                <p>
-                  Abertura do conjunto com medição precisa do feixe (Medida A). Limpeza
-                  química/mecânica não agressiva das placas e desincrustação.
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-[10.5px] text-slate-700">
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
+                <span className="font-bold text-slate-900 block">1. Desmontagem</span>
+                <p className="text-[10px] leading-tight text-slate-600">
+                  Abertura do feixe de placas com registro prévio da Medida A (distância entre as
+                  placas de aperto) para referência de remontagem.
                 </p>
               </div>
-              <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                <span className="font-bold text-slate-900 block">
-                  Inspeção NDT & Teste Hidrostático
-                </span>
-                <p>
-                  Inspeção visual/líquido penetrante para trincas e microporosidades. Remontagem com
-                  torque cruzado uniforme e teste de estanqueidade.
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
+                <span className="font-bold text-slate-900 block">2. Limpeza</span>
+                <p className="text-[10px] leading-tight text-slate-600">
+                  Remoção de incrustações e resíduos de processo através de limpeza mecânica manual
+                  e/ou química, preservando a integridade do material das placas.
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
+                <span className="font-bold text-slate-900 block">3. Inspeção de Placas</span>
+                <p className="text-[10px] leading-tight text-slate-600">
+                  Análise visual individualizada para detecção de furos, deformações, pontos de
+                  corrosão ou desgaste prematuro.
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
+                <span className="font-bold text-slate-900 block">4. Inspeção de Gaxetas</span>
+                <p className="text-[10px] leading-tight text-slate-600">
+                  Verificação da elasticidade, presença de trincas, ressecamento ou perda de perfil
+                  de vedação.
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
+                <span className="font-bold text-slate-900 block">5. Montagem</span>
+                <p className="text-[10px] leading-tight text-slate-600">
+                  Fechamento do equipamento com aplicação de torque gradual e uniforme, respeitando
+                  a Medida A final especificada.
+                </p>
+              </div>
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
+                <span className="font-bold text-slate-900 block">6. Teste de Estanqueidade</span>
+                <p className="text-[10px] leading-tight text-slate-600">
+                  Verificação pós-montagem e ensaio hidrostático para garantia de ausência de
+                  vazamentos externos sob pressão de operação.
                 </p>
               </div>
             </div>
