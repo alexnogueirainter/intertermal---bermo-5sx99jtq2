@@ -982,7 +982,7 @@ export function QuotesManager({
       // Custos Diretos
       lodging_meals_cost: lodgingMealsTotal,
       travel_cost: travelTotal,
-      materials_cost: totalMaterials,
+      materials_cost: materialsCost,
       third_party_cost: thirdPartyCost,
       other_costs: otherCosts,
       discount_amount: discountAmount,
