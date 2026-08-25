@@ -82,6 +82,7 @@ interface QuotesManagerProps {
   onSelectQuote: (quote: QuoteRecord | null) => void
   onCreateQuote: (data: Partial<QuoteRecord>) => void
   onUpdateQuoteStatus: (id: string, status: QuoteStatus) => void
+  onCreateClient?: (data: Partial<ClientRecord>) => Promise<ClientRecord | void> | void
   onOpenCatalog?: () => void
 }
 
@@ -163,27 +164,42 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
   onSelectQuote,
   onCreateQuote,
   onUpdateQuoteStatus,
+  onCreateClient,
   onOpenCatalog,
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'client' | 'internal'>('client') // Proposta cliente vs Preview interno
 
+  // Estado para Modal de Criação Rápida de Cliente no Orçamento
+  const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false)
+  const [newClientName, setNewClientName] = useState('')
+  const [newClientDocument, setNewClientDocument] = useState('')
+  const [newClientPhone, setNewClientPhone] = useState('')
+  const [newClientEmail, setNewClientEmail] = useState('')
+  const [newClientAddress, setNewClientAddress] = useState('')
+  const [newClientCity, setNewClientCity] = useState('')
+  const [newClientState, setNewClientState] = useState('')
+  const [isCreatingClientLoading, setIsCreatingClientLoading] = useState(false)
+
   // Form State - 3a. Equipamento & Especificações Técnicas BERMO
   const [quoteNumber, setQuoteNumber] = useState(`INT-2025-00${quotes.length + 1}`)
   const [clientId, setClientId] = useState('')
   const [selectedBermoCode, setSelectedBermoCode] = useState<string>('BERMO-BP6-SAN')
+  const [platesCount, setPlatesCount] = useState<number | string>(40)
+  const [plateDimensions, setPlateDimensions] = useState('704 x 400 mm (Sanitária)')
+  const [gasketsCount, setGasketsCount] = useState<number | string>(40)
   const [serviceScope, setServiceScope] = useState(
     'Manutenção preventiva especializada e revisão de estanqueidade',
   )
-  const [fluidType, setFluidType] = useState<any>('vapor')
-  const [fluidName, setFluidName] = useState('Vapor Saturado')
-  const [inletTemp, setInletTemp] = useState<number | string>(120)
-  const [outletTemp, setOutletTemp] = useState<number | string>(60)
-  const [operatingPressure, setOperatingPressure] = useState<number | string>(6.0)
-  const [flowRate, setFlowRate] = useState<number | string>(12)
+  const [fluidType, setFluidType] = useState<any>('agua_quente')
+  const [fluidName, setFluidName] = useState('Água Quente / Solução Sanitária')
+  const [inletTemp, setInletTemp] = useState<number | string>(85)
+  const [outletTemp, setOutletTemp] = useState<number | string>(25)
+  const [operatingPressure, setOperatingPressure] = useState<number | string>(4.5)
+  const [flowRate, setFlowRate] = useState<number | string>(15)
   const [pressureDrop, setPressureDrop] = useState<number | string>(0.3)
-  const [equipmentSize, setEquipmentSize] = useState('DN65 / 40 Placas')
-  const [frameMaterial, setFrameMaterial] = useState('Aço Carbono Pintura Epóxi')
+  const [equipmentSize, setEquipmentSize] = useState('Tri-Clamp DN65 / 40 Placas')
+  const [frameMaterial, setFrameMaterial] = useState('Placas AISI 316L eletropolidas')
   const [gasketType, setGasketType] = useState('EPDM FDA')
 
   // Form State - Itens e Serviços
@@ -284,12 +300,32 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
     setDistanceKm(res.distanceKm)
   }
 
-  // Sincronizar dados ao selecionar produto BERMO
+  // Sincronizar dados ao selecionar produto BERMO (carrega automaticamente especificações técnicas)
   const handleSelectBermoProduct = (code: string) => {
     setSelectedBermoCode(code)
     const prd = BERMO_CATALOG.find((p) => p.code === code)
     if (prd) {
-      if (prd.specs.connection) setEquipmentSize(prd.specs.connection)
+      // 1. Número de placas
+      const autoPlates = prd.specs.platesCount !== undefined ? prd.specs.platesCount : ''
+      setPlatesCount(autoPlates)
+
+      // 2. Dimensão das placas / Dimensões do equipamento
+      const autoPlateDims = prd.specs.plateDimensions || prd.specs.dimensions || ''
+      setPlateDimensions(autoPlateDims)
+
+      // 3. Quantidade de gaxetas
+      const autoGaskets = prd.specs.gasketsCount !== undefined ? prd.specs.gasketsCount : ''
+      setGasketsCount(autoGaskets)
+
+      // Conexão / Tamanho do equipamento
+      const autoEqSize = prd.specs.connection
+        ? `${prd.specs.connection}${autoPlates ? ` / ${autoPlates} Placas` : ''}`
+        : autoPlates
+          ? `${autoPlates} Placas`
+          : equipmentSize
+      setEquipmentSize(autoEqSize)
+
+      // Materiais e tipo de vedação
       if (prd.specs.gaskets) setGasketType(prd.specs.gaskets.split('/')[0].trim())
       if (prd.specs.materials) setFrameMaterial(prd.specs.materials.split('/')[0].trim())
 
@@ -311,10 +347,83 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
           outletTemp,
           operatingPressure,
           flowRate,
-          equipmentSize,
+          equipmentSize: autoEqSize,
+          platesCount: autoPlates,
+          plateDimensions: autoPlateDims,
+          gasketsCount: autoGaskets,
+          frameMaterial: prd.specs.materials
+            ? prd.specs.materials.split('/')[0].trim()
+            : frameMaterial,
+          gasketType: prd.specs.gaskets ? prd.specs.gaskets.split('/')[0].trim() : gasketType,
         },
       }
       setItems(updated)
+    }
+  }
+
+  // Handler para submeter e salvar um novo cliente diretamente do orçamento
+  const handleQuickCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newClientName.trim()) return
+
+    setIsCreatingClientLoading(true)
+    try {
+      const newClientPayload: Partial<ClientRecord> = {
+        name: newClientName.trim(),
+        document: newClientDocument.trim() || undefined,
+        phone: newClientPhone.trim() || undefined,
+        whatsapp: newClientPhone.trim() || undefined,
+        email: newClientEmail.trim() || undefined,
+        address: newClientAddress.trim() || undefined,
+        city: newClientCity.trim() || undefined,
+        state: newClientState.trim() || undefined,
+        status: 'prospect',
+        score: 85,
+        notes: 'Cliente cadastrado diretamente pelo gerador de orçamentos BERMO.',
+        assigned_to: 'Alexandre Nogueira',
+      }
+
+      let createdId = ''
+      if (onCreateClient) {
+        const res = await onCreateClient(newClientPayload)
+        if (res && (res as ClientRecord).id) {
+          createdId = (res as ClientRecord).id
+        }
+      }
+
+      // Se o callback não retornou o id direto mas a lista de clientes foi atualizada
+      if (createdId) {
+        setClientId(createdId)
+      } else {
+        // Fallback: aguardar render ou pegar pelo nome
+        setTimeout(() => {
+          const match = clients.find(
+            (c) => c.name.toLowerCase() === newClientName.trim().toLowerCase(),
+          )
+          if (match) setClientId(match.id)
+        }, 300)
+      }
+
+      // Preencher destino imediatamente caso endereço/cidade informados
+      if (newClientAddress || newClientCity) {
+        setDestinationAddress(
+          `${newClientAddress ? newClientAddress + ', ' : ''}${newClientCity || ''}${newClientState ? ' - ' + newClientState : ''}`,
+        )
+      }
+
+      // Limpar formulário de cliente rápido
+      setNewClientName('')
+      setNewClientDocument('')
+      setNewClientPhone('')
+      setNewClientEmail('')
+      setNewClientAddress('')
+      setNewClientCity('')
+      setNewClientState('')
+      setIsNewClientModalOpen(false)
+    } catch (err) {
+      console.error('Erro ao salvar cliente no orçamento:', err)
+    } finally {
+      setIsCreatingClientLoading(false)
     }
   }
 
@@ -339,6 +448,14 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
     else if (tpl.terms === '28 DDL') setPaymentCondition('28_ddl')
     else if (tpl.terms === '30 DDL') setPaymentCondition('30_ddl')
 
+    const prd = BERMO_CATALOG.find((p) => p.code === tpl.productCode)
+    if (prd) {
+      setPlatesCount(prd.specs.platesCount !== undefined ? prd.specs.platesCount : '')
+      setPlateDimensions(prd.specs.plateDimensions || prd.specs.dimensions || '')
+      setGasketsCount(prd.specs.gasketsCount !== undefined ? prd.specs.gasketsCount : '')
+      if (prd.specs.connection) setEquipmentSize(prd.specs.connection)
+    }
+
     setItems([
       {
         name: tpl.defaultItemName,
@@ -346,6 +463,21 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
         unit_price: 5800,
         discount: 0,
         total: 5800,
+        bermo_specs: {
+          productCode: tpl.productCode,
+          productModel: prd?.model,
+          productBrand: prd?.brand,
+          serviceScope: tpl.serviceScope,
+          fluidType: tpl.fluid as any,
+          inletTemp: tpl.tempIn,
+          outletTemp: tpl.tempOut,
+          operatingPressure: tpl.pressure,
+          flowRate: tpl.flow,
+          equipmentSize: prd?.specs.connection,
+          platesCount: prd?.specs.platesCount,
+          plateDimensions: prd?.specs.plateDimensions || prd?.specs.dimensions,
+          gasketsCount: prd?.specs.gasketsCount,
+        },
       },
     ])
     setNotes(`Orçamento estruturado com base no ${tpl.name}. Validade: 10 dias úteis.`)
@@ -524,7 +656,34 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
       client_id: clientId || undefined,
       client_name: client ? client.name : 'Cliente Industrial',
       status: 'draft',
-      items,
+      items: items.map((it, idx) => {
+        if (idx === 0) {
+          return {
+            ...it,
+            bermo_specs: {
+              ...(it.bermo_specs || {}),
+              productCode: selectedBermoCode,
+              productModel: prd?.model,
+              productBrand: prd?.brand,
+              serviceScope,
+              fluidType,
+              fluidName,
+              inletTemp,
+              outletTemp,
+              operatingPressure,
+              flowRate,
+              pressureDrop,
+              equipmentSize,
+              frameMaterial,
+              gasketType,
+              platesCount,
+              plateDimensions,
+              gasketsCount,
+            },
+          }
+        }
+        return it
+      }),
       subtotal: computation.directCostsTotal,
       discount_total: 0,
       total: computation.finalClientPrice,
@@ -550,6 +709,9 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
           equipmentSize,
           frameMaterial,
           gasketType,
+          platesCount,
+          plateDimensions,
+          gasketsCount,
         },
         labor_costs: laborCostsObj,
         travel_costs: travelCostsObj,
@@ -877,11 +1039,28 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                                   {item.name}
                                 </div>
                                 {item.bermo_specs && (
-                                  <div className="text-[11px] text-muted-foreground bg-slate-50 dark:bg-slate-900/70 p-1.5 rounded border border-slate-100 dark:border-slate-800 space-y-0.5">
+                                  <div className="text-[11px] text-muted-foreground bg-slate-50 dark:bg-slate-900/70 p-2 rounded border border-slate-100 dark:border-slate-800 space-y-1">
                                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px]">
                                       {item.bermo_specs.productCode && (
                                         <span>
                                           Ref: <strong>{item.bermo_specs.productCode}</strong>
+                                        </span>
+                                      )}
+                                      {item.bermo_specs.platesCount && (
+                                        <span className="text-teal-700 dark:text-teal-400">
+                                          Nº Placas: <strong>{item.bermo_specs.platesCount}</strong>
+                                        </span>
+                                      )}
+                                      {item.bermo_specs.plateDimensions && (
+                                        <span className="text-teal-700 dark:text-teal-400">
+                                          Dimensão Placas:{' '}
+                                          <strong>{item.bermo_specs.plateDimensions}</strong>
+                                        </span>
+                                      )}
+                                      {item.bermo_specs.gasketsCount && (
+                                        <span className="text-teal-700 dark:text-teal-400">
+                                          Qtd Gaxetas:{' '}
+                                          <strong>{item.bermo_specs.gasketsCount}</strong>
                                         </span>
                                       )}
                                       {item.bermo_specs.fluidType && (
@@ -911,7 +1090,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                                       </div>
                                     )}
                                   </div>
-                                )}
+                                )}{' '}
                               </td>
                               <td className="p-2.5 text-center">{item.quantity}</td>
                               <td className="p-2.5 text-right">
@@ -1130,17 +1309,35 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs font-medium">Cliente Industrial Destinatário *</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-medium">Cliente Industrial Destinatário *</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsNewClientModalOpen(true)}
+                    className="h-6 text-[11px] px-2 text-teal-700 border-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950 font-medium"
+                  >
+                    <Plus className="h-3 w-3 mr-1 text-teal-600" />
+                    Novo Cliente
+                  </Button>
+                </div>
                 <Select value={clientId} onValueChange={setClientId} required>
                   <SelectTrigger className="text-xs">
                     <SelectValue placeholder="Selecione o cliente..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {clients.map((c) => (
-                      <SelectItem key={c.id} value={c.id} className="text-xs">
-                        {c.name} {c.city ? `(${c.city}/${c.state})` : ''}
-                      </SelectItem>
-                    ))}
+                    {clients.length === 0 ? (
+                      <div className="p-2 text-xs text-muted-foreground text-center">
+                        Nenhum cliente cadastrado
+                      </div>
+                    ) : (
+                      clients.map((c) => (
+                        <SelectItem key={c.id} value={c.id} className="text-xs">
+                          {c.name} {c.city ? `(${c.city}/${c.state || 'BR'})` : ''}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -1214,6 +1411,60 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              {/* ESPECIFICAÇÕES TÉCNICAS AUTO-PREENCHIDAS (Número de Placas, Dimensão das Placas, Quantidade de Gaxetas) */}
+              <div className="p-2.5 rounded-lg bg-teal-100/50 dark:bg-teal-900/30 border border-teal-300 dark:border-teal-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-teal-900 dark:text-teal-200 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-teal-600" />
+                    Especificações do Trocador / Válvula (Auto-preenchidas pelo Catálogo BERMO)
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] bg-white dark:bg-slate-900 text-teal-800 border-teal-300"
+                  >
+                    Sincronizado
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                      Número de Placas
+                    </Label>
+                    <Input
+                      value={platesCount}
+                      onChange={(e) => setPlatesCount(e.target.value)}
+                      placeholder="ex: 40"
+                      className="text-xs h-8 bg-white dark:bg-slate-900 font-semibold text-teal-900 dark:text-teal-100"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                      Dimensão das Placas
+                    </Label>
+                    <Input
+                      value={plateDimensions}
+                      onChange={(e) => setPlateDimensions(e.target.value)}
+                      placeholder="ex: 704 x 400 mm"
+                      className="text-xs h-8 bg-white dark:bg-slate-900"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                      Quantidade de Gaxetas
+                    </Label>
+                    <Input
+                      value={gasketsCount}
+                      onChange={(e) => setGasketsCount(e.target.value)}
+                      placeholder="ex: 40"
+                      className="text-xs h-8 bg-white dark:bg-slate-900 font-semibold text-teal-900 dark:text-teal-100"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1877,6 +2128,125 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               </Button>
               <Button type="submit" size="sm" className="bg-teal-700 hover:bg-teal-600 text-white">
                 Gerar Proposta Intertermal
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Rápido: Cadastrar Novo Cliente Diretamente do Orçamento */}
+      <Dialog open={isNewClientModalOpen} onOpenChange={setIsNewClientModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-teal-700 text-white text-[10px]">Cadastro Rápido</Badge>
+              <span className="text-xs text-muted-foreground">
+                Vínculo Automático com o Orçamento
+              </span>
+            </div>
+            <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 mt-1">
+              Cadastrar Novo Cliente Industrial
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleQuickCreateClient} className="space-y-3 py-2 text-xs">
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">Razão Social / Nome do Cliente *</Label>
+              <Input
+                required
+                placeholder="Ex: Usina São Martinho S.A."
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+                className="text-xs h-8"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">CNPJ / CPF</Label>
+                <Input
+                  placeholder="00.000.000/0001-00"
+                  value={newClientDocument}
+                  onChange={(e) => setNewClientDocument(e.target.value)}
+                  className="text-xs h-8"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Telefone / WhatsApp</Label>
+                <Input
+                  placeholder="(11) 98765-4321"
+                  value={newClientPhone}
+                  onChange={(e) => setNewClientPhone(e.target.value)}
+                  className="text-xs h-8"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">E-mail de Contato / Cotações</Label>
+              <Input
+                type="email"
+                placeholder="compras@saomartinho.com.br"
+                value={newClientEmail}
+                onChange={(e) => setNewClientEmail(e.target.value)}
+                className="text-xs h-8"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">Endereço (Rua, Número, Bairro)</Label>
+              <Input
+                placeholder="Rodovia SP-300, Km 140 - Distrito Industrial"
+                value={newClientAddress}
+                onChange={(e) => setNewClientAddress(e.target.value)}
+                className="text-xs h-8"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="col-span-2 space-y-1">
+                <Label className="text-xs font-semibold">Cidade</Label>
+                <Input
+                  placeholder="Piracicaba"
+                  value={newClientCity}
+                  onChange={(e) => setNewClientCity(e.target.value)}
+                  className="text-xs h-8"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">UF</Label>
+                <Input
+                  placeholder="SP"
+                  maxLength={2}
+                  value={newClientState}
+                  onChange={(e) => setNewClientState(e.target.value.toUpperCase())}
+                  className="text-xs h-8"
+                />
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-lg bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 text-[11px] text-teal-800 dark:text-teal-300">
+              💡 Ao salvar, este cliente será <strong>selecionado automaticamente</strong> no
+              orçamento em edição e seu endereço será preenchido para o cálculo de logística.
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsNewClientModalOpen(false)}
+                className="text-xs h-8"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                disabled={isCreatingClientLoading}
+                size="sm"
+                className="bg-teal-700 hover:bg-teal-600 text-white text-xs h-8"
+              >
+                {isCreatingClientLoading ? 'Salvando...' : 'Salvar & Selecionar Cliente'}
               </Button>
             </DialogFooter>
           </form>

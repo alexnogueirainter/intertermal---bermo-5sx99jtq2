@@ -100,6 +100,9 @@ export interface ServiceTechnicalSpecs {
   equipmentSize?: string // Tamanho ou número de placas/DN
   frameMaterial?: string // ex: Aço Carbono, Inox 304, Inox 316
   gasketType?: string // ex: NBR, EPDM, Viton, PTFE
+  platesCount?: number | string // Número das placas
+  plateDimensions?: string // Dimensão das placas
+  gasketsCount?: number | string // Quantidade de gaxetas
 }
 
 // 3b. Mão de obra — 3 funções

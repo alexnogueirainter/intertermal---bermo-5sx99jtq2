@@ -137,11 +137,12 @@ export default function IndexPage() {
   }
 
   // Clientes Handlers
-  const handleCreateClient = async (data: Partial<ClientRecord>) => {
+  const handleCreateClient = async (data: Partial<ClientRecord>): Promise<ClientRecord | void> => {
     try {
       const created = await clientsService.create(data)
       setClients([created, ...clients])
       toast({ title: 'Cliente cadastrado com sucesso!' })
+      return created
     } catch (err: any) {
       toast({ title: 'Erro ao cadastrar', description: err.message, variant: 'destructive' })
     }
@@ -550,6 +551,7 @@ export default function IndexPage() {
               onSelectQuote={setSelectedQuote}
               onCreateQuote={handleCreateQuote}
               onUpdateQuoteStatus={handleUpdateQuoteStatus}
+              onCreateClient={handleCreateClient}
               onOpenCatalog={() => setActiveTab('catalog')}
             />
           )}

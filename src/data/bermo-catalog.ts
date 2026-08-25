@@ -9,6 +9,9 @@ export interface BermoTechnicalSpecs {
   heatExchangeArea?: string // ex: Até 13 m²
   applications?: string // ex: Aquecimento e refrigeração geral, vapor, alimentos
   typeOrFeatures?: string // ex: Triexcêntrica, Passagem Plena, Trunnion
+  platesCount?: number | string // ex: 40 ou "40 placas"
+  plateDimensions?: string // ex: "704 x 400 mm"
+  gasketsCount?: number | string // ex: 40 ou "40 gaxetas"
 }
 
 export interface BermoProductItem {
@@ -97,6 +100,9 @@ export const BERMO_CATALOG: BermoProductItem[] = [
     basePrice: 14500,
     specs: {
       dimensions: 'Altura 704 mm, Largura 400 mm',
+      plateDimensions: '704 x 400 mm (0.13 m²/placa)',
+      platesCount: 40,
+      gasketsCount: 40,
       connection: 'DN65 (2.1/2")',
       maxTemperature: '180 °C',
       maxPressure: '10 barg',
@@ -120,6 +126,9 @@ export const BERMO_CATALOG: BermoProductItem[] = [
     basePrice: 28900,
     specs: {
       dimensions: 'Altura 1.150 mm, Largura 480 mm',
+      plateDimensions: '1.150 x 480 mm (0.35 m²/placa)',
+      platesCount: 65,
+      gasketsCount: 65,
       connection: 'DN100 (4")',
       maxTemperature: '180 °C',
       maxPressure: '16 barg',
@@ -143,6 +152,9 @@ export const BERMO_CATALOG: BermoProductItem[] = [
     basePrice: 52000,
     specs: {
       dimensions: 'Altura 1.680 mm, Largura 620 mm',
+      plateDimensions: '1.680 x 620 mm (0.62 m²/placa)',
+      platesCount: 110,
+      gasketsCount: 110,
       connection: 'DN150 (6")',
       maxTemperature: '190 °C',
       maxPressure: '16 barg',
@@ -166,6 +178,9 @@ export const BERMO_CATALOG: BermoProductItem[] = [
     basePrice: 19800,
     specs: {
       dimensions: 'Altura 720 mm, Largura 400 mm (Estrutura Inox Sanitária)',
+      plateDimensions: '704 x 400 mm (Sanitária)',
+      platesCount: 40,
+      gasketsCount: 40,
       connection: 'Tri-Clamp DN65 / SMS / RJT',
       maxTemperature: '160 °C',
       maxPressure: '10 barg',
@@ -189,6 +204,9 @@ export const BERMO_CATALOG: BermoProductItem[] = [
     basePrice: 36500,
     specs: {
       dimensions: 'Altura 1.200 mm, Largura 490 mm',
+      plateDimensions: '1.150 x 480 mm (Sanitária)',
+      platesCount: 70,
+      gasketsCount: 70,
       connection: 'Tri-Clamp DN100 / DIN 11851',
       maxTemperature: '160 °C',
       maxPressure: '16 barg',

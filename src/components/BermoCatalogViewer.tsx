@@ -315,6 +315,34 @@ export const BermoCatalogViewer: React.FC<BermoCatalogViewerProps> = ({
                         </span>
                       </div>
                     )}
+                    {selectedProduct.specs.platesCount && (
+                      <div className="p-2.5 flex justify-between bg-slate-50/50 dark:bg-slate-900/50">
+                        <span className="text-muted-foreground font-medium">Número de Placas:</span>
+                        <span className="font-semibold text-teal-700 dark:text-teal-300">
+                          {selectedProduct.specs.platesCount} placas
+                        </span>
+                      </div>
+                    )}
+                    {selectedProduct.specs.plateDimensions && (
+                      <div className="p-2.5 flex justify-between bg-white dark:bg-slate-950">
+                        <span className="text-muted-foreground font-medium">
+                          Dimensões das Placas:
+                        </span>
+                        <span className="font-semibold text-slate-900 dark:text-slate-100">
+                          {selectedProduct.specs.plateDimensions}
+                        </span>
+                      </div>
+                    )}
+                    {selectedProduct.specs.gasketsCount && (
+                      <div className="p-2.5 flex justify-between bg-slate-50/50 dark:bg-slate-900/50">
+                        <span className="text-muted-foreground font-medium">
+                          Quantidade de Gaxetas:
+                        </span>
+                        <span className="font-semibold text-teal-700 dark:text-teal-300">
+                          {selectedProduct.specs.gasketsCount} unidades
+                        </span>
+                      </div>
+                    )}{' '}
                     {selectedProduct.specs.connection && (
                       <div className="p-2.5 flex justify-between bg-slate-50/50 dark:bg-slate-900/50">
                         <span className="text-muted-foreground font-medium">
