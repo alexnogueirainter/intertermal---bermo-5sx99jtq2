@@ -83,10 +83,18 @@ export function calculateQuotePricing(input: QuoteCalculationInput): QuoteCalcul
     customTaxes = {},
   } = input
 
-  // 1. Custos Diretos de Itens/Produtos (apenas os marcados como incluídos no custo ou sem marcação de produto)
+  // 1. Custos Diretos de Itens/Produtos de equipamentos (apenas se marcado para incluir custo de produto novo)
   const itemsDirectCost = items.reduce((sum, it) => {
-    // Se o item tem especificação de equipamento, o total do item já representa o custo do serviço (e produto se marcado)
-    return sum + (it.total || 0)
+    if (it.include_product_cost) {
+      const prodPrice = it.bermo_specs?.productBasePrice || 0
+      const qty = it.quantity || 1
+      return sum + prodPrice * qty
+    }
+    // Para itens genéricos sem bermo_specs que possam ter valor unitário direto
+    if (!it.bermo_specs && it.unit_price) {
+      return sum + (it.total || 0)
+    }
+    return sum
   }, 0)
 
   // 2. Custos de Logística e Deslocamento

@@ -239,6 +239,61 @@ export async function deleteQuote(id: string): Promise<boolean> {
   }
 }
 
+export interface EquipmentSpecsSearchResult {
+  found: boolean
+  brand: string
+  model: string
+  name?: string
+  description?: string
+  specs?: {
+    connection?: string
+    pressure?: string
+    temperature?: string
+    material?: string
+    gasketMaterial?: string
+    platesRange?: string
+    plateDimensions?: string
+    gasketsCount?: string
+    maxFlowRate?: string
+    applications?: string
+  } | null
+  source?: string
+  message?: string
+}
+
+export async function searchEquipmentSpecsOnline(
+  model: string,
+): Promise<EquipmentSpecsSearchResult> {
+  const clean = (model || '').trim()
+  if (!clean) {
+    return {
+      found: false,
+      brand: 'Outro',
+      model: '',
+      specs: null,
+      message: 'Modelo não informado.',
+    }
+  }
+
+  try {
+    const res = await pb.send<EquipmentSpecsSearchResult>('/backend/v1/equipment/search-specs', {
+      method: 'POST',
+      body: { model: clean },
+      requestKey: null,
+    })
+    return res
+  } catch (error) {
+    console.warn('Erro ao consultar backend para specs do equipamento:', error)
+    return {
+      found: false,
+      brand: 'Outro',
+      model: clean,
+      specs: null,
+      message: 'Busca online indisponível no momento. Preencha manualmente os campos técnicos.',
+    }
+  }
+}
+
 export const quotesService = {
   getAll: getQuotes,
   getById: async (id: string): Promise<QuoteRecord> => {
@@ -247,4 +302,5 @@ export const quotesService = {
   create: createQuote,
   update: updateQuote,
   delete: deleteQuote,
+  searchSpecsOnline: searchEquipmentSpecsOnline,
 }
