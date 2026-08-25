@@ -2833,8 +2833,8 @@ export function QuotesManager({
                       </span>
                     </div>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </div>
 
             {/* SEÇÃO 4: MATERIAIS DE MANUTENÇÃO (APENAS COMPOSIÇÃO INTERNA) */}
@@ -3014,46 +3014,168 @@ export function QuotesManager({
                       Suporte
                     </Badge>
                   </div>
-                  <div className="grid grid-cols-3 gap-1 text-[10px]">
-                    <div>
-                      <Label className="text-[9px]">Qtde</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={helperCount}
-                        onChange={(e) => setHelperCount(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[9px]">Horas</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={helperHours}
-                        onChange={(e) => setHelperHours(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-[9px]">R$/Hora</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={helperRate}
-                        onChange={(e) => setHelperRate(Number(e.target.value))}
-                        className="text-xs h-7"
-                      />
-                    </div>
+            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+                  </span>
+                </div>
+
+                {/* Toggle Ida e Volta com Ícone e Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <ArrowLeftRight className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <Label
+                      htmlFor="toggle-round-trip"
+                      className="text-xs font-semibold cursor-pointer select-none"
+                    >
+                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                    </Label>
+                    <Switch
+                      id="toggle-round-trip"
+                      checked={isRoundTrip}
+                      onCheckedChange={handleToggleRoundTrip}
+                    />
                   </div>
-                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
-                    Total:{' '}
-                    {laborHelperTotal.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
+
+                  <span className="text-xs font-bold text-emerald-600 font-mono">
+                    Subtotal:{' '}
+                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Origem (CEP e Endereço da Base)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={originCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setOriginCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(destinationCep, val)
+                        }
+                      }}
+                      placeholder="89066-000"
+                      className="text-xs h-8 w-32 font-mono font-bold"
+                    />
+                    <Input
+                      value={originAddress}
+                      onChange={(e) => setOriginAddress(e.target.value)}
+                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                      className="text-xs h-8 flex-1"
+                    />
                   </div>
                 </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Destino da Fábrica / Cliente (CEP e Cidade)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={destinationCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setDestinationCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(val, originCep)
+                        }
+                      }}
+                      placeholder="ex: 89801-000"
+                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                    />
+                    <Input
+                      value={destinationAddress}
+                      onChange={(e) => setDestinationAddress(e.target.value)}
+                      placeholder="Cidade/UF do Cliente"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parâmetros do Mapeia / Deslocamento */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] px-1 py-0 ${
+                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
+                      }`}
+                    >
+                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
+                    </Badge>
+                  </div>
+                  <Input
+                    type="number"
+                    value={distanceKm}
+                    onChange={(e) => setDistanceKm(Number(e.target.value))}
+                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    {isRoundTrip
+                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
+                      : `(Percurso unidirecional: ${distanceKm} km)`}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Consumo Veículo (km/L)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={consumptionKmL}
+                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L ({isRoundTrip ? 'ida+volta' : 'só ida'})
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Preço Litro Combustível (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={fuelPrice}
+                    onChange={(e) => setFuelPrice(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Combustível:{' '}
+                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
+                  <Input
+                    type="number"
+                    value={tollRoadPercent}
+                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Pedágios ({estimatedTolls} praças):{' '}
+                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
 
               <div className="flex justify-end pt-1">
                 <Button
@@ -3065,6 +3187,1463 @@ export function QuotesManager({
                   className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
                 >
                   {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+=======
+              {/* Ajustes Manuais de Combustível e Pedágio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Combustível (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualFuelAdj}
+                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Pedágio (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualTollAdj}
+                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * Campos calculados automaticamente via CEP permanecem 100% editáveis.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Calculando Rota...
+                    </>
+                  ) : (
+                    'Recalcular Rota Mapeia'
+                  )}
+                </Button>
+              </div>
+            </div>=======
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Hotel className="h-4 w-4 text-purple-600" />
+=======
+                {/* 3. Inspetor */}
+                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                      3. Inspetor / NDT
+                    </span>
+                    <Badge variant="secondary" className="text-[9px]">
+                      Qualidade
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-[10px]">
+                    <div>
+                      <Label className="text-[9px]">Qtde</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={inspectorCount}
+                        onChange={(e) => setInspectorCount(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">Horas</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={inspectorHours}
+                        onChange={(e) => setInspectorHours(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">R$/Hora</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={inspectorRate}
+                        onChange={(e) => setInspectorRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                    Total:{' '}
+                    {laborInspectorTotal.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+                  </span>
+                </div>
+
+                {/* Toggle Ida e Volta com Ícone e Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <ArrowLeftRight
+                      className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
+                    />
+                    <Label
+                      htmlFor="toggle-round-trip"
+                      className="text-xs font-semibold cursor-pointer select-none"
+                    >
+                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                    </Label>
+                    <Switch
+                      id="toggle-round-trip"
+                      checked={isRoundTrip}
+                      onCheckedChange={handleToggleRoundTrip}
+                    />
+                  </div>
+
+                  <span className="text-xs font-bold text-emerald-600 font-mono">
+                    Subtotal:{' '}
+                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Origem (CEP e Endereço da Base)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={originCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setOriginCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(destinationCep, val)
+                        }
+                      }}
+                      placeholder="89066-000"
+                      className="text-xs h-8 w-32 font-mono font-bold"
+                    />
+                    <Input
+                      value={originAddress}
+                      onChange={(e) => setOriginAddress(e.target.value)}
+                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Destino da Fábrica / Cliente (CEP e Cidade)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={destinationCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setDestinationCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(val, originCep)
+                        }
+                      }}
+                      placeholder="ex: 89801-000"
+                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                    />
+                    <Input
+                      value={destinationAddress}
+                      onChange={(e) => setDestinationAddress(e.target.value)}
+                      placeholder="Cidade/UF do Cliente"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parâmetros do Mapeia / Deslocamento */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] px-1 py-0 ${
+                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
+                      }`}
+                    >
+                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
+                    </Badge>
+                  </div>
+                  <Input
+                    type="number"
+                    value={distanceKm}
+                    onChange={(e) => setDistanceKm(Number(e.target.value))}
+                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    {isRoundTrip
+                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
+                      : `(Percurso unidirecional: ${distanceKm} km)`}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Consumo Veículo (km/L)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={consumptionKmL}
+                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L (
+                    {isRoundTrip ? 'ida+volta' : 'só ida'})
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Preço Litro Combustível (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={fuelPrice}
+                    onChange={(e) => setFuelPrice(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Combustível:{' '}
+                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
+                  <Input
+                    type="number"
+                    value={tollRoadPercent}
+                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Pedágios ({estimatedTolls} praças):{' '}
+                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Ajustes Manuais de Combustível e Pedágio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Combustível (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualFuelAdj}
+                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Pedágio (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualTollAdj}
+                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine. Campos editáveis.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Calculando Rota...
+                    </>
+                  ) : (
+                    'Recalcular Rota Mapeia'
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Hotel className="h-4 w-4 text-purple-600" />
+=======
+            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+                  </span>
+                </div>
+
+                {/* Toggle Ida e Volta com Ícone e Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <ArrowLeftRight className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <Label
+                      htmlFor="toggle-round-trip"
+                      className="text-xs font-semibold cursor-pointer select-none"
+                    >
+                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                    </Label>
+                    <Switch
+                      id="toggle-round-trip"
+                      checked={isRoundTrip}
+                      onCheckedChange={handleToggleRoundTrip}
+                    />
+                  </div>
+
+                  <span className="text-xs font-bold text-emerald-600 font-mono">
+                    Subtotal:{' '}
+                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Origem (CEP e Endereço da Base)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={originCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setOriginCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(destinationCep, val)
+                        }
+                      }}
+                      placeholder="89066-000"
+                      className="text-xs h-8 w-32 font-mono font-bold"
+                    />
+                    <Input
+                      value={originAddress}
+                      onChange={(e) => setOriginAddress(e.target.value)}
+                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Destino da Fábrica / Cliente (CEP e Cidade)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={destinationCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setDestinationCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(val, originCep)
+                        }
+                      }}
+                      placeholder="ex: 89801-000"
+                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                    />
+                    <Input
+                      value={destinationAddress}
+                      onChange={(e) => setDestinationAddress(e.target.value)}
+                      placeholder="Cidade/UF do Cliente"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parâmetros do Mapeia / Deslocamento */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] px-1 py-0 ${
+                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
+                      }`}
+                    >
+                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
+                    </Badge>
+                  </div>
+                  <Input
+                    type="number"
+                    value={distanceKm}
+                    onChange={(e) => setDistanceKm(Number(e.target.value))}
+                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    {isRoundTrip
+                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
+                      : `(Percurso unidirecional: ${distanceKm} km)`}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Consumo Veículo (km/L)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={consumptionKmL}
+                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L ({isRoundTrip ? 'ida+volta' : 'só ida'})
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Preço Litro Combustível (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={fuelPrice}
+                    onChange={(e) => setFuelPrice(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Combustível:{' '}
+                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
+                  <Input
+                    type="number"
+                    value={tollRoadPercent}
+                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Pedágios ({estimatedTolls} praças):{' '}
+                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+=======
+              {/* Ajustes Manuais de Combustível e Pedágio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Combustível (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualFuelAdj}
+                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Pedágio (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualTollAdj}
+                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * Campos calculados automaticamente via CEP permanecem 100% editáveis.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Calculando Rota...
+                    </>
+                  ) : (
+                    'Recalcular Rota Mapeia'
+                  )}
+                </Button>
+              </div>
+            </div>=======
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Hotel className="h-4 w-4 text-purple-600" />
+=======
+                {/* 3. Inspetor */}
+                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                      3. Inspetor / NDT
+                    </span>
+                    <Badge variant="secondary" className="text-[9px]">
+                      Qualidade
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-[10px]">
+                    <div>
+                      <Label className="text-[9px]">Qtde</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={inspectorCount}
+                        onChange={(e) => setInspectorCount(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">Horas</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={inspectorHours}
+                        onChange={(e) => setInspectorHours(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">R$/Hora</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={inspectorRate}
+                        onChange={(e) => setInspectorRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                    Total:{' '}
+                    {laborInspectorTotal.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+                  </span>
+                </div>
+
+                {/* Toggle Ida e Volta com Ícone e Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <ArrowLeftRight
+                      className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
+                    />
+                    <Label
+                      htmlFor="toggle-round-trip"
+                      className="text-xs font-semibold cursor-pointer select-none"
+                    >
+                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                    </Label>
+                    <Switch
+                      id="toggle-round-trip"
+                      checked={isRoundTrip}
+                      onCheckedChange={handleToggleRoundTrip}
+                    />
+                  </div>
+
+                  <span className="text-xs font-bold text-emerald-600 font-mono">
+                    Subtotal:{' '}
+                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Origem (CEP e Endereço da Base)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={originCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setOriginCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(destinationCep, val)
+                        }
+                      }}
+                      placeholder="89066-000"
+                      className="text-xs h-8 w-32 font-mono font-bold"
+                    />
+                    <Input
+                      value={originAddress}
+                      onChange={(e) => setOriginAddress(e.target.value)}
+                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Destino da Fábrica / Cliente (CEP e Cidade)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={destinationCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setDestinationCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(val, originCep)
+                        }
+                      }}
+                      placeholder="ex: 89801-000"
+                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                    />
+                    <Input
+                      value={destinationAddress}
+                      onChange={(e) => setDestinationAddress(e.target.value)}
+                      placeholder="Cidade/UF do Cliente"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parâmetros do Mapeia / Deslocamento */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] px-1 py-0 ${
+                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
+                      }`}
+                    >
+                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
+                    </Badge>
+                  </div>
+                  <Input
+                    type="number"
+                    value={distanceKm}
+                    onChange={(e) => setDistanceKm(Number(e.target.value))}
+                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    {isRoundTrip
+                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
+                      : `(Percurso unidirecional: ${distanceKm} km)`}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Consumo Veículo (km/L)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={consumptionKmL}
+                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L (
+                    {isRoundTrip ? 'ida+volta' : 'só ida'})
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Preço Litro Combustível (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={fuelPrice}
+                    onChange={(e) => setFuelPrice(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Combustível:{' '}
+                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
+                  <Input
+                    type="number"
+                    value={tollRoadPercent}
+                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Pedágios ({estimatedTolls} praças):{' '}
+                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Ajustes Manuais de Combustível e Pedágio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Combustível (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualFuelAdj}
+                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Pedágio (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualTollAdj}
+                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine. Campos editáveis.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Calculando Rota...
+                    </>
+                  ) : (
+                    'Recalcular Rota Mapeia'
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3d: HOSPEDAGEM & ALIMENTAÇÃO */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Hotel className="h-4 w-4 text-purple-600" />=======
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+=======
+=======
+            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+                  </span>
+                </div>
+
+                {/* Toggle Ida e Volta com Ícone e Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <ArrowLeftRight className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <Label
+                      htmlFor="toggle-round-trip"
+                      className="text-xs font-semibold cursor-pointer select-none"
+                    >
+                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                    </Label>
+                    <Switch
+                      id="toggle-round-trip"
+                      checked={isRoundTrip}
+                      onCheckedChange={handleToggleRoundTrip}
+                    />
+                  </div>
+
+                  <span className="text-xs font-bold text-emerald-600 font-mono">
+                    Subtotal:{' '}
+                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Origem (CEP e Endereço da Base)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={originCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setOriginCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(destinationCep, val)
+                        }
+                      }}
+                      placeholder="89066-000"
+                      className="text-xs h-8 w-32 font-mono font-bold"
+                    />
+                    <Input
+                      value={originAddress}
+                      onChange={(e) => setOriginAddress(e.target.value)}
+                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Destino da Fábrica / Cliente (CEP e Cidade)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={destinationCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setDestinationCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(val, originCep)
+                        }
+                      }}
+                      placeholder="ex: 89801-000"
+                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                    />
+                    <Input
+                      value={destinationAddress}
+                      onChange={(e) => setDestinationAddress(e.target.value)}
+                      placeholder="Cidade/UF do Cliente"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parâmetros do Mapeia / Deslocamento */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] px-1 py-0 ${
+                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
+                      }`}
+                    >
+                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
+                    </Badge>
+                  </div>
+                  <Input
+                    type="number"
+                    value={distanceKm}
+                    onChange={(e) => setDistanceKm(Number(e.target.value))}
+                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    {isRoundTrip
+                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
+                      : `(Percurso unidirecional: ${distanceKm} km)`}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Consumo Veículo (km/L)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={consumptionKmL}
+                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L ({isRoundTrip ? 'ida+volta' : 'só ida'})
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Preço Litro Combustível (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={fuelPrice}
+                    onChange={(e) => setFuelPrice(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Combustível:{' '}
+                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
+                  <Input
+                    type="number"
+                    value={tollRoadPercent}
+                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Pedágios ({estimatedTolls} praças):{' '}
+                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+=======
+              {/* Ajustes Manuais de Combustível e Pedágio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Combustível (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualFuelAdj}
+                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Pedágio (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualTollAdj}
+                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * Campos calculados automaticamente via CEP permanecem 100% editáveis.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Calculando Rota...
+                    </>
+                  ) : (
+                    'Recalcular Rota Mapeia'
+                  )}
+                </Button>
+              </div>
+            </div>=======
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
+                </Button>
+              </div>
+            </div>
+=======
+                {/* 3. Inspetor */}
+                <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
+                      3. Inspetor / NDT
+                    </span>
+                    <Badge variant="secondary" className="text-[9px]">
+                      Qualidade
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-[10px]">
+                    <div>
+                      <Label className="text-[9px]">Qtde</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={inspectorCount}
+                        onChange={(e) => setInspectorCount(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">Horas</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={inspectorHours}
+                        onChange={(e) => setInspectorHours(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">R$/Hora</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={inspectorRate}
+                        onChange={(e) => setInspectorRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                    Total:{' '}
+                    {laborInspectorTotal.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-emerald-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+                  </span>
+                </div>
+
+                {/* Toggle Ida e Volta com Ícone e Badge */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <ArrowLeftRight
+                      className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
+                    />
+                    <Label
+                      htmlFor="toggle-round-trip"
+                      className="text-xs font-semibold cursor-pointer select-none"
+                    >
+                      {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                    </Label>
+                    <Switch
+                      id="toggle-round-trip"
+                      checked={isRoundTrip}
+                      onCheckedChange={handleToggleRoundTrip}
+                    />
+                  </div>
+
+                  <span className="text-xs font-bold text-emerald-600 font-mono">
+                    Subtotal:{' '}
+                    {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Origem (CEP e Endereço da Base)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={originCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setOriginCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(destinationCep, val)
+                        }
+                      }}
+                      placeholder="89066-000"
+                      className="text-xs h-8 w-32 font-mono font-bold"
+                    />
+                    <Input
+                      value={originAddress}
+                      onChange={(e) => setOriginAddress(e.target.value)}
+                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Destino da Fábrica / Cliente (CEP e Cidade)
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={destinationCep}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setDestinationCep(val)
+                        const clean = val.replace(/\D/g, '')
+                        if (clean.length === 8) {
+                          handleRecalculateRoute(val, originCep)
+                        }
+                      }}
+                      placeholder="ex: 89801-000"
+                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                    />
+                    <Input
+                      value={destinationAddress}
+                      onChange={(e) => setDestinationAddress(e.target.value)}
+                      placeholder="Cidade/UF do Cliente"
+                      className="text-xs h-8 flex-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Parâmetros do Mapeia / Deslocamento */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className={`text-[9px] px-1 py-0 ${
+                        isRoundTrip ? 'text-emerald-700 bg-emerald-50' : 'text-slate-600 bg-slate-50'
+                      }`}
+                    >
+                      {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
+                    </Badge>
+                  </div>
+                  <Input
+                    type="number"
+                    value={distanceKm}
+                    onChange={(e) => setDistanceKm(Number(e.target.value))}
+                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    {isRoundTrip
+                      ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
+                      : `(Percurso unidirecional: ${distanceKm} km)`}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Consumo Veículo (km/L)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={consumptionKmL}
+                    onChange={(e) => setConsumptionKmL(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L (
+                    {isRoundTrip ? 'ida+volta' : 'só ida'})
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Preço Litro Combustível (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={fuelPrice}
+                    onChange={(e) => setFuelPrice(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Combustível:{' '}
+                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
+                  <Input
+                    type="number"
+                    value={tollRoadPercent}
+                    onChange={(e) => setTollRoadPercent(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Pedágios ({estimatedTolls} praças):{' '}
+                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Ajustes Manuais de Combustível e Pedágio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Combustível (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualFuelAdj}
+                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Pedágio (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualTollAdj}
+                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[10px] text-muted-foreground">
+                  * CEPs consultam automaticamente ViaCEP e estimam rota Haversine. Campos editáveis.
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? (
+                    <>
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                      Calculando Rota...
+                    </>
+                  ) : (
+                    'Recalcular Rota Mapeia'
+                  )}
                 </Button>
               </div>
             </div>
