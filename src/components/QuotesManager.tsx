@@ -431,9 +431,37 @@ export function QuotesManager({
         }
       }
 
-      // Atualiza também o primeiro item
+      // Atualiza apenas os metadados do item 0 sem sobrescrever o input digitado
       if (items.length > 0) {
-        applySupplierProductToItem(match, 0)
+        const isIncludeProd = items[0].include_product_cost ?? includeProductCost
+        const unitPrice = isIncludeProd ? match.basePrice : 0
+        const qty = items[0].quantity || 1
+        const updated = [...items]
+        updated[0] = {
+          ...updated[0],
+          name: `Manutenção Especializada: ${match.brand} ${match.name}`,
+          unit_price: unitPrice,
+          total: Math.max(0, qty * unitPrice - (updated[0].discount || 0)),
+          include_product_cost: isIncludeProd,
+          bermo_specs: {
+            ...(updated[0].bermo_specs || {}),
+            productCode: match.code,
+            productName: match.name,
+            productModel: match.model,
+            productBrand: match.brand,
+            equipmentSize: match.specs.connection,
+            frameMaterial: match.specs.material,
+            gasketType: match.specs.gasketMaterial,
+            platesCount: match.specs.platesRange?.match(/(\d+)/)?.[1] || platesCount,
+            plateDimensions: match.specs.plateDimensions || plateDimensions,
+            gasketsCount: match.specs.platesRange?.match(/(\d+)/)?.[1] || gasketsCount,
+            operatingPressure: match.specs.pressure?.replace(/\D/g, '') || '16',
+            productBasePrice: match.basePrice,
+            serviceBasePrice: servPrice,
+            includeProductCost: isIncludeProd,
+          },
+        }
+        setItems(updated)
       }
     } else {
       setMatchedSupplierInfo(null)
