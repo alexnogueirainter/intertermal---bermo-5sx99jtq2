@@ -21,6 +21,11 @@ export interface SupplierProductItem {
   specs: SupplierProductSpecs
 }
 
+import { BERMO_CATALOG, BermoProductItem } from './bermo-catalog'
+
+export { BERMO_CATALOG }
+export const SUPPLIERS_DATABASE = BERMO_CATALOG
+
 export const ALFA_LAVAL_SUPPLIERS: SupplierProductItem[] = [
   {
     id: 'alfa-t2-bfg',
@@ -216,9 +221,27 @@ export const ALFA_LAVAL_SUPPLIERS: SupplierProductItem[] = [
 /**
  * Busca por modelo na base de fornecedores (Alfa Laval e outros)
  */
-export function searchSupplierProduct(query: string): SupplierProductItem | undefined {
+export function searchSupplierProduct(
+  query: string,
+): BermoProductItem | SupplierProductItem | undefined {
   if (!query) return undefined
   const clean = query.trim().toLowerCase().replace(/\s+/g, '')
+
+  // Primeiro busca no catálogo unificado BERMO / Alfa Laval
+  const foundBermo = BERMO_CATALOG.find((p) => {
+    const codeClean = p.code.toLowerCase().replace(/\s+/g, '')
+    const modelClean = p.model.toLowerCase().replace(/\s+/g, '')
+    const nameClean = p.name.toLowerCase().replace(/\s+/g, '')
+    return (
+      codeClean === clean ||
+      modelClean === clean ||
+      codeClean.includes(clean) ||
+      clean.includes(codeClean) ||
+      nameClean.includes(clean)
+    )
+  })
+  if (foundBermo) return foundBermo
+
   return ALFA_LAVAL_SUPPLIERS.find((p) => {
     const codeClean = p.code.toLowerCase().replace(/\s+/g, '')
     const modelClean = p.model.toLowerCase().replace(/\s+/g, '')

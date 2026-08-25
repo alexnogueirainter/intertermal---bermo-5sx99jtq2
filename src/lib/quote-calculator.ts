@@ -85,10 +85,7 @@ export function calculateQuotePricing(input: QuoteCalculationInput): QuoteCalcul
 
   // 1. Custos Diretos de Itens/Produtos (apenas os marcados como incluídos no custo ou sem marcação de produto)
   const itemsDirectCost = items.reduce((sum, it) => {
-    // Se o item tem especificação bermo mas include_product_cost é falso, não soma no custo direto de venda
-    if (it.bermo_specs && it.include_product_cost === false) {
-      return sum
-    }
+    // Se o item tem especificação de equipamento, o total do item já representa o custo do serviço (e produto se marcado)
     return sum + (it.total || 0)
   }, 0)
 

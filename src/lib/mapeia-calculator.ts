@@ -7,9 +7,15 @@ export interface RouteCalculationInput {
 }
 
 export interface RouteCalculationResult {
-  distanceKm: number
+  distanceOneWayKm: number
+  roundTripKm: number
+  distanceKm: number // Distância total considerada (ida e volta)
   destinationCity?: string
   destinationState?: string
+  destinationAddress?: string
+  originCity?: string
+  originState?: string
+  originAddress?: string
   fuelCost: number
   tollCost: number
   totalTravelCost: number
@@ -34,7 +40,91 @@ export const CEP_DATABASE: Record<
   '80010-000': { city: 'Curitiba', state: 'PR', lat: -25.429, lng: -49.271 },
 }
 
-function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+// Coordenadas aproximadas por estado/região do Brasil (fallback geográfico caso necessário)
+const STATE_COORDINATES: Record<string, { lat: number; lng: number }> = {
+  SC: { lat: -27.2423, lng: -50.2189 },
+  PR: { lat: -25.2521, lng: -52.0215 },
+  RS: { lat: -30.0346, lng: -51.2177 },
+  SP: { lat: -23.5505, lng: -46.6333 },
+  RJ: { lat: -22.9068, lng: -43.1729 },
+  MG: { lat: -19.9167, lng: -43.9345 },
+  ES: { lat: -20.3155, lng: -40.3128 },
+  MS: { lat: -20.4697, lng: -54.6201 },
+  MT: { lat: -15.6014, lng: -56.0979 },
+  GO: { lat: -16.6869, lng: -49.2648 },
+  DF: { lat: -15.7975, lng: -47.8919 },
+  BA: { lat: -12.9777, lng: -38.5016 },
+  PE: { lat: -8.0476, lng: -34.877 },
+  CE: { lat: -3.7319, lng: -38.5267 },
+}
+
+// Cidades conhecidas para coordenadas mais precisas
+const CITY_COORDINATES: Record<string, { lat: number; lng: number }> = {
+  'blumenau/sc': { lat: -26.868, lng: -49.095 },
+  'joinville/sc': { lat: -26.304, lng: -48.848 },
+  'florianópolis/sc': { lat: -27.596, lng: -48.549 },
+  'florianopolis/sc': { lat: -27.596, lng: -48.549 },
+  'itajaí/sc': { lat: -26.907, lng: -48.661 },
+  'itajai/sc': { lat: -26.907, lng: -48.661 },
+  'jaraguá do sul/sc': { lat: -26.485, lng: -49.083 },
+  'jaragua do sul/sc': { lat: -26.485, lng: -49.083 },
+  'chapeco/sc': { lat: -27.1, lng: -52.615 },
+  'chapecó/sc': { lat: -27.1, lng: -52.615 },
+  'criciúma/sc': { lat: -28.677, lng: -49.37 },
+  'criciuma/sc': { lat: -28.677, lng: -49.37 },
+  'concórdia/sc': { lat: -27.233, lng: -52.023 },
+  'concordia/sc': { lat: -27.233, lng: -52.023 },
+  'brusque/sc': { lat: -27.098, lng: -48.917 },
+  'lages/sc': { lat: -27.816, lng: -50.326 },
+  'tubarão/sc': { lat: -28.473, lng: -49.014 },
+  'tubarao/sc': { lat: -28.473, lng: -49.014 },
+  'rio do sul/sc': { lat: -27.214, lng: -49.643 },
+  'curitiba/pr': { lat: -25.429, lng: -49.271 },
+  'são paulo/sp': { lat: -23.55, lng: -46.633 },
+  'sao paulo/sp': { lat: -23.55, lng: -46.633 },
+  'campinas/sp': { lat: -22.905, lng: -47.06 },
+  'porto alegre/rs': { lat: -30.034, lng: -51.217 },
+  'caxias do sul/rs': { lat: -29.167, lng: -51.179 },
+}
+
+export interface ViaCepResponse {
+  cep: string
+  logradouro?: string
+  complemento?: string
+  bairro?: string
+  localidade: string
+  uf: string
+  ibge?: string
+  gia?: string
+  ddd?: string
+  siafi?: string
+  erro?: boolean
+}
+
+/**
+ * Consulta CEP na API oficial do ViaCEP
+ */
+export async function fetchViaCep(cep: string): Promise<ViaCepResponse | null> {
+  const clean = cep.replace(/\D/g, '')
+  if (clean.length !== 8) return null
+
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${clean}/json/`)
+    if (!res.ok) return null
+    const data = await res.json()
+    if (data.erro) return null
+    return data as ViaCepResponse
+  } catch (err) {
+    console.warn(`[ViaCEP] Falha ao consultar CEP ${clean}:`, err)
+    return null
+  }
+}
+
+/**
+ * Fórmula de Haversine para cálculo de distância em linha reta entre 2 coordenadas geográficas
+ * Multiplicado por 1.25 para simulação de traçado de rodovias brasileiras
+ */
+export function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371 // Raio da Terra em km
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLon = ((lon2 - lon1) * Math.PI) / 180
@@ -45,10 +135,88 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2)
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-  // Multiplica por 1.25 para simular traçado de rodovias reais
+  // Multiplica por 1.25 para estimar a malha viária real
   return Math.round(R * c * 1.25)
 }
 
+function resolveCoordinates(
+  cepClean: string,
+  viaCepData: ViaCepResponse | null,
+  fallbackCity: string,
+  fallbackState: string,
+): { lat: number; lng: number; city: string; state: string; address?: string } {
+  // 1. Procura na tabela de CEPs conhecidos
+  const origKey = Object.keys(CEP_DATABASE).find((k) => k.replace(/\D/g, '') === cepClean)
+  if (origKey && CEP_DATABASE[origKey]) {
+    const item = CEP_DATABASE[origKey]
+    return {
+      lat: item.lat,
+      lng: item.lng,
+      city: item.city,
+      state: item.state,
+      address: `${item.city}/${item.state}`,
+    }
+  }
+
+  // 2. Se temos resposta do ViaCEP
+  if (viaCepData && viaCepData.localidade) {
+    const cityKey = `${viaCepData.localidade.toLowerCase()}/${viaCepData.uf.toLowerCase()}`
+    const cityCleanKey = `${viaCepData.localidade
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')}/${viaCepData.uf.toLowerCase()}`
+
+    let coords = CITY_COORDINATES[cityKey] || CITY_COORDINATES[cityCleanKey]
+    if (!coords) {
+      coords = STATE_COORDINATES[viaCepData.uf.toUpperCase()] || { lat: -27.24, lng: -50.21 }
+    }
+
+    const addrParts = [
+      viaCepData.logradouro,
+      viaCepData.bairro,
+      `${viaCepData.localidade}/${viaCepData.uf}`,
+    ].filter(Boolean)
+
+    return {
+      lat: coords.lat,
+      lng: coords.lng,
+      city: viaCepData.localidade,
+      state: viaCepData.uf,
+      address: addrParts.join(' - '),
+    }
+  }
+
+  // 3. Fallbacks regionais baseados no prefixo do CEP
+  if (cepClean.startsWith('890') || cepClean.startsWith('891')) {
+    return { lat: -26.91, lng: -49.06, city: 'Blumenau / Vale do Itajaí', state: 'SC' }
+  } else if (cepClean.startsWith('892')) {
+    return { lat: -26.3, lng: -48.84, city: 'Joinville / Norte SC', state: 'SC' }
+  } else if (cepClean.startsWith('880') || cepClean.startsWith('881')) {
+    return { lat: -27.59, lng: -48.54, city: 'Grande Florianópolis', state: 'SC' }
+  } else if (cepClean.startsWith('883')) {
+    return { lat: -26.9, lng: -48.66, city: 'Itajaí / Litoral SC', state: 'SC' }
+  } else if (cepClean.startsWith('898')) {
+    return { lat: -27.1, lng: -52.61, city: 'Chapecó / Oeste SC', state: 'SC' }
+  } else if (cepClean.startsWith('80') || cepClean.startsWith('81')) {
+    return { lat: -25.42, lng: -49.27, city: 'Curitiba', state: 'PR' }
+  } else if (cepClean.startsWith('0')) {
+    return { lat: -23.55, lng: -46.63, city: 'São Paulo', state: 'SP' }
+  } else if (cepClean.startsWith('9')) {
+    return { lat: -30.03, lng: -51.21, city: 'Porto Alegre / RS', state: 'RS' }
+  }
+
+  return {
+    lat: -27.1,
+    lng: -52.615,
+    city: fallbackCity || 'Destino',
+    state: fallbackState || 'SC',
+  }
+}
+
+/**
+ * Calcula deslocamento completo (IDA E VOLTA) entre CEP de origem e destino
+ * Utiliza ViaCEP para resolução de endereço e coordenadas e fórmula de Haversine
+ */
 export async function calculateDistanceBetweenCeps(
   originCep: string,
   destinationCep: string,
@@ -59,46 +227,53 @@ export async function calculateDistanceBetweenCeps(
   const cleanOrig = (originCep || '89066-000').replace(/\D/g, '')
   const cleanDest = (destinationCep || '').replace(/\D/g, '')
 
-  let origCoords = { lat: -26.868, lng: -49.095, city: 'Blumenau', state: 'SC' }
-  let destCoords = { lat: -27.1, lng: -52.615, city: 'Chapecó', state: 'SC' }
+  // Consulta ViaCEP em paralelo para origem e destino
+  const [origViaCep, destViaCep] = await Promise.all([
+    cleanOrig.length === 8 ? fetchViaCep(cleanOrig) : Promise.resolve(null),
+    cleanDest.length === 8 ? fetchViaCep(cleanDest) : Promise.resolve(null),
+  ])
 
-  const origKey = Object.keys(CEP_DATABASE).find((k) => k.replace(/\D/g, '') === cleanOrig)
-  if (origKey && CEP_DATABASE[origKey]) {
-    origCoords = CEP_DATABASE[origKey]
-  }
+  const origInfo = resolveCoordinates(cleanOrig, origViaCep, 'Blumenau', 'SC')
+  const destInfo = resolveCoordinates(cleanDest, destViaCep, 'Chapecó', 'SC')
 
-  const destKey = Object.keys(CEP_DATABASE).find((k) => k.replace(/\D/g, '') === cleanDest)
-  if (destKey && CEP_DATABASE[destKey]) {
-    destCoords = CEP_DATABASE[destKey]
-  } else if (cleanDest.startsWith('89')) {
-    destCoords = { lat: -26.5, lng: -49.5, city: 'Região Norte/Vale SC', state: 'SC' }
-  } else if (cleanDest.startsWith('88')) {
-    destCoords = { lat: -27.5, lng: -48.6, city: 'Região Litoral SC', state: 'SC' }
-  } else if (cleanDest.startsWith('80')) {
-    destCoords = { lat: -25.4, lng: -49.2, city: 'Curitiba', state: 'PR' }
-  } else if (cleanDest.startsWith('0')) {
-    destCoords = { lat: -23.5, lng: -46.6, city: 'Grande São Paulo', state: 'SP' }
-  }
-
-  const distanceKm = Math.max(
+  // Distância só de ida (mínimo 15km)
+  const distanceOneWayKm = Math.max(
     15,
-    haversineDistance(origCoords.lat, origCoords.lng, destCoords.lat, destCoords.lng),
+    haversineDistance(origInfo.lat, origInfo.lng, destInfo.lat, destInfo.lng),
   )
-  const roundTripKm = distanceKm * 2
-  const liters = roundTripKm / (consumptionKmL || 9.5)
+
+  // DISTÂNCIA TOTAL (IDA E VOLTA = distância × 2)
+  const roundTripKm = distanceOneWayKm * 2
+
+  // Combustível para IDA E VOLTA
+  const liters = roundTripKm / (consumptionKmL > 0 ? consumptionKmL : 9.5)
   const fuelCost = Math.round(liters * fuelPrice * 100) / 100
 
-  const tollBooths = Math.max(1, Math.round((distanceKm / 80) * (tollRoadPercent / 100)))
-  const tollCost = tollBooths * 14.5
+  // Pedágio para IDA E VOLTA (pedágios de ida × 2)
+  const oneWayTollBooths = Math.max(
+    1,
+    Math.round((distanceOneWayKm / 80) * (tollRoadPercent / 100)),
+  )
+  const roundTripTollBooths = oneWayTollBooths * 2
+  const tollCost = roundTripTollBooths * 14.5
+
+  const originFormatted = origInfo.address || `${origInfo.city}/${origInfo.state}`
+  const destinationFormatted = destInfo.address || `${destInfo.city}/${destInfo.state}`
 
   return {
-    distanceKm,
-    destinationCity: destCoords.city,
-    destinationState: destCoords.state,
+    distanceOneWayKm,
+    roundTripKm,
+    distanceKm: roundTripKm, // O sistema usa o total ida+volta
+    destinationCity: destInfo.city,
+    destinationState: destInfo.state,
+    destinationAddress: destinationFormatted,
+    originCity: origInfo.city,
+    originState: origInfo.state,
+    originAddress: originFormatted,
     fuelCost,
     tollCost,
-    totalTravelCost: fuelCost + tollCost,
-    originFormatted: `${origCoords.city}/${origCoords.state}`,
-    destinationFormatted: `${destCoords.city}/${destCoords.state}`,
+    totalTravelCost: Math.round((fuelCost + tollCost) * 100) / 100,
+    originFormatted,
+    destinationFormatted,
   }
 }

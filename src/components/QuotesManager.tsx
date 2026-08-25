@@ -177,12 +177,13 @@ export function QuotesManager({
   const [customPaymentCondition, setCustomPaymentCondition] = useState('')
   const [notes, setNotes] = useState('')
 
-  // Seção 3A: Produto BERMO / Fornecedor & Especificações Técnicas
+  // Seção 3A: Produto BERMO / Fornecedor & Especificações Técnicas (Global/Padrão)
   const [selectedBermoCode, setSelectedBermoCode] = useState('BP30')
   const [modelSearchInput, setModelSearchInput] = useState('BP30')
   const [supplierSearchQuery, setSupplierSearchQuery] = useState('')
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false)
   const [matchedSupplierInfo, setMatchedSupplierInfo] = useState<BermoProductItem | null>(null)
+  const [activeItemIndexForDropdown, setActiveItemIndexForDropdown] = useState<number | null>(null)
 
   const [fluidType, setFluidType] = useState('vapor')
   const [fluidName, setFluidName] = useState('')
@@ -214,7 +215,7 @@ export function QuotesManager({
   const [productBasePrice, setProductBasePrice] = useState(18500)
   const [serviceBasePrice, setServiceBasePrice] = useState(7400)
 
-  // Itens da Proposta
+  // Itens da Proposta (Múltiplos Equipamentos / Serviços)
   const [items, setItems] = useState<QuoteItem[]>([])
 
   // Seção de Materiais de Manutenção (Custo Interno)
@@ -291,58 +292,78 @@ export function QuotesManager({
     )
   }, [supplierSearchQuery, modelSearchInput])
 
-  // Aplica produto selecionado ou buscado da base de fornecedores
-  const applySupplierProduct = (prod: BermoProductItem) => {
-    setSelectedBermoCode(prod.code)
-    setModelSearchInput(prod.model || prod.code)
-    setMatchedSupplierInfo(prod)
-    setShowSupplierDropdown(false)
-
-    setProductBasePrice(prod.basePrice)
+  // Aplica produto selecionado ou buscado da base de fornecedores para um item específico (ou o item padrão 0)
+  const applySupplierProductToItem = (prod: BermoProductItem, targetIdx: number = 0) => {
     const servPrice = Math.round(prod.basePrice * 0.4)
-    setServiceBasePrice(servPrice)
-
-    if (prod.specs.pressure) setOperatingPressure(prod.specs.pressure.replace(/\D/g, '') || '16')
-    if (prod.specs.connection) setEquipmentSize(prod.specs.connection)
-    if (prod.specs.material) setFrameMaterial(prod.specs.material)
-    if (prod.specs.gasketMaterial) setGasketType(prod.specs.gasketMaterial)
-    if (prod.specs.plateDimensions) setPlateDimensions(prod.specs.plateDimensions)
-
+    let extractedPlates = '40'
     if (prod.specs.platesRange) {
       const match = prod.specs.platesRange.match(/(\d+)/)
-      if (match) {
-        setPlatesCount(match[1])
-        setGasketsCount(match[1])
-      }
+      if (match) extractedPlates = match[1]
     }
 
-    // Atualiza o primeiro item
-    if (items.length > 0) {
+    if (targetIdx === 0) {
+      setSelectedBermoCode(prod.code)
+      setModelSearchInput(prod.model || prod.code)
+      setMatchedSupplierInfo(prod)
+      setShowSupplierDropdown(false)
+      setActiveItemIndexForDropdown(null)
+
+      setProductBasePrice(prod.basePrice)
+      setServiceBasePrice(servPrice)
+
+      if (prod.specs.pressure) setOperatingPressure(prod.specs.pressure.replace(/\D/g, '') || '16')
+      if (prod.specs.connection) setEquipmentSize(prod.specs.connection)
+      if (prod.specs.material) setFrameMaterial(prod.specs.material)
+      if (prod.specs.gasketMaterial) setGasketType(prod.specs.gasketMaterial)
+      if (prod.specs.plateDimensions) setPlateDimensions(prod.specs.plateDimensions)
+      setPlatesCount(extractedPlates)
+      setGasketsCount(extractedPlates)
+    }
+
+    if (items.length > targetIdx) {
       const updated = [...items]
       const brand = prod.brand || 'BERMO'
       const methodName = getStandardServiceMethodology([brand])
-      updated[0] = {
-        ...updated[0],
-        name: `Serviço Especializado de Manutenção: ${prod.name}`,
-        unit_price: servPrice,
-        total: servPrice,
-        description: updated[0].description || methodName,
+      const qty = updated[targetIdx].quantity || 1
+      const isIncludeProd =
+        updated[targetIdx].include_product_cost ?? (targetIdx === 0 ? includeProductCost : false)
+      const unitPrice = isIncludeProd ? servPrice + prod.basePrice : servPrice
+
+      updated[targetIdx] = {
+        ...updated[targetIdx],
+        name: `Manutenção Especializada: ${prod.brand} ${prod.model || prod.code}`,
+        unit_price: unitPrice,
+        total: unitPrice * qty,
+        description: updated[targetIdx].description || methodName,
+        include_product_cost: isIncludeProd,
         bermo_specs: {
-          ...(updated[0].bermo_specs || {}),
+          ...(updated[targetIdx].bermo_specs || {}),
           productCode: prod.code,
           productName: prod.name,
           productModel: prod.model,
           productBrand: prod.brand,
-          equipmentSize: prod.specs.connection,
-          frameMaterial: prod.specs.material,
-          gasketType: prod.specs.gasketMaterial || updated[0].bermo_specs?.gasketType,
-          plateDimensions: prod.specs.plateDimensions || updated[0].bermo_specs?.plateDimensions,
+          equipmentSize: prod.specs.connection || 'DN50 (2 pol)',
+          frameMaterial: prod.specs.material || 'AISI 316L (0.5mm)',
+          gasketType: prod.specs.gasketMaterial || 'EPDM Clip-on / NBR',
+          plateDimensions: prod.specs.plateDimensions || '680 x 280 mm',
+          platesCount: extractedPlates,
+          gasketsCount: extractedPlates,
+          operatingPressure: prod.specs.pressure?.replace(/\D/g, '') || '16',
           productBasePrice: prod.basePrice,
           serviceBasePrice: servPrice,
+          includeProductCost: isIncludeProd,
         },
       }
       setItems(updated)
     }
+  }
+
+  // Atalho para compatibilidade
+  const applySupplierProduct = (prod: BermoProductItem) => {
+    applySupplierProductToItem(
+      prod,
+      activeItemIndexForDropdown !== null ? activeItemIndexForDropdown : 0,
+    )
   }
 
   // Busca manual quando o usuário digita qualquer modelo
@@ -350,6 +371,7 @@ export function QuotesManager({
     setModelSearchInput(typedValue)
     setSupplierSearchQuery(typedValue)
     setShowSupplierDropdown(true)
+    setActiveItemIndexForDropdown(0)
 
     // Tenta encontrar match exato ou aproximado
     const match = searchSupplierProduct(typedValue)
@@ -373,10 +395,81 @@ export function QuotesManager({
           setGasketsCount(pMatch[1])
         }
       }
+
+      // Atualiza também o primeiro item
+      if (items.length > 0) {
+        applySupplierProductToItem(match, 0)
+      }
     } else {
       setMatchedSupplierInfo(null)
       setSelectedBermoCode(typedValue.toUpperCase())
+      if (items.length > 0) {
+        const updated = [...items]
+        updated[0] = {
+          ...updated[0],
+          name: `Manutenção Especializada: ${typedValue.toUpperCase()}`,
+          bermo_specs: {
+            ...(updated[0].bermo_specs || {}),
+            productCode: typedValue.toUpperCase(),
+            productModel: typedValue,
+          },
+        }
+        setItems(updated)
+      }
     }
+  }
+
+  // Atualização das especificações técnicas de um item específico (para múltiplos equipamentos)
+  const handleUpdateItemSpecs = (itemIdx: number, specKey: string, specVal: any) => {
+    const updated = [...items]
+    const currentItem = updated[itemIdx]
+    const updatedSpecs = {
+      ...(currentItem.bermo_specs || {}),
+      [specKey]: specVal,
+    }
+    updated[itemIdx] = {
+      ...currentItem,
+      bermo_specs: updatedSpecs,
+    }
+    // Se for o item 0, sincroniza também com os estados globais da Seção 3A
+    if (itemIdx === 0) {
+      if (specKey === 'platesCount') setPlatesCount(String(specVal))
+      if (specKey === 'plateDimensions') setPlateDimensions(String(specVal))
+      if (specKey === 'gasketsCount') setGasketsCount(String(specVal))
+      if (specKey === 'equipmentSize') setEquipmentSize(String(specVal))
+      if (specKey === 'frameMaterial') setFrameMaterial(String(specVal))
+      if (specKey === 'gasketType') setGasketType(String(specVal))
+      if (specKey === 'operatingPressure') setOperatingPressure(String(specVal))
+      if (specKey === 'pipeMeasurement') setPipeMeasurement(String(specVal))
+    }
+    setItems(updated)
+  }
+
+  // Alterna se inclui ou não o custo do produto em um item individual
+  const handleToggleItemIncludeProduct = (itemIdx: number, checked: boolean) => {
+    const updated = [...items]
+    const it = updated[itemIdx]
+    const servBase = it.bermo_specs?.serviceBasePrice || it.unit_price || 2500
+    const prodBase = it.bermo_specs?.productBasePrice || 0
+    const newUnitPrice = checked ? servBase + prodBase : servBase
+    const qty = it.quantity || 1
+
+    updated[itemIdx] = {
+      ...it,
+      unit_price: newUnitPrice,
+      total: Math.max(0, qty * newUnitPrice - (it.discount || 0)),
+      include_product_cost: checked,
+      bermo_specs: {
+        ...(it.bermo_specs || {}),
+        includeProductCost: checked,
+      },
+    }
+
+    if (itemIdx === 0) {
+      setIncludeProductCost(checked)
+    }
+
+    setItems(updated)
   }
 
   // Abre modal de novo orçamento
@@ -593,7 +686,7 @@ export function QuotesManager({
     return maintenanceMaterials.reduce((sum, m) => sum + (m.amount || 0), 0)
   }, [maintenanceMaterials])
 
-  // Recalculo da rota via CEP
+  // Recalculo da rota via CEP (considerando Ida e Volta automaticamente)
   const handleRecalculateRoute = async (destCep?: string, origCep?: string) => {
     setIsCalculatingRoute(true)
     const targetDest = destCep || destinationCep
@@ -607,9 +700,15 @@ export function QuotesManager({
         consumptionKmL,
         tollRoadPercent,
       )
-      setDistanceKm(res.distanceKm)
-      if (res.destinationCity) {
+      // res.roundTripKm é a distância total (ida e volta)
+      setDistanceKm(res.roundTripKm || res.distanceKm)
+      if (res.destinationAddress) {
+        setDestinationAddress(res.destinationAddress)
+      } else if (res.destinationCity) {
         setDestinationAddress(`${res.destinationCity} / ${res.destinationState || 'SC'}`)
+      }
+      if (res.originAddress && (!originAddress || originAddress.includes('Blumenau'))) {
+        setOriginAddress(res.originAddress)
       }
     } catch (e) {
       console.warn('Erro ao calcular rota:', e)
@@ -624,11 +723,15 @@ export function QuotesManager({
   const laborInspectorTotal = inspectorCount * inspectorHours * inspectorRate
   const laborTotal = laborTechTotal + laborHelperTotal + laborInspectorTotal
 
-  // Cálculos de Logística
-  const roundTripKm = distanceKm * 2
-  const litersNeeded = roundTripKm / (consumptionKmL || 9.5)
+  // Cálculos de Logística (distanceKm já representa a distância total de IDA E VOLTA)
+  const totalDistanceRoundTrip = distanceKm
+  const litersNeeded = totalDistanceRoundTrip / (consumptionKmL || 9.5)
   const baseFuelCost = Math.round(litersNeeded * fuelPrice * 100) / 100
-  const estimatedTolls = Math.max(1, Math.round((distanceKm / 80) * (tollRoadPercent / 100)))
+  // Para pedágios: calcula com base na distância total ida e volta (pedágios distribuídos ao longo do percurso)
+  const estimatedTolls = Math.max(
+    2,
+    Math.round((totalDistanceRoundTrip / 80) * (tollRoadPercent / 100)),
+  )
   const baseTollCost = estimatedTolls * 14.5
   const travelTotal = baseFuelCost + baseTollCost + manualFuelAdj + manualTollAdj
 
@@ -706,56 +809,68 @@ export function QuotesManager({
     customTaxes: customTaxesObj,
   })
 
-  // Adição de novo serviço ao orçamento com metodologia padronizada dinâmica
-  const handleAddItem = (productId?: string) => {
-    const brandForMethod = matchedSupplierInfo?.brand || 'BERMO'
-    const standardDesc = getStandardServiceMethodology([brandForMethod, ...distinctBrands])
-
-    if (productId) {
-      const bermo = SUPPLIERS_DATABASE.find((p) => p.id === productId || p.code === productId)
-      if (bermo) {
-        const servPrice = Math.round(bermo.basePrice * 0.4)
-        setItems([
-          ...items,
-          {
-            name: `Serviço Especializado ${bermo.brand}: ${bermo.name}`,
-            quantity: 1,
-            unit_price: servPrice,
-            discount: 0,
-            total: servPrice,
-            description: getStandardServiceMethodology([bermo.brand, ...distinctBrands]),
-            include_product_cost: false,
-            bermo_specs: {
-              productCode: bermo.code,
-              productName: bermo.name,
-              productModel: bermo.model,
-              productBrand: bermo.brand,
-              equipmentSize: bermo.specs.connection,
-              frameMaterial: bermo.specs.material,
-              gasketType: bermo.specs.gasketMaterial,
-              plateDimensions: bermo.specs.plateDimensions,
-              includeProductCost: false,
-              productBasePrice: bermo.basePrice,
-              serviceBasePrice: servPrice,
-            },
-          },
-        ])
-        return
-      }
+  // Adicionar novo equipamento/trocador ou serviço ao orçamento
+  const handleAddEquipmentItem = (productParam?: BermoProductItem | string) => {
+    let targetProduct: BermoProductItem | undefined
+    if (typeof productParam === 'object' && productParam !== null) {
+      targetProduct = productParam
+    } else if (typeof productParam === 'string') {
+      targetProduct = SUPPLIERS_DATABASE.find(
+        (p) => p.id === productParam || p.code === productParam || p.model === productParam,
+      )
     }
 
-    setItems([
-      ...items,
-      {
-        name: 'Serviço Técnico de Manutenção & Estanqueidade',
-        quantity: 1,
-        unit_price: 2500,
-        discount: 0,
-        total: 2500,
-        description: standardDesc,
-        include_product_cost: false,
+    // Se nenhum produto foi especificado, pega um modelo padrão da lista (ex: Alfa Laval M10-B ou outro BERMO)
+    if (!targetProduct) {
+      const nextIndex = items.length % SUPPLIERS_DATABASE.length
+      targetProduct = SUPPLIERS_DATABASE[nextIndex] || BERMO_CATALOG[0]
+    }
+
+    const servPrice = Math.round(targetProduct.basePrice * 0.4)
+    let extractedPlates = '40'
+    if (targetProduct.specs.platesRange) {
+      const match = targetProduct.specs.platesRange.match(/(\d+)/)
+      if (match) extractedPlates = match[1]
+    }
+
+    const brand = targetProduct.brand || 'BERMO'
+    const methodology = getStandardServiceMethodology([brand, ...distinctBrands])
+
+    const newItem: QuoteItem = {
+      name: `Manutenção Especializada: ${targetProduct.brand} ${targetProduct.model || targetProduct.code}`,
+      quantity: 1,
+      unit_price: servPrice,
+      discount: 0,
+      total: servPrice,
+      description: methodology,
+      include_product_cost: false,
+      bermo_specs: {
+        productCode: targetProduct.code,
+        productName: targetProduct.name,
+        productModel: targetProduct.model,
+        productBrand: targetProduct.brand,
+        equipmentSize: targetProduct.specs.connection || 'DN50 (2 pol)',
+        frameMaterial: targetProduct.specs.material || 'AISI 316L (0.5mm)',
+        gasketType: targetProduct.specs.gasketMaterial || 'EPDM Clip-on / NBR',
+        plateDimensions: targetProduct.specs.plateDimensions || '680 x 280 mm',
+        platesCount: extractedPlates,
+        gasketsCount: extractedPlates,
+        operatingPressure: targetProduct.specs.pressure?.replace(/\D/g, '') || '16',
+        workAreaDifficulty: 'Médio',
+        needsIntegration: 'Não',
+        pipeMeasurement: targetProduct.specs.connection || 'DN50 (2 pol)',
+        includeProductCost: false,
+        productBasePrice: targetProduct.basePrice,
+        serviceBasePrice: servPrice,
       },
-    ])
+    }
+
+    setItems([...items, newItem])
+  }
+
+  // Compatibilidade com handleAddItem
+  const handleAddItem = (productId?: string) => {
+    handleAddEquipmentItem(productId)
   }
 
   const handleUpdateItem = (index: number, field: keyof QuoteItem, value: any) => {
@@ -926,7 +1041,7 @@ export function QuotesManager({
       valid_until: validUntilDate.toISOString(),
       notes:
         notes ||
-        `Orçamento de Prestação de Serviços Técnicos (${prd?.name || 'Trocadores & Válvulas'}). Assistência Especializada.`,
+        `Orçamento de Prestação de Serviços Técnicos (${prd?.name || 'Trocadores & Válvulas'}). Assistência Especializada Intertermal.`,
       assigned_to: 'Alex Nogueira - Especialista Técnico Intertermal',
       service_details: {
         service_technical_specs: {
@@ -1694,14 +1809,22 @@ export function QuotesManager({
                   <div className="relative flex-1">
                     <Input
                       value={modelSearchInput}
-                      onChange={(e) => handleModelSearchChange(e.target.value)}
-                      onFocus={() => setShowSupplierDropdown(true)}
-                      placeholder="Digite ex: T5-BFG, BP30, M10-B, BL50..."
+                      onChange={(e) => {
+                        handleModelSearchChange(e.target.value)
+                      }}
+                      onFocus={() => {
+                        setShowSupplierDropdown(true)
+                        setActiveItemIndexForDropdown(0)
+                      }}
+                      placeholder="Digite ex: T5-BFG, BP30, M10-B, BL50 ou modelo customizado..."
                       className="text-xs h-9 bg-white dark:bg-slate-900 font-bold text-teal-900 dark:text-teal-100 pr-8"
                       required
                     />
                     {matchedSupplierInfo && (
-                      <span className="absolute right-2.5 top-2.5">
+                      <span
+                        className="absolute right-2.5 top-2.5"
+                        title="Especificações técnicas encontradas na base do fornecedor"
+                      >
                         <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       </span>
                     )}
@@ -1710,48 +1833,77 @@ export function QuotesManager({
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowSupplierDropdown(!showSupplierDropdown)}
-                    className="h-9 text-xs border-teal-300 text-teal-700"
+                    onClick={() => {
+                      setShowSupplierDropdown(!showSupplierDropdown)
+                      setActiveItemIndexForDropdown(0)
+                    }}
+                    className="h-9 text-xs border-teal-300 text-teal-700 bg-white dark:bg-slate-900 hover:bg-teal-50"
                   >
-                    Ver Catálogo ({SUPPLIERS_DATABASE.length})
+                    <Search className="h-3.5 w-3.5 mr-1" />
+                    Busca em base BERMO & Alfa Laval ({SUPPLIERS_DATABASE.length})
                   </Button>
                 </div>
 
-                {/* Dropdown de sugestões da base de fornecedores */}
+                {/* Dropdown de sugestões da base de fornecedores BERMO & Alfa Laval */}
                 {showSupplierDropdown && (
-                  <div className="absolute z-20 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white dark:bg-slate-900 border border-teal-300 dark:border-teal-700 rounded-lg shadow-xl p-1.5 space-y-1">
-                    <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-slate-100 dark:border-slate-800">
-                      Modelos Cadastrados (BERMO & Alfa Laval)
+                  <div className="absolute z-30 left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 border border-teal-400 dark:border-teal-700 rounded-lg shadow-2xl p-1.5 space-y-1">
+                    <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                      <span>
+                        Base de Fornecedores BERMO & Alfa Laval ({filteredSuppliers.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowSupplierDropdown(false)}
+                        className="text-[10px] text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                      >
+                        Fechar ✕
+                      </button>
                     </div>
                     {filteredSuppliers.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-muted-foreground">
-                        Nenhum modelo encontrado com esse termo. Ao confirmar, o modelo digitado
-                        será utilizado com os campos manuais preenchidos.
+                      <div className="p-3 text-center text-xs text-muted-foreground bg-amber-50/50 dark:bg-amber-950/20 rounded">
+                        <p className="font-semibold text-amber-900 dark:text-amber-300">
+                          Modelo &ldquo;{modelSearchInput}&rdquo; não encontrado no catálogo.
+                        </p>
+                        <p className="text-[11px] mt-0.5 text-amber-800/80 dark:text-amber-400/80">
+                          Você pode preencher as especificações técnicas manualmente nos campos
+                          abaixo (placas, conexões, materiais).
+                        </p>
                       </div>
                     ) : (
                       filteredSuppliers.map((p) => (
                         <div
                           key={p.id}
-                          onClick={() => applySupplierProduct(p)}
-                          className="p-2 rounded-md hover:bg-teal-50 dark:hover:bg-teal-950/60 cursor-pointer text-xs flex items-center justify-between transition-colors border border-transparent hover:border-teal-200"
+                          onClick={() => {
+                            applySupplierProductToItem(
+                              p,
+                              activeItemIndexForDropdown !== null ? activeItemIndexForDropdown : 0,
+                            )
+                            setShowSupplierDropdown(false)
+                          }}
+                          className="p-2 rounded-md hover:bg-teal-50 dark:hover:bg-teal-950/70 cursor-pointer text-xs flex items-center justify-between transition-colors border border-transparent hover:border-teal-300"
                         >
                           <div>
                             <span className="font-bold text-slate-900 dark:text-slate-100 font-mono mr-2">
                               {p.code}
                             </span>
-                            <span className="text-slate-600 dark:text-slate-300">{p.name}</span>
-                            <div className="text-[10px] text-muted-foreground flex items-center gap-2 mt-0.5 font-mono">
-                              <span>Marca: {p.brand}</span>
-                              {p.specs.platesRange && <span>Placas: {p.specs.platesRange}</span>}
-                              {p.specs.connection && <span>Conexão: {p.specs.connection}</span>}
+                            <span className="text-slate-700 dark:text-slate-300 font-semibold">
+                              {p.name}
+                            </span>
+                            <div className="text-[10px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 font-mono">
+                              <span className="font-semibold text-teal-800 dark:text-teal-300">
+                                Marca: {p.brand}
+                              </span>
+                              {p.specs.platesRange && <span>• Placas: {p.specs.platesRange}</span>}
+                              {p.specs.connection && <span>• Conexão: {p.specs.connection}</span>}
+                              {p.specs.material && <span>• Material: {p.specs.material}</span>}
                             </div>
                           </div>
                           <Badge
                             variant="secondary"
-                            className={`text-[9px] ${
+                            className={`text-[9px] shrink-0 font-bold ${
                               p.brand === 'Alfa Laval'
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200'
-                                : 'bg-teal-100 text-teal-800 dark:bg-teal-900/60 dark:text-teal-200'
+                                ? 'bg-blue-100 text-blue-900 dark:bg-blue-900/60 dark:text-blue-200'
+                                : 'bg-teal-100 text-teal-900 dark:bg-teal-900/60 dark:text-teal-200'
                             }`}
                           >
                             {p.brand}
@@ -2097,36 +2249,149 @@ export function QuotesManager({
               </div>
             </div>
 
-            {/* SEÇÃO 2: ITENS & SERVIÇOS TÉCNICOS COM METODOLOGIA PADRONIZADA */}
+            {/* SEÇÃO 2: ITENS & MÚLTIPLOS MODELOS/TOCADORES DE CALOR NO MESMO ORÇAMENTO */}
             <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Wrench className="h-4 w-4 text-teal-600" />
                   <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    Itens e Escopo de Serviços Técnicos
+                    Equipamentos & Serviços no Orçamento ({items.length})
                   </span>
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleAddItem()}
-                  className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
-                >
-                  <Plus className="h-3 w-3 mr-1" /> Adicionar Serviço
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleAddEquipmentItem()}
+                    className="h-7 text-xs bg-teal-700 hover:bg-teal-600 text-white font-semibold shadow-xs"
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> Adicionar Equipamento
+                  </Button>
+                </div>
               </div>
 
               <div className="space-y-3">
                 {items.map((it, idx) => (
                   <div
                     key={idx}
-                    className="p-3 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5"
+                    className="p-3.5 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 space-y-1">
+                    {/* Header do Equipamento / Item */}
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                      <div className="flex items-center gap-2 flex-1">
+                        <Badge className="bg-slate-800 text-white text-[10px] px-1.5 py-0">
+                          Item #{idx + 1}
+                        </Badge>
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                            Equipamento / Modelo BERMO & Alfa Laval *
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Select
+                              value={
+                                it.bermo_specs?.productCode || (idx === 0 ? selectedBermoCode : '')
+                              }
+                              onValueChange={(val) => {
+                                const found = SUPPLIERS_DATABASE.find(
+                                  (p) => p.code === val || p.id === val,
+                                )
+                                if (found) {
+                                  applySupplierProductToItem(found, idx)
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="text-xs h-8 font-semibold bg-slate-50 dark:bg-slate-900">
+                                <SelectValue placeholder="Selecione o modelo do fabricante..." />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-56">
+                                {SUPPLIERS_DATABASE.map((p) => (
+                                  <SelectItem key={p.id} value={p.code} className="text-xs">
+                                    <span className="font-bold mr-1">[{p.brand}]</span> {p.model} (
+                                    {p.code}) - {p.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {items.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveItem(idx)}
+                          className="h-7 px-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
+                          title="Remover Equipamento"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1" />
+                          <span className="text-[11px]">Remover</span>
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Especificações Técnicas do Equipamento Individual Carregadas Automaticamente */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-teal-50/50 dark:bg-teal-950/20 p-2.5 rounded-md border border-teal-100 dark:border-teal-900/40">
+                      <div className="space-y-1">
                         <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Título do Item / Serviço {idx + 1} *
+                          Nº de Placas
+                        </Label>
+                        <Input
+                          value={it.bermo_specs?.platesCount || '40'}
+                          onChange={(e) =>
+                            handleUpdateItemSpecs(idx, 'platesCount', e.target.value)
+                          }
+                          placeholder="ex: 40"
+                          className="text-xs h-7 bg-white dark:bg-slate-900 font-semibold text-teal-900 dark:text-teal-100"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                          Dimensão Placas
+                        </Label>
+                        <Input
+                          value={it.bermo_specs?.plateDimensions || '680 x 280 mm'}
+                          onChange={(e) =>
+                            handleUpdateItemSpecs(idx, 'plateDimensions', e.target.value)
+                          }
+                          placeholder="ex: 680 x 280 mm"
+                          className="text-xs h-7 bg-white dark:bg-slate-900"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                          Qtd Gaxetas / Vedação
+                        </Label>
+                        <Input
+                          value={it.bermo_specs?.gasketsCount || '40'}
+                          onChange={(e) =>
+                            handleUpdateItemSpecs(idx, 'gasketsCount', e.target.value)
+                          }
+                          placeholder="ex: 40"
+                          className="text-xs h-7 bg-white dark:bg-slate-900 font-semibold text-teal-900 dark:text-teal-100"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                          Tamanho / Conexão
+                        </Label>
+                        <Input
+                          value={it.bermo_specs?.equipmentSize || 'DN50 (2 pol)'}
+                          onChange={(e) =>
+                            handleUpdateItemSpecs(idx, 'equipmentSize', e.target.value)
+                          }
+                          placeholder="ex: DN50 (2 pol)"
+                          className="text-xs h-7 bg-white dark:bg-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Preços, Quantidade e Custo Individual de Manutenção */}
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end pt-1">
+                      <div className="sm:col-span-5 space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                          Título / Descrição Comercial do Item *
                         </Label>
                         <Input
                           value={it.name}
@@ -2135,9 +2400,10 @@ export function QuotesManager({
                           required
                         />
                       </div>
-                      <div className="w-20 space-y-1">
+
+                      <div className="sm:col-span-2 space-y-1">
                         <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Qtd
+                          Quantidade
                         </Label>
                         <Input
                           type="number"
@@ -2146,13 +2412,16 @@ export function QuotesManager({
                           onChange={(e) =>
                             handleUpdateItem(idx, 'quantity', Number(e.target.value))
                           }
-                          className="text-xs h-8 text-center"
+                          className="text-xs h-8 text-center font-bold"
                         />
                       </div>
-                      <div className="w-32 space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Valor Unitário (R$)
-                        </Label>
+
+                      <div className="sm:col-span-3 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                            Custo Unitário Manutenção (R$)
+                          </Label>
+                        </div>
                         <Input
                           type="number"
                           step="0.01"
@@ -2160,28 +2429,56 @@ export function QuotesManager({
                           onChange={(e) =>
                             handleUpdateItem(idx, 'unit_price', Number(e.target.value))
                           }
-                          className="text-xs h-8 text-right font-mono"
+                          className="text-xs h-8 text-right font-mono font-bold text-teal-800 dark:text-teal-200"
                         />
                       </div>
-                      {items.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveItem(idx)}
-                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 mt-4"
+
+                      <div className="sm:col-span-2 space-y-1 text-right">
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                          Total do Item
+                        </Label>
+                        <div className="text-xs font-bold text-emerald-700 dark:text-emerald-300 h-8 flex items-center justify-end font-mono bg-slate-50 dark:bg-slate-900 px-2 rounded border border-slate-200 dark:border-slate-800">
+                          {(it.total || 0).toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Checkbox de Fornecimento do Equipamento Novo para este item */}
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900/60 p-2 rounded border border-slate-200 dark:border-slate-800 text-xs">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          id={`toggle-prod-item-${idx}`}
+                          checked={it.include_product_cost ?? false}
+                          onCheckedChange={(chk) => handleToggleItemIncludeProduct(idx, chk)}
+                        />
+                        <Label
+                          htmlFor={`toggle-prod-item-${idx}`}
+                          className="text-[11px] font-semibold cursor-pointer"
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          Incluir também fornecimento do equipamento novo (+{' '}
+                          {(it.bermo_specs?.productBasePrice || 18500).toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                          )
+                        </Label>
+                      </div>
+                      {it.bermo_specs?.productBrand && (
+                        <Badge variant="outline" className="text-[10px] font-mono">
+                          {it.bermo_specs.productBrand}
+                        </Badge>
                       )}
                     </div>
 
-                    {/* Descrição do Serviço (Metodologia Padronizada Editável) */}
+                    {/* Metodologia de Engenharia do Item */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
                           <CheckCircle2 className="h-3 w-3 text-teal-600" />
-                          Descrição do Serviço (Metodologia Padronizada Editável)
+                          Metodologia do Serviço para este Equipamento (Proposta do Cliente)
                         </Label>
                         <Button
                           type="button"
@@ -2197,14 +2494,14 @@ export function QuotesManager({
                           }}
                           className="h-5 text-[10px] text-teal-700 hover:bg-teal-50 px-1.5"
                         >
-                          Resetar p/ Texto Padrão
+                          Resetar Metodologia
                         </Button>
                       </div>
                       <Textarea
                         value={it.description || ''}
                         onChange={(e) => handleUpdateItem(idx, 'description', e.target.value)}
-                        placeholder="Descreva a metodologia aplicada ao serviço..."
-                        rows={6}
+                        placeholder="Descreva a metodologia aplicada a este equipamento..."
+                        rows={3}
                         className="text-xs font-mono bg-slate-50/70 dark:bg-slate-900 resize-y leading-relaxed"
                       />
                     </div>
@@ -2498,7 +2795,6 @@ export function QuotesManager({
                   {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
               </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
@@ -2554,17 +2850,30 @@ export function QuotesManager({
                   </div>
                 </div>
               </div>
-
-              {/* Parâmetros do Mapeia */}
+              {/* Parâmetros do Mapeia / Deslocamento */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Distância (km só ida)</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] text-muted-foreground">
+                      Distância Total (Ida + Volta km)
+                    </Label>
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] px-1 py-0 text-emerald-700 bg-emerald-50"
+                    >
+                      ×2 Ida/Volta
+                    </Badge>
+                  </div>
                   <Input
                     type="number"
                     value={distanceKm}
                     onChange={(e) => setDistanceKm(Number(e.target.value))}
-                    className="text-xs h-8 font-bold"
+                    className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
                   />
+                  <span className="text-[9px] text-muted-foreground block">
+                    (Ida: ~{Math.round(distanceKm / 2)} km | Volta: ~{Math.round(distanceKm / 2)}{' '}
+                    km)
+                  </span>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">
@@ -2576,6 +2885,9 @@ export function QuotesManager({
                     onChange={(e) => setConsumptionKmL(Number(e.target.value))}
                     className="text-xs h-8"
                   />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L (ida+volta)
+                  </span>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">
@@ -2588,20 +2900,55 @@ export function QuotesManager({
                     onChange={(e) => setFuelPrice(Number(e.target.value))}
                     className="text-xs h-8"
                   />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Combustível:{' '}
+                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    % Rodovias com Pedágio
-                  </Label>
+                  <Label className="text-[10px] text-muted-foreground">% Rodovias c/ Pedágio</Label>
                   <Input
                     type="number"
                     value={tollRoadPercent}
                     onChange={(e) => setTollRoadPercent(Number(e.target.value))}
                     className="text-xs h-8"
                   />
+                  <span className="text-[9px] text-muted-foreground block">
+                    Pedágios:{' '}
+                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </span>
                 </div>
               </div>
-
+              {/* Ajustes Manuais de Combustível e Pedágio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Combustível (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualFuelAdj}
+                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                    Ajuste Manual Pedágio (+/- R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={manualTollAdj}
+                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-8 font-mono"
+                  />
+                </div>
+              </div>
+              =======
               <div className="flex justify-end pt-1">
                 <Button
                   type="button"
