@@ -1,18 +1,31 @@
-import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Slider } from '@/components/ui/slider'
+import React, { useState, useMemo } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog'
+  QuoteRecord,
+  QuoteItem,
+  ClientRecord,
+  QuoteStatus,
+  PaymentConditionType,
+  MaintenanceMaterialItem,
+} from '@/types/crm'
+import {
+  BERMO_CATALOG,
+  SUPPLIERS_DATABASE,
+  searchSupplierProduct,
+  getStandardServiceMethodology,
+  PROPOSAL_INCLUSIONS_TEXT,
+  BermoProductItem,
+} from '@/data/bermo-catalog'
+import { calculateQuotePricing } from '@/lib/quote-calculator'
+import { calculateDistanceBetweenCeps } from '@/lib/mapeia-calculator'
+import { QuotePdfPreviewDialog } from '@/components/QuotePdfPreviewDialog'
+import { Card, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
+import { Slider } from '@/components/ui/slider'
 import {
   Select,
   SelectContent,
@@ -21,803 +34,670 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  FileSpreadsheet,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import {
   Plus,
-  Send,
-  CheckCircle2,
+  Trash2,
+  FileText,
   Clock,
   Printer,
-  Copy,
-  Building2,
-  Trash2,
-  Package,
-  Layers,
   Sparkles,
-  Download,
+  Wrench,
   Flame,
   Truck,
   Hotel,
-  Utensils,
-  Percent,
-  Calculator,
-  ShieldCheck,
-  Eye,
-  EyeOff,
-  Wrench,
-  UserCheck,
-  Calendar,
-  DollarSign,
-  MapPin,
-  HelpCircle,
   SlidersHorizontal,
-  FileText,
-  Info,
+  Eye,
+  ShieldCheck,
+  UserCheck,
+  Package,
+  FileSpreadsheet,
+  CheckCircle2,
+  Search,
+  Layers,
+  AlertCircle,
 } from 'lucide-react'
-import { Switch } from '@/components/ui/switch'
-import type {
-  QuoteRecord,
-  QuoteStatus,
-  ClientRecord,
-  ProductRecord,
-  QuoteItem,
-  ServiceTechnicalSpecs,
-  LaborCosts,
-  TravelCosts,
-  LodgingMealsCosts,
-  IndirectCosts,
-  IndirectTaxes,
-  PaymentAndValidity,
-  PaymentConditionType,
-} from '@/types/crm'
-import { BERMO_CATALOG, BermoProductItem } from '@/data/bermo-catalog'
-import { calculateRouteMapeiaStyle } from '@/lib/mapeia-calculator'
-import {
-  calculateQuoteServiceComposition,
-  DEFAULT_INDIRECT_TAXES,
-  QuoteServiceComputation,
-} from '@/lib/quote-calculator'
-import { QuotePdfPreviewDialog } from '@/components/QuotePdfPreviewDialog'
 
 interface QuotesManagerProps {
   quotes: QuoteRecord[]
   clients: ClientRecord[]
-  products: ProductRecord[]
   selectedQuote?: QuoteRecord | null
-  onSelectQuote: (quote: QuoteRecord | null) => void
-  onCreateQuote: (data: Partial<QuoteRecord>) => void
-  onUpdateQuote?: (id: string, data: Partial<QuoteRecord>) => Promise<void> | void
+  onCreateQuote: (quote: Partial<QuoteRecord>) => void
+  onUpdateQuote?: (id: string, quote: Partial<QuoteRecord>) => void
   onUpdateQuoteStatus: (id: string, status: QuoteStatus) => void
-  onCreateClient?: (data: Partial<ClientRecord>) => Promise<ClientRecord | void> | void
   onOpenCatalog?: () => void
+  onCreateClient?: (client: Partial<ClientRecord>) => Promise<ClientRecord>
 }
 
 const TEMPLATE_PRESETS = [
   {
-    id: 'tpl-trocador-gaxetado',
-    name: 'Modelo 1: Manutenção em Trocador a Placas BP6 Sanitário',
-    description: 'Abertura, limpeza química CIP, troca de gaxetas EPDM FDA e teste hidrostático.',
-    productCode: 'BERMO-BP6-SAN',
-    defaultItemName:
-      'Serviço de Manutenção Preventiva e Troca de Gaxetas em Trocador BP6 Sanitário',
-    fluid: 'agua_quente',
-    tempIn: 85,
-    tempOut: 25,
-    pressure: 4.5,
-    flow: 15,
-    serviceScope:
-      'Desmontagem de pacote de placas, limpeza CIP, relubrificação de tirantes e teste',
-    laborTechHours: 16,
-    laborHelperHours: 16,
-    laborInspectorHours: 4,
-    distanceKm: 180,
-    hotelDays: 1,
-    mealsDays: 2,
+    id: 'bermo-standard-clean',
+    name: 'Manutenção Padrão BERMO (Limpeza + NDT)',
+    description:
+      'Abertura de trocador a placas, desincrustação, líquido penetrante, troca de gaxetas e teste de estanqueidade.',
+    productCode: 'BP30',
+    servicePrice: 4200,
+    labor: {
+      techCount: 1,
+      techHours: 16,
+      techRate: 85,
+      helperCount: 1,
+      helperHours: 16,
+      helperRate: 50,
+      inspectorCount: 1,
+      inspectorHours: 8,
+      inspectorRate: 110,
+    },
     terms: '28 DDL',
   },
   {
-    id: 'tpl-valvulas-vapor',
-    name: 'Modelo 2: Overhaul em Válvulas Triexcêntricas ARI-ZETRIX & DF-40',
+    id: 'bermo-sanitary-cip',
+    name: 'Revisão Sanitária BP6-S (Alimentício / Pharma)',
     description:
-      'Lapidação de sedes metal x metal, substituição de anel de grafite e calibração de purga.',
-    productCode: 'ARI-ZETRIX',
-    defaultItemName:
-      'Overhaul e Teste de Estanqueidade Zero Leakage ARI-ZETRIX DN200 + Válvula DF-40',
-    fluid: 'vapor',
-    tempIn: 300,
-    tempOut: 300,
-    pressure: 25,
-    flow: 40,
-    serviceScope:
-      'Lapidação de sedes, ensaio de estanqueidade conforme norma e regulagem pneumática',
-    laborTechHours: 24,
-    laborHelperHours: 12,
-    laborInspectorHours: 8,
-    distanceKm: 340,
-    hotelDays: 2,
-    mealsDays: 3,
+      'Higienização profunda grau alimentício, inspeção de placas AISI 316L, substituição por gaxetas EPDM FDA.',
+    productCode: 'BP6-S',
+    servicePrice: 5800,
+    labor: {
+      techCount: 2,
+      techHours: 20,
+      techRate: 90,
+      helperCount: 1,
+      helperHours: 20,
+      helperRate: 55,
+      inspectorCount: 1,
+      inspectorHours: 12,
+      inspectorRate: 120,
+    },
     terms: '14 DDL',
   },
   {
-    id: 'tpl-estacao-misturadora',
-    name: 'Modelo 3: Instalação & Start-up de Estação Misturadora WD2010',
+    id: 'bermo-heavy-plant',
+    name: 'Overhaul Completo Linha Pesada (BL50 / BP60)',
     description:
-      'Montagem mecânica, tubulações de vapor e água com teste de segurança anti-queimadura.',
-    productCode: 'BERMO-WD-2010',
-    defaultItemName:
-      'Instalação, Comissionamento e Start-up de Estação Misturadora Água/Vapor WD2010',
-    fluid: 'vapor',
-    tempIn: 140,
-    tempOut: 65,
-    pressure: 6,
-    flow: 8,
-    serviceScope: 'Instalação completa em linha de higienização de fábrica com teste térmico',
-    laborTechHours: 12,
-    laborHelperHours: 12,
-    laborInspectorHours: 2,
-    distanceKm: 90,
-    hotelDays: 0,
-    mealsDays: 1,
+      'Reforma completa de grande porte em campo: jateamento controlado, retífica de encostos, teste 25 bar.',
+    productCode: 'BL50',
+    servicePrice: 12500,
+    labor: {
+      techCount: 2,
+      techHours: 36,
+      techRate: 95,
+      helperCount: 2,
+      helperHours: 36,
+      helperRate: 55,
+      inspectorCount: 1,
+      inspectorHours: 18,
+      inspectorRate: 130,
+    },
     terms: '30 DDL',
   },
 ]
 
-export const QuotesManager: React.FC<QuotesManagerProps> = ({
+export function QuotesManager({
   quotes,
   clients,
-  products,
   selectedQuote,
-  onSelectQuote,
   onCreateQuote,
   onUpdateQuote,
   onUpdateQuoteStatus,
-  onCreateClient,
   onOpenCatalog,
-}) => {
+  onCreateClient,
+}: QuotesManagerProps) {
+  // Modal de criação / edição
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'client' | 'internal'>('client') // Proposta cliente vs Preview interno
 
-  // Estado para Visualização de PDF da Proposta (Modal Completo)
+  // Modal de Prévia em PDF
   const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false)
   const [quoteForPdf, setQuoteForPdf] = useState<QuoteRecord | null>(null)
 
-  // Estado para Modal de Criação Rápida de Cliente no Orçamento
+  // Alternador de Visão de Exibição
+  const [viewMode, setViewMode] = useState<'client' | 'internal'>('client')
+
+  // Modal de criação rápida de cliente
   const [isNewClientModalOpen, setIsNewClientModalOpen] = useState(false)
   const [newClientName, setNewClientName] = useState('')
-  const [newClientDocument, setNewClientDocument] = useState('')
-  const [newClientPhone, setNewClientPhone] = useState('')
-  const [newClientEmail, setNewClientEmail] = useState('')
-  const [newClientAddress, setNewClientAddress] = useState('')
+  const [newClientDoc, setNewClientDoc] = useState('')
   const [newClientCity, setNewClientCity] = useState('')
-  const [newClientState, setNewClientState] = useState('')
-  const [isCreatingClientLoading, setIsCreatingClientLoading] = useState(false)
+  const [newClientState, setNewClientState] = useState('SC')
+  const [newClientCep, setNewClientCep] = useState('')
 
-  // Form State - 3a. Equipamento & Especificações Técnicas BERMO
-  const [quoteNumber, setQuoteNumber] = useState(`INT-2025-00${quotes.length + 1}`)
+  // ----------------------------------------------------
+  // ESTADOS DO FORMULÁRIO DE ORÇAMENTO
+  // ----------------------------------------------------
+  const [quoteNumber, setQuoteNumber] = useState('')
   const [clientId, setClientId] = useState('')
-  const [selectedBermoCode, setSelectedBermoCode] = useState<string>('BERMO-BP6-SAN')
-  const [platesCount, setPlatesCount] = useState<number | string>(40)
-  const [plateDimensions, setPlateDimensions] = useState('704 x 400 mm (Sanitária)')
-  const [gasketsCount, setGasketsCount] = useState<number | string>(40)
-  const [serviceScope, setServiceScope] = useState(
-    'Manutenção preventiva especializada e revisão de estanqueidade',
-  )
-  const [fluidType, setFluidType] = useState<any>('agua_quente')
-  const [fluidName, setFluidName] = useState('Água Quente / Solução Sanitária')
-  const [inletTemp, setInletTemp] = useState<number | string>(85)
-  const [outletTemp, setOutletTemp] = useState<number | string>(25)
-  const [operatingPressure, setOperatingPressure] = useState<number | string>(4.5)
-  const [flowRate, setFlowRate] = useState<number | string>(15)
-  const [pressureDrop, setPressureDrop] = useState<number | string>(0.3)
-  const [equipmentSize, setEquipmentSize] = useState('Tri-Clamp DN65 / 40 Placas')
-  const [frameMaterial, setFrameMaterial] = useState('Placas AISI 316L eletropolidas')
-  const [gasketType, setGasketType] = useState('EPDM FDA')
-  // Novos campos Item 3A
-  const [workAreaDifficulty, setWorkAreaDifficulty] = useState<'Alto' | 'Médio' | 'Baixo'>('Médio')
-  const [workAreaObservations, setWorkAreaObservations] = useState('')
-  const [needsIntegration, setNeedsIntegration] = useState<'Sim' | 'Não'>('Não')
-  const [integrationTiming, setIntegrationTiming] = useState<'same_day' | 'early'>('same_day')
-  const [integrationObservations, setIntegrationObservations] = useState('')
-  const [pipeMeasurement, setPipeMeasurement] = useState('DN50 (2 pol) - Schedule 40')
-
-  // Toggle: incluir custo de compra do produto na proposta (padrão FALSE: Assistência Técnica)
-  const [includeProductCost, setIncludeProductCost] = useState<boolean>(false)
-  const [productBasePrice, setProductBasePrice] = useState<number>(19800)
-  const [serviceBasePrice, setServiceBasePrice] = useState<number>(6500)
-
-  // Form State - Itens e Serviços
-  const [items, setItems] = useState<QuoteItem[]>([
-    {
-      name: 'Prestação de Serviços Especializados em Trocador a Placas BP6 Sanitário',
-      quantity: 1,
-      unit_price: 6500,
-      discount: 0,
-      total: 6500,
-      include_product_cost: false,
-    },
-  ])
-
-  // Form State - 3b. Mão de Obra (3 funções)
-  const [techCount, setTechCount] = useState<number>(1)
-  const [techHours, setTechHours] = useState<number>(16)
-  const [techRate, setTechRate] = useState<number>(180) // R$ 180/h
-
-  const [helperCount, setHelperCount] = useState<number>(1)
-  const [helperHours, setHelperHours] = useState<number>(16)
-  const [helperRate, setHelperRate] = useState<number>(95) // R$ 95/h
-
-  const [inspectorCount, setInspectorCount] = useState<number>(1)
-  const [inspectorHours, setInspectorHours] = useState<number>(4)
-  const [inspectorRate, setInspectorRate] = useState<number>(240) // R$ 240/h
-
-  // Form State - 3c. Deslocamento (Mapeia / Google Maps)
-  const [originAddress, setOriginAddress] = useState('Rua Bernardo Reiter, 500 - Blumenau/SC')
-  const [originCep, setOriginCep] = useState('89066-000')
-  const [destinationAddress, setDestinationAddress] = useState('')
-  const [destinationCep, setDestinationCep] = useState('80010-000')
-  const [distanceKm, setDistanceKm] = useState<number>(150)
-  const [roundTrip, setRoundTrip] = useState<boolean>(true)
-  const [consumptionKmL, setConsumptionKmL] = useState<number>(10)
-  const [fuelPrice, setFuelPrice] = useState<number>(6.1)
-  const [tollRoadPercent, setTollRoadPercent] = useState<number>(70)
-  const [tollRateKm, setTollRateKm] = useState<number>(0.15)
-  const [manualFuelAdj, setManualFuelAdj] = useState<number>(0)
-  const [manualTollAdj, setManualTollAdj] = useState<number>(0)
-
-  // Form State - 3d. Hospedagem & Alimentação
-  const [hotelDays, setHotelDays] = useState<number>(1)
-  const [hotelRate, setHotelRate] = useState<number>(250) // R$ 250 por diária
-  const [mealsDays, setMealsDays] = useState<number>(2)
-  const [mealsRate, setMealsRate] = useState<number>(90) // R$ 90 por dia/refeições
-
-  // Form State - 3e. Custos Indiretos (Internos)
-  const [serviceMargin, setServiceMargin] = useState<number>(25) // Slider 20% a 30% (padrão 25%)
-  const [adminCost, setAdminCost] = useState<number>(15) // Fixo 15%
-  const [salesCommission, setSalesCommission] = useState<number>(6) // Slider 4% a 10% (padrão 6%)
-
-  // Impostos
-  const [pisRate, setPisRate] = useState<number>(1.65)
-  const [cofinsRate, setCofinsRate] = useState<number>(7.6)
-  const [issRate, setIssRate] = useState<number>(5.0) // Editável por município
-  const [csllRate, setCsllRate] = useState<number>(1.08)
-  const [irpjRate, setIrpjRate] = useState<number>(4.8)
-  const [irDiffRate, setIrDiffRate] = useState<number>(20.0) // 20% sobre IRPJ
-
-  // Form State - 3f. Validade e Condições de Pagamento
-  const [validityDays, setValidityDays] = useState<number>(10) // 10 dias úteis
+  const [validityDays, setValidityDays] = useState(10)
   const [paymentCondition, setPaymentCondition] = useState<PaymentConditionType>('28_ddl')
   const [customPaymentCondition, setCustomPaymentCondition] = useState('')
   const [notes, setNotes] = useState('')
 
-  // Efeito ao selecionar cliente: preenche cidade e destino automaticamente
-  useEffect(() => {
-    if (clientId) {
-      const c = clients.find((client) => client.id === clientId)
-      if (c) {
-        if (c.address || c.city) {
-          setDestinationAddress(
-            `${c.address ? c.address + ', ' : ''}${c.city || ''} - ${c.state || ''}`,
-          )
-        }
-        if (c.city === 'São Paulo' || c.state === 'SP') setDestinationCep('01001-000')
-        else if (c.city === 'Curitiba' || c.state === 'PR') setDestinationCep('80010-000')
-        else if (c.city === 'Porto Alegre' || c.state === 'RS') setDestinationCep('90010-000')
-        else if (c.city === 'Belo Horizonte' || c.state === 'MG') setDestinationCep('30130-000')
-        else if (c.city === 'Ribeirão Preto') setDestinationCep('14000-000')
-        else setDestinationCep('88010-000')
-      }
-    }
-  }, [clientId, clients])
+  // Seção 3A: Produto BERMO / Fornecedor & Especificações Técnicas
+  const [selectedBermoCode, setSelectedBermoCode] = useState('BP30')
+  const [modelSearchInput, setModelSearchInput] = useState('BP30')
+  const [supplierSearchQuery, setSupplierSearchQuery] = useState('')
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false)
+  const [matchedSupplierInfo, setMatchedSupplierInfo] = useState<BermoProductItem | null>(null)
 
+  const [fluidType, setFluidType] = useState('vapor')
+  const [fluidName, setFluidName] = useState('')
+  const [inletTemp, setInletTemp] = useState('140')
+  const [outletTemp, setOutletTemp] = useState('80')
+  const [operatingPressure, setOperatingPressure] = useState('6.0')
+  const [flowRate, setFlowRate] = useState('15')
+  const [pressureDrop, setPressureDrop] = useState('0.5')
+  const [equipmentSize, setEquipmentSize] = useState('DN50 (2 pol)')
+  const [frameMaterial, setFrameMaterial] = useState('AISI 316L (0.5mm)')
+  const [gasketType, setGasketType] = useState('EPDM Clip-on / NBR')
+  const [serviceScope, setServiceScope] = useState('')
+
+  // Placas e Gaxetas
+  const [platesCount, setPlatesCount] = useState('40')
+  const [plateDimensions, setPlateDimensions] = useState('680 x 280 mm')
+  const [gasketsCount, setGasketsCount] = useState('40')
+
+  // Novos campos 3A
+  const [workAreaDifficulty, setWorkAreaDifficulty] = useState<'Baixo' | 'Médio' | 'Alto'>('Médio')
+  const [workAreaObservations, setWorkAreaObservations] = useState('')
+  const [needsIntegration, setNeedsIntegration] = useState<'Sim' | 'Não'>('Não')
+  const [integrationTiming, setIntegrationTiming] = useState<'same_day' | 'early'>('same_day')
+  const [integrationObservations, setIntegrationObservations] = useState('')
+  const [pipeMeasurement, setPipeMeasurement] = useState('DN50 (2 pol)')
+
+  // Preço de base do produto vs Serviço de assistência
+  const [includeProductCost, setIncludeProductCost] = useState(false)
+  const [productBasePrice, setProductBasePrice] = useState(18500)
+  const [serviceBasePrice, setServiceBasePrice] = useState(7400)
+
+  // Itens da Proposta
+  const [items, setItems] = useState<QuoteItem[]>([])
+
+  // Seção de Materiais de Manutenção (Custo Interno)
+  const [maintenanceMaterials, setMaintenanceMaterials] = useState<MaintenanceMaterialItem[]>([])
+  const [newMaterialDesc, setNewMaterialDesc] = useState('')
+  const [newMaterialAmount, setNewMaterialAmount] = useState('')
+
+  // Seção 3B: Mão de Obra (3 funções)
+  const [techCount, setTechCount] = useState(1)
+  const [techHours, setTechHours] = useState(16)
+  const [techRate, setTechRate] = useState(85)
+
+  const [helperCount, setHelperCount] = useState(1)
+  const [helperHours, setHelperHours] = useState(16)
+  const [helperRate, setHelperRate] = useState(50)
+
+  const [inspectorCount, setInspectorCount] = useState(1)
+  const [inspectorHours, setInspectorHours] = useState(8)
+  const [inspectorRate, setInspectorRate] = useState(110)
+
+  // Seção 3C: Deslocamento (Padrão Mapeia)
+  const [originCep, setOriginCep] = useState('89066-000')
+  const [originAddress, setOriginAddress] = useState('Rua Bernardo Reiter, 500 - Blumenau/SC')
+  const [destinationCep, setDestinationCep] = useState('')
+  const [destinationAddress, setDestinationAddress] = useState('')
+  const [distanceKm, setDistanceKm] = useState(85)
+  const [fuelPrice, setFuelPrice] = useState(5.89)
+  const [consumptionKmL, setConsumptionKmL] = useState(9.5)
+  const [tollRoadPercent, setTollRoadPercent] = useState(40)
+  const [manualFuelAdj, setManualFuelAdj] = useState(0)
+  const [manualTollAdj, setManualTollAdj] = useState(0)
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false)
 
-  // Recalcular Rota Mapeia automaticamente quando o CEP de origem ou destino mudar
-  const handleRecalculateRoute = async (customDestCep?: string, customOriginCep?: string) => {
-    setIsCalculatingRoute(true)
-    try {
-      const targetOriginCep = customOriginCep || originCep
-      const targetDestCep = customDestCep || destinationCep
+  // Seção 3D: Hospedagem & Alimentação
+  const [hotelDays, setHotelDays] = useState(1)
+  const [hotelRate, setHotelRate] = useState(180)
+  const [mealsDays, setMealsDays] = useState(2)
+  const [mealsRate, setMealsRate] = useState(75)
 
-      const res = await calculateRouteMapeiaStyle({
-        originCep: targetOriginCep,
-        destinationCep: targetDestCep,
-        consumptionKmL,
-        fuelPrice,
-        tollRoadPercent,
-        tollRateKm,
-        roundTrip,
-      })
+  // Seção 3E: Custos Indiretos Internos
+  const [serviceMargin, setServiceMargin] = useState(25)
+  const [adminCost, setAdminCost] = useState(15)
+  const [salesCommission, setSalesCommission] = useState(6)
 
-      if (res.distanceKm) {
-        setDistanceKm(res.distanceKm)
+  // Impostos Fiscais
+  const [pisRate, setPisRate] = useState(1.65)
+  const [cofinsRate, setCofinsRate] = useState(7.6)
+  const [issRate, setIssRate] = useState(3.5)
+  const [csllRate, setCsllRate] = useState(1.08)
+  const [irpjRate, setIrpjRate] = useState(4.8)
+  const [irDiffRate, setIrDiffRate] = useState(0.96)
+
+  // Lista de marcas presentes nos itens para gerar a metodologia dinâmica
+  const distinctBrands = useMemo(() => {
+    const brands = new Set<string>()
+    items.forEach((it) => {
+      if (it.bermo_specs?.productBrand) {
+        brands.add(it.bermo_specs.productBrand)
       }
+    })
+    return Array.from(brands)
+  }, [items])
 
-      if (res.originInfo?.city && (!originAddress || originAddress.includes('Blumenau'))) {
-        setOriginAddress(
-          `${res.originInfo.address ? res.originInfo.address + ', ' : ''}${res.originInfo.city} - ${res.originInfo.state || 'SC'}`,
-        )
-      }
+  // Filtragem de fornecedores para o Combobox/Busca inteligente
+  const filteredSuppliers = useMemo(() => {
+    const q = (supplierSearchQuery || modelSearchInput || '').trim().toLowerCase()
+    if (!q) return SUPPLIERS_DATABASE
+    return SUPPLIERS_DATABASE.filter(
+      (p) =>
+        p.code.toLowerCase().includes(q) ||
+        p.model.toLowerCase().includes(q) ||
+        p.name.toLowerCase().includes(q) ||
+        p.brand.toLowerCase().includes(q),
+    )
+  }, [supplierSearchQuery, modelSearchInput])
 
-      if (res.destinationInfo?.city) {
-        setDestinationAddress(
-          `${res.destinationInfo.address ? res.destinationInfo.address + ', ' : ''}${res.destinationInfo.city} - ${res.destinationInfo.state || 'SP'}`,
-        )
+  // Aplica produto selecionado ou buscado da base de fornecedores
+  const applySupplierProduct = (prod: BermoProductItem) => {
+    setSelectedBermoCode(prod.code)
+    setModelSearchInput(prod.model || prod.code)
+    setMatchedSupplierInfo(prod)
+    setShowSupplierDropdown(false)
+
+    setProductBasePrice(prod.basePrice)
+    const servPrice = Math.round(prod.basePrice * 0.4)
+    setServiceBasePrice(servPrice)
+
+    if (prod.specs.pressure) setOperatingPressure(prod.specs.pressure.replace(/\D/g, '') || '16')
+    if (prod.specs.connection) setEquipmentSize(prod.specs.connection)
+    if (prod.specs.material) setFrameMaterial(prod.specs.material)
+    if (prod.specs.gasketMaterial) setGasketType(prod.specs.gasketMaterial)
+    if (prod.specs.plateDimensions) setPlateDimensions(prod.specs.plateDimensions)
+
+    if (prod.specs.platesRange) {
+      const match = prod.specs.platesRange.match(/(\d+)/)
+      if (match) {
+        setPlatesCount(match[1])
+        setGasketsCount(match[1])
       }
-    } finally {
-      setIsCalculatingRoute(false)
+    }
+
+    // Atualiza o primeiro item
+    if (items.length > 0) {
+      const updated = [...items]
+      const brand = prod.brand || 'BERMO'
+      const methodName = getStandardServiceMethodology([brand])
+      updated[0] = {
+        ...updated[0],
+        name: `Serviço Especializado de Manutenção: ${prod.name}`,
+        unit_price: servPrice,
+        total: servPrice,
+        description: updated[0].description || methodName,
+        bermo_specs: {
+          ...(updated[0].bermo_specs || {}),
+          productCode: prod.code,
+          productName: prod.name,
+          productModel: prod.model,
+          productBrand: prod.brand,
+          equipmentSize: prod.specs.connection,
+          frameMaterial: prod.specs.material,
+          gasketType: prod.specs.gasketMaterial || updated[0].bermo_specs?.gasketType,
+          plateDimensions: prod.specs.plateDimensions || updated[0].bermo_specs?.plateDimensions,
+          productBasePrice: prod.basePrice,
+          serviceBasePrice: servPrice,
+        },
+      }
+      setItems(updated)
     }
   }
 
-  // Função para carregar uma proposta existente no formulário para edição completa
+  // Busca manual quando o usuário digita qualquer modelo
+  const handleModelSearchChange = (typedValue: string) => {
+    setModelSearchInput(typedValue)
+    setSupplierSearchQuery(typedValue)
+    setShowSupplierDropdown(true)
+
+    // Tenta encontrar match exato ou aproximado
+    const match = searchSupplierProduct(typedValue)
+    if (match) {
+      setMatchedSupplierInfo(match)
+      setSelectedBermoCode(match.code)
+      setProductBasePrice(match.basePrice)
+      const servPrice = Math.round(match.basePrice * 0.4)
+      setServiceBasePrice(servPrice)
+
+      if (match.specs.pressure)
+        setOperatingPressure(match.specs.pressure.replace(/\D/g, '') || '16')
+      if (match.specs.connection) setEquipmentSize(match.specs.connection)
+      if (match.specs.material) setFrameMaterial(match.specs.material)
+      if (match.specs.gasketMaterial) setGasketType(match.specs.gasketMaterial)
+      if (match.specs.plateDimensions) setPlateDimensions(match.specs.plateDimensions)
+      if (match.specs.platesRange) {
+        const pMatch = match.specs.platesRange.match(/(\d+)/)
+        if (pMatch) {
+          setPlatesCount(pMatch[1])
+          setGasketsCount(pMatch[1])
+        }
+      }
+    } else {
+      setMatchedSupplierInfo(null)
+      setSelectedBermoCode(typedValue.toUpperCase())
+    }
+  }
+
+  // Abre modal de novo orçamento
+  const handleOpenNewQuote = () => {
+    setIsEditMode(false)
+    setEditingQuoteId(null)
+    setQuoteNumber(`INT-2025-${Math.floor(100 + Math.random() * 900)}`)
+    setClientId(clients.length > 0 ? clients[0].id : '')
+    setValidityDays(10)
+    setPaymentCondition('28_ddl')
+    setCustomPaymentCondition('')
+    setNotes(
+      'Orçamento técnico com metodologia rigorosa de normas industriais e recomendações dos fabricantes. Inclui desmontagem com Medida A, limpeza controlada, inspeção e estanqueidade.',
+    )
+
+    const defaultBermo = BERMO_CATALOG.find((p) => p.code === 'BP30') || BERMO_CATALOG[0]
+    setSelectedBermoCode(defaultBermo.code)
+    setModelSearchInput(defaultBermo.model)
+    setMatchedSupplierInfo(defaultBermo)
+    setProductBasePrice(defaultBermo.basePrice)
+    const servPrice = Math.round(defaultBermo.basePrice * 0.4)
+    setServiceBasePrice(servPrice)
+    setIncludeProductCost(false)
+
+    setPlatesCount('40')
+    setPlateDimensions(defaultBermo.specs.plateDimensions || '680 x 280 mm')
+    setGasketsCount('40')
+    setWorkAreaDifficulty('Médio')
+    setWorkAreaObservations('')
+    setNeedsIntegration('Não')
+    setIntegrationTiming('same_day')
+    setIntegrationObservations('')
+    setPipeMeasurement('DN50 (2 pol)')
+    setMaintenanceMaterials([])
+
+    // Item inicial com metodologia padronizada
+    const initialMethodology = getStandardServiceMethodology([defaultBermo.brand])
+    setItems([
+      {
+        name: `Serviço Especializado BERMO: ${defaultBermo.name}`,
+        quantity: 1,
+        unit_price: servPrice,
+        discount: 0,
+        total: servPrice,
+        description: initialMethodology,
+        include_product_cost: false,
+        bermo_specs: {
+          productCode: defaultBermo.code,
+          productName: defaultBermo.name,
+          productModel: defaultBermo.model,
+          productBrand: defaultBermo.brand,
+          equipmentSize: defaultBermo.specs.connection,
+          frameMaterial: defaultBermo.specs.material,
+          gasketType: defaultBermo.specs.gasketMaterial,
+          platesCount: '40',
+          plateDimensions: defaultBermo.specs.plateDimensions || '680 x 280 mm',
+          gasketsCount: '40',
+          workAreaDifficulty: 'Médio',
+          needsIntegration: 'Não',
+          pipeMeasurement: 'DN50 (2 pol)',
+          includeProductCost: false,
+          productBasePrice: defaultBermo.basePrice,
+          serviceBasePrice: servPrice,
+        },
+      },
+    ])
+
+    // Preenche destino se houver cliente selecionado
+    if (clients.length > 0) {
+      const c = clients[0]
+      setDestinationAddress(`${c.city || ''} / ${c.state || 'SC'}`)
+    }
+
+    setIsCreateModalOpen(true)
+  }
+
+  // Abre modal para edição completa de orçamento existente
   const handleOpenEditQuote = (quote: QuoteRecord) => {
-    onSelectQuote(quote)
     setIsEditMode(true)
     setEditingQuoteId(quote.id)
-    setQuoteNumber(quote.quote_number || '')
+    setQuoteNumber(quote.quote_number)
     setClientId(quote.client_id || '')
     setNotes(quote.notes || '')
 
     const firstItem = quote.items && quote.items.length > 0 ? quote.items[0] : null
-    const specs = quote.service_details?.service_technical_specs || firstItem?.bermo_specs || {}
+    const specs = firstItem?.bermo_specs || quote.service_details?.service_technical_specs
 
-    if (specs.productCode) setSelectedBermoCode(specs.productCode)
-    if (specs.platesCount !== undefined) setPlatesCount(specs.platesCount)
-    if (specs.plateDimensions) setPlateDimensions(specs.plateDimensions)
-    if (specs.gasketsCount !== undefined) setGasketsCount(specs.gasketsCount)
-    if (specs.serviceScope) setServiceScope(specs.serviceScope)
-    if (specs.fluidType) setFluidType(specs.fluidType)
-    if (specs.fluidName) setFluidName(specs.fluidName)
-    if (specs.inletTemp !== undefined) setInletTemp(specs.inletTemp)
-    if (specs.outletTemp !== undefined) setOutletTemp(specs.outletTemp)
-    if (specs.operatingPressure !== undefined) setOperatingPressure(specs.operatingPressure)
-    if (specs.flowRate !== undefined) setFlowRate(specs.flowRate)
-    if (specs.pressureDrop !== undefined) setPressureDrop(specs.pressureDrop)
-    if (specs.equipmentSize) setEquipmentSize(specs.equipmentSize)
-    if (specs.frameMaterial) setFrameMaterial(specs.frameMaterial)
-    if (specs.gasketType) setGasketType(specs.gasketType)
-    // Novos campos 3A
-    if (specs.workAreaDifficulty) setWorkAreaDifficulty(specs.workAreaDifficulty)
-    if (specs.workAreaObservations !== undefined)
-      setWorkAreaObservations(specs.workAreaObservations)
-    if (specs.needsIntegration) setNeedsIntegration(specs.needsIntegration)
-    if (specs.integrationTiming) setIntegrationTiming(specs.integrationTiming)
-    if (specs.integrationObservations !== undefined)
-      setIntegrationObservations(specs.integrationObservations)
-    if (specs.pipeMeasurement !== undefined) setPipeMeasurement(specs.pipeMeasurement)
+    if (specs) {
+      const code = specs.productCode || 'BP30'
+      setSelectedBermoCode(code)
+      setModelSearchInput(specs.productModel || code)
+      const found = searchSupplierProduct(code)
+      setMatchedSupplierInfo(found || null)
 
-    // Toggle include product cost
-    const hasIncludedProductCost =
-      specs.includeProductCost ?? firstItem?.include_product_cost ?? false
-    setIncludeProductCost(hasIncludedProductCost)
+      if (specs.fluidType) setFluidType(specs.fluidType)
+      if (specs.fluidName) setFluidName(specs.fluidName)
+      if (specs.inletTemp) setInletTemp(specs.inletTemp)
+      if (specs.outletTemp) setOutletTemp(specs.outletTemp)
+      if (specs.operatingPressure) setOperatingPressure(specs.operatingPressure)
+      if (specs.flowRate) setFlowRate(specs.flowRate)
+      if (specs.pressureDrop) setPressureDrop(specs.pressureDrop)
+      if (specs.equipmentSize) setEquipmentSize(specs.equipmentSize)
+      if (specs.frameMaterial) setFrameMaterial(specs.frameMaterial)
+      if (specs.gasketType) setGasketType(specs.gasketType)
+      if (specs.serviceScope) setServiceScope(specs.serviceScope)
 
-    const prd = BERMO_CATALOG.find((p) => p.code === (specs.productCode || selectedBermoCode))
-    if (prd) {
-      setProductBasePrice(specs.productBasePrice || prd.basePrice)
+      if (specs.platesCount) setPlatesCount(specs.platesCount)
+      if (specs.plateDimensions) setPlateDimensions(specs.plateDimensions)
+      if (specs.gasketsCount) setGasketsCount(specs.gasketsCount)
+
+      if (specs.workAreaDifficulty) setWorkAreaDifficulty(specs.workAreaDifficulty)
+      if (specs.workAreaObservations) setWorkAreaObservations(specs.workAreaObservations)
+      if (specs.needsIntegration) setNeedsIntegration(specs.needsIntegration)
+      if (specs.integrationTiming) setIntegrationTiming(specs.integrationTiming)
+      if (specs.integrationObservations) setIntegrationObservations(specs.integrationObservations)
+      if (specs.pipeMeasurement) setPipeMeasurement(specs.pipeMeasurement)
+
+      setIncludeProductCost(specs.includeProductCost ?? false)
+      if (specs.productBasePrice) setProductBasePrice(specs.productBasePrice)
+      if (specs.serviceBasePrice) setServiceBasePrice(specs.serviceBasePrice)
     }
-    if (specs.serviceBasePrice !== undefined) {
-      setServiceBasePrice(specs.serviceBasePrice)
-    } else if (firstItem) {
-      setServiceBasePrice(
-        hasIncludedProductCost && prd
-          ? Math.max(0, firstItem.unit_price - prd.basePrice)
-          : firstItem.unit_price,
-      )
+
+    if (quote.service_details?.maintenance_materials) {
+      setMaintenanceMaterials(quote.service_details.maintenance_materials)
+    } else {
+      setMaintenanceMaterials([])
+    }
+
+    if (quote.service_details?.labor_costs) {
+      const l = quote.service_details.labor_costs
+      setTechCount(l.techMechanical?.count ?? 1)
+      setTechHours(l.techMechanical?.hours ?? 16)
+      setTechRate(l.techMechanical?.ratePerHour ?? 85)
+      setHelperCount(l.helper?.count ?? 1)
+      setHelperHours(l.helper?.hours ?? 16)
+      setHelperRate(l.helper?.ratePerHour ?? 50)
+      setInspectorCount(l.inspectorNDT?.count ?? 1)
+      setInspectorHours(l.inspectorNDT?.hours ?? 8)
+      setInspectorRate(l.inspectorNDT?.ratePerHour ?? 110)
+    }
+
+    if (quote.service_details?.travel_costs) {
+      const t = quote.service_details.travel_costs
+      setOriginCep(t.originCep || '89066-000')
+      setOriginAddress(t.originAddress || 'Rua Bernardo Reiter, 500 - Blumenau/SC')
+      setDestinationCep(t.destinationCep || '')
+      setDestinationAddress(t.destinationAddress || '')
+      setDistanceKm(t.distanceKm || 85)
+      setFuelPrice(t.fuelPrice || 5.89)
+      setConsumptionKmL(t.consumptionKmL || 9.5)
+      setTollRoadPercent(t.tollRoadPercent || 40)
+      setManualFuelAdj(t.manualFuelAdjustment || 0)
+      setManualTollAdj(t.manualTollAdjustment || 0)
+    }
+
+    if (quote.service_details?.lodging_meals_costs) {
+      const lm = quote.service_details.lodging_meals_costs
+      setHotelDays(lm.hotelDays ?? 1)
+      setHotelRate(lm.hotelRatePerDay ?? 180)
+      setMealsDays(lm.mealsDays ?? 2)
+      setMealsRate(lm.mealsRatePerDay ?? 75)
+    }
+
+    if (quote.service_details?.indirect_costs) {
+      const ind = quote.service_details.indirect_costs
+      setServiceMargin(ind.serviceMarginPercent ?? 25)
+      setAdminCost(ind.administrativeCostPercent ?? 15)
+      setSalesCommission(ind.salesCommissionPercent ?? 6)
+      if (ind.taxes) {
+        setPisRate(ind.taxes.pis ?? 1.65)
+        setCofinsRate(ind.taxes.cofins ?? 7.6)
+        setIssRate(ind.taxes.iss ?? 3.5)
+        setCsllRate(ind.taxes.csll ?? 1.08)
+        setIrpjRate(ind.taxes.irpj ?? 4.8)
+        setIrDiffRate(ind.taxes.irDiff ?? 0.96)
+      }
+    }
+
+    if (quote.service_details?.payment_and_validity) {
+      const pv = quote.service_details.payment_and_validity
+      setValidityDays(pv.validityDays ?? 10)
+      setPaymentCondition(pv.conditionType ?? '28_ddl')
+      setCustomPaymentCondition(pv.customConditionText ?? '')
     }
 
     if (quote.items && quote.items.length > 0) {
       setItems(quote.items)
     }
 
-    // Mão de obra
-    const labor = quote.service_details?.labor_costs
-    if (labor?.technician) {
-      setTechCount(labor.technician.professionalsCount || 1)
-      setTechHours(labor.technician.estimatedHours || 16)
-      setTechRate(labor.technician.hourlyRate || 180)
-    }
-    if (labor?.helper) {
-      setHelperCount(labor.helper.professionalsCount || 1)
-      setHelperHours(labor.helper.estimatedHours || 16)
-      setHelperRate(labor.helper.hourlyRate || 95)
-    }
-    if (labor?.inspector) {
-      setInspectorCount(labor.inspector.professionalsCount || 1)
-      setInspectorHours(labor.inspector.estimatedHours || 4)
-      setInspectorRate(labor.inspector.hourlyRate || 240)
-    }
-
-    // Deslocamento Mapeia
-    const travel = quote.service_details?.travel_costs
-    if (travel) {
-      if (travel.originAddress) setOriginAddress(travel.originAddress)
-      if (travel.originCep) setOriginCep(travel.originCep)
-      if (travel.destinationAddress) setDestinationAddress(travel.destinationAddress)
-      if (travel.destinationCep) setDestinationCep(travel.destinationCep)
-      if (travel.distanceKm) setDistanceKm(travel.distanceKm)
-      if (travel.roundTrip !== undefined) setRoundTrip(travel.roundTrip)
-      if (travel.fuelConsumptionKmL) setConsumptionKmL(travel.fuelConsumptionKmL)
-      if (travel.fuelPricePerLiter) setFuelPrice(travel.fuelPricePerLiter)
-      if (travel.tollRoadPercentage !== undefined) setTollRoadPercent(travel.tollRoadPercentage)
-      if (travel.tollRatePerKm) setTollRateKm(travel.tollRatePerKm)
-      if (travel.manualFuelAdjustment !== undefined) setManualFuelAdj(travel.manualFuelAdjustment)
-      if (travel.manualTollAdjustment !== undefined) setManualTollAdj(travel.manualTollAdjustment)
-    }
-
-    // Hospedagem
-    const lodging = quote.service_details?.lodging_meals_costs
-    if (lodging) {
-      if (lodging.hotelDailyCount !== undefined) setHotelDays(lodging.hotelDailyCount)
-      if (lodging.hotelDailyRate !== undefined) setHotelRate(lodging.hotelDailyRate)
-      if (lodging.mealsDailyCount !== undefined) setMealsDays(lodging.mealsDailyCount)
-      if (lodging.mealsDailyRate !== undefined) setMealsRate(lodging.mealsDailyRate)
-    }
-
-    // Custos Indiretos
-    const indirect = quote.service_details?.indirect_costs
-    if (indirect) {
-      if (indirect.serviceMarginPercent !== undefined)
-        setServiceMargin(indirect.serviceMarginPercent)
-      if (indirect.administrativeCostPercent !== undefined)
-        setAdminCost(indirect.administrativeCostPercent)
-      if (indirect.salesCommissionPercent !== undefined)
-        setSalesCommission(indirect.salesCommissionPercent)
-      if (indirect.taxes) {
-        if (indirect.taxes.pis !== undefined) setPisRate(indirect.taxes.pis)
-        if (indirect.taxes.cofins !== undefined) setCofinsRate(indirect.taxes.cofins)
-        if (indirect.taxes.iss !== undefined) setIssRate(indirect.taxes.iss)
-        if (indirect.taxes.csll !== undefined) setCsllRate(indirect.taxes.csll)
-        if (indirect.taxes.irpj !== undefined) setIrpjRate(indirect.taxes.irpj)
-        if (indirect.taxes.irDifference !== undefined) setIrDiffRate(indirect.taxes.irDifference)
-      }
-    }
-
-    // Condições
-    const payment = quote.service_details?.payment_and_validity
-    if (payment) {
-      if (payment.validityDays !== undefined) setValidityDays(payment.validityDays)
-      if (payment.conditionType) setPaymentCondition(payment.conditionType)
-      if (payment.customConditionText !== undefined)
-        setCustomPaymentCondition(payment.customConditionText)
-    }
-
     setIsCreateModalOpen(true)
   }
 
-  const handleOpenNewQuote = () => {
-    setIsEditMode(false)
-    setEditingQuoteId(null)
-    setQuoteNumber(`INT-2025-00${quotes.length + 1}`)
-    setIncludeProductCost(false) // Por padrão DESMARCADO (empresa é assistência técnica)
-    const prd = BERMO_CATALOG.find((p) => p.code === selectedBermoCode)
-    if (prd) {
-      setProductBasePrice(prd.basePrice)
-      setServiceBasePrice(Math.round(prd.basePrice * 0.45))
+  // Manipulação de Materiais de Manutenção (Custo Interno)
+  const handleAddMaterial = () => {
+    if (!newMaterialDesc.trim()) return
+    const amt = parseFloat(newMaterialAmount.replace(',', '.')) || 0
+    if (amt <= 0) return
+
+    const newMat: MaintenanceMaterialItem = {
+      id: `mat-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      description: newMaterialDesc.trim(),
+      amount: amt,
     }
-    setIsCreateModalOpen(true)
+    setMaintenanceMaterials([...maintenanceMaterials, newMat])
+    setNewMaterialDesc('')
+    setNewMaterialAmount('')
   }
 
-  // Sincronizar dados ao selecionar produto BERMO (carrega automaticamente especificações técnicas)
-  // REGRA: Informações técnicas SEMPRE aparecem. Custo do produto NÃO é incluído automaticamente por padrão.
-  const handleSelectBermoProduct = (code: string) => {
-    setSelectedBermoCode(code)
-    const prd = BERMO_CATALOG.find((p) => p.code === code)
-    if (prd) {
-      setProductBasePrice(prd.basePrice)
-      const servicePrice = Math.round(prd.basePrice * 0.45)
-      setServiceBasePrice(servicePrice)
-
-      // 1. Número de placas
-      const autoPlates = prd.specs.platesCount !== undefined ? prd.specs.platesCount : ''
-      setPlatesCount(autoPlates)
-
-      // 2. Dimensão das placas / Dimensões do equipamento
-      const autoPlateDims = prd.specs.plateDimensions || prd.specs.dimensions || ''
-      setPlateDimensions(autoPlateDims)
-
-      // 3. Quantidade de gaxetas
-      const autoGaskets = prd.specs.gasketsCount !== undefined ? prd.specs.gasketsCount : ''
-      setGasketsCount(autoGaskets)
-
-      // Conexão / Tamanho do equipamento
-      const autoEqSize = prd.specs.connection
-        ? `${prd.specs.connection}${autoPlates ? ` / ${autoPlates} Placas` : ''}`
-        : autoPlates
-          ? `${autoPlates} Placas`
-          : equipmentSize
-      setEquipmentSize(autoEqSize)
-
-      // Materiais e tipo de vedação
-      if (prd.specs.gaskets) setGasketType(prd.specs.gaskets.split('/')[0].trim())
-      if (prd.specs.materials) setFrameMaterial(prd.specs.materials.split('/')[0].trim())
-
-      // Valor unitário do item: apenas serviço quando toggle = false; serviço + produto quando toggle = true
-      const finalUnitPrice = includeProductCost ? servicePrice + prd.basePrice : servicePrice
-
-      // Atualizar primeiro item da proposta com todas as especificações técnicas
-      const updated = [...items]
-      updated[0] = {
-        name: `Prestação de Serviços em ${prd.name}`,
-        quantity: 1,
-        unit_price: finalUnitPrice,
-        discount: 0,
-        total: finalUnitPrice,
-        include_product_cost: includeProductCost,
-        bermo_specs: {
-          productCode: prd.code,
-          productName: prd.name,
-          productModel: prd.model,
-          productBrand: prd.brand,
-          serviceScope,
-          fluidType,
-          inletTemp,
-          outletTemp,
-          operatingPressure,
-          flowRate,
-          equipmentSize: autoEqSize,
-          platesCount: autoPlates,
-          plateDimensions: autoPlateDims,
-          gasketsCount: autoGaskets,
-          frameMaterial: prd.specs.materials
-            ? prd.specs.materials.split('/')[0].trim()
-            : frameMaterial,
-          gasketType: prd.specs.gaskets ? prd.specs.gaskets.split('/')[0].trim() : gasketType,
-          includeProductCost: includeProductCost,
-          productBasePrice: prd.basePrice,
-          serviceBasePrice: servicePrice,
-        },
-      }
-      setItems(updated)
-    }
+  const handleRemoveMaterial = (id: string) => {
+    setMaintenanceMaterials(maintenanceMaterials.filter((m) => m.id !== id))
   }
 
-  // Handler para alternar a inclusão do custo de compra do produto
-  const handleToggleIncludeProductCost = (included: boolean) => {
-    setIncludeProductCost(included)
-    const prd = BERMO_CATALOG.find((p) => p.code === selectedBermoCode)
-    const baseP = productBasePrice || prd?.basePrice || 0
-    const srvP = serviceBasePrice || 6500
+  const maintenanceMaterialsTotal = useMemo(() => {
+    return maintenanceMaterials.reduce((sum, m) => sum + (m.amount || 0), 0)
+  }, [maintenanceMaterials])
 
-    const finalUnitPrice = included ? srvP + baseP : srvP
+  // Recalculo da rota via CEP
+  const handleRecalculateRoute = async (destCep?: string, origCep?: string) => {
+    setIsCalculatingRoute(true)
+    const targetDest = destCep || destinationCep
+    const targetOrig = origCep || originCep
 
-    const updated = [...items]
-    if (updated.length > 0) {
-      const qty = updated[0].quantity || 1
-      const disc = updated[0].discount || 0
-      updated[0] = {
-        ...updated[0],
-        unit_price: finalUnitPrice,
-        total: Math.max(0, qty * finalUnitPrice - disc),
-        include_product_cost: included,
-        bermo_specs: {
-          ...(updated[0].bermo_specs || {}),
-          includeProductCost: included,
-          productBasePrice: baseP,
-          serviceBasePrice: srvP,
-        },
-      }
-      setItems(updated)
-    }
-  }
-
-  // Handler para submeter e salvar um novo cliente diretamente do orçamento
-  const handleQuickCreateClient = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!newClientName.trim()) return
-
-    setIsCreatingClientLoading(true)
     try {
-      const newClientPayload: Partial<ClientRecord> = {
-        name: newClientName.trim(),
-        document: newClientDocument.trim() || undefined,
-        phone: newClientPhone.trim() || undefined,
-        whatsapp: newClientPhone.trim() || undefined,
-        email: newClientEmail.trim() || undefined,
-        address: newClientAddress.trim() || undefined,
-        city: newClientCity.trim() || undefined,
-        state: newClientState.trim() || undefined,
-        status: 'prospect',
-        score: 85,
-        notes: 'Cliente cadastrado diretamente pelo gerador de orçamentos BERMO.',
-        assigned_to: 'Alex Nogueia',
+      const res = await calculateDistanceBetweenCeps(
+        targetOrig,
+        targetDest,
+        fuelPrice,
+        consumptionKmL,
+        tollRoadPercent,
+      )
+      setDistanceKm(res.distanceKm)
+      if (res.destinationCity) {
+        setDestinationAddress(`${res.destinationCity} / ${res.destinationState || 'SC'}`)
       }
-
-      let createdId = ''
-      if (onCreateClient) {
-        const res = await onCreateClient(newClientPayload)
-        if (res && (res as ClientRecord).id) {
-          createdId = (res as ClientRecord).id
-        }
-      }
-
-      // Se o callback não retornou o id direto mas a lista de clientes foi atualizada
-      if (createdId) {
-        setClientId(createdId)
-      } else {
-        // Fallback: aguardar render ou pegar pelo nome
-        setTimeout(() => {
-          const match = clients.find(
-            (c) => c.name.toLowerCase() === newClientName.trim().toLowerCase(),
-          )
-          if (match) setClientId(match.id)
-        }, 300)
-      }
-
-      // Preencher destino imediatamente caso endereço/cidade informados
-      if (newClientAddress || newClientCity) {
-        setDestinationAddress(
-          `${newClientAddress ? newClientAddress + ', ' : ''}${newClientCity || ''}${newClientState ? ' - ' + newClientState : ''}`,
-        )
-      }
-
-      // Limpar formulário de cliente rápido
-      setNewClientName('')
-      setNewClientDocument('')
-      setNewClientPhone('')
-      setNewClientEmail('')
-      setNewClientAddress('')
-      setNewClientCity('')
-      setNewClientState('')
-      setIsNewClientModalOpen(false)
-    } catch (err) {
-      console.error('Erro ao salvar cliente no orçamento:', err)
+    } catch (e) {
+      console.warn('Erro ao calcular rota:', e)
     } finally {
-      setIsCreatingClientLoading(false)
+      setIsCalculatingRoute(false)
     }
   }
 
-  const handleApplyPreset = (tplId: string) => {
-    const tpl = TEMPLATE_PRESETS.find((t) => t.id === tplId)
-    if (!tpl) return
-
-    setSelectedBermoCode(tpl.productCode)
-    setServiceScope(tpl.serviceScope)
-    setFluidType(tpl.fluid)
-    setInletTemp(tpl.tempIn)
-    setOutletTemp(tpl.tempOut)
-    setOperatingPressure(tpl.pressure)
-    setFlowRate(tpl.flow)
-    setTechHours(tpl.laborTechHours)
-    setHelperHours(tpl.laborHelperHours)
-    setInspectorHours(tpl.laborInspectorHours)
-    setDistanceKm(tpl.distanceKm)
-    setHotelDays(tpl.hotelDays)
-    setMealsDays(tpl.mealsDays)
-    if (tpl.terms === '14 DDL') setPaymentCondition('14_ddl')
-    else if (tpl.terms === '28 DDL') setPaymentCondition('28_ddl')
-    else if (tpl.terms === '30 DDL') setPaymentCondition('30_ddl')
-
-    const prd = BERMO_CATALOG.find((p) => p.code === tpl.productCode)
-    if (prd) {
-      setPlatesCount(prd.specs.platesCount !== undefined ? prd.specs.platesCount : '')
-      setPlateDimensions(prd.specs.plateDimensions || prd.specs.dimensions || '')
-      setGasketsCount(prd.specs.gasketsCount !== undefined ? prd.specs.gasketsCount : '')
-      if (prd.specs.connection) setEquipmentSize(prd.specs.connection)
-    }
-
-    setIncludeProductCost(false) // Padrão assistência técnica: não inclui custo do produto
-    if (prd) {
-      setProductBasePrice(prd.basePrice)
-      setServiceBasePrice(5800)
-    }
-
-    setItems([
-      {
-        name: tpl.defaultItemName,
-        quantity: 1,
-        unit_price: 5800,
-        discount: 0,
-        total: 5800,
-        include_product_cost: false,
-        bermo_specs: {
-          productCode: tpl.productCode,
-          productName: prd?.name,
-          productModel: prd?.model,
-          productBrand: prd?.brand,
-          serviceScope: tpl.serviceScope,
-          fluidType: tpl.fluid as any,
-          inletTemp: tpl.tempIn,
-          outletTemp: tpl.tempOut,
-          operatingPressure: tpl.pressure,
-          flowRate: tpl.flow,
-          equipmentSize: prd?.specs.connection,
-          platesCount: prd?.specs.platesCount,
-          plateDimensions: prd?.specs.plateDimensions || prd?.specs.dimensions,
-          gasketsCount: prd?.specs.gasketsCount,
-          includeProductCost: false,
-          productBasePrice: prd?.basePrice,
-          serviceBasePrice: 5800,
-        },
-      },
-    ])
-    setNotes(`Orçamento estruturado com base no ${tpl.name}. Validade: 10 dias úteis.`)
-  }
-
-  // Cálculos em tempo real
+  // Cálculos de Mão de Obra
   const laborTechTotal = techCount * techHours * techRate
   const laborHelperTotal = helperCount * helperHours * helperRate
   const laborInspectorTotal = inspectorCount * inspectorHours * inspectorRate
   const laborTotal = laborTechTotal + laborHelperTotal + laborInspectorTotal
 
-  const effectiveDistance = roundTrip ? distanceKm * 2 : distanceKm
-  const baseFuelCost =
-    Math.round((effectiveDistance / Math.max(consumptionKmL, 1)) * fuelPrice * 100) / 100
-  const baseTollCost =
-    Math.round(effectiveDistance * (tollRoadPercent / 100) * tollRateKm * 100) / 100
-  const travelFuelCost = baseFuelCost + Number(manualFuelAdj || 0)
-  const travelTollCost = baseTollCost + Number(manualTollAdj || 0)
-  const travelTotal = Math.max(0, travelFuelCost + travelTollCost)
+  // Cálculos de Logística
+  const roundTripKm = distanceKm * 2
+  const litersNeeded = roundTripKm / (consumptionKmL || 9.5)
+  const baseFuelCost = Math.round(litersNeeded * fuelPrice * 100) / 100
+  const estimatedTolls = Math.max(1, Math.round((distanceKm / 80) * (tollRoadPercent / 100)))
+  const baseTollCost = estimatedTolls * 14.5
+  const travelTotal = baseFuelCost + baseTollCost + manualFuelAdj + manualTollAdj
 
-  const hotelTotal = hotelDays * hotelRate
-  const mealsTotal = mealsDays * mealsRate
-  const lodgingMealsTotal = hotelTotal + mealsTotal
+  // Cálculos de Hospedagem & Alimentação
+  const lodgingMealsTotal = hotelDays * hotelRate + mealsDays * mealsRate
 
-  const laborCostsObj: LaborCosts = {
-    technician: {
-      professionalsCount: techCount,
-      estimatedHours: techHours,
-      hourlyRate: techRate,
+  // Estruturas de Dados
+  const laborCostsObj = {
+    techMechanical: {
+      count: techCount,
+      hours: techHours,
+      ratePerHour: techRate,
       total: laborTechTotal,
     },
     helper: {
-      professionalsCount: helperCount,
-      estimatedHours: helperHours,
-      hourlyRate: helperRate,
+      count: helperCount,
+      hours: helperHours,
+      ratePerHour: helperRate,
       total: laborHelperTotal,
     },
-    inspector: {
-      professionalsCount: inspectorCount,
-      estimatedHours: inspectorHours,
-      hourlyRate: inspectorRate,
+    inspectorNDT: {
+      count: inspectorCount,
+      hours: inspectorHours,
+      ratePerHour: inspectorRate,
       total: laborInspectorTotal,
     },
-    total: laborTotal,
+    totalLabor: laborTotal,
   }
 
-  const travelCostsObj: TravelCosts = {
-    originAddress,
+  const travelCostsObj = {
     originCep,
-    destinationAddress,
+    originAddress,
     destinationCep,
+    destinationAddress,
     distanceKm,
-    roundTrip,
-    fuelConsumptionKmL: consumptionKmL,
-    fuelPricePerLiter: fuelPrice,
-    tollRoadPercentage: tollRoadPercent,
-    tollRatePerKm: tollRateKm,
+    fuelPrice,
+    consumptionKmL,
+    tollRoadPercent,
     calculatedFuelCost: baseFuelCost,
     calculatedTollCost: baseTollCost,
-    manualFuelAdjustment: Number(manualFuelAdj || 0),
-    manualTollAdjustment: Number(manualTollAdj || 0),
-    total: travelTotal,
+    manualFuelAdjustment: manualFuelAdj,
+    manualTollAdjustment: manualTollAdj,
+    totalTravelCost: travelTotal,
   }
 
-  const lodgingMealsCostsObj: LodgingMealsCosts = {
-    hotelDailyCount: hotelDays,
-    hotelDailyRate: hotelRate,
-    mealsDailyCount: mealsDays,
-    mealsDailyRate: mealsRate,
-    hotelSubtotal: hotelTotal,
-    mealsSubtotal: mealsTotal,
-    total: lodgingMealsTotal,
+  const lodgingMealsCostsObj = {
+    hotelDays,
+    hotelRatePerDay: hotelRate,
+    mealsDays,
+    mealsRatePerDay: mealsRate,
+    totalLodgingMeals: lodgingMealsTotal,
   }
 
-  const customTaxesObj: IndirectTaxes = {
+  const customTaxesObj = {
     pis: pisRate,
     cofins: cofinsRate,
     iss: issRate,
     csll: csllRate,
     irpj: irpjRate,
-    irDifference: irDiffRate,
-    totalTaxesPercentage: 0,
-    calculatedTaxesAmount: 0,
+    irDiff: irDiffRate,
   }
 
-  const computation: QuoteServiceComputation = calculateQuoteServiceComposition({
+  // Motor de Cálculo Rigoroso
+  const computation = calculateQuotePricing({
     items,
-    labor: laborCostsObj,
-    travel: travelCostsObj,
+    laborTotal,
+    travelCosts: travelCostsObj,
     lodgingMeals: lodgingMealsCostsObj,
+    maintenanceMaterialsTotal,
     needsIntegration,
     integrationTiming,
     serviceMarginPercent: serviceMargin,
@@ -826,20 +706,24 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
     customTaxes: customTaxesObj,
   })
 
-  // Itens manipulation
+  // Adição de novo serviço ao orçamento com metodologia padronizada dinâmica
   const handleAddItem = (productId?: string) => {
+    const brandForMethod = matchedSupplierInfo?.brand || 'BERMO'
+    const standardDesc = getStandardServiceMethodology([brandForMethod, ...distinctBrands])
+
     if (productId) {
-      const bermo = BERMO_CATALOG.find((p) => p.id === productId || p.code === productId)
+      const bermo = SUPPLIERS_DATABASE.find((p) => p.id === productId || p.code === productId)
       if (bermo) {
         const servPrice = Math.round(bermo.basePrice * 0.4)
         setItems([
           ...items,
           {
-            name: `Serviço Especializado BERMO: ${bermo.name}`,
+            name: `Serviço Especializado ${bermo.brand}: ${bermo.name}`,
             quantity: 1,
             unit_price: servPrice,
             discount: 0,
             total: servPrice,
+            description: getStandardServiceMethodology([bermo.brand, ...distinctBrands]),
             include_product_cost: false,
             bermo_specs: {
               productCode: bermo.code,
@@ -847,6 +731,9 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               productModel: bermo.model,
               productBrand: bermo.brand,
               equipmentSize: bermo.specs.connection,
+              frameMaterial: bermo.specs.material,
+              gasketType: bermo.specs.gasketMaterial,
+              plateDimensions: bermo.specs.plateDimensions,
               includeProductCost: false,
               productBasePrice: bermo.basePrice,
               serviceBasePrice: servPrice,
@@ -856,14 +743,16 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
         return
       }
     }
+
     setItems([
       ...items,
       {
-        name: 'Serviço Técnico Adicional / Teste de Estanqueidade',
+        name: 'Serviço Técnico de Manutenção & Estanqueidade',
         quantity: 1,
-        unit_price: 1500,
+        unit_price: 2500,
         discount: 0,
-        total: 1500,
+        total: 2500,
+        description: standardDesc,
         include_product_cost: false,
       },
     ])
@@ -882,6 +771,81 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
 
   const handleRemoveItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index))
+  }
+
+  const handleToggleIncludeProductCost = (checked: boolean) => {
+    setIncludeProductCost(checked)
+    if (items.length > 0) {
+      const updated = [...items]
+      const servPrice = serviceBasePrice || 7400
+      const prodPrice = productBasePrice || 18500
+      const unit = checked ? servPrice + prodPrice : servPrice
+      updated[0] = {
+        ...updated[0],
+        unit_price: unit,
+        total: unit * (updated[0].quantity || 1),
+        include_product_cost: checked,
+        bermo_specs: {
+          ...(updated[0].bermo_specs || {}),
+          includeProductCost: checked,
+        },
+      }
+      setItems(updated)
+    }
+  }
+
+  const handleApplyPreset = (tplId: string) => {
+    const tpl = TEMPLATE_PRESETS.find((t) => t.id === tplId)
+    if (!tpl) return
+
+    const bermo = BERMO_CATALOG.find((p) => p.code === tpl.productCode) || BERMO_CATALOG[0]
+    setSelectedBermoCode(bermo.code)
+    setModelSearchInput(bermo.model)
+    setMatchedSupplierInfo(bermo)
+    setProductBasePrice(bermo.basePrice)
+    setServiceBasePrice(tpl.servicePrice)
+    setIncludeProductCost(false)
+
+    setTechCount(tpl.labor.techCount)
+    setTechHours(tpl.labor.techHours)
+    setTechRate(tpl.labor.techRate)
+    setHelperCount(tpl.labor.helperCount)
+    setHelperHours(tpl.labor.helperHours)
+    setHelperRate(tpl.labor.helperRate)
+    setInspectorCount(tpl.labor.inspectorCount)
+    setInspectorHours(tpl.labor.inspectorHours)
+    setInspectorRate(tpl.labor.inspectorRate)
+
+    if (bermo.specs.plateDimensions) setPlateDimensions(bermo.specs.plateDimensions)
+    if (bermo.specs.connection) setEquipmentSize(bermo.specs.connection)
+    if (bermo.specs.material) setFrameMaterial(bermo.specs.material)
+    if (bermo.specs.gasketMaterial) setGasketType(bermo.specs.gasketMaterial)
+
+    const methodology = getStandardServiceMethodology([bermo.brand])
+    setItems([
+      {
+        name: `Serviço Especializado BERMO: ${bermo.name}`,
+        quantity: 1,
+        unit_price: tpl.servicePrice,
+        discount: 0,
+        total: tpl.servicePrice,
+        description: methodology,
+        include_product_cost: false,
+        bermo_specs: {
+          productCode: bermo.code,
+          productName: bermo.name,
+          productModel: bermo.model,
+          productBrand: bermo.brand,
+          equipmentSize: bermo.specs.connection,
+          frameMaterial: bermo.specs.material,
+          gasketType: bermo.specs.gasketMaterial,
+          plateDimensions: bermo.specs.plateDimensions,
+          includeProductCost: false,
+          productBasePrice: bermo.basePrice,
+          serviceBasePrice: tpl.servicePrice,
+        },
+      },
+    ])
   }
 
   const getPaymentTermLabel = (type: PaymentConditionType, custom?: string) => {
@@ -904,11 +868,11 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault()
     const client = clients.find((c) => c.id === clientId)
-    const prd = BERMO_CATALOG.find((p) => p.code === selectedBermoCode)
+    const prd = matchedSupplierInfo || searchSupplierProduct(selectedBermoCode)
 
     const paymentTermsFormatted = getPaymentTermLabel(paymentCondition, customPaymentCondition)
     const validUntilDate = new Date()
-    validUntilDate.setDate(validUntilDate.getDate() + (validityDays || 10) * 1.4) // Aproximação dias corridos p/ dias úteis
+    validUntilDate.setDate(validUntilDate.getDate() + (validityDays || 10) * 1.4)
 
     const quotePayload: Partial<QuoteRecord> = {
       quote_number: quoteNumber || `INT-2025-${Math.floor(100 + Math.random() * 900)}`,
@@ -922,10 +886,10 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
             include_product_cost: includeProductCost,
             bermo_specs: {
               ...(it.bermo_specs || {}),
-              productCode: selectedBermoCode,
-              productName: prd?.name,
-              productModel: prd?.model,
-              productBrand: prd?.brand,
+              productCode: selectedBermoCode || modelSearchInput,
+              productName: prd?.name || it.bermo_specs?.productName || modelSearchInput,
+              productModel: prd?.model || modelSearchInput,
+              productBrand: prd?.brand || it.bermo_specs?.productBrand || 'BERMO',
               serviceScope,
               fluidType,
               fluidName,
@@ -962,14 +926,14 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
       valid_until: validUntilDate.toISOString(),
       notes:
         notes ||
-        `Orçamento de Prestação de Serviços BERMO (${prd?.name || 'Válvulas & Trocadores'}). Assistência Técnica Especializada.`,
-      assigned_to: 'Alex Nogueia - Especialista Técnico Intertermal',
+        `Orçamento de Prestação de Serviços Técnicos (${prd?.name || 'Trocadores & Válvulas'}). Assistência Especializada.`,
+      assigned_to: 'Alex Nogueira - Especialista Técnico Intertermal',
       service_details: {
         service_technical_specs: {
-          productCode: selectedBermoCode,
-          productName: prd?.name,
-          productModel: prd?.model,
-          productBrand: prd?.brand,
+          productCode: selectedBermoCode || modelSearchInput,
+          productName: prd?.name || modelSearchInput,
+          productModel: prd?.model || modelSearchInput,
+          productBrand: prd?.brand || 'BERMO',
           serviceScope,
           fluidType,
           fluidName,
@@ -998,6 +962,8 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
         labor_costs: laborCostsObj,
         travel_costs: travelCostsObj,
         lodging_meals_costs: lodgingMealsCostsObj,
+        maintenance_materials: maintenanceMaterials,
+        maintenance_materials_total: maintenanceMaterialsTotal,
         indirect_costs: {
           serviceMarginPercent: serviceMargin,
           administrativeCostPercent: adminCost,
@@ -1030,7 +996,6 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
   }
 
   const currentViewQuote = selectedQuote || (quotes.length > 0 ? quotes[0] : null)
-  const currentClient = clients.find((c) => c.id === currentViewQuote?.client_id)
 
   const handleOpenPdfPreview = (quoteToPreview?: QuoteRecord) => {
     const q = quoteToPreview || currentViewQuote
@@ -1047,11 +1012,11 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
         <div>
           <h2 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Wrench className="h-6 w-6 text-teal-600 dark:text-teal-400" />
-            Orçamentos de Prestação de Serviços BERMO
+            Orçamentos de Prestação de Serviços BERMO & Alfa Laval
           </h2>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
-            Gerador técnico de propostas com cálculo de mão de obra (3 funções), logística Mapeia,
-            hospedagem e precificação interna da assistência técnica.
+            Gerador técnico de propostas com busca integrada na base de fornecedores, metodologia
+            padronizada, cálculo de mão de obra (3 funções) e logística Mapeia.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -1074,7 +1039,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               className="border-teal-300 dark:border-teal-800 text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950 text-xs"
             >
               <Package className="h-4 w-4 mr-1.5" />
-              Catálogo BERMO
+              Catálogo Fornecedores
             </Button>
           )}
           <Button
@@ -1087,7 +1052,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
         </div>
       </div>
 
-      {/* Modelos Prontos de Serviços BERMO */}
+      {/* Modelos Prontos de Serviços */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         {TEMPLATE_PRESETS.map((tpl) => (
           <Card
@@ -1196,7 +1161,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
           })}
         </div>
 
-        {/* Visualizador da Proposta (Modo Cliente vs Modo Interno com Custos Indiretos) */}
+        {/* Visualizador da Proposta (Modo Cliente vs Modo Interno) */}
         <div className="lg:col-span-8">
           {currentViewQuote ? (
             <Card className="border-slate-300 dark:border-slate-700 shadow-md bg-white dark:bg-slate-950 overflow-hidden">
@@ -1205,14 +1170,14 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-mono tracking-widest text-teal-300 uppercase font-bold">
-                      INTERTERMAL • PROPOSTA DE SERVIÇOS TÉCNICOS BERMO
+                      INTERTERMAL • PROPOSTA DE SERVIÇOS TÉCNICOS
                     </span>
                   </div>
                   <h3 className="text-xl font-extrabold">{currentViewQuote.quote_number}</h3>
                   <p className="text-xs text-slate-300">
                     Emitido por:{' '}
                     {currentViewQuote.assigned_to ||
-                      'Alex Nogueia - Especialista de Aplicações BERMO'}
+                      'Alex Nogueira - Especialista de Aplicações Técnicas'}
                   </p>
                 </div>
 
@@ -1231,7 +1196,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     variant="outline"
                     onClick={() => handleOpenEditQuote(currentViewQuote)}
                     className="h-8 text-xs bg-teal-800/80 hover:bg-teal-700 border-teal-600 text-white font-medium"
-                    title="Abrir proposta completa para conferência e edição de todos os campos"
+                    title="Abrir proposta completa para conferência e edição"
                   >
                     <Wrench className="h-3.5 w-3.5 mr-1" /> Editar Proposta
                   </Button>
@@ -1245,7 +1210,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                           ? 'bg-teal-700 text-white shadow-xs'
                           : 'text-slate-400 hover:text-white'
                       }`}
-                      title="Exibição formal enviada ao cliente (sem custos indiretos)"
+                      title="Exibição formal enviada ao cliente (sem custos indiretos e sem materiais de manutenção)"
                     >
                       <Eye className="h-3 w-3" />
                       Proposta Cliente
@@ -1257,7 +1222,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                           ? 'bg-teal-700 text-white shadow-xs'
                           : 'text-slate-400 hover:text-white'
                       }`}
-                      title="Exibição interna completa com impostos, margem e comissão"
+                      title="Exibição interna completa com impostos, margem, comissão e materiais de manutenção"
                     >
                       <SlidersHorizontal className="h-3 w-3" />
                       Composição Interna
@@ -1301,9 +1266,9 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     <div className="flex items-center gap-2">
                       <ShieldCheck className="h-4 w-4 text-teal-600 shrink-0" />
                       <span>
-                        <strong>Visão Oficial do Cliente:</strong> Exibe apenas dados do cliente,
-                        produtos/serviços BERMO, mão de obra, logística, valor total e condições.
-                        Custos indiretos ocultados.
+                        <strong>Visão Oficial do Cliente:</strong> Exibe itens do serviço com
+                        metodologia, especificações técnicas, inclusões e condições comerciais.
+                        Custos indiretos e materiais internos ocultados.
                       </span>
                     </div>
                   </div>
@@ -1313,8 +1278,8 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                       <SlidersHorizontal className="h-4 w-4 text-amber-600 shrink-0" />
                       <span>
                         <strong>Visão Interna (Intertermal):</strong> Visualização gerencial com
-                        margem de lucro, taxa administrativa, impostos (PIS/COFINS/ISS/CSLL/IRPJ) e
-                        comissão de vendas.
+                        materiais de manutenção, margem de lucro, taxa administrativa, impostos e
+                        comissão.
                       </span>
                     </div>
                   </div>
@@ -1333,7 +1298,8 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                       <Clock className="h-3 w-3 text-slate-400" />
                       Validade da Proposta:{' '}
                       <strong className="text-slate-700 dark:text-slate-300">
-                        10 dias úteis
+                        {currentViewQuote.service_details?.payment_and_validity?.validityDays || 10}{' '}
+                        dias úteis
                       </strong>{' '}
                       da emissão
                     </div>
@@ -1347,21 +1313,21 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                       {currentViewQuote.payment_terms || '28 DDL (28 dias do dia líquido)'}
                     </div>
                     <div className="text-[11px] text-muted-foreground">
-                      Faturamento via boleto bancário mediante aprovação cadastral.
+                      Faturamento via boleto bancário mediante homologação do serviço.
                     </div>
                   </div>
                 </div>
 
-                {/* Tabela de Itens e Serviços BERMO */}
+                {/* Tabela de Itens e Serviços */}
                 <div className="space-y-2">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                    <span>1. Escopo de Serviços & Produtos BERMO</span>
+                    <span>1. Escopo de Serviços & Equipamentos</span>
                   </h4>
                   <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
                     <table className="w-full text-xs text-left">
                       <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 uppercase text-[10px] font-semibold">
                         <tr>
-                          <th className="p-2.5">Descrição do Serviço / Produto BERMO</th>
+                          <th className="p-2.5">Descrição do Serviço / Produto</th>
                           <th className="p-2.5 text-center">Qtd</th>
                           <th className="p-2.5 text-right">Valor Unitário</th>
                           <th className="p-2.5 text-right">Total</th>
@@ -1374,21 +1340,28 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                               key={idx}
                               className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50"
                             >
-                              <td className="p-2.5 space-y-1">
+                              <td className="p-2.5 space-y-1.5">
                                 <div className="font-semibold text-slate-900 dark:text-slate-100">
                                   {item.name}
                                 </div>
+                                {item.description && (
+                                  <div className="text-[11px] text-slate-600 dark:text-slate-300 whitespace-pre-line bg-slate-50 dark:bg-slate-900/40 p-2 rounded border border-slate-100 dark:border-slate-800">
+                                    {item.description}
+                                  </div>
+                                )}
                                 {item.bermo_specs && (
-                                  <div className="text-[11px] text-muted-foreground bg-slate-50 dark:bg-slate-900/70 p-2 rounded border border-slate-100 dark:border-slate-800 space-y-1">
+                                  <div className="text-[11px] text-muted-foreground bg-teal-50/40 dark:bg-teal-950/20 p-2 rounded border border-teal-100 dark:border-teal-900/50 space-y-1">
                                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px]">
                                       {item.bermo_specs.productCode && (
                                         <span>
-                                          Ref: <strong>{item.bermo_specs.productCode}</strong>
+                                          Ref/Modelo:{' '}
+                                          <strong>{item.bermo_specs.productCode}</strong>
                                         </span>
                                       )}
                                       {item.bermo_specs.productBrand && (
                                         <span>
-                                          Marca: <strong>{item.bermo_specs.productBrand}</strong>
+                                          Fabricante:{' '}
+                                          <strong>{item.bermo_specs.productBrand}</strong>
                                         </span>
                                       )}
                                       {item.bermo_specs.platesCount && (
@@ -1402,15 +1375,9 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                                           <strong>{item.bermo_specs.plateDimensions}</strong>
                                         </span>
                                       )}
-                                      {item.bermo_specs.gasketsCount && (
-                                        <span className="text-teal-700 dark:text-teal-400">
-                                          Qtd Gaxetas:{' '}
-                                          <strong>{item.bermo_specs.gasketsCount}</strong>
-                                        </span>
-                                      )}
-                                      {item.bermo_specs.fluidType && (
+                                      {item.bermo_specs.gasketType && (
                                         <span>
-                                          Fluido: <strong>{item.bermo_specs.fluidType}</strong>
+                                          Gaxetas: <strong>{item.bermo_specs.gasketType}</strong>
                                         </span>
                                       )}
                                       {item.bermo_specs.operatingPressure && (
@@ -1419,137 +1386,18 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                                           <strong>{item.bermo_specs.operatingPressure} bar</strong>
                                         </span>
                                       )}
-                                      {item.bermo_specs.inletTemp && (
-                                        <span>
-                                          Temp:{' '}
-                                          <strong>
-                                            {item.bermo_specs.inletTemp}°C →{' '}
-                                            {item.bermo_specs.outletTemp}°C
-                                          </strong>
-                                        </span>
-                                      )}
                                     </div>
-                                    {item.bermo_specs.serviceScope && (
-                                      <div className="text-[10px] text-slate-600 dark:text-slate-300">
-                                        Escopo: {item.bermo_specs.serviceScope}
-                                      </div>
-                                    )}
-
-                                    {/* Exibição dos novos campos do Item 3A */}
-                                    {(item.bermo_specs.workAreaDifficulty ||
-                                      item.bermo_specs.needsIntegration ||
-                                      item.bermo_specs.pipeMeasurement ||
-                                      currentViewQuote.service_details?.service_technical_specs
-                                        ?.workAreaDifficulty ||
-                                      currentViewQuote.service_details?.service_technical_specs
-                                        ?.needsIntegration ||
-                                      currentViewQuote.service_details?.service_technical_specs
-                                        ?.pipeMeasurement) && (
-                                      <div className="pt-1.5 mt-1.5 border-t border-slate-200 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[10px]">
-                                        <div>
-                                          <span className="text-slate-500 block">
-                                            Dificuldade da Área:
-                                          </span>
-                                          <span className="font-bold text-slate-800 dark:text-slate-200">
-                                            {item.bermo_specs.workAreaDifficulty ||
-                                              currentViewQuote.service_details
-                                                ?.service_technical_specs?.workAreaDifficulty ||
-                                              'Não especificado'}
-                                          </span>
-                                          {(item.bermo_specs.workAreaObservations ||
-                                            currentViewQuote.service_details
-                                              ?.service_technical_specs?.workAreaObservations) && (
-                                            <p className="text-[9px] text-slate-500 italic mt-0.5">
-                                              Obs:{' '}
-                                              {item.bermo_specs.workAreaObservations ||
-                                                currentViewQuote.service_details
-                                                  ?.service_technical_specs?.workAreaObservations}
-                                            </p>
-                                          )}
-                                        </div>
-
-                                        <div>
-                                          <span className="text-slate-500 block">
-                                            Integração de Funcionários:
-                                          </span>
-                                          <span className="font-bold text-teal-700 dark:text-teal-300">
-                                            {item.bermo_specs.needsIntegration ||
-                                              currentViewQuote.service_details
-                                                ?.service_technical_specs?.needsIntegration ||
-                                              'Não'}
-                                            {(item.bermo_specs.needsIntegration === 'Sim' ||
-                                              currentViewQuote.service_details
-                                                ?.service_technical_specs?.needsIntegration ===
-                                                'Sim') && (
-                                              <span className="text-[9px] font-normal text-muted-foreground ml-1">
-                                                (
-                                                {(item.bermo_specs.integrationTiming ||
-                                                  currentViewQuote.service_details
-                                                    ?.service_technical_specs
-                                                    ?.integrationTiming) === 'early'
-                                                  ? 'Antecipada / Prévia'
-                                                  : 'No dia do início'}
-                                                )
-                                              </span>
-                                            )}
-                                          </span>
-                                          {((item.bermo_specs.integrationCost &&
-                                            item.bermo_specs.integrationCost > 0) ||
-                                            (currentViewQuote.service_details
-                                              ?.service_technical_specs?.integrationCost &&
-                                              currentViewQuote.service_details
-                                                .service_technical_specs.integrationCost > 0)) && (
-                                            <p className="text-[9px] font-semibold text-teal-800 dark:text-teal-200 mt-0.5">
-                                              Custo Adicional:{' '}
-                                              {(
-                                                item.bermo_specs.integrationCost ||
-                                                currentViewQuote.service_details
-                                                  ?.service_technical_specs?.integrationCost ||
-                                                0
-                                              ).toLocaleString('pt-BR', {
-                                                style: 'currency',
-                                                currency: 'BRL',
-                                              })}
-                                            </p>
-                                          )}
-                                          {(item.bermo_specs.integrationObservations ||
-                                            currentViewQuote.service_details
-                                              ?.service_technical_specs
-                                              ?.integrationObservations) && (
-                                            <p className="text-[9px] text-slate-500 italic mt-0.5">
-                                              Obs:{' '}
-                                              {item.bermo_specs.integrationObservations ||
-                                                currentViewQuote.service_details
-                                                  ?.service_technical_specs
-                                                  ?.integrationObservations}
-                                            </p>
-                                          )}
-                                        </div>
-
-                                        <div>
-                                          <span className="text-slate-500 block">
-                                            Medida da Tubulação:
-                                          </span>
-                                          <span className="font-bold text-slate-800 dark:text-slate-200">
-                                            {item.bermo_specs.pipeMeasurement ||
-                                              currentViewQuote.service_details
-                                                ?.service_technical_specs?.pipeMeasurement ||
-                                              'Conforme projeto'}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    )}
                                   </div>
-                                )}{' '}
+                                )}
                               </td>
                               <td className="p-2.5 text-center">{item.quantity}</td>
-                              <td className="p-2.5 text-right">
+                              <td className="p-2.5 text-right font-mono">
                                 {(item.unit_price || 0).toLocaleString('pt-BR', {
                                   style: 'currency',
                                   currency: 'BRL',
                                 })}
                               </td>
-                              <td className="p-2.5 text-right font-bold text-slate-900 dark:text-slate-100">
+                              <td className="p-2.5 text-right font-bold text-slate-900 dark:text-slate-100 font-mono">
                                 {(item.total || 0).toLocaleString('pt-BR', {
                                   style: 'currency',
                                   currency: 'BRL',
@@ -1569,100 +1417,125 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                   </div>
                 </div>
 
-                {/* 4. Custos Indiretos Internos (EXIBIDO APENAS NO MODO INTERNO) */}
+                {/* Seção 2: Incluso no Valor (Visível na Proposta do Cliente) */}
+                <div className="p-3.5 rounded-xl bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900 space-y-1.5 text-xs">
+                  <div className="flex items-center gap-1.5 text-teal-900 dark:text-teal-200 font-bold uppercase text-[11px] tracking-wider">
+                    <CheckCircle2 className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                    Incluso no valor
+                  </div>
+                  <p className="text-[11px] text-slate-700 dark:text-slate-300 leading-relaxed text-justify">
+                    {PROPOSAL_INCLUSIONS_TEXT}
+                  </p>
+                </div>
+
+                {/* Seção 3: Materiais de Manutenção & Custos Internos (EXIBIDO APENAS NO MODO INTERNO) */}
                 {viewMode === 'internal' && (
-                  <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-900/60 space-y-3 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5 uppercase text-[11px] tracking-wider">
-                        <SlidersHorizontal className="h-4 w-4" />
-                        Custos Internos & Composição de Preço (NÃO VISÍVEL AO CLIENTE)
-                      </span>
-                      <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 text-[10px]">
-                        Uso Interno Intertermal
-                      </Badge>
+                  <div className="space-y-4">
+                    {/* Materiais de Manutenção Internos */}
+                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5 uppercase text-[11px] tracking-wider">
+                          <Layers className="h-4 w-4 text-teal-600" />
+                          Materiais de Manutenção (Apenas Composição Interna)
+                        </span>
+                        <Badge variant="outline" className="text-[10px]">
+                          Não exibido ao cliente
+                        </Badge>
+                      </div>
+
+                      {currentViewQuote.service_details?.maintenance_materials &&
+                      currentViewQuote.service_details.maintenance_materials.length > 0 ? (
+                        <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold uppercase">
+                              <tr>
+                                <th className="p-2">Descrição do Material</th>
+                                <th className="p-2 text-right">Valor (R$)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {currentViewQuote.service_details.maintenance_materials.map((m) => (
+                                <tr key={m.id}>
+                                  <td className="p-2">{m.description}</td>
+                                  <td className="p-2 text-right font-mono font-bold">
+                                    {(m.amount || 0).toLocaleString('pt-BR', {
+                                      style: 'currency',
+                                      currency: 'BRL',
+                                    })}
+                                  </td>
+                                </tr>
+                              ))}
+                              <tr className="bg-slate-100/50 dark:bg-slate-800/50 font-bold">
+                                <td className="p-2 text-right">Total dos Materiais:</td>
+                                <td className="p-2 text-right font-mono text-teal-700 dark:text-teal-300">
+                                  {(
+                                    currentViewQuote.service_details?.maintenance_materials_total ||
+                                    0
+                                  ).toLocaleString('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL',
+                                  })}
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground italic">
+                          Nenhum material de manutenção adicional lançado nesta proposta.
+                        </p>
+                      )}
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                      <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
-                        <span className="text-muted-foreground block text-[10px]">
-                          Margem de Serviços:
+                    {/* Quebra de Custos Indiretos */}
+                    <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-300 dark:border-amber-900/60 space-y-3 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5 uppercase text-[11px] tracking-wider">
+                          <SlidersHorizontal className="h-4 w-4" />
+                          Custos Indiretos & Composição de Preço (NÃO VISÍVEL AO CLIENTE)
                         </span>
-                        <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                          {serviceMargin}%
-                        </span>
-                        <span className="text-[10px] text-muted-foreground block">
-                          {(computation.serviceMarginAmount || 0).toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </span>
+                        <Badge className="bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-200 text-[10px]">
+                          Uso Interno Intertermal
+                        </Badge>
                       </div>
 
-                      <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
-                        <span className="text-muted-foreground block text-[10px]">
-                          Custos Administrativos:
-                        </span>
-                        <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                          15% fixo
-                        </span>
-                        <span className="text-[10px] text-muted-foreground block">
-                          {(computation.adminCostAmount || 0).toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </span>
-                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
+                          <span className="text-muted-foreground block text-[10px]">
+                            Margem de Serviços:
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                            {serviceMargin}%
+                          </span>
+                        </div>
 
-                      <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
-                        <span className="text-muted-foreground block text-[10px]">
-                          Total de Impostos:
-                        </span>
-                        <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                          {computation.totalTaxesPercent}%
-                        </span>
-                        <span className="text-[10px] text-muted-foreground block">
-                          {(computation.taxesAmount || 0).toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </span>
-                      </div>
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
+                          <span className="text-muted-foreground block text-[10px]">
+                            Custos Administrativos:
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                            15% fixo
+                          </span>
+                        </div>
 
-                      <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
-                        <span className="text-muted-foreground block text-[10px]">
-                          Comissão de Vendas:
-                        </span>
-                        <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                          {salesCommission}%
-                        </span>
-                        <span className="text-[10px] text-muted-foreground block">
-                          {(computation.salesCommissionAmount || 0).toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </span>
-                      </div>
-                    </div>
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
+                          <span className="text-muted-foreground block text-[10px]">
+                            Total de Impostos:
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                            {computation.totalTaxesPercent}%
+                          </span>
+                        </div>
 
-                    <div className="text-[11px] text-slate-600 dark:text-slate-300 pt-1 border-t border-amber-200/60 dark:border-amber-900/60 flex flex-wrap gap-x-4">
-                      <span>
-                        PIS: <strong>1.65%</strong>
-                      </span>
-                      <span>
-                        COFINS: <strong>7.60%</strong>
-                      </span>
-                      <span>
-                        ISS: <strong>{issRate}%</strong>
-                      </span>
-                      <span>
-                        CSLL: <strong>1.08%</strong>
-                      </span>
-                      <span>
-                        IRPJ: <strong>4.80%</strong>
-                      </span>
-                      <span>
-                        Dif. IR (20% s/ IRPJ): <strong>0.96%</strong>
-                      </span>
+                        <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-900">
+                          <span className="text-muted-foreground block text-[10px]">
+                            Comissão de Vendas:
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
+                            {salesCommission}%
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1675,27 +1548,16 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                         <span>Custos Diretos (Subtotal):</span>
                         <span>
                           {(
-                            computation.directCostsTotal ||
                             currentViewQuote.subtotal ||
+                            computation.directCostsTotal ||
                             0
                           ).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </span>
                       </div>
                     )}
-                    {viewMode === 'internal' && (
-                      <div className="flex justify-between text-muted-foreground">
-                        <span>Custos Indiretos + Margem + Impostos:</span>
-                        <span>
-                          {(computation.totalIndirectCosts || 0).toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </span>
-                      </div>
-                    )}
                     <div className="flex justify-between text-base font-extrabold text-slate-900 dark:text-slate-100 pt-2 border-t border-slate-200 dark:border-slate-800">
                       <span>Valor Total da Proposta:</span>
-                      <span className="text-teal-700 dark:text-teal-400">
+                      <span className="text-teal-700 dark:text-teal-400 font-mono">
                         {(currentViewQuote.total || 0).toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
@@ -1728,16 +1590,16 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
         </div>
       </div>
 
-      {/* Modal Completo de Criação de Orçamento de Prestação de Serviços BERMO */}
+      {/* MODAL COMPLETO DE CRIAÇÃO / EDIÇÃO DE ORÇAMENTO */}
       <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-        <DialogContent className="sm:max-w-[840px] max-h-[92vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[860px] max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-center gap-2">
               <Badge className="bg-teal-700 text-white text-[10px]">
-                Intertermal - Serviços BERMO
+                Intertermal - Serviços Técnicos
               </Badge>
               <span className="text-xs text-muted-foreground">
-                Engenharia & Manutenção de Válvulas e Trocadores
+                Engenharia & Manutenção de Válvulas e Trocadores (BERMO / Alfa Laval)
               </span>
             </div>
             <DialogTitle className="text-lg font-bold">
@@ -1755,7 +1617,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                 <Input
                   value={quoteNumber}
                   onChange={(e) => setQuoteNumber(e.target.value)}
-                  className="text-xs font-mono"
+                  className="text-xs font-mono font-bold"
                   required
                 />
               </div>
@@ -1763,16 +1625,18 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-medium">Cliente Industrial Destinatário *</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsNewClientModalOpen(true)}
-                    className="h-6 text-[11px] px-2 text-teal-700 border-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950 font-medium"
-                  >
-                    <Plus className="h-3 w-3 mr-1 text-teal-600" />
-                    Novo Cliente
-                  </Button>
+                  {onCreateClient && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsNewClientModalOpen(true)}
+                      className="h-6 text-[11px] px-2 text-teal-700 border-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950 font-medium"
+                    >
+                      <Plus className="h-3 w-3 mr-1 text-teal-600" />
+                      Novo Cliente
+                    </Button>
+                  )}
                 </div>
                 <Select value={clientId} onValueChange={setClientId} required>
                   <SelectTrigger className="text-xs">
@@ -1795,42 +1659,123 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               </div>
             </div>
 
-            {/* SEÇÃO 3a: SELEÇÃO DE PRODUTOS & ESPECIFICAÇÕES TÉCNICAS BERMO */}
+            {/* SEÇÃO 3A: PRODUTO BERMO / FORNECEDOR (COMBOBOX EDITÁVEL E BUSCA) */}
             <div className="p-3.5 rounded-xl bg-teal-50/40 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-900/60 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Flame className="h-4 w-4 text-teal-700" />
                   <span className="text-xs font-bold text-teal-900 dark:text-teal-200 uppercase tracking-wider">
-                    3a. Produto BERMO & Parâmetros Técnicos do Serviço
+                    3a. Produto BERMO / Alfa Laval & Parâmetros Técnicos do Serviço
                   </span>
                 </div>
                 <Badge
                   variant="outline"
-                  className="text-[10px] bg-teal-100 text-teal-800 border-teal-300"
+                  className="text-[10px] bg-teal-100 text-teal-800 border-teal-300 font-semibold"
                 >
-                  Catálogo Oficial BERMO
+                  {matchedSupplierInfo
+                    ? `Fornecedor: ${matchedSupplierInfo.brand}`
+                    : 'Modelo Customizado'}
                 </Badge>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
+              {/* Combobox editável com busca na base de fornecedores */}
+              <div className="space-y-1.5 relative">
+                <div className="flex items-center justify-between">
                   <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                    Modelo / Referência BERMO *
+                    Modelo do Equipamento (Editável - Selecione ou Digite o Modelo do Fabricante) *
                   </Label>
-                  <Select value={selectedBermoCode} onValueChange={handleSelectBermoProduct}>
-                    <SelectTrigger className="text-xs bg-white dark:bg-slate-900">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {BERMO_CATALOG.map((p) => (
-                        <SelectItem key={p.code} value={p.code} className="text-xs">
-                          {p.code} - {p.name} ({p.brand})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <Search className="h-3 w-3 text-teal-600" />
+                    Busca em base BERMO & Alfa Laval
+                  </span>
                 </div>
 
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      value={modelSearchInput}
+                      onChange={(e) => handleModelSearchChange(e.target.value)}
+                      onFocus={() => setShowSupplierDropdown(true)}
+                      placeholder="Digite ex: T5-BFG, BP30, M10-B, BL50..."
+                      className="text-xs h-9 bg-white dark:bg-slate-900 font-bold text-teal-900 dark:text-teal-100 pr-8"
+                      required
+                    />
+                    {matchedSupplierInfo && (
+                      <span className="absolute right-2.5 top-2.5">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      </span>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowSupplierDropdown(!showSupplierDropdown)}
+                    className="h-9 text-xs border-teal-300 text-teal-700"
+                  >
+                    Ver Catálogo ({SUPPLIERS_DATABASE.length})
+                  </Button>
+                </div>
+
+                {/* Dropdown de sugestões da base de fornecedores */}
+                {showSupplierDropdown && (
+                  <div className="absolute z-20 left-0 right-0 mt-1 max-h-60 overflow-y-auto bg-white dark:bg-slate-900 border border-teal-300 dark:border-teal-700 rounded-lg shadow-xl p-1.5 space-y-1">
+                    <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground border-b border-slate-100 dark:border-slate-800">
+                      Modelos Cadastrados (BERMO & Alfa Laval)
+                    </div>
+                    {filteredSuppliers.length === 0 ? (
+                      <div className="p-3 text-center text-xs text-muted-foreground">
+                        Nenhum modelo encontrado com esse termo. Ao confirmar, o modelo digitado
+                        será utilizado com os campos manuais preenchidos.
+                      </div>
+                    ) : (
+                      filteredSuppliers.map((p) => (
+                        <div
+                          key={p.id}
+                          onClick={() => applySupplierProduct(p)}
+                          className="p-2 rounded-md hover:bg-teal-50 dark:hover:bg-teal-950/60 cursor-pointer text-xs flex items-center justify-between transition-colors border border-transparent hover:border-teal-200"
+                        >
+                          <div>
+                            <span className="font-bold text-slate-900 dark:text-slate-100 font-mono mr-2">
+                              {p.code}
+                            </span>
+                            <span className="text-slate-600 dark:text-slate-300">{p.name}</span>
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-2 mt-0.5 font-mono">
+                              <span>Marca: {p.brand}</span>
+                              {p.specs.platesRange && <span>Placas: {p.specs.platesRange}</span>}
+                              {p.specs.connection && <span>Conexão: {p.specs.connection}</span>}
+                            </div>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className={`text-[9px] ${
+                              p.brand === 'Alfa Laval'
+                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200'
+                                : 'bg-teal-100 text-teal-800 dark:bg-teal-900/60 dark:text-teal-200'
+                            }`}
+                          >
+                            {p.brand}
+                          </Badge>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {matchedSupplierInfo && (
+                  <div className="p-2 rounded bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60 text-[11px] text-emerald-900 dark:text-emerald-300 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <span>
+                      Modelo reconhecido na base <strong>{matchedSupplierInfo.brand}</strong>:
+                      especificações técnicas de placas, gaxetas, dimensões e conexões
+                      auto-preenchidas!
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Fluido de processo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
                     Fluido Utilizado no Processo
@@ -1864,6 +1809,18 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    Nome / Detalhe do Fluido (Opcional)
+                  </Label>
+                  <Input
+                    value={fluidName}
+                    onChange={(e) => setFluidName(e.target.value)}
+                    placeholder="Ex: Solução Soda Cáustica 2% CIP"
+                    className="text-xs bg-white dark:bg-slate-900"
+                  />
+                </div>
               </div>
 
               {/* Opção de incluir ou não o custo de compra do produto na proposta */}
@@ -1875,26 +1832,12 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                       htmlFor="toggle-include-product-cost"
                       className="text-xs font-bold text-emerald-950 dark:text-emerald-200 cursor-pointer"
                     >
-                      Incluir custo do produto na proposta
+                      Incluir custo de fornecimento do equipamento novo na proposta
                     </Label>
-                    <Badge
-                      variant="outline"
-                      className={`text-[9px] font-semibold ${
-                        includeProductCost
-                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                          : 'bg-slate-100 text-slate-700 border-slate-300'
-                      }`}
-                    >
-                      {includeProductCost
-                        ? 'Custo Incluso no Item'
-                        : 'Desmarcado (Padrão Assistência)'}
-                    </Badge>
                   </div>
                   <p className="text-[11px] text-emerald-900/80 dark:text-emerald-300/80">
-                    Empresa de assistência técnica: a venda do produto BERMO é direta pelo
-                    fabricante.{' '}
-                    <strong>As especificações técnicas sempre aparecem na proposta</strong>, mas o
-                    custo de compra só é somado ao marcar este item.
+                    As especificações técnicas sempre aparecem na proposta técnica. O valor de venda
+                    do equipamento só é somado se esta opção for ativada.
                   </p>
                 </div>
 
@@ -1913,18 +1856,18 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                 </div>
               </div>
 
-              {/* ESPECIFICAÇÕES TÉCNICAS AUTO-PREENCHIDAS (Número de Placas, Dimensão das Placas, Quantidade de Gaxetas) */}
+              {/* ESPECIFICAÇÕES TÉCNICAS AUTO-PREENCHIDAS */}
               <div className="p-2.5 rounded-lg bg-teal-100/50 dark:bg-teal-900/30 border border-teal-300 dark:border-teal-800 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-teal-900 dark:text-teal-200 flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-teal-600" />
-                    Especificações do Trocador / Válvula (Auto-preenchidas pelo Catálogo BERMO)
+                    Especificações Técnicas de Placas & Gaxetas (Editáveis / Sincronizadas)
                   </span>
                   <Badge
                     variant="outline"
-                    className="text-[9px] bg-white dark:bg-slate-900 text-teal-800 border-teal-300"
+                    className="text-[9px] bg-white dark:bg-slate-900 text-teal-800 border-teal-300 font-mono"
                   >
-                    Sincronizado
+                    Auto-Filled
                   </Badge>
                 </div>
 
@@ -1948,7 +1891,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     <Input
                       value={plateDimensions}
                       onChange={(e) => setPlateDimensions(e.target.value)}
-                      placeholder="ex: 704 x 400 mm"
+                      placeholder="ex: 680 x 280 mm"
                       className="text-xs h-8 bg-white dark:bg-slate-900"
                     />
                   </div>
@@ -2000,7 +1943,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">Vazão (m³/h ou kg/s)</Label>
+                  <Label className="text-[10px] text-muted-foreground">Vazão (m³/h)</Label>
                   <Input
                     type="number"
                     value={flowRate}
@@ -2016,14 +1959,12 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                   <Input
                     value={equipmentSize}
                     onChange={(e) => setEquipmentSize(e.target.value)}
-                    placeholder="ex: DN65 / 40 Placas"
+                    placeholder="ex: DN50 / 2 polegadas"
                     className="text-xs h-8 bg-white dark:bg-slate-900"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Material da Estrutura/Placas
-                  </Label>
+                  <Label className="text-[10px] text-muted-foreground">Material das Placas</Label>
                   <Input
                     value={frameMaterial}
                     onChange={(e) => setFrameMaterial(e.target.value)}
@@ -2033,24 +1974,23 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[10px] text-muted-foreground">
-                    Tipo de Vedação / Sede
+                    Tipo de Gaxeta / Vedação
                   </Label>
                   <Input
                     value={gasketType}
                     onChange={(e) => setGasketType(e.target.value)}
-                    placeholder="ex: EPDM FDA / NBR / Metal"
+                    placeholder="ex: NBR / EPDM / Viton"
                     className="text-xs h-8 bg-white dark:bg-slate-900"
                   />
                 </div>
               </div>
 
-              {/* NOVOS CAMPOS DO ITEM 3A: GRAU DE DIFICULDADE, INTEGRAÇÃO E MEDIDA DA TUBULAÇÃO */}
+              {/* CAMPOS DO ITEM 3A: DIFICULDADE, INTEGRAÇÃO E TUBULAÇÃO */}
               <div className="p-3 rounded-lg bg-teal-100/40 dark:bg-teal-900/30 border border-teal-300 dark:border-teal-800 space-y-2.5">
                 <span className="text-[11px] font-bold text-teal-900 dark:text-teal-200 block">
                   Parâmetros de Acesso e Tubulação (Escopo Técnico 3A)
                 </span>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Grau de dificuldade da área de trabalho */}
                   <div className="space-y-1">
                     <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
                       Grau de Dificuldade da Área de Trabalho *
@@ -2079,10 +2019,9 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     </Select>
                   </div>
 
-                  {/* Necessidade de integração */}
                   <div className="space-y-1">
                     <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      Necessidade de Integração (Onboarding/Treinamento) *
+                      Necessidade de Integração (Onboarding) *
                     </Label>
                     <Select
                       value={needsIntegration}
@@ -2101,7 +2040,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                       </SelectContent>
                     </Select>
                   </div>
-                  {/* Medida da tubulação */}
+
                   <div className="space-y-1">
                     <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
                       Medida da Tubulação (Editável) *
@@ -2114,7 +2053,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     />
                   </div>
                 </div>
-                {/* Sub-campo condicional quando Necessidade de Integração for Sim */}
+
                 {needsIntegration === 'Sim' && (
                   <div className="p-2.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-300 dark:border-teal-700 space-y-2">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2151,41 +2090,230 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                             currency: 'BRL',
                           })}
                         </span>
-                        <span className="text-[9px] text-slate-500">
-                          {integrationTiming === 'same_day'
-                            ? 'Meio dia (4h) de serviço para cada funcionário alocado.'
-                            : '1 dia inteiro (8h) de cada funcionário + deslocamento extra.'}
-                        </span>
                       </div>
                     </div>
                   </div>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Observações sobre o Grau de Dificuldade da Área
-                    </Label>
-                    <Textarea
-                      value={workAreaObservations}
-                      onChange={(e) => setWorkAreaObservations(e.target.value)}
-                      placeholder="Ex: Área requer andaime tubular, trava-quedas, permissão de trabalho a quente..."
-                      className="text-xs h-16 bg-white dark:bg-slate-900 resize-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">
-                      Observações sobre a Integração de Funcionários
-                    </Label>
-                    <Textarea
-                      value={integrationObservations}
-                      onChange={(e) => setIntegrationObservations(e.target.value)}
-                      placeholder="Ex: Integração presencial de segurança na portaria 2 com exame médico ASO..."
-                      className="text-xs h-16 bg-white dark:bg-slate-900 resize-none"
-                    />
-                  </div>
-                </div>{' '}
               </div>
+            </div>
+
+            {/* SEÇÃO 2: ITENS & SERVIÇOS TÉCNICOS COM METODOLOGIA PADRONIZADA */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-4 w-4 text-teal-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    Itens e Escopo de Serviços Técnicos
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleAddItem()}
+                  className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
+                >
+                  <Plus className="h-3 w-3 mr-1" /> Adicionar Serviço
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {items.map((it, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-lg bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                          Título do Item / Serviço {idx + 1} *
+                        </Label>
+                        <Input
+                          value={it.name}
+                          onChange={(e) => handleUpdateItem(idx, 'name', e.target.value)}
+                          className="text-xs font-semibold h-8"
+                          required
+                        />
+                      </div>
+                      <div className="w-20 space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                          Qtd
+                        </Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={it.quantity}
+                          onChange={(e) =>
+                            handleUpdateItem(idx, 'quantity', Number(e.target.value))
+                          }
+                          className="text-xs h-8 text-center"
+                        />
+                      </div>
+                      <div className="w-32 space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                          Valor Unitário (R$)
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={it.unit_price}
+                          onChange={(e) =>
+                            handleUpdateItem(idx, 'unit_price', Number(e.target.value))
+                          }
+                          className="text-xs h-8 text-right font-mono"
+                        />
+                      </div>
+                      {items.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveItem(idx)}
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 mt-4"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+
+                    {/* Descrição do Serviço (Metodologia Padronizada Editável) */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                          <CheckCircle2 className="h-3 w-3 text-teal-600" />
+                          Descrição do Serviço (Metodologia Padronizada Editável)
+                        </Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const brand = it.bermo_specs?.productBrand || 'BERMO'
+                            handleUpdateItem(
+                              idx,
+                              'description',
+                              getStandardServiceMethodology([brand, ...distinctBrands]),
+                            )
+                          }}
+                          className="h-5 text-[10px] text-teal-700 hover:bg-teal-50 px-1.5"
+                        >
+                          Resetar p/ Texto Padrão
+                        </Button>
+                      </div>
+                      <Textarea
+                        value={it.description || ''}
+                        onChange={(e) => handleUpdateItem(idx, 'description', e.target.value)}
+                        placeholder="Descreva a metodologia aplicada ao serviço..."
+                        rows={6}
+                        className="text-xs font-mono bg-slate-50/70 dark:bg-slate-900 resize-y leading-relaxed"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* SEÇÃO 4: MATERIAIS DE MANUTENÇÃO (APENAS COMPOSIÇÃO INTERNA) */}
+            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-teal-600" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    4. Materiais de Manutenção (Composição Interna)
+                  </span>
+                </div>
+                <span className="text-xs font-bold text-teal-700 dark:text-teal-300 font-mono">
+                  Subtotal Materiais:{' '}
+                  {maintenanceMaterialsTotal.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+                </span>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900/60 text-[11px] text-teal-900 dark:text-teal-200 flex items-center gap-1.5">
+                <AlertCircle className="h-4 w-4 text-teal-600 shrink-0" />
+                <span>
+                  O valor dos materiais inseridos aqui compõe{' '}
+                  <strong>apenas a composição interna</strong> de custos diretos. NÃO é exibido
+                  separadamente na proposta do cliente nem no PDF.
+                </span>
+              </div>
+
+              {/* Formulário de Inserção de Material */}
+              <div className="flex flex-col sm:flex-row gap-2 items-end">
+                <div className="flex-1 space-y-1 w-full">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Descrição do Material de Manutenção
+                  </Label>
+                  <Input
+                    value={newMaterialDesc}
+                    onChange={(e) => setNewMaterialDesc(e.target.value)}
+                    placeholder="Ex: Solvente Desengraxante Químico 20L, Estopas, Kit Vedação..."
+                    className="text-xs h-8 bg-white dark:bg-slate-950"
+                  />
+                </div>
+                <div className="w-full sm:w-36 space-y-1">
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Valor (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newMaterialAmount}
+                    onChange={(e) => setNewMaterialAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="text-xs h-8 bg-white dark:bg-slate-950 font-mono"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleAddMaterial}
+                  className="h-8 text-xs bg-teal-700 hover:bg-teal-600 text-white shrink-0"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Material
+                </Button>
+              </div>
+
+              {/* Lista dos materiais adicionados */}
+              {maintenanceMaterials.length > 0 && (
+                <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-slate-950">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-100 dark:bg-slate-800 text-[10px] uppercase font-semibold text-slate-600 dark:text-slate-300">
+                      <tr>
+                        <th className="p-2">Material</th>
+                        <th className="p-2 text-right">Valor (R$)</th>
+                        <th className="p-2 text-center w-12">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {maintenanceMaterials.map((m) => (
+                        <tr key={m.id}>
+                          <td className="p-2">{m.description}</td>
+                          <td className="p-2 text-right font-mono font-bold">
+                            {m.amount.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </td>
+                          <td className="p-2 text-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleRemoveMaterial(m.id)}
+                              className="h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
             {/* SEÇÃO 3b: MÃO DE OBRA (3 FUNÇÕES) */}
@@ -2197,13 +2325,12 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     3b. Mão de Obra Especializada (3 Funções)
                   </span>
                 </div>
-                <span className="text-xs font-bold text-blue-600">
+                <span className="text-xs font-bold text-blue-600 font-mono">
                   Subtotal M.O.:{' '}
                   {laborTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
               </div>
 
-              {/* Tabela das 3 Funções */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {/* 1. Técnico */}
                 <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
@@ -2247,7 +2374,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
                     Total:{' '}
                     {laborTechTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </div>
@@ -2295,7 +2422,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
                     Total:{' '}
                     {laborHelperTotal.toLocaleString('pt-BR', {
                       style: 'currency',
@@ -2346,7 +2473,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                       />
                     </div>
                   </div>
-                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
                     Total:{' '}
                     {laborInspectorTotal.toLocaleString('pt-BR', {
                       style: 'currency',
@@ -2357,7 +2484,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               </div>
             </div>
 
-            {/* SEÇÃO 3c: DESLOCAMENTO (PADRÃO MAPIEA & GOOGLE MAPS) */}
+            {/* SEÇÃO 3c: DESLOCAMENTO & LOGÍSTICA */}
             <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -2366,7 +2493,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     3c. Deslocamento & Rotas (Ref. Mapeia / Google Maps)
                   </span>
                 </div>
-                <span className="text-xs font-bold text-emerald-600">
+                <span className="text-xs font-bold text-emerald-600 font-mono">
                   Subtotal Deslocamento:{' '}
                   {travelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
@@ -2374,11 +2501,9 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      Origem (CEP e Endereço da Base / Matriz)
-                    </Label>
-                  </div>
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Origem (CEP e Endereço da Base)
+                  </Label>
                   <div className="flex gap-2">
                     <Input
                       value={originCep}
@@ -2390,7 +2515,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                           handleRecalculateRoute(undefined, val)
                         }
                       }}
-                      placeholder="CEP Origem (89066-000)"
+                      placeholder="89066-000"
                       className="text-xs h-8 w-32 font-mono font-bold"
                     />
                     <Input
@@ -2403,11 +2528,9 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                 </div>
 
                 <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      Destino da Fábrica / Cliente (CEP e Endereço)
-                    </Label>
-                  </div>
+                  <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                    Destino da Fábrica / Cliente (CEP e Cidade)
+                  </Label>
                   <div className="flex gap-2">
                     <Input
                       value={destinationCep}
@@ -2425,7 +2548,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     <Input
                       value={destinationAddress}
                       onChange={(e) => setDestinationAddress(e.target.value)}
-                      placeholder="Cidade/UF da planta do Cliente"
+                      placeholder="Cidade/UF do Cliente"
                       className="text-xs h-8 flex-1"
                     />
                   </div>
@@ -2479,51 +2602,6 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                 </div>
               </div>
 
-              {/* Resumo Automático e Ajustes Manuais Editáveis */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 pt-1 bg-white dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs">
-                <div className="space-y-0.5">
-                  <span className="text-[10px] text-muted-foreground block">
-                    Combustível Calculado:
-                  </span>
-                  <strong className="text-slate-900 dark:text-slate-100 text-xs">
-                    {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </strong>
-                </div>
-
-                <div className="space-y-0.5">
-                  <span className="text-[10px] text-muted-foreground block">Pedágio Estimado:</span>
-                  <strong className="text-slate-900 dark:text-slate-100 text-xs">
-                    {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </strong>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Ajuste Manual Combustível (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    value={manualFuelAdj}
-                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-7"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Ajuste Manual Pedágio (R$)
-                  </Label>
-                  <Input
-                    type="number"
-                    value={manualTollAdj}
-                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                    placeholder="0.00"
-                    className="text-xs h-7"
-                  />
-                </div>
-              </div>
-
               <div className="flex justify-end pt-1">
                 <Button
                   type="button"
@@ -2533,13 +2611,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                   onClick={() => handleRecalculateRoute()}
                   className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
                 >
-                  {isCalculatingRoute ? (
-                    <span className="flex items-center gap-1">
-                      <Sparkles className="h-3 w-3 animate-spin" /> Buscando CEP e Calculando...
-                    </span>
-                  ) : (
-                    'Recalcular Rota Mapeia (ViaCEP + Haversine)'
-                  )}
+                  {isCalculatingRoute ? 'Buscando Rota...' : 'Recalcular Rota Mapeia'}
                 </Button>
               </div>
             </div>
@@ -2553,7 +2625,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     3d. Hospedagem & Alimentação
                   </span>
                 </div>
-                <span className="text-xs font-bold text-purple-600">
+                <span className="text-xs font-bold text-purple-600 font-mono">
                   Subtotal Hosp/Alim:{' '}
                   {lodgingMealsTotal.toLocaleString('pt-BR', {
                     style: 'currency',
@@ -2608,7 +2680,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               </div>
             </div>
 
-            {/* SEÇÃO 3e: CUSTOS INDIRETOS (INTERNOS - NÃO VISÍVEIS AO CLIENTE) */}
+            {/* SEÇÃO 3e: CUSTOS INDIRETOS & IMPOSTOS */}
             <div className="p-4 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border-2 border-amber-300 dark:border-amber-800 space-y-3.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -2690,7 +2762,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     />
                   </div>
                   <div>
-                    <Label className="text-[9px] text-muted-foreground">ISS Municipal (%)</Label>
+                    <Label className="text-[9px] text-muted-foreground">ISS (%)</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -2720,7 +2792,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     />
                   </div>
                   <div>
-                    <Label className="text-[9px] text-muted-foreground">Dif. IR s/ IRPJ (%)</Label>
+                    <Label className="text-[9px] text-muted-foreground">Dif. IR (%)</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -2733,7 +2805,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               </div>
             </div>
 
-            {/* SEÇÃO 3f: PRAZO DE VALIDADE & CONDIÇÕES DE PAGAMENTO */}
+            {/* SEÇÃO 3f: PRAZO & CONDIÇÕES */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-200 dark:border-slate-800">
               <div className="space-y-1">
                 <Label className="text-xs font-medium">Prazo de Validade da Proposta</Label>
@@ -2761,19 +2833,19 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="14_ddl" className="text-xs">
-                      14 DDL (14 dias do dia líquido) - Padrão
+                      14 DDL (14 dias do dia líquido)
                     </SelectItem>
                     <SelectItem value="28_ddl" className="text-xs">
-                      28 DDL (28 dias do dia líquido) - Padrão
+                      28 DDL (28 dias do dia líquido)
                     </SelectItem>
                     <SelectItem value="30_ddl" className="text-xs">
-                      30 DDL (Negociação)
+                      30 DDL (30 dias negociados)
                     </SelectItem>
                     <SelectItem value="45_ddl" className="text-xs">
-                      45 DDL (Negociação)
+                      45 DDL (45 dias negociados)
                     </SelectItem>
                     <SelectItem value="60_ddl" className="text-xs">
-                      60 DDL (Negociação)
+                      60 DDL (60 dias negociados)
                     </SelectItem>
                     <SelectItem value="custom" className="text-xs">
                       Outras Condições Especiais
@@ -2783,13 +2855,13 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               </div>
             </div>
 
-            {/* Totalizador Geral e Botões */}
+            {/* Totalizador Geral */}
             <div className="p-4 rounded-xl bg-slate-900 text-white flex items-center justify-between">
               <div>
                 <span className="text-[11px] text-slate-400 block">
                   Preço Final de Venda ao Cliente:
                 </span>
-                <span className="text-xl font-black text-teal-300">
+                <span className="text-xl font-black text-teal-300 font-mono">
                   {computation.finalClientPrice.toLocaleString('pt-BR', {
                     style: 'currency',
                     currency: 'BRL',
@@ -2798,7 +2870,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               </div>
               <div className="text-right text-[11px] text-slate-300">
                 <div>
-                  Custos Diretos:{' '}
+                  Custos Diretos (com materiais):{' '}
                   {computation.directCostsTotal.toLocaleString('pt-BR', {
                     style: 'currency',
                     currency: 'BRL',
@@ -2818,144 +2890,112 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
                 onClick={() => setIsCreateModalOpen(false)}
+                className="text-xs"
               >
                 Cancelar
               </Button>
-              <Button type="submit" size="sm" className="bg-teal-700 hover:bg-teal-600 text-white">
-                {isEditMode ? 'Salvar Alterações da Proposta' : 'Gerar Proposta Intertermal'}
+              <Button type="submit" className="text-xs bg-teal-700 hover:bg-teal-600 text-white">
+                {isEditMode ? 'Salvar Alterações na Proposta' : 'Emitir Proposta Técnica'}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Modal Rápido: Cadastrar Novo Cliente Diretamente do Orçamento */}
-      <Dialog open={isNewClientModalOpen} onOpenChange={setIsNewClientModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-teal-700 text-white text-[10px]">Cadastro Rápido</Badge>
-              <span className="text-xs text-muted-foreground">
-                Vínculo Automático com o Orçamento
-              </span>
-            </div>
-            <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 mt-1">
-              Cadastrar Novo Cliente Industrial
-            </DialogTitle>
-          </DialogHeader>
-
-          <form onSubmit={handleQuickCreateClient} className="space-y-3 py-2 text-xs">
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold">Razão Social / Nome do Cliente *</Label>
-              <Input
-                required
-                placeholder="Ex: Usina São Martinho S.A."
-                value={newClientName}
-                onChange={(e) => setNewClientName(e.target.value)}
-                className="text-xs h-8"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
+      {/* Modal de Criação Rápida de Cliente */}
+      {onCreateClient && (
+        <Dialog open={isNewClientModalOpen} onOpenChange={setIsNewClientModalOpen}>
+          <DialogContent className="sm:max-w-[450px]">
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold">Cadastrar Novo Cliente</DialogTitle>
+            </DialogHeader>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault()
+                if (!newClientName) return
+                const created = await onCreateClient({
+                  name: newClientName,
+                  document: newClientDoc,
+                  city: newClientCity,
+                  state: newClientState,
+                  status: 'active',
+                })
+                if (created?.id) {
+                  setClientId(created.id)
+                  if (newClientCity) {
+                    setDestinationAddress(`${newClientCity} / ${newClientState}`)
+                  }
+                }
+                setIsNewClientModalOpen(false)
+                setNewClientName('')
+                setNewClientDoc('')
+                setNewClientCity('')
+              }}
+              className="space-y-3 py-2 text-xs"
+            >
               <div className="space-y-1">
-                <Label className="text-xs font-semibold">CNPJ / CPF</Label>
+                <Label className="text-xs">Razão Social / Nome Fantasia *</Label>
                 <Input
+                  value={newClientName}
+                  onChange={(e) => setNewClientName(e.target.value)}
+                  placeholder="Ex: Aurora Alimentos S.A."
+                  className="text-xs"
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">CNPJ</Label>
+                <Input
+                  value={newClientDoc}
+                  onChange={(e) => setNewClientDoc(e.target.value)}
                   placeholder="00.000.000/0001-00"
-                  value={newClientDocument}
-                  onChange={(e) => setNewClientDocument(e.target.value)}
-                  className="text-xs h-8"
+                  className="text-xs"
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Telefone / WhatsApp</Label>
-                <Input
-                  placeholder="(11) 98765-4321"
-                  value={newClientPhone}
-                  onChange={(e) => setNewClientPhone(e.target.value)}
-                  className="text-xs h-8"
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Cidade</Label>
+                  <Input
+                    value={newClientCity}
+                    onChange={(e) => setNewClientCity(e.target.value)}
+                    placeholder="Chapecó"
+                    className="text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">UF</Label>
+                  <Input
+                    value={newClientState}
+                    onChange={(e) => setNewClientState(e.target.value)}
+                    placeholder="SC"
+                    className="text-xs uppercase"
+                  />
+                </div>
               </div>
-            </div>
+              <DialogFooter className="pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsNewClientModalOpen(false)}
+                  className="text-xs"
+                >
+                  Cancelar
+                </Button>
+                <Button type="submit" className="text-xs bg-teal-700 hover:bg-teal-600 text-white">
+                  Salvar e Selecionar
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
 
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold">E-mail de Contato / Cotações</Label>
-              <Input
-                type="email"
-                placeholder="compras@saomartinho.com.br"
-                value={newClientEmail}
-                onChange={(e) => setNewClientEmail(e.target.value)}
-                className="text-xs h-8"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold">Endereço (Rua, Número, Bairro)</Label>
-              <Input
-                placeholder="Rodovia SP-300, Km 140 - Distrito Industrial"
-                value={newClientAddress}
-                onChange={(e) => setNewClientAddress(e.target.value)}
-                className="text-xs h-8"
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-2.5">
-              <div className="col-span-2 space-y-1">
-                <Label className="text-xs font-semibold">Cidade</Label>
-                <Input
-                  placeholder="Piracicaba"
-                  value={newClientCity}
-                  onChange={(e) => setNewClientCity(e.target.value)}
-                  className="text-xs h-8"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">UF</Label>
-                <Input
-                  placeholder="SP"
-                  maxLength={2}
-                  value={newClientState}
-                  onChange={(e) => setNewClientState(e.target.value.toUpperCase())}
-                  className="text-xs h-8"
-                />
-              </div>
-            </div>
-
-            <div className="p-2.5 rounded-lg bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 text-[11px] text-teal-800 dark:text-teal-300">
-              💡 Ao salvar, este cliente será <strong>selecionado automaticamente</strong> no
-              orçamento em edição e seu endereço será preenchido para o cálculo de logística.
-            </div>
-
-            <DialogFooter className="pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setIsNewClientModalOpen(false)}
-                className="text-xs h-8"
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={isCreatingClientLoading}
-                size="sm"
-                className="bg-teal-700 hover:bg-teal-600 text-white text-xs h-8"
-              >
-                {isCreatingClientLoading ? 'Salvando...' : 'Salvar & Selecionar Cliente'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal de Prévia em PDF da Proposta Técnica */}
+      {/* Modal de Prévia em PDF da Proposta */}
       <QuotePdfPreviewDialog
-        isOpen={isPdfPreviewOpen}
-        onClose={() => setIsPdfPreviewOpen(false)}
         quote={quoteForPdf}
-        client={clients.find((c) => c.id === quoteForPdf?.client_id)}
+        open={isPdfPreviewOpen}
+        onOpenChange={setIsPdfPreviewOpen}
       />
     </div>
   )
