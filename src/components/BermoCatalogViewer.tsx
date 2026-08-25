@@ -18,23 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Layers,
-  Flame,
-  Disc,
-  CircleDot,
-  Cpu,
-  Wrench,
-  Search,
-  CheckCircle2,
-  SlidersHorizontal,
-  FileText,
-  Building2,
-  Plus,
-  Info,
-  Shield,
-  Zap,
-} from 'lucide-react'
+import { Layers, Disc, Cpu, Wrench, Search, Plus, Info, Shield } from 'lucide-react'
 import {
   BERMO_CATALOG,
   BERMO_CATEGORIES,
@@ -46,13 +30,11 @@ interface BermoCatalogViewerProps {
   onSelectProductForQuote?: (product: BermoProductItem) => void
 }
 
-const CATEGORY_ICON_MAP: Record<BermoCategoryKey, any> = {
-  heat_exchanger_gasketed: Layers,
-  heat_exchanger_brazed: Flame,
-  butterfly_valves: Disc,
-  ball_valves: CircleDot,
-  automation: Cpu,
-  industrial_accessories: Wrench,
+const CATEGORY_ICON_MAP: Record<BermoCategoryKey, React.ComponentType<{ className?: string }>> = {
+  trocadores: Layers,
+  valvulas: Disc,
+  sistemas: Cpu,
+  instrumentacao: Wrench,
 }
 
 export const BermoCatalogViewer: React.FC<BermoCatalogViewerProps> = ({
@@ -64,7 +46,10 @@ export const BermoCatalogViewer: React.FC<BermoCatalogViewerProps> = ({
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
 
   const filteredProducts = BERMO_CATALOG.filter((p) => {
-    const matchesCategory = selectedCategory === 'all' || p.category === selectedCategory
+    const matchesCategory =
+      selectedCategory === 'all' ||
+      p.categoryKey === selectedCategory ||
+      p.category === selectedCategory
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -117,14 +102,17 @@ export const BermoCatalogViewer: React.FC<BermoCatalogViewerProps> = ({
         </button>
 
         {BERMO_CATEGORIES.map((cat) => {
-          const Icon = CATEGORY_ICON_MAP[cat.key]
-          const isSelected = selectedCategory === cat.key
-          const count = BERMO_CATALOG.filter((p) => p.category === cat.key).length
+          const categoryKey = cat.id || (cat as any).key
+          const Icon = CATEGORY_ICON_MAP[categoryKey] || Wrench
+          const isSelected = selectedCategory === categoryKey
+          const count = BERMO_CATALOG.filter(
+            (p) => p.categoryKey === categoryKey || p.category === categoryKey,
+          ).length
 
           return (
             <button
-              key={cat.key}
-              onClick={() => setSelectedCategory(cat.key)}
+              key={categoryKey}
+              onClick={() => setSelectedCategory(categoryKey)}
               className={`p-3 rounded-xl border text-left transition-all ${
                 isSelected
                   ? 'bg-teal-700 text-white border-teal-600 shadow-sm'
@@ -159,7 +147,7 @@ export const BermoCatalogViewer: React.FC<BermoCatalogViewerProps> = ({
       {/* Grid de Cards de Produtos BERMO */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredProducts.map((p) => {
-          const Icon = CATEGORY_ICON_MAP[p.category] || Wrench
+          const Icon = (p.categoryKey && CATEGORY_ICON_MAP[p.categoryKey]) || Wrench
 
           return (
             <Card

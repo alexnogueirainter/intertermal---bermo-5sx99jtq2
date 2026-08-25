@@ -7,6 +7,7 @@ export interface ClientContact {
   email?: string
   phone?: string
   whatsapp?: string
+  birth_date?: string
   is_primary?: boolean
 }
 
@@ -176,6 +177,7 @@ export interface QuoteServiceDetails {
   maintenance_materials?: MaintenanceMaterialItem[]
   maintenance_materials_total?: number
   indirect_costs?: IndirectCostsState
+  service_composition?: any
   payment_and_validity?: {
     validityDays: number
     conditionType: PaymentConditionType
@@ -186,6 +188,7 @@ export interface QuoteServiceDetails {
 export interface QuoteRecord {
   id: string
   quote_number: string
+  title?: string
   client_id?: string
   client_name?: string
   deal_id?: string
@@ -207,6 +210,17 @@ export interface QuoteRecord {
 export type TicketChannel = 'whatsapp' | 'email' | 'phone' | 'chat' | 'in_person'
 export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
 
+export interface TicketTimelineItem {
+  date?: string
+  timestamp?: string
+  author: string
+  role?: string
+  message?: string
+  note?: string
+  status?: TicketStatus
+  type?: TicketChannel
+}
+
 export interface TicketRecord {
   id: string
   ticket_number: string
@@ -218,12 +232,7 @@ export interface TicketRecord {
   priority: PriorityLevel
   status: TicketStatus
   assigned_to?: string
-  timeline?: {
-    date: string
-    author: string
-    note: string
-    status?: TicketStatus
-  }[]
+  timeline?: TicketTimelineItem[]
   resolution_notes?: string
   created: string
   updated: string
@@ -298,6 +307,7 @@ export type ServiceOrderStatus =
   | 'pending_approval'
   | 'approved'
   | 'in_progress'
+  | 'in_execution'
   | 'completed'
   | 'rejected'
   | 'cancelled'
@@ -310,6 +320,7 @@ export interface ServiceOrderTechnicalDetails {
   contactPerson?: string
   contactPhone?: string
   scopeDescription?: string
+  service_composition?: any
   executionChecklist?: {
     id: string
     task: string
@@ -333,19 +344,37 @@ export interface ServiceOrderRecord {
   quote_number?: string
   client_id?: string
   client_name?: string
+  deal_id?: string
   title: string
   status: ServiceOrderStatus
   services: QuoteItem[]
   total_value: number
+  final_price?: number
+  internal_cost?: number
   priority: PriorityLevel
   assigned_to?: string
   technical_details?: ServiceOrderTechnicalDetails
   approval_notes?: string
+  rejection_notes?: string
   approved_at?: string
   approved_by?: string
+  rejected_at?: string
+  rejected_by?: string
   start_date?: string
   end_date?: string
   notes?: string
+  created: string
+  updated: string
+}
+
+export interface ProductRecord {
+  id: string
+  code: string
+  name: string
+  category: string
+  price: number
+  stock: number
+  description?: string
   created: string
   updated: string
 }

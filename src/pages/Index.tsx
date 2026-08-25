@@ -151,7 +151,7 @@ export default function IndexPage() {
   }
 
   // Clientes Handlers
-  const handleCreateClient = async (data: Partial<ClientRecord>): Promise<ClientRecord | void> => {
+  const handleCreateClient = async (data: Partial<ClientRecord>): Promise<ClientRecord> => {
     try {
       const created = await clientsService.create(data)
       setClients([created, ...clients])
@@ -159,6 +159,7 @@ export default function IndexPage() {
       return created
     } catch (err: any) {
       toast({ title: 'Erro ao cadastrar', description: err.message, variant: 'destructive' })
+      throw err
     }
   }
 
@@ -711,9 +712,7 @@ export default function IndexPage() {
             <QuotesManager
               quotes={quotes}
               clients={clients}
-              products={products}
               selectedQuote={selectedQuote}
-              onSelectQuote={setSelectedQuote}
               onCreateQuote={handleCreateQuote}
               onUpdateQuote={handleUpdateQuote}
               onUpdateQuoteStatus={handleUpdateQuoteStatus}
