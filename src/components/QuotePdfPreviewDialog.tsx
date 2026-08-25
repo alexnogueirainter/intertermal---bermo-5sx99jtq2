@@ -322,6 +322,7 @@ export function QuotePdfPreviewDialog({
 
         {/* ÁREA DO DOCUMENTO FORMATADO (A4 STYLE) */}
         <div
+          id="quote-printable-document"
           ref={printRef}
           className="relative p-8 sm:p-12 space-y-6 text-slate-900 bg-white font-sans text-xs leading-relaxed print:p-0 print:text-[11px] overflow-hidden"
         >
