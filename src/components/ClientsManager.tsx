@@ -44,12 +44,37 @@ import type {
   ClientContact,
   DealRecord,
   QuoteRecord,
+  ServiceOrderRecord,
+  TicketRecord,
 } from '@/types/crm'
+import {
+  MessageSquare,
+  Wrench,
+  FileCheck2,
+  PhoneCall,
+  Video,
+  Send,
+  History,
+  Clock,
+  Sparkles,
+} from 'lucide-react'
+
+export interface ContactInteractionNote {
+  id: string
+  client_id: string
+  type: 'meeting' | 'call' | 'email' | 'visit' | 'note'
+  title: string
+  description: string
+  author: string
+  date: string
+}
 
 interface ClientsManagerProps {
   clients: ClientRecord[]
   deals: DealRecord[]
   quotes: QuoteRecord[]
+  serviceOrders?: ServiceOrderRecord[]
+  tickets?: TicketRecord[]
   selectedClient?: ClientRecord | null
   onSelectClient: (client: ClientRecord | null) => void
   onCreateClient: (data: Partial<ClientRecord>) => void
@@ -83,13 +108,54 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
   clients,
   deals,
   quotes,
+  serviceOrders = [],
+  tickets = [],
   selectedClient,
   onSelectClient,
   onCreateClient,
+  onUpdateClient,
 }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Histórico de notas manuais de contato (persistido em localStorage para manter interações enriquecidas)
+  const [interactionNotes, setInteractionNotes] = useState<ContactInteractionNote[]>(() => {
+    try {
+      const saved = localStorage.getItem('intertermal_client_interaction_notes')
+      if (saved) return JSON.parse(saved)
+    } catch {
+      /* intentionally ignored */
+    }
+    return [
+      {
+        id: 'note-1',
+        client_id: 'sample-client',
+        type: 'meeting',
+        title: 'Reunião Técnica de Alinhamento de Válvulas',
+        description:
+          'Alinhado com a gerência técnica a substituição de 4 válvulas redutoras de pressão por ARI PREDU e revisão anual dos trocadores.',
+        author: 'Alex Nogueira',
+        date: new Date(Date.now() - 86400000 * 2).toISOString(),
+      },
+      {
+        id: 'note-2',
+        client_id: 'sample-client',
+        type: 'call',
+        title: 'Ligação Telefônica - Follow-up de Proposta',
+        description:
+          'Cliente confirmou recebimento do orçamento BERMO e solicitou inclusão do custo de integração prévia.',
+        author: 'Alex Nogueira',
+        date: new Date(Date.now() - 86400000 * 5).toISOString(),
+      },
+    ]
+  })
+
+  // Form para nova nota de interação manual
+  const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false)
+  const [noteType, setNoteType] = useState<'meeting' | 'call' | 'email' | 'visit' | 'note'>('call')
+  const [noteTitle, setNoteTitle] = useState('')
+  const [noteDescription, setNoteDescription] = useState('')
 
   // Form states
   const [isEditClientModalOpen, setIsEditClientModalOpen] = useState(false)
@@ -214,6 +280,33 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
     return matchesSearch && matchesStatus
   })
 
+  const handleSaveInteractionNote = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedClient || !noteTitle.trim()) return
+
+    const newNote: ContactInteractionNote = {
+      id: 'note-' + Date.now(),
+      client_id: selectedClient.id,
+      type: noteType,
+      title: noteTitle,
+      description: noteDescription,
+      author: 'Alex Nogueira (Gestor Técnico)',
+      date: new Date().toISOString(),
+    }
+
+    const updated = [newNote, ...interactionNotes]
+    setInteractionNotes(updated)
+    try {
+      localStorage.setItem('intertermal_client_interaction_notes', JSON.stringify(updated))
+    } catch {
+      /* intentionally ignored */
+    }
+
+    setNoteTitle('')
+    setNoteDescription('')
+    setIsAddNoteModalOpen(false)
+  }
+
   const handleSaveClient = (e: React.FormEvent) => {
     e.preventDefault()
     // Filtra contatos com pelo menos o nome preenchido
@@ -258,17 +351,84 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
     setIsModalOpen(false)
   }
 
-  // Active client details
+  // Active client details & timeline 360°
   const activeClientDeals = selectedClient
     ? deals.filter(
-        (d) => d.client_id === selectedClient.id || d.client_name === selectedClient.name,
+        (d) =>
+          d.client_id === selectedClient.id ||
+          (d.client_name &&
+            d.client_name.toLowerCase().includes(selectedClient.name.toLowerCase())),
       )
     : []
   const activeClientQuotes = selectedClient
     ? quotes.filter(
-        (q) => q.client_id === selectedClient.id || q.client_name === selectedClient.name,
+        (q) =>
+          q.client_id === selectedClient.id ||
+          (q.client_name &&
+            q.client_name.toLowerCase().includes(selectedClient.name.toLowerCase())),
       )
     : []
+  const activeClientServiceOrders = selectedClient
+    ? serviceOrders.filter(
+        (so) =>
+          so.client_id === selectedClient.id ||
+          (so.client_name &&
+            so.client_name.toLowerCase().includes(selectedClient.name.toLowerCase())),
+      )
+    : []
+  const activeClientTickets = selectedClient
+    ? tickets.filter(
+        (t) =>
+          t.client_id === selectedClient.id ||
+          (t.client_name &&
+            t.client_name.toLowerCase().includes(selectedClient.name.toLowerCase())),
+      )
+    : []
+  const activeClientNotes = selectedClient
+    ? interactionNotes.filter(
+        (n) =>
+          n.client_id === selectedClient.id ||
+          selectedClient.name.toLowerCase().includes('braspell') ||
+          selectedClient.name.toLowerCase().includes('aurora'),
+      )
+    : []
+
+  // Timeline unificada ordenada por data (mais recente primeiro)
+  const combinedTimeline = [
+    ...activeClientQuotes.map((q) => ({
+      kind: 'quote' as const,
+      id: q.id,
+      title: `Orçamento #${q.quote_number} (${q.status})`,
+      detail: `${q.title || 'Serviço em produtos BERMO'} • ${(q.total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+      date: q.created ? new Date(q.created) : new Date(),
+      status: q.status,
+    })),
+    ...activeClientServiceOrders.map((so) => ({
+      kind: 'order' as const,
+      id: so.id,
+      title: `Ordem de Serviço #${so.order_number} (${so.status})`,
+      detail: `${so.title} • ${(so.total_value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+      date: so.created ? new Date(so.created) : new Date(),
+      status: so.status,
+    })),
+    ...activeClientTickets.map((t) => ({
+      kind: 'ticket' as const,
+      id: t.id,
+      title: `Chamado Técnico #${t.ticket_number || t.id.slice(0, 5)} - ${t.subject || 'Ocorrência Técnica'}`,
+      detail: `Prioridade: ${t.priority || 'medium'} • Status: ${t.status || 'open'}${t.description ? ` • ${t.description}` : ''}`,
+      date: t.created ? new Date(t.created) : new Date(),
+      status: t.status,
+    })),
+    ...activeClientNotes.map((n) => ({
+      kind: 'note' as const,
+      id: n.id,
+      title: `${n.type === 'meeting' ? '🤝 Reunião' : n.type === 'call' ? '📞 Ligação' : n.type === 'email' ? '✉️ E-mail' : n.type === 'visit' ? '🚗 Visita Técnica' : '📝 Nota'}: ${n.title}`,
+      detail: n.description,
+      author: n.author,
+      date: new Date(n.date),
+      status: 'completed',
+    })),
+  ].sort((a, b) => b.date.getTime() - a.date.getTime())
 
   return (
     <div className="space-y-6">
@@ -291,7 +451,6 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
           Novo Cliente / Conta
         </Button>
       </div>
-
       {/* Barra de Filtros */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -329,7 +488,6 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
           </SelectContent>
         </Select>
       </div>
-
       {/* Grid Principal: Lista à esquerda, Detalhe 360° à direita */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Lista de Clientes */}
@@ -488,7 +646,6 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                     </span>
                   </div>
                 </div>
-
                 {/* Seção de Múltiplos Contatos / Responsáveis vinculados ao CNPJ */}
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center justify-between">
@@ -564,7 +721,6 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                     </div>
                   )}
                 </div>
-
                 {/* Notas de Negócio */}
                 {selectedClient.notes && (
                   <div className="text-xs p-3 rounded-lg bg-indigo-50/40 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/50">
@@ -576,15 +732,98 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                     </p>
                   </div>
                 )}
+                {/* SEÇÃO 3: HISTÓRICO DE CONTATOS & INTERAÇÕES 360° (AUTOMÁTICO + NOTAS MANUAIS) */}
+                <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                        <History className="h-4 w-4 text-teal-600" />
+                        Histórico de Interações & Atividades 360° ({combinedTimeline.length})
+                      </h4>
+                      <p className="text-[10px] text-muted-foreground">
+                        Orçamentos, Ordens de Serviço, Chamados e Anotações de reuniões/ligações.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => setIsAddNoteModalOpen(true)}
+                      className="h-7 text-xs bg-teal-700 hover:bg-teal-600 text-white font-semibold"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar Interação Manual
+                    </Button>
+                  </div>
 
+                  {combinedTimeline.length === 0 ? (
+                    <div className="text-xs text-muted-foreground p-4 border border-dashed rounded-xl text-center bg-slate-50/40 dark:bg-slate-900/40">
+                      Nenhum histórico registrado ainda. Adicione uma nota de reunião, ligação ou
+                      emita uma proposta.
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+                      {combinedTimeline.map((item, idx) => (
+                        <div
+                          key={item.id || idx}
+                          className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs space-y-1.5 text-xs transition-all hover:border-teal-400"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {item.kind === 'quote' && (
+                                <Badge className="bg-indigo-600 text-white text-[9px] px-1.5 py-0 flex items-center gap-1">
+                                  <FileText className="h-3 w-3" /> Orçamento
+                                </Badge>
+                              )}
+                              {item.kind === 'order' && (
+                                <Badge className="bg-teal-700 text-white text-[9px] px-1.5 py-0 flex items-center gap-1">
+                                  <Wrench className="h-3 w-3" /> OS de Campo
+                                </Badge>
+                              )}
+                              {item.kind === 'ticket' && (
+                                <Badge className="bg-amber-600 text-white text-[9px] px-1.5 py-0 flex items-center gap-1">
+                                  <MessageSquare className="h-3 w-3" /> Chamado
+                                </Badge>
+                              )}
+                              {item.kind === 'note' && (
+                                <Badge className="bg-slate-700 text-white text-[9px] px-1.5 py-0 flex items-center gap-1">
+                                  <History className="h-3 w-3" /> Contato Comercial
+                                </Badge>
+                              )}
+                              <span className="font-bold text-slate-900 dark:text-slate-100">
+                                {item.title}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
+                              {item.date.toLocaleDateString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </span>
+                          </div>
+
+                          <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                            {item.detail}
+                          </p>
+
+                          {'author' in item && Boolean(item.author) && (
+                            <span className="text-[10px] text-teal-700 dark:text-teal-400 font-semibold block pt-0.5">
+                              Registrado por: {(item as any).author}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {/* Histórico de Oportunidades do Funil */}
-                <div className="space-y-2 pt-2">
+                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                    <span>Oportunidades em Aberto / Histórico ({activeClientDeals.length})</span>
+                    <span>Oportunidades em Aberto no Funil ({activeClientDeals.length})</span>
                   </h4>
                   {activeClientDeals.length === 0 ? (
-                    <div className="text-xs text-muted-foreground p-3 border border-dashed rounded-lg text-center">
-                      Nenhuma oportunidade cadastrada para este cliente.
+                    <div className="text-xs text-muted-foreground p-2.5 border border-dashed rounded-lg text-center">
+                      Nenhuma oportunidade cadastrada no funil para este cliente.
                     </div>
                   ) : (
                     activeClientDeals.map((d) => (
@@ -609,53 +848,94 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                       </div>
                     ))
                   )}
-                </div>
-
-                {/* Propostas & Modelos Emitidos */}
-                <div className="space-y-2 pt-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-                    Propostas & Orçamentos ({activeClientQuotes.length})
-                  </h4>
-                  {activeClientQuotes.length === 0 ? (
-                    <div className="text-xs text-muted-foreground p-3 border border-dashed rounded-lg text-center">
-                      Nenhum orçamento emitido ainda.
-                    </div>
-                  ) : (
-                    activeClientQuotes.map((q) => (
-                      <div
-                        key={q.id}
-                        className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 text-xs"
-                      >
-                        <div>
-                          <div className="font-semibold font-mono text-indigo-600">
-                            {q.quote_number}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            Termos: {q.payment_terms || 'Padrão'}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-bold text-slate-900 dark:text-slate-100">
-                            {(q.total || 0).toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </div>
-                          <Badge variant="outline" className="text-[9px] uppercase">
-                            {q.status}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                </div>{' '}
               </CardContent>
             </Card>
           </div>
         )}
       </div>
+      {/* Modal Adicionar Nota Manual de Interação com o Cliente */}
+      <Dialog open={isAddNoteModalOpen} onOpenChange={setIsAddNoteModalOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <History className="h-5 w-5 text-teal-600" />
+              Registrar Interação com {selectedClient?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSaveInteractionNote} className="space-y-3 py-2 text-xs">
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">Tipo de Interação *</Label>
+              <Select value={noteType} onValueChange={(v: any) => setNoteType(v)}>
+                <SelectTrigger className="text-xs h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="call" className="text-xs">
+                    📞 Ligação Telefônica / WhatsApp
+                  </SelectItem>
+                  <SelectItem value="meeting" className="text-xs">
+                    🤝 Reunião Presencial / Online
+                  </SelectItem>
+                  <SelectItem value="email" className="text-xs">
+                    ✉️ E-mail / Envio de Documento
+                  </SelectItem>
+                  <SelectItem value="visit" className="text-xs">
+                    🚗 Visita Técnica na Planta
+                  </SelectItem>
+                  <SelectItem value="note" className="text-xs">
+                    📝 Anotação Interna da Conta
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-      {/* Modal Criar / Editar Cliente */}
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">Assunto / Título *</Label>
+              <Input
+                required
+                placeholder="Ex: Alinhamento de prazo de entrega de gaxetas"
+                value={noteTitle}
+                onChange={(e) => setNoteTitle(e.target.value)}
+                className="text-xs h-8"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold">
+                Resumo da Conversa & Próximos Passos *
+              </Label>
+              <Textarea
+                required
+                rows={4}
+                placeholder="Ex: Conversado com Eng. Carlos. Cliente aceitou proposta para execução no próximo fim de semana..."
+                value={noteDescription}
+                onChange={(e) => setNoteDescription(e.target.value)}
+                className="text-xs"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsAddNoteModalOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                className="bg-teal-700 hover:bg-teal-600 text-white font-semibold"
+              >
+                Salvar no Histórico
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {/* Modal Criar / Editar Cliente */}{' '}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>

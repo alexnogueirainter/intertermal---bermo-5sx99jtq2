@@ -87,6 +87,7 @@ export type QuoteStatus = 'draft' | 'sent' | 'approved' | 'rejected' | 'expired'
 // 3a. Especificações Técnicas de Serviço para produtos BERMO
 export type WorkAreaDifficulty = 'Alto' | 'Médio' | 'Baixo'
 export type IntegrationNeed = 'Sim' | 'Não'
+export type IntegrationTiming = 'same_day' | 'early' // 'same_day': No dia do início da obra | 'early': Antecipada (antes do início da obra)
 
 export interface ServiceTechnicalSpecs {
   productId?: string
@@ -119,7 +120,9 @@ export interface ServiceTechnicalSpecs {
   // Novos campos Item 3A
   workAreaDifficulty?: WorkAreaDifficulty // Grau de dificuldade da área de trabalho (Alto, Médio, Baixo)
   workAreaObservations?: string // Observações do grau de dificuldade
-  needsIntegration?: IntegrationNeed // Necessidade de integração (Sim, Não)
+  needsIntegration?: IntegrationNeed // Necessidade de integração de funcionários (Sim, Não)
+  integrationTiming?: IntegrationTiming // Quando será a integração ('same_day' | 'early')
+  integrationCost?: number // Custo calculado automaticamente da integração
   integrationObservations?: string // Observações sobre a necessidade de integração
   pipeMeasurement?: string // Medida da tubulação (campo de texto editável)
 }
@@ -221,6 +224,24 @@ export interface QuoteServiceDetails {
   lodging_meals_costs?: LodgingMealsCosts
   indirect_costs?: IndirectCosts
   payment_and_validity?: PaymentAndValidity
+  service_composition?: {
+    itemsTotal?: number
+    laborTotal?: number
+    travelTotal?: number
+    lodgingMealsTotal?: number
+    integrationTotal?: number
+    directCostsTotal?: number
+    serviceMarginPercent?: number
+    serviceMarginValue?: number
+    adminCostPercent?: number
+    adminCostValue?: number
+    salesCommissionPercent?: number
+    salesCommissionValue?: number
+    netValueBeforeTaxes?: number
+    effectiveTaxRate?: number
+    totalWithTaxes?: number
+    suggestedFinalPrice?: number
+  }
 }
 
 export interface QuoteRecord {
@@ -229,6 +250,7 @@ export interface QuoteRecord {
   client_id?: string
   client_name?: string
   deal_id?: string
+  title?: string
   status?: QuoteStatus
   items?: QuoteItem[]
   subtotal?: number
@@ -324,6 +346,7 @@ export interface ServiceRecord {
 export type ServiceOrderStatus =
   | 'pending_approval'
   | 'approved'
+  | 'in_execution'
   | 'in_progress'
   | 'completed'
   | 'rejected'
@@ -334,21 +357,31 @@ export interface ServiceOrderRecord {
   order_number: string
   quote_id?: string
   quote_number?: string
+  deal_id?: string
   client_id?: string
   client_name?: string
   title: string
   status: ServiceOrderStatus
   services?: any[]
   total_value?: number
+  final_price?: number // Preço final cobrado
+  internal_cost?: number // Custos internos totais (MO + Itens + Deslocamento + Hospedagem + Integração)
   priority?: Priority
   assigned_to?: string
+  assigned_team?: string[]
   technical_details?: any
+  service_scope?: string
+  equipment?: string
   approval_notes?: string
   approved_at?: string
   approved_by?: string
+  rejection_notes?: string
+  rejected_at?: string
+  rejected_by?: string
   start_date?: string
   end_date?: string
   notes?: string
+  execution_notes?: string
   created?: string
   updated?: string
 }

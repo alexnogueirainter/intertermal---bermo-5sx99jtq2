@@ -12,7 +12,8 @@ export interface QuoteServiceComputation {
   laborTotal: number
   travelTotal: number
   lodgingMealsTotal: number
-  directCostsTotal: number // Soma dos custos diretos (Itens + MO + Deslocamento + Hospedagem)
+  integrationTotal: number // Custo de integração de funcionários (Item 3A)
+  directCostsTotal: number // Soma dos custos diretos (Itens + MO + Deslocamento + Hospedagem + Integração)
 
   // Custos indiretos calculados
   serviceMarginPercent: number
@@ -53,11 +54,65 @@ export function computeTotalTaxesPercentage(taxes: IndirectTaxes): number {
 /**
  * Calcula a composição de custos diretos e indiretos de serviços BERMO
  */
+/**
+ * Calcula o custo adicional da Integração de Funcionários (Item 3A do orçamento):
+ * - Se "Não": 0
+ * - Se "Sim" e "No dia do início da obra" (same_day):
+ *     Meio dia (4h) de serviço para cada funcionário alocado (Técnico, Ajudante, Inspetor)
+ *     => 4h * (techCount * techRate + helperCount * helperRate + inspectorCount * inspectorRate)
+ * - Se "Sim" e "Antecipada" (early):
+ *     Custos COMPLETOS de deslocamento (ida e volta) + 1 DIA INTEIRO (8h) de serviço de cada funcionário alocado
+ *     => travelTotal + 8h * (techCount * techRate + helperCount * helperRate + inspectorCount * inspectorRate)
+ */
+export function calculateIntegrationCost({
+  needsIntegration = 'Não',
+  integrationTiming = 'same_day',
+  labor,
+  travel,
+}: {
+  needsIntegration?: 'Sim' | 'Não'
+  integrationTiming?: 'same_day' | 'early'
+  labor?: LaborCosts
+  travel?: TravelCosts
+}): number {
+  if (needsIntegration !== 'Sim') {
+    return 0
+  }
+
+  const techCount = Number(labor?.technician?.professionalsCount || 0)
+  const techRate = Number(labor?.technician?.hourlyRate || 0)
+
+  const helperCount = Number(labor?.helper?.professionalsCount || 0)
+  const helperRate = Number(labor?.helper?.hourlyRate || 0)
+
+  const inspectorCount = Number(labor?.inspector?.professionalsCount || 0)
+  const inspectorRate = Number(labor?.inspector?.hourlyRate || 0)
+
+  // Custo por hora de toda a equipe alocada
+  const hourlyTeamCost =
+    techCount * techRate + helperCount * helperRate + inspectorCount * inspectorRate
+
+  if (integrationTiming === 'same_day') {
+    // Meio dia (4 horas ou 50% de uma diária de 8h)
+    const halfDayLabor = hourlyTeamCost * 4
+    return Math.round(halfDayLabor * 100) / 100
+  } else if (integrationTiming === 'early') {
+    // Deslocamento completo + Um dia inteiro (8 horas)
+    const fullDayLabor = hourlyTeamCost * 8
+    const travelCost = Number(travel?.total || 0)
+    return Math.round((travelCost + fullDayLabor) * 100) / 100
+  }
+
+  return 0
+}
+
 export function calculateQuoteServiceComposition({
   items = [],
   labor,
   travel,
   lodgingMeals,
+  needsIntegration = 'Não',
+  integrationTiming = 'same_day',
   serviceMarginPercent = 25, // 20% a 30% (padrão 25%)
   adminCostPercent = 15, // Fixo 15%
   salesCommissionPercent = 6, // 4% a 10% (padrão 6%)
@@ -67,6 +122,8 @@ export function calculateQuoteServiceComposition({
   labor?: LaborCosts
   travel?: TravelCosts
   lodgingMeals?: LodgingMealsCosts
+  needsIntegration?: 'Sim' | 'Não'
+  integrationTiming?: 'same_day' | 'early'
   serviceMarginPercent?: number
   adminCostPercent?: number
   salesCommissionPercent?: number
@@ -106,8 +163,17 @@ export function calculateQuoteServiceComposition({
       )
     : 0
 
+  // Custo de Integração de Funcionários (Item 3A)
+  const integrationTotal = calculateIntegrationCost({
+    needsIntegration,
+    integrationTiming,
+    labor,
+    travel,
+  })
+
   // Total de Custos Diretos
-  const directCostsTotal = itemsTotal + laborTotal + travelTotal + lodgingMealsTotal
+  const directCostsTotal =
+    itemsTotal + laborTotal + travelTotal + lodgingMealsTotal + integrationTotal
 
   // Impostos
   const taxes: IndirectTaxes = customTaxes || { ...DEFAULT_INDIRECT_TAXES }
@@ -131,6 +197,7 @@ export function calculateQuoteServiceComposition({
     laborTotal,
     travelTotal,
     lodgingMealsTotal,
+    integrationTotal,
     directCostsTotal,
     serviceMarginPercent,
     serviceMarginAmount: marginAmt,

@@ -109,17 +109,24 @@ export const serviceOrdersService = {
   async updateStatus(
     id: string,
     status: ServiceOrderRecord['status'],
-    approval_notes?: string,
-    approved_by?: string,
+    notes?: string,
+    authorName?: string,
   ): Promise<ServiceOrderRecord> {
     const payload: Partial<ServiceOrderRecord> = { status }
-    if (status === 'approved') {
-      payload.approved_at = new Date().toISOString()
-      payload.approved_by = approved_by || 'Alex Nogueia (Gestor Técnico)'
+    const now = new Date().toISOString()
+
+    if (status === 'approved' || status === 'in_execution') {
+      payload.approved_at = now
+      payload.approved_by = authorName || 'Alex Nogueira (Gestor Técnico)'
+      if (notes !== undefined) payload.approval_notes = notes
+    } else if (status === 'rejected') {
+      payload.rejected_at = now
+      payload.rejected_by = authorName || 'Alex Nogueira (Gestor Técnico)'
+      if (notes !== undefined) payload.rejection_notes = notes
+    } else {
+      if (notes !== undefined) payload.notes = notes
     }
-    if (approval_notes !== undefined) {
-      payload.approval_notes = approval_notes
-    }
+
     return await pb.collection('service_orders').update<ServiceOrderRecord>(id, payload)
   },
 

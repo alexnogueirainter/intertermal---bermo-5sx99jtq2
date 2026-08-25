@@ -216,36 +216,52 @@ export async function lookupCepDetails(cleanCep: string): Promise<{
   state?: string
   address?: string
   neighborhood?: string
+  lat?: number
+  lng?: number
   found: boolean
 }> {
-  if (cleanCep.length !== 8) {
+  const norm = normalizeCep(cleanCep)
+  if (norm.length !== 8) {
     return { found: false }
   }
 
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 2000)
-    const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`, {
+    const timeoutId = setTimeout(() => controller.abort(), 3500)
+    const res = await fetch(`https://viacep.com.br/ws/${norm}/json/`, {
       signal: controller.signal,
     })
     clearTimeout(timeoutId)
     if (res.ok) {
       const data = await res.json()
-      if (!data.erro) {
+      if (!data.erro && data.localidade) {
+        const coords = estimateCoordsFromCep(norm)
         return {
           city: data.localidade,
           state: data.uf,
-          address: data.logradouro,
-          neighborhood: data.bairro,
+          address: data.logradouro || '',
+          neighborhood: data.bairro || '',
+          lat: coords.lat,
+          lng: coords.lng,
           found: true,
         }
       }
     }
   } catch (_) {
-    // Falha silenciosa de rede — usa o simulador
+    // Fallback gracioso
   }
-  return { found: false }
+
+  // Fallback offline com estimativa das coordenadas
+  const fallbackCoords = estimateCoordsFromCep(norm)
+  return {
+    city: fallbackCoords.cityHint || '',
+    state: fallbackCoords.stateHint || '',
+    lat: fallbackCoords.lat,
+    lng: fallbackCoords.lng,
+    found: true,
+  }
 }
+
 /**
  * Calcula a rota completa no padrão Mapeia:
  * - Distância
@@ -276,22 +292,46 @@ export async function calculateRouteMapeiaStyle({
   fuelCost: number
   tollCost: number
   totalTravelCost: number
+  originInfo?: { city?: string; state?: string; address?: string }
+  destinationInfo?: { city?: string; state?: string; address?: string }
   isEstimated: boolean
 }> {
   let oneWayDistance = manualDistanceKm || 0
+  let originInfo: { city?: string; state?: string; address?: string } | undefined
+  let destinationInfo: { city?: string; state?: string; address?: string } | undefined
 
-  if (!oneWayDistance && originCep && destinationCep) {
-    const cleanOrig = normalizeCep(originCep)
-    const cleanDest = normalizeCep(destinationCep)
+  const cleanOrig = originCep ? normalizeCep(originCep) : ''
+  const cleanDest = destinationCep ? normalizeCep(destinationCep) : ''
 
-    if (cleanOrig && cleanDest) {
-      if (cleanOrig === cleanDest) {
-        oneWayDistance = 25 // Deslocamento urbano local
-      } else {
-        const c1 = estimateCoordsFromCep(cleanOrig)
-        const c2 = estimateCoordsFromCep(cleanDest)
-        oneWayDistance = calculateHaversineDistance(c1.lat, c1.lng, c2.lat, c2.lng)
+  if (cleanOrig.length === 8) {
+    const origData = await lookupCepDetails(cleanOrig)
+    if (origData.found) {
+      originInfo = {
+        city: origData.city,
+        state: origData.state,
+        address: origData.address,
       }
+    }
+  }
+
+  if (cleanDest.length === 8) {
+    const destData = await lookupCepDetails(cleanDest)
+    if (destData.found) {
+      destinationInfo = {
+        city: destData.city,
+        state: destData.state,
+        address: destData.address,
+      }
+    }
+  }
+
+  if (!oneWayDistance && cleanOrig.length === 8 && cleanDest.length === 8) {
+    if (cleanOrig === cleanDest) {
+      oneWayDistance = 25 // Deslocamento urbano local
+    } else {
+      const c1 = estimateCoordsFromCep(cleanOrig)
+      const c2 = estimateCoordsFromCep(cleanDest)
+      oneWayDistance = calculateHaversineDistance(c1.lat, c1.lng, c2.lat, c2.lng)
     }
   }
 
@@ -301,7 +341,7 @@ export async function calculateRouteMapeiaStyle({
 
   const effectiveDistance = roundTrip ? oneWayDistance * 2 : oneWayDistance
 
-  // Custo Combustível = (distância em km / consumo médio em km/L) * preço do litro
+  // Custo Combustível = (distância em km / consumo médio em km/L) * preço do litro (padrão 10 km/l e preço diesel)
   const fuelCost =
     Math.round((effectiveDistance / Math.max(consumptionKmL, 1)) * fuelPrice * 100) / 100
 
@@ -317,6 +357,8 @@ export async function calculateRouteMapeiaStyle({
     fuelCost,
     tollCost,
     totalTravelCost,
+    originInfo,
+    destinationInfo,
     isEstimated: true,
   }
 }

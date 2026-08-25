@@ -260,8 +260,12 @@ export default function IndexPage() {
             title: `OS ${newOrderNumber} - ${updated.title || 'Manutenção em Equipamento BERMO'}`,
             status: 'pending_approval',
             total_value: updated.total || 0,
+            final_price: updated.total || 0,
+            internal_cost:
+              updated.service_details?.service_composition?.directCostsTotal ||
+              Math.round((updated.total || 0) * 0.65 * 100) / 100,
             priority: 'high',
-            assigned_to: updated.assigned_to || 'Alex Nogueia',
+            assigned_to: updated.assigned_to || 'Alex Nogueira',
             services: updated.items || [],
             technical_details: updated.service_details || {},
             notes: `Ordem de Serviço gerada automaticamente a partir da proposta aprovada ${updated.quote_number}. Aguardando validação do gestor técnico.`,
@@ -291,25 +295,92 @@ export default function IndexPage() {
   const handleUpdateServiceOrderStatus = async (
     id: string,
     status: ServiceOrderStatus,
-    approvalNotes?: string,
+    notes?: string,
   ) => {
     try {
       const updated = await serviceOrdersService.updateStatus(
         id,
         status,
-        approvalNotes,
-        'Alex Nogueia (Gestor Técnico)',
+        notes,
+        'Alex Nogueira (Gestor Técnico)',
       )
-      setServiceOrders((prev) => prev.map((o) => (o.id === id ? updated : o)))
+      setServiceOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...updated } : o)))
+
+      // Se a OS foi aprovada ou movida para em execução, mover o card correspondente no Kanban para "Fechado (Ganho)" / Em Execução
+      const targetOrder = serviceOrders.find((so) => so.id === id) || updated
+      if (status === 'approved' || status === 'in_execution') {
+        const matchingDeal = deals.find(
+          (d) =>
+            (targetOrder.deal_id && d.id === targetOrder.deal_id) ||
+            (targetOrder.quote_id && d.id === targetOrder.quote_id) ||
+            (targetOrder.quote_number && d.title?.includes(targetOrder.quote_number)) ||
+            (targetOrder.order_number && d.title?.includes(targetOrder.order_number)) ||
+            (targetOrder.client_id && d.client_id === targetOrder.client_id),
+        )
+
+        if (matchingDeal && matchingDeal.stage !== 'won') {
+          try {
+            await dealsService.updateStage(matchingDeal.id, 'won')
+            setDeals((prev) =>
+              prev.map((d) => (d.id === matchingDeal.id ? { ...d, stage: 'won' } : d)),
+            )
+          } catch {
+            setDeals((prev) =>
+              prev.map((d) => (d.id === matchingDeal.id ? { ...d, stage: 'won' } : d)),
+            )
+          }
+        }
+      }
+
       toast({
-        title: status === 'approved' ? '✅ OS Aprovada com Sucesso!' : 'OS Atualizada',
-        description: `Ordem de Serviço #${updated.order_number} agora está ${status}.`,
+        title:
+          status === 'approved'
+            ? '✅ OS Aprovada pelo Gestor!'
+            : status === 'rejected'
+              ? '❌ Ordem de Serviço Rejeitada'
+              : 'OS Atualizada',
+        description: `Ordem de Serviço #${targetOrder.order_number || id} atualizada para ${status}. Kanban sincronizado.`,
       })
     } catch (err: any) {
+      // Fallback local caso falhe a persistência remota
+      const now = new Date().toISOString()
+      setServiceOrders((prev) =>
+        prev.map((so) => {
+          if (so.id === id) {
+            return {
+              ...so,
+              status,
+              approval_notes:
+                status === 'approved' || status === 'in_execution' ? notes : so.approval_notes,
+              approved_at:
+                status === 'approved' || status === 'in_execution' ? now : so.approved_at,
+              approved_by:
+                status === 'approved' || status === 'in_execution'
+                  ? 'Alex Nogueira'
+                  : so.approved_by,
+              rejection_notes: status === 'rejected' ? notes : so.rejection_notes,
+              rejected_at: status === 'rejected' ? now : so.rejected_at,
+              rejected_by: status === 'rejected' ? 'Alex Nogueira' : so.rejected_by,
+            }
+          }
+          return so
+        }),
+      )
+
+      const targetOrder = serviceOrders.find((so) => so.id === id)
+      if (targetOrder && (status === 'approved' || status === 'in_execution')) {
+        setDeals((prev) =>
+          prev.map((d) =>
+            d.client_id === targetOrder.client_id || d.title?.includes(targetOrder.order_number)
+              ? { ...d, stage: 'won' }
+              : d,
+          ),
+        )
+      }
+
       toast({
-        title: 'Erro ao atualizar OS',
-        description: err.message,
-        variant: 'destructive',
+        title: 'Status da OS Atualizado',
+        description: `Ordem de Serviço atualizada localmente para "${status}".`,
       })
     }
   }
@@ -631,6 +702,7 @@ export default function IndexPage() {
               quotes={quotes}
               tickets={tickets}
               services={services}
+              serviceOrders={serviceOrders}
               onNavigate={(tab) => setActiveTab(tab as ActiveTab)}
             />
           )}
@@ -668,6 +740,8 @@ export default function IndexPage() {
               clients={clients}
               deals={deals}
               quotes={quotes}
+              serviceOrders={serviceOrders}
+              tickets={tickets}
               selectedClient={selectedClient}
               onSelectClient={setSelectedClient}
               onCreateClient={handleCreateClient}

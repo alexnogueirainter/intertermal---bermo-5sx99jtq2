@@ -26,6 +26,7 @@ import {
   CheckCircle2,
   Clock,
   AlertTriangle,
+  AlertCircle,
   Calendar,
   Layers,
   Flame,
@@ -78,8 +79,9 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
     useState<ServiceOrderRecord | null>(null)
   const [approvalNotes, setApprovalNotes] = useState('')
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
-  const [actionType, setActionType] = useState<'approve' | 'reject'>('approve')
-
+  const [actionType, setActionType] = useState<'approve' | 'reject' | 'execute' | 'complete'>(
+    'approve',
+  )
   // Form State
   const [title, setTitle] = useState('')
   const [serviceType, setServiceType] = useState<ServiceType>('maintenance')
@@ -214,12 +216,14 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os Status</SelectItem>
-            <SelectItem value="planning">Planejamento</SelectItem>
-            <SelectItem value="in_progress">Em Execução</SelectItem>
-            <SelectItem value="pending_client">Aguardando Fábrica</SelectItem>
-            <SelectItem value="completed">Concluído</SelectItem>
+            <SelectItem value="pending_approval">Aguardando Aprovação</SelectItem>
+            <SelectItem value="approved">Aprovada</SelectItem>
+            <SelectItem value="in_execution">Em Execução</SelectItem>
+            <SelectItem value="in_progress">Em Andamento</SelectItem>
+            <SelectItem value="completed">Concluída</SelectItem>
+            <SelectItem value="rejected">Rejeitada</SelectItem>
           </SelectContent>
-        </Select>
+        </Select>{' '}
       </div>
 
       {/* ABA 1: ORDENS DE SERVIÇO (GERADAS AUTOMATICAMENTE DAS PROPOSTAS APROVADAS) */}
@@ -263,18 +267,24 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                         )}
                         {so.status === 'approved' && (
                           <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] flex items-center gap-1">
-                            <ShieldCheck className="h-3 w-3" /> Aprovada pelo Gestor
+                            <ShieldCheck className="h-3 w-3" /> Aprovada (Pronta p/ Execução)
+                          </Badge>
+                        )}
+                        {(so.status === 'in_execution' || so.status === 'in_progress') && (
+                          <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] flex items-center gap-1">
+                            <Wrench className="h-3 w-3 animate-pulse" /> Em Execução
+                          </Badge>
+                        )}
+                        {so.status === 'completed' && (
+                          <Badge className="bg-teal-600 text-white text-[10px] flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> Concluída
                           </Badge>
                         )}
                         {so.status === 'rejected' && (
-                          <Badge className="bg-rose-600 text-white text-[10px]">Rejeitada</Badge>
-                        )}
-                        {so.status === 'in_progress' && (
-                          <Badge className="bg-blue-600 text-white text-[10px]">Em Execução</Badge>
-                        )}
-                        {so.status === 'completed' && (
-                          <Badge className="bg-teal-600 text-white text-[10px]">Finalizada</Badge>
-                        )}
+                          <Badge className="bg-rose-600 text-white text-[10px] flex items-center gap-1">
+                            <XCircle className="h-3 w-3" /> Rejeitada
+                          </Badge>
+                        )}{' '}
                       </div>
 
                       <CardTitle className="text-sm font-bold mt-2 text-slate-900 dark:text-slate-100 line-clamp-2">
@@ -317,10 +327,18 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                       {so.approved_by && (
                         <div className="text-[10px] text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
                           <CheckCircle className="h-3 w-3 shrink-0" />
-                          <span>Aprovado por: {so.approved_by}</span>
+                          <span>
+                            Aprovado por: {so.approved_by}{' '}
+                            {so.approval_notes ? `("${so.approval_notes}")` : ''}
+                          </span>
                         </div>
                       )}
-
+                      {so.rejection_notes && (
+                        <div className="text-[10px] text-rose-700 dark:text-rose-400 flex items-center gap-1 bg-rose-50 dark:bg-rose-950/40 p-1.5 rounded">
+                          <AlertCircle className="h-3 w-3 shrink-0" />
+                          <span>Motivo Rejeição: {so.rejection_notes}</span>
+                        </div>
+                      )}
                       <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                         <div>
                           <span className="text-[10px] text-muted-foreground block">
@@ -333,37 +351,70 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                             })}
                           </span>
                         </div>
+                        {/* Botões de Ação do Gestor / Operação */}
+                        {onUpdateServiceOrderStatus && (
+                          <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                            {isPending && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedOrderForApproval(so)
+                                    setActionType('reject')
+                                    setApprovalNotes('')
+                                    setIsApproveModalOpen(true)
+                                  }}
+                                  className="h-7 px-2 text-[11px] text-rose-600 hover:bg-rose-50 border-rose-200"
+                                >
+                                  <XCircle className="h-3.5 w-3.5 mr-1" /> Rejeitar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedOrderForApproval(so)
+                                    setActionType('approve')
+                                    setApprovalNotes('')
+                                    setIsApproveModalOpen(true)
+                                  }}
+                                  className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-xs"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5 mr-1" /> Aprovar OS
+                                </Button>
+                              </>
+                            )}
 
-                        {/* Botões de Ação do Gestor */}
-                        {isPending && onUpdateServiceOrderStatus && (
-                          <div className="flex items-center gap-1.5">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedOrderForApproval(so)
-                                setActionType('reject')
-                                setApprovalNotes('')
-                                setIsApproveModalOpen(true)
-                              }}
-                              className="h-7 px-2 text-[11px] text-rose-600 hover:bg-rose-50 border-rose-200"
-                            >
-                              Rejeitar
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setSelectedOrderForApproval(so)
-                                setActionType('approve')
-                                setApprovalNotes('')
-                                setIsApproveModalOpen(true)
-                              }}
-                              className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold"
-                            >
-                              <CheckCircle className="h-3.5 w-3.5 mr-1" /> Aprovar OS
-                            </Button>
+                            {isApproved && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedOrderForApproval(so)
+                                  setActionType('execute')
+                                  setApprovalNotes('')
+                                  setIsApproveModalOpen(true)
+                                }}
+                                className="h-7 px-2.5 text-[11px] bg-blue-600 hover:bg-blue-500 text-white font-semibold"
+                              >
+                                <Wrench className="h-3.5 w-3.5 mr-1" /> Iniciar Execução
+                              </Button>
+                            )}
+
+                            {(so.status === 'in_execution' || so.status === 'in_progress') && (
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedOrderForApproval(so)
+                                  setActionType('complete')
+                                  setApprovalNotes('')
+                                  setIsApproveModalOpen(true)
+                                }}
+                                className="h-7 px-2.5 text-[11px] bg-teal-700 hover:bg-teal-600 text-white font-semibold"
+                              >
+                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir OS
+                              </Button>
+                            )}
                           </div>
-                        )}
+                        )}{' '}
                       </div>
                     </CardContent>
                   </Card>
@@ -428,25 +479,37 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
         </div>
       )}
 
-      {/* Modal de Aprovação / Rejeição de OS pelo Gestor */}
+      {/* Modal de Aprovação / Rejeição / Transição de OS pelo Gestor */}
       <Dialog open={isApproveModalOpen} onOpenChange={setIsApproveModalOpen}>
-        <DialogContent className="sm:max-w-[450px]">
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle className="text-base font-bold flex items-center gap-2">
-              {actionType === 'approve' ? (
+              {actionType === 'approve' && (
                 <>
                   <ShieldCheck className="h-5 w-5 text-emerald-600" />
                   Aprovar Ordem de Serviço #{selectedOrderForApproval?.order_number}
                 </>
-              ) : (
+              )}
+              {actionType === 'reject' && (
                 <>
                   <XCircle className="h-5 w-5 text-rose-600" />
                   Rejeitar Ordem de Serviço #{selectedOrderForApproval?.order_number}
                 </>
               )}
+              {actionType === 'execute' && (
+                <>
+                  <Wrench className="h-5 w-5 text-blue-600" />
+                  Iniciar Execução de Campo #{selectedOrderForApproval?.order_number}
+                </>
+              )}
+              {actionType === 'complete' && (
+                <>
+                  <CheckCircle2 className="h-5 w-5 text-teal-600" />
+                  Concluir Ordem de Serviço #{selectedOrderForApproval?.order_number}
+                </>
+              )}
             </DialogTitle>
           </DialogHeader>
-
           <div className="space-y-3 py-2 text-xs">
             <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-1">
               <p className="font-bold text-slate-900 dark:text-slate-100">
@@ -465,24 +528,28 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                 </strong>
               </p>
             </div>
-
             <div className="space-y-1">
               <Label className="text-xs font-semibold">
-                {actionType === 'approve'
-                  ? 'Observações de Liberação / Gestão Técnica (Opcional)'
-                  : 'Motivo da Rejeição (Obrigatório)'}
+                {actionType === 'approve' && 'Observações de Liberação Técnica (Opcional)'}
+                {actionType === 'reject' && 'Motivo da Rejeição (Obrigatório) *'}
+                {actionType === 'execute' && 'Observações de Mobilização de Equipe / Ferramental'}
+                {actionType === 'complete' && 'Relatório Final / Apontamento de Horas e Peças'}
               </Label>
               <Textarea
                 placeholder={
                   actionType === 'approve'
-                    ? 'Ex: Escopo validado. Liberado para agendamento com o cliente...'
-                    : 'Ex: Aguardando chegada de peças de reposição...'
+                    ? 'Ex: Escopo e custos validados. Mover card no Kanban para execução...'
+                    : actionType === 'reject'
+                      ? 'Ex: Inconsistência no dimensionamento de placas ou falta de estoque...'
+                      : actionType === 'execute'
+                        ? 'Ex: Equipe de técnicos e inspetor mobilizada para a fábrica...'
+                        : 'Ex: Troca de gaxetas e retubagem finalizadas com sucesso. Teste hidrostático OK.'
                 }
                 value={approvalNotes}
                 onChange={(e) => setApprovalNotes(e.target.value)}
                 className="text-xs h-20"
               />
-            </div>
+            </div>{' '}
           </div>
 
           <DialogFooter>
@@ -497,11 +564,17 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
             <Button
               type="button"
               size="sm"
+              disabled={actionType === 'reject' && !approvalNotes.trim()}
               onClick={async () => {
                 if (selectedOrderForApproval && onUpdateServiceOrderStatus) {
+                  let nextStatus: ServiceOrderStatus = 'approved'
+                  if (actionType === 'reject') nextStatus = 'rejected'
+                  if (actionType === 'execute') nextStatus = 'in_execution'
+                  if (actionType === 'complete') nextStatus = 'completed'
+
                   await onUpdateServiceOrderStatus(
                     selectedOrderForApproval.id,
-                    actionType === 'approve' ? 'approved' : 'rejected',
+                    nextStatus,
                     approvalNotes,
                   )
                   setIsApproveModalOpen(false)
@@ -511,11 +584,18 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
               className={
                 actionType === 'approve'
                   ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                  : 'bg-rose-600 hover:bg-rose-500 text-white'
+                  : actionType === 'reject'
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                    : actionType === 'execute'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                      : 'bg-teal-700 hover:bg-teal-600 text-white'
               }
             >
-              {actionType === 'approve' ? 'Confirmar Aprovação' : 'Confirmar Rejeição'}
-            </Button>
+              {actionType === 'approve' && 'Confirmar Aprovação'}
+              {actionType === 'reject' && 'Confirmar Rejeição'}
+              {actionType === 'execute' && 'Mover para Em Execução'}
+              {actionType === 'complete' && 'Concluir Ordem'}
+            </Button>{' '}
           </DialogFooter>
         </DialogContent>
       </Dialog>

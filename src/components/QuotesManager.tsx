@@ -209,6 +209,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
   const [workAreaDifficulty, setWorkAreaDifficulty] = useState<'Alto' | 'Médio' | 'Baixo'>('Médio')
   const [workAreaObservations, setWorkAreaObservations] = useState('')
   const [needsIntegration, setNeedsIntegration] = useState<'Sim' | 'Não'>('Não')
+  const [integrationTiming, setIntegrationTiming] = useState<'same_day' | 'early'>('same_day')
   const [integrationObservations, setIntegrationObservations] = useState('')
   const [pipeMeasurement, setPipeMeasurement] = useState('DN50 (2 pol) - Schedule 40')
 
@@ -297,22 +298,37 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
 
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false)
 
-  // Recalcular Rota Mapeia automaticamente quando o CEP de destino ou distância mudar
+  // Recalcular Rota Mapeia automaticamente quando o CEP de origem ou destino mudar
   const handleRecalculateRoute = async (customDestCep?: string, customOriginCep?: string) => {
     setIsCalculatingRoute(true)
     try {
+      const targetOriginCep = customOriginCep || originCep
+      const targetDestCep = customDestCep || destinationCep
+
       const res = await calculateRouteMapeiaStyle({
-        originCep: customOriginCep || originCep,
-        destinationCep: customDestCep || destinationCep,
+        originCep: targetOriginCep,
+        destinationCep: targetDestCep,
         consumptionKmL,
         fuelPrice,
         tollRoadPercent,
         tollRateKm,
         roundTrip,
       })
-      setDistanceKm(res.distanceKm)
-      if (res.estimatedFuelCost > 0 && manualFuelAdj === 0) {
-        // baseFuelCost recalculates automatically via render computation
+
+      if (res.distanceKm) {
+        setDistanceKm(res.distanceKm)
+      }
+
+      if (res.originInfo?.city && (!originAddress || originAddress.includes('Blumenau'))) {
+        setOriginAddress(
+          `${res.originInfo.address ? res.originInfo.address + ', ' : ''}${res.originInfo.city} - ${res.originInfo.state || 'SC'}`,
+        )
+      }
+
+      if (res.destinationInfo?.city) {
+        setDestinationAddress(
+          `${res.destinationInfo.address ? res.destinationInfo.address + ', ' : ''}${res.destinationInfo.city} - ${res.destinationInfo.state || 'SP'}`,
+        )
       }
     } finally {
       setIsCalculatingRoute(false)
@@ -351,6 +367,7 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
     if (specs.workAreaObservations !== undefined)
       setWorkAreaObservations(specs.workAreaObservations)
     if (specs.needsIntegration) setNeedsIntegration(specs.needsIntegration)
+    if (specs.integrationTiming) setIntegrationTiming(specs.integrationTiming)
     if (specs.integrationObservations !== undefined)
       setIntegrationObservations(specs.integrationObservations)
     if (specs.pipeMeasurement !== undefined) setPipeMeasurement(specs.pipeMeasurement)
@@ -709,6 +726,8 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
     labor: laborCostsObj,
     travel: travelCostsObj,
     lodgingMeals: lodgingMealsCostsObj,
+    needsIntegration,
+    integrationTiming,
     serviceMarginPercent: serviceMargin,
     adminCostPercent: adminCost,
     salesCommissionPercent: salesCommission,
@@ -856,6 +875,8 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
           workAreaDifficulty,
           workAreaObservations,
           needsIntegration,
+          integrationTiming: needsIntegration === 'Sim' ? integrationTiming : undefined,
+          integrationCost: computation.integrationTotal,
           integrationObservations,
           pipeMeasurement,
         },
@@ -1286,14 +1307,48 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
 
                                         <div>
                                           <span className="text-slate-500 block">
-                                            Necessidade Integração:
+                                            Integração de Funcionários:
                                           </span>
                                           <span className="font-bold text-teal-700 dark:text-teal-300">
                                             {item.bermo_specs.needsIntegration ||
                                               currentViewQuote.service_details
                                                 ?.service_technical_specs?.needsIntegration ||
                                               'Não'}
+                                            {(item.bermo_specs.needsIntegration === 'Sim' ||
+                                              currentViewQuote.service_details
+                                                ?.service_technical_specs?.needsIntegration ===
+                                                'Sim') && (
+                                              <span className="text-[9px] font-normal text-muted-foreground ml-1">
+                                                (
+                                                {(item.bermo_specs.integrationTiming ||
+                                                  currentViewQuote.service_details
+                                                    ?.service_technical_specs
+                                                    ?.integrationTiming) === 'early'
+                                                  ? 'Antecipada / Prévia'
+                                                  : 'No dia do início'}
+                                                )
+                                              </span>
+                                            )}
                                           </span>
+                                          {((item.bermo_specs.integrationCost &&
+                                            item.bermo_specs.integrationCost > 0) ||
+                                            (currentViewQuote.service_details
+                                              ?.service_technical_specs?.integrationCost &&
+                                              currentViewQuote.service_details
+                                                .service_technical_specs.integrationCost > 0)) && (
+                                            <p className="text-[9px] font-semibold text-teal-800 dark:text-teal-200 mt-0.5">
+                                              Custo Adicional:{' '}
+                                              {(
+                                                item.bermo_specs.integrationCost ||
+                                                currentViewQuote.service_details
+                                                  ?.service_technical_specs?.integrationCost ||
+                                                0
+                                              ).toLocaleString('pt-BR', {
+                                                style: 'currency',
+                                                currency: 'BRL',
+                                              })}
+                                            </p>
+                                          )}
                                           {(item.bermo_specs.integrationObservations ||
                                             currentViewQuote.service_details
                                               ?.service_technical_specs
@@ -1784,7 +1839,6 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                 <span className="text-[11px] font-bold text-teal-900 dark:text-teal-200 block">
                   Parâmetros de Acesso e Tubulação (Escopo Técnico 3A)
                 </span>
-
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {/* Grau de dificuldade da área de trabalho */}
                   <div className="space-y-1">
@@ -1818,26 +1872,25 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                   {/* Necessidade de integração */}
                   <div className="space-y-1">
                     <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                      Necessidade de Integração *
+                      Necessidade de Integração (Onboarding/Treinamento) *
                     </Label>
                     <Select
                       value={needsIntegration}
                       onValueChange={(val: any) => setNeedsIntegration(val)}
                     >
-                      <SelectTrigger className="text-xs h-8 bg-white dark:bg-slate-900">
+                      <SelectTrigger className="text-xs h-8 bg-white dark:bg-slate-900 font-semibold">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Sim" className="text-xs font-semibold text-teal-700">
-                          Sim (Interligação com CLP/Supervisório/Skid)
-                        </SelectItem>
                         <SelectItem value="Não" className="text-xs font-semibold text-slate-600">
-                          Não (Instalação Mecânica Direta)
+                          Não (Sem custo adicional)
+                        </SelectItem>
+                        <SelectItem value="Sim" className="text-xs font-semibold text-teal-700">
+                          Sim (Requer integração de funcionários)
                         </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-
                   {/* Medida da tubulação */}
                   <div className="space-y-1">
                     <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
@@ -1851,7 +1904,52 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                     />
                   </div>
                 </div>
+                {/* Sub-campo condicional quando Necessidade de Integração for Sim */}
+                {needsIntegration === 'Sim' && (
+                  <div className="p-2.5 rounded-lg bg-teal-50 dark:bg-teal-950/60 border border-teal-300 dark:border-teal-700 space-y-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-bold text-teal-900 dark:text-teal-200 flex items-center gap-1">
+                          <Clock className="h-3.5 w-3.5 text-teal-600" />
+                          Quando será a integração? *
+                        </Label>
+                        <Select
+                          value={integrationTiming}
+                          onValueChange={(val: any) => setIntegrationTiming(val)}
+                        >
+                          <SelectTrigger className="text-xs h-8 bg-white dark:bg-slate-900 font-semibold text-teal-900 dark:text-teal-100">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="same_day" className="text-xs">
+                              No dia do início da obra (+50% H/H da equipe)
+                            </SelectItem>
+                            <SelectItem value="early" className="text-xs">
+                              Antecipada (+1 diária completa H/H + deslocamento)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
 
+                      <div className="p-2 rounded bg-white dark:bg-slate-900 border border-teal-200 dark:border-teal-800 text-xs flex flex-col justify-center">
+                        <span className="text-[10px] text-muted-foreground block">
+                          Custo Adicional da Integração Calculado:
+                        </span>
+                        <span className="text-sm font-bold text-teal-700 dark:text-teal-300">
+                          {(computation.integrationTotal || 0).toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
+                        <span className="text-[9px] text-slate-500">
+                          {integrationTiming === 'same_day'
+                            ? 'Meio dia (4h) de serviço para cada funcionário alocado.'
+                            : '1 dia inteiro (8h) de cada funcionário + deslocamento extra.'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                   <div className="space-y-1">
                     <Label className="text-[10px] text-muted-foreground">
@@ -1867,16 +1965,16 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
 
                   <div className="space-y-1">
                     <Label className="text-[10px] text-muted-foreground">
-                      Observações sobre a Integração
+                      Observações sobre a Integração de Funcionários
                     </Label>
                     <Textarea
                       value={integrationObservations}
                       onChange={(e) => setIntegrationObservations(e.target.value)}
-                      placeholder="Ex: Interligação do posicionador digital 4-20mA HART com sistema DeltaV..."
+                      placeholder="Ex: Integração presencial de segurança na portaria 2 com exame médico ASO..."
                       className="text-xs h-16 bg-white dark:bg-slate-900 resize-none"
                     />
                   </div>
-                </div>
+                </div>{' '}
               </div>
             </div>
 
@@ -2066,16 +2164,12 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Origem (Endereço e CEP)
-                  </Label>
+                  <div className="flex justify-between items-center">
+                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                      Origem (CEP e Endereço da Base / Matriz)
+                    </Label>
+                  </div>
                   <div className="flex gap-2">
-                    <Input
-                      value={originAddress}
-                      onChange={(e) => setOriginAddress(e.target.value)}
-                      placeholder="Blumenau/SC"
-                      className="text-xs h-8 flex-1"
-                    />
                     <Input
                       value={originCep}
                       onChange={(e) => {
@@ -2086,23 +2180,25 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                           handleRecalculateRoute(undefined, val)
                         }
                       }}
-                      placeholder="CEP Origem"
-                      className="text-xs h-8 w-28 font-mono"
+                      placeholder="CEP Origem (89066-000)"
+                      className="text-xs h-8 w-32 font-mono font-bold"
+                    />
+                    <Input
+                      value={originAddress}
+                      onChange={(e) => setOriginAddress(e.target.value)}
+                      placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                      className="text-xs h-8 flex-1"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-[10px] text-muted-foreground">
-                    Destino do Cliente (Endereço e CEP)
-                  </Label>
+                  <div className="flex justify-between items-center">
+                    <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                      Destino da Fábrica / Cliente (CEP e Endereço)
+                    </Label>
+                  </div>
                   <div className="flex gap-2">
-                    <Input
-                      value={destinationAddress}
-                      onChange={(e) => setDestinationAddress(e.target.value)}
-                      placeholder="Cidade/UF do Cliente"
-                      className="text-xs h-8 flex-1"
-                    />
                     <Input
                       value={destinationCep}
                       onChange={(e) => {
@@ -2114,7 +2210,13 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                         }
                       }}
                       placeholder="CEP Destino"
-                      className="text-xs h-8 w-28 font-mono"
+                      className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                    />
+                    <Input
+                      value={destinationAddress}
+                      onChange={(e) => setDestinationAddress(e.target.value)}
+                      placeholder="Cidade/UF da planta do Cliente"
+                      className="text-xs h-8 flex-1"
                     />
                   </div>
                 </div>
@@ -2167,38 +2269,68 @@ export const QuotesManager: React.FC<QuotesManagerProps> = ({
                 </div>
               </div>
 
-              {/* Ajustes Manuais */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 bg-white dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs">
-                <div className="flex items-center justify-between sm:justify-start gap-2">
-                  <span className="text-muted-foreground">Combustível Calc.:</span>
-                  <strong className="text-slate-900 dark:text-slate-100">
+              {/* Resumo Automático e Ajustes Manuais Editáveis */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 pt-1 bg-white dark:bg-slate-950 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-xs">
+                <div className="space-y-0.5">
+                  <span className="text-[10px] text-muted-foreground block">
+                    Combustível Calculado:
+                  </span>
+                  <strong className="text-slate-900 dark:text-slate-100 text-xs">
                     {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </strong>
                 </div>
-                <div className="flex items-center justify-between sm:justify-start gap-2">
-                  <span className="text-muted-foreground">Pedágio Calc. (R$ 0,15/km):</span>
-                  <strong className="text-slate-900 dark:text-slate-100">
+
+                <div className="space-y-0.5">
+                  <span className="text-[10px] text-muted-foreground block">Pedágio Estimado:</span>
+                  <strong className="text-slate-900 dark:text-slate-100 text-xs">
                     {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </strong>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={isCalculatingRoute}
-                    onClick={() => handleRecalculateRoute()}
-                    className="text-[11px] h-7 w-full border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                  >
-                    {isCalculatingRoute ? (
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="h-3 w-3 animate-spin" /> Calculando...
-                      </span>
-                    ) : (
-                      'Recalcular Rota Mapeia'
-                    )}
-                  </Button>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Ajuste Manual Combustível (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={manualFuelAdj}
+                    onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-7"
+                  />
                 </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground">
+                    Ajuste Manual Pedágio (R$)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={manualTollAdj}
+                    onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                    placeholder="0.00"
+                    className="text-xs h-7"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={isCalculatingRoute}
+                  onClick={() => handleRecalculateRoute()}
+                  className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                >
+                  {isCalculatingRoute ? (
+                    <span className="flex items-center gap-1">
+                      <Sparkles className="h-3 w-3 animate-spin" /> Buscando CEP e Calculando...
+                    </span>
+                  ) : (
+                    'Recalcular Rota Mapeia (ViaCEP + Haversine)'
+                  )}
+                </Button>
               </div>
             </div>
 
