@@ -164,6 +164,7 @@ export function QuotesManager({
   const [scopeOfWork, setScopeOfWork] = useState(
     'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
   )
+  const [workFluid, setWorkFluid] = useState<string>('')
 
   // Novos campos Seção 3A: Integração, PT e Pernoite
   const [integrationNeeded, setIntegrationNeeded] = useState<boolean>(false)
@@ -843,6 +844,7 @@ export function QuotesManager({
         dimensions: dimensions,
         weightKg: weightKg,
         scopeOfWork: scopeOfWork,
+        workFluid: workFluid,
       },
       integration_details: {
         integration_needed: integrationNeeded,
@@ -1152,6 +1154,7 @@ export function QuotesManager({
     setScopeOfWork(
       'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
     )
+    setWorkFluid('')
     setIntegrationNeeded(false)
     setIntegrationWhen('same_day')
     setIntegrationDay('')
@@ -1304,6 +1307,7 @@ export function QuotesManager({
         q.notes ||
         'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
     )
+    setWorkFluid(sSpecs.workFluid || '')
 
     // Novos campos: Integração, PT e Pernoite
     setIntegrationNeeded(q.integration_needed ?? sIntegration.integration_needed ?? false)
@@ -1355,7 +1359,7 @@ export function QuotesManager({
     setIrDiffRate(q.ir_diff_rate ?? pricingCfg?.irDiffRate ?? sTaxes.irDiff ?? 1.5)
 
     // Custos Diretos & Peças
-    setMaterialsCost(q.materials_cost || sDetails.materials_breakdown?.baseMaterials || 0)
+    setMaterialsCost(q.materials_cost ?? sDetails.materials_breakdown?.baseMaterials ?? 0)
     setCustomMaterialsList(
       q.custom_materials ||
         sDetails.materials_breakdown?.customMaterials ||
@@ -1367,9 +1371,9 @@ export function QuotesManager({
         })) ||
         [],
     )
-    setThirdPartyCost(q.third_party_cost || 0)
-    setOtherCosts(q.other_costs || 0)
-    setDiscountAmount(q.discount_amount || q.discount_total || 0)
+    setThirdPartyCost(q.third_party_cost ?? 0)
+    setOtherCosts(q.other_costs ?? 0)
+    setDiscountAmount(q.discount_amount ?? q.discount_total ?? 0)
 
     // Logística & Rotas
     const travelCfg = q.travel_config || {}
@@ -1397,8 +1401,8 @@ export function QuotesManager({
     setConsumptionKmL(travelCfg.consumptionKmL || sTravel.consumptionKmL || 9.5)
     setFuelPrice(travelCfg.fuelPrice || sTravel.fuelPrice || 5.89)
     setTollRoadPercent(travelCfg.tollRoadPercent || sTravel.tollRoadPercent || 60)
-    setManualFuelAdj(travelCfg.manualFuelAdj || sTravel.manualFuelAdjustment || 0)
-    setManualTollAdj(travelCfg.manualTollAdj || sTravel.manualTollAdjustment || 0)
+    setManualFuelAdj(travelCfg.manualFuelAdj ?? sTravel.manualFuelAdjustment ?? 0)
+    setManualTollAdj(travelCfg.manualTollAdj ?? sTravel.manualTollAdjustment ?? 0)
 
     // Aluguel de Carro
     const restoredRentalType =
@@ -1412,7 +1416,7 @@ export function QuotesManager({
       q.car_rental_days ?? travelCfg.car_rental_days ?? sTravel.car_rental_days ?? 1
 
     setCarRentalType(restoredRentalType)
-    setCarRentalDailyRate(restoredRentalRate)
+    setCarRentalDailyRate(restoredRentalRate ?? 0)
     setCarRentalDays(restoredRentalDays)
 
     // Hospedagem & Alimentação
@@ -2225,6 +2229,16 @@ export function QuotesManager({
                   onChange={(e) => setScopeOfWork(e.target.value)}
                   rows={2}
                   className="text-xs"
+                />
+              </div>
+
+              <div>
+                <Label className="text-[10px] font-semibold">Fluido de Trabalho</Label>
+                <Input
+                  value={workFluid}
+                  onChange={(e) => setWorkFluid(e.target.value)}
+                  placeholder="Ex: Vapor saturado, Óleo térmico, Água gelada, Gases de processo"
+                  className="text-xs h-8 mt-1"
                 />
               </div>
 
