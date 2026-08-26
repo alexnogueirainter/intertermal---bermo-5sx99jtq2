@@ -903,7 +903,7 @@ export function QuotesManager({
         totalLodgingMeals: lodgingMealsTotal,
       },
       materials_breakdown: {
-        baseMaterials: materialsCost,
+        baseMaterials: 0,
         customMaterials: customMaterialsList,
         totalMaterials: totalMaterials,
       },
@@ -1039,7 +1039,7 @@ export function QuotesManager({
       // Custos Diretos
       lodging_meals_cost: lodgingMealsTotal,
       travel_cost: travelTotal,
-      materials_cost: materialsCost,
+      materials_cost: 0,
       third_party_cost: thirdPartyCost,
       other_costs: otherCosts,
       discount_amount: discountAmount,
@@ -1359,7 +1359,14 @@ export function QuotesManager({
     setIrDiffRate(q.ir_diff_rate ?? pricingCfg?.irDiffRate ?? sTaxes.irDiff ?? 1.5)
 
     // Custos Diretos & Peças
-    setMaterialsCost(q.materials_cost ?? sDetails.materials_breakdown?.baseMaterials ?? 0)
+    // Se há custom_materials, materialsCost deve ser 0 (não há campo separado para base materials)
+    const hasCustomMats =
+      (q.custom_materials && q.custom_materials.length > 0) ||
+      (sDetails.materials_breakdown?.customMaterials &&
+        sDetails.materials_breakdown.customMaterials.length > 0)
+    setMaterialsCost(
+      hasCustomMats ? 0 : (q.materials_cost ?? sDetails.materials_breakdown?.baseMaterials ?? 0),
+    )
     setCustomMaterialsList(
       q.custom_materials ||
         sDetails.materials_breakdown?.customMaterials ||
@@ -2232,14 +2239,41 @@ export function QuotesManager({
                 />
               </div>
 
-              <div>
-                <Label className="text-[10px] font-semibold">Fluido de Trabalho</Label>
-                <Input
-                  value={workFluid}
-                  onChange={(e) => setWorkFluid(e.target.value)}
-                  placeholder="Ex: Vapor saturado, Óleo térmico, Água gelada, Gases de processo"
-                  className="text-xs h-8 mt-1"
-                />
+              <div className="space-y-1">
+                <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                  Fluido de Trabalho
+                </Label>
+                <Select value={workFluid} onValueChange={(val) => setWorkFluid(val)}>
+                  <SelectTrigger className="text-xs h-8 mt-1">
+                    <SelectValue placeholder="Selecione o fluido de trabalho..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Vapor saturado" className="text-xs">
+                      Vapor saturado
+                    </SelectItem>
+                    <SelectItem value="Óleo térmico" className="text-xs">
+                      Óleo térmico
+                    </SelectItem>
+                    <SelectItem value="Água quente" className="text-xs">
+                      Água quente
+                    </SelectItem>
+                    <SelectItem value="Água gelada" className="text-xs">
+                      Água gelada
+                    </SelectItem>
+                    <SelectItem value="Gases de processo" className="text-xs">
+                      Gases de processo
+                    </SelectItem>
+                    <SelectItem value="Fluido frigorífico (Amônia/R134a)" className="text-xs">
+                      Fluido frigorífico (Amônia/R134a)
+                    </SelectItem>
+                    <SelectItem value="Solução sanitária/CIP" className="text-xs">
+                      Solução sanitária/CIP
+                    </SelectItem>
+                    <SelectItem value="Outro" className="text-xs">
+                      Outro
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Novos Campos: Integração, PT e Pernoite */}
