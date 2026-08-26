@@ -275,6 +275,14 @@ export interface QuoteRecord {
   commercial_notes?: string
   service_details?: any
   items?: any[]
+
+  // Novos campos Seção 3A
+  integration_needed?: boolean
+  integration_day?: string
+  integration_type?: 'day_of_work' | 'early' | string
+  work_permit_needed?: boolean
+  work_permit_time?: 'first_hour' | string
+  overnight_needed?: boolean
   notes?: string
   assigned_to?: string
   created?: string

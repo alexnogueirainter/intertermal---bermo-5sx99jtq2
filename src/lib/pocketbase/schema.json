@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-25T20:56:16.804Z",
+  "generatedAt": "2026-08-26T15:17:53.356Z",
   "collections": [
     {
       "name": "users",
@@ -830,6 +830,42 @@
         {
           "name": "custom_materials",
           "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "integration_needed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "integration_day",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "integration_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "work_permit_needed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "work_permit_time",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "overnight_needed",
+          "type": "bool",
           "required": false,
           "system": false
         }
