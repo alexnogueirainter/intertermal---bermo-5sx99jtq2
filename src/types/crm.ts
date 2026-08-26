@@ -195,6 +195,7 @@ export interface QuoteRecord {
   working_pressure_bar?: number
   dimensions_w_h_d?: string
   weight_kg?: number
+  work_fluid?: string
   scope_of_work?: string
 
   // Mão de obra (Valores individuais e agrupados)
