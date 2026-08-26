@@ -165,6 +165,13 @@ export function QuotesManager({
     'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
   )
 
+  // Novos campos Seção 3A: Integração, PT e Pernoite
+  const [integrationNeeded, setIntegrationNeeded] = useState<boolean>(false)
+  const [integrationWhen, setIntegrationWhen] = useState<'same_day' | 'early'>('same_day')
+  const [integrationDay, setIntegrationDay] = useState<string>('')
+  const [workPermitNeeded, setWorkPermitNeeded] = useState<boolean>(false)
+  const [overnightNeeded, setOvernightNeeded] = useState<boolean>(false)
+
   // Identificador da fonte do modelo (Base Local vs Manual)
   const [modelSource, setModelSource] = useState<'local' | 'manual'>('manual')
   const [isSearchingOnline, setIsSearchingOnline] = useState(false)
@@ -690,11 +697,38 @@ export function QuotesManager({
   const customMaterialsTotal = customMaterialsList.reduce((acc, m) => acc + m.qty * m.unitPrice, 0)
   const totalMaterials = materialsCost + customMaterialsTotal
 
+  // Cálculos dos Custos Adicionais: Integração, PT e Pernoite
+  const sumRates = techRate + helperRate + inspectorRate
+  const totalTeamCount = techCount + helperCount + inspectorCount
+
+  const integrationCost = useMemo(() => {
+    if (!integrationNeeded) return 0
+    if (integrationWhen === 'same_day') {
+      return sumRates * 4 // Meio dia (4h)
+    } else {
+      // 'early': travelTotal + diária cheia da equipe (8h)
+      return travelTotal + sumRates * 8
+    }
+  }, [integrationNeeded, integrationWhen, sumRates, travelTotal])
+
+  const workPermitCost = useMemo(() => {
+    if (!workPermitNeeded) return 0
+    return sumRates * 1 // 1 hora da equipe
+  }, [workPermitNeeded, sumRates])
+
+  const overnightCost = useMemo(() => {
+    if (!overnightNeeded) return 0
+    return hotelRate * 1 + mealsRate * 1 * totalTeamCount
+  }, [overnightNeeded, hotelRate, mealsRate, totalTeamCount])
+
+  // Custo Direto da Seção 3A com Integração e PT
+  const section3AAdditionalCost = integrationCost + workPermitCost
+
   const computation: PricingCalculationResult = useMemo(() => {
     return calculateQuotePricing({
       directCosts: {
         materials: totalMaterials,
-        labor: laborTotal,
+        labor: laborTotal + section3AAdditionalCost,
         travel: travelTotal,
         lodgingMeals: lodgingMealsTotal,
         thirdParty: thirdPartyCost,
@@ -718,6 +752,7 @@ export function QuotesManager({
   }, [
     totalMaterials,
     laborTotal,
+    section3AAdditionalCost,
     travelTotal,
     lodgingMealsTotal,
     thirdPartyCost,
@@ -808,6 +843,16 @@ export function QuotesManager({
         dimensions: dimensions,
         weightKg: weightKg,
         scopeOfWork: scopeOfWork,
+      },
+      integration_details: {
+        integration_needed: integrationNeeded,
+        integration_when: integrationWhen,
+        integration_day: integrationDay,
+        integration_cost: integrationCost,
+        work_permit_needed: workPermitNeeded,
+        work_permit_cost: workPermitCost,
+        overnight_needed: overnightNeeded,
+        overnight_cost: overnightCost,
       },
       labor_costs: {
         techMechanical: {
@@ -976,6 +1021,16 @@ export function QuotesManager({
       travel_config: travelConfig,
       lodging_meals_config: lodgingMealsConfig,
 
+      // Novos Campos: Integração, PT e Pernoite
+      integration_needed: integrationNeeded,
+      integration_when: integrationWhen,
+      integration_day: integrationDay,
+      integration_cost: integrationCost,
+      work_permit_needed: workPermitNeeded,
+      work_permit_cost: workPermitCost,
+      overnight_needed: overnightNeeded,
+      overnight_cost: overnightCost,
+
       // Peças & Consumíveis
       custom_materials: customMaterialsList,
 
@@ -1097,6 +1152,11 @@ export function QuotesManager({
     setScopeOfWork(
       'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
     )
+    setIntegrationNeeded(false)
+    setIntegrationWhen('same_day')
+    setIntegrationDay('')
+    setWorkPermitNeeded(false)
+    setOvernightNeeded(false)
     setModelSource('manual')
     setMaterialsCost(0)
     setCustomMaterialsList([])
@@ -1177,6 +1237,7 @@ export function QuotesManager({
     // Extrair dados aninhados em service_details ou items caso existam
     const sDetails = q.service_details || {}
     const sSpecs = sDetails.service_technical_specs || {}
+    const sIntegration = sDetails.integration_details || {}
     const sLabor = sDetails.labor_costs || {}
     const sTravel = sDetails.travel_costs || {}
     const sLodging = sDetails.lodging_meals_costs || {}
@@ -1243,6 +1304,13 @@ export function QuotesManager({
         q.notes ||
         'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
     )
+
+    // Novos campos: Integração, PT e Pernoite
+    setIntegrationNeeded(q.integration_needed ?? sIntegration.integration_needed ?? false)
+    setIntegrationWhen(q.integration_when ?? sIntegration.integration_when ?? 'same_day')
+    setIntegrationDay(q.integration_day ?? sIntegration.integration_day ?? '')
+    setWorkPermitNeeded(q.work_permit_needed ?? sIntegration.work_permit_needed ?? false)
+    setOvernightNeeded(q.overnight_needed ?? sIntegration.overnight_needed ?? false)
 
     // -------------------------------------------------------------------------
     // PROBLEMA 1: RESTAURAR VALORES DE MÃO DE OBRA (techRate, helperRate, etc.)
@@ -2158,6 +2226,233 @@ export function QuotesManager({
                   rows={2}
                   className="text-xs"
                 />
+              </div>
+
+              {/* Novos Campos: Integração, PT e Pernoite */}
+              <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                {/* a) Necessidade de Integração de Funcionários */}
+                <div className="p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                        Necessidade de Integração de Funcionários
+                      </Label>
+                      <p className="text-[10px] text-muted-foreground">
+                        Treinamento de integração ou ambientação técnica de segurança na fábrica do
+                        cliente.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={integrationNeeded ? 'default' : 'ghost'}
+                        onClick={() => setIntegrationNeeded(true)}
+                        className={`h-7 px-3 text-xs font-medium ${
+                          integrationNeeded
+                            ? 'bg-teal-700 hover:bg-teal-600 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Sim
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={!integrationNeeded ? 'default' : 'ghost'}
+                        onClick={() => setIntegrationNeeded(false)}
+                        className={`h-7 px-3 text-xs font-medium ${
+                          !integrationNeeded
+                            ? 'bg-slate-700 hover:bg-slate-600 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Não
+                      </Button>
+                    </div>
+                  </div>
+
+                  {integrationNeeded && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                          Quando será a integração?
+                        </Label>
+                        <Select
+                          value={integrationWhen}
+                          onValueChange={(val) => setIntegrationWhen(val as 'same_day' | 'early')}
+                        >
+                          <SelectTrigger className="text-xs h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="same_day" className="text-xs">
+                              No dia do início da obra
+                            </SelectItem>
+                            <SelectItem value="early" className="text-xs">
+                              Antecipada (antes do início da obra)
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                          Dia da semana da integração
+                        </Label>
+                        <Input
+                          value={integrationDay}
+                          onChange={(e) => setIntegrationDay(e.target.value)}
+                          placeholder="Ex: Segunda-feira"
+                          className="text-xs h-8"
+                        />
+                      </div>
+
+                      {quoteViewMode === 'internal' && (
+                        <div className="sm:col-span-2 text-right text-[11px] font-bold text-teal-700 dark:text-teal-300 font-mono">
+                          Custo Adicional Integração (
+                          {integrationWhen === 'same_day'
+                            ? 'Meio dia / 4h'
+                            : 'Antecipada / Diária + Deslocamento'}
+                          ):{' '}
+                          {integrationCost.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* b) Liberação de Permissão de Trabalho (PT) */}
+                <div className="p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                        Liberação de Permissão de Trabalho (PT)
+                      </Label>
+                      <p className="text-[10px] text-muted-foreground">
+                        Emissão de APR, PT, PET e alinhamento de segurança no cliente.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={workPermitNeeded ? 'default' : 'ghost'}
+                        onClick={() => setWorkPermitNeeded(true)}
+                        className={`h-7 px-3 text-xs font-medium ${
+                          workPermitNeeded
+                            ? 'bg-teal-700 hover:bg-teal-600 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Sim
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={!workPermitNeeded ? 'default' : 'ghost'}
+                        onClick={() => setWorkPermitNeeded(false)}
+                        className={`h-7 px-3 text-xs font-medium ${
+                          !workPermitNeeded
+                            ? 'bg-slate-700 hover:bg-slate-600 text-white shadow-xs'
+                            : 'text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        Não
+                      </Button>
+                    </div>
+                  </div>
+
+                  {workPermitNeeded && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                      <span className="text-slate-600 dark:text-slate-400 text-[11px] italic">
+                        ℹ A liberação acontece no primeiro horário de trabalho
+                      </span>
+                      {quoteViewMode === 'internal' && (
+                        <span className="text-[11px] font-bold text-teal-700 dark:text-teal-300 font-mono">
+                          Custo Adicional PT (1h equipe):{' '}
+                          {workPermitCost.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* c) Pernoite no dia anterior (mostrar APENAS se (distanceKm / 2) > 240) */}
+                {distanceKm / 2 > 240 && (
+                  <div className="p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <Label className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                            Pernoite no dia anterior
+                          </Label>
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] text-amber-700 bg-amber-50 dark:bg-amber-950/40"
+                          >
+                            Distância &gt; 240km ({Math.round(distanceKm / 2)}km só ida)
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Hospedagem prévia para a equipe iniciar os trabalhos pontualmente pela
+                          manhã.
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={overnightNeeded ? 'default' : 'ghost'}
+                          onClick={() => setOvernightNeeded(true)}
+                          className={`h-7 px-3 text-xs font-medium ${
+                            overnightNeeded
+                              ? 'bg-teal-700 hover:bg-teal-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400'
+                          }`}
+                        >
+                          Sim
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={!overnightNeeded ? 'default' : 'ghost'}
+                          onClick={() => setOvernightNeeded(false)}
+                          className={`h-7 px-3 text-xs font-medium ${
+                            !overnightNeeded
+                              ? 'bg-slate-700 hover:bg-slate-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400'
+                          }`}
+                        >
+                          Não
+                        </Button>
+                      </div>
+                    </div>
+
+                    {overnightNeeded && (
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                        <span className="text-slate-600 dark:text-slate-400 text-[11px]">
+                          Pernoite e alimentação no dia anterior ao início do atendimento.
+                        </span>
+                        {quoteViewMode === 'internal' && (
+                          <span className="text-[11px] font-bold text-teal-700 dark:text-teal-300 font-mono">
+                            Custo Adicional Pernoite (1 diária + alimentação equipe):{' '}
+                            {overnightCost.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Peças e Materiais Adicionais */}

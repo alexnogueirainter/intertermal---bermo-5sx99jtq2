@@ -280,9 +280,13 @@ export interface QuoteRecord {
   integration_needed?: boolean
   integration_day?: string
   integration_type?: 'day_of_work' | 'early' | string
+  integration_when?: 'same_day' | 'early' | string
+  integration_cost?: number
   work_permit_needed?: boolean
+  work_permit_cost?: number
   work_permit_time?: 'first_hour' | string
   overnight_needed?: boolean
+  overnight_cost?: number
   notes?: string
   assigned_to?: string
   created?: string
