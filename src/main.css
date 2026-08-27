@@ -289,7 +289,6 @@
   }
 }
 
-/* Print styles para Prévia em PDF da Proposta Técnica */
 @media print {
   @page {
     margin: 10mm 12mm 10mm 12mm;
@@ -310,49 +309,34 @@
     display: none !important;
   }
 
-  /* Mantém o portal Radix e o documento visíveis */
+  /* Esconde TUDO que está fora do #root (incluindo portais) por padrão */
+  body > *:not([data-radix-portal]) {
+    display: none !important;
+  }
+
+  /* Esconde TODOS os portais por padrão */
   [data-radix-portal] {
-    display: block !important;
-  }
-
-  /* Esconde o overlay preto/escuro do Radix Dialog na impressão */
-  [data-radix-portal] [data-state] {
-    animation: none !important;
-  }
-
-  /* Dialog Overlay transparente/oculto */
-  .fixed.inset-0.bg-black\/80,
-  [data-radix-dialog-overlay] {
-    display: none !important;
-    background: transparent !important;
-    backdrop-filter: none !important;
-  }
-
-  /* Garante que o DialogContent não fique preso com overflow/max-height/fixed center */
-  [role='dialog'] {
-    position: static !important;
-    transform: none !important;
-    max-height: none !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    overflow: visible !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-  }
-
-  /* Elementos com classe print:hidden continuam ocultos */
-  .print\:hidden {
     display: none !important;
   }
 
-  /* Exibe o documento imprimível */
-  #quote-printable-document {
+  /* Mostra APENAS o portal que contém #quote-printable-document */
+  [data-radix-portal]:has(#quote-printable-document) {
     display: block !important;
   }
 
+  /* Dentro desse portal, esconde tudo exceto o documento */
+  [data-radix-portal]:has(#quote-printable-document) > * {
+    display: none !important;
+  }
+
+  /* Mostra o documento e todo o seu conteúdo */
+  [data-radix-portal] #quote-printable-document,
+  [data-radix-portal] #quote-printable-document * {
+    display: revert !important;
+    visibility: visible !important;
+  }
+
+  /* Garante que o conteúdo do documento ocupe a página */
   #quote-printable-document {
     position: relative !important;
     left: 0 !important;

@@ -88,7 +88,11 @@ export function QuotePdfPreviewDialog({
   }
 
   const handlePrint = () => {
-    window.print()
+    // Fecha outros diálogos que possam estar abertos (ex: modal de edição do QuotesManager)
+    // antes de imprimir, garantindo que apenas o PDF apareça
+    setTimeout(() => {
+      window.print()
+    }, 150)
   }
 
   // Identificação do primeiro item com especificações
