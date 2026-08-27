@@ -157,6 +157,26 @@ export interface QuoteCustomMaterial {
   unitPrice: number
 }
 
+export interface QuoteEquipmentItem {
+  id: string
+  model: string
+  brand: string
+  series?: string
+  plateCount: number
+  plateMaterial: string
+  plateThickness: number
+  gasketMaterial: string
+  connectionSize: string
+  connectionType?: string
+  pressureTestBar: number
+  workingPressureBar: number
+  dimensions: string
+  weightKg: number
+  quantity: number
+  modelSource?: 'local' | 'manual'
+  isExpanded?: boolean
+}
+
 export interface DealRecord {
   id: string
   title: string
@@ -196,6 +216,7 @@ export interface QuoteRecord {
   working_pressure_bar?: number
   dimensions_w_h_d?: string
   weight_kg?: number
+  equipments?: QuoteEquipmentItem[]
   work_fluid?: string
   scope_of_work?: string
 

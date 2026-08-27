@@ -233,7 +233,88 @@ export function QuotePdfPreviewDialog({
     taxes.totalTaxes ??
     pisPercent + cofinsPercent + issPercent + csllPercent + irpjPercent + irDiffPercent
 
-  const equipmentQuantity = quote.equipment_quantity ?? 1
+  // Lista unificada de equipamentos da proposta (suporta array q.equipments, service_details ou fallback)
+  let quoteEquipmentsList: any[] = []
+  if (quote.equipments && Array.isArray(quote.equipments) && quote.equipments.length > 0) {
+    quoteEquipmentsList = quote.equipments
+  } else if (
+    specs?.equipments_list &&
+    Array.isArray(specs.equipments_list) &&
+    specs.equipments_list.length > 0
+  ) {
+    quoteEquipmentsList = specs.equipments_list
+  } else if (quote.items && quote.items.length > 0) {
+    const itemsWithSpecs = quote.items.filter((it) => it.bermo_specs && it.bermo_specs.productModel)
+    if (itemsWithSpecs.length > 0) {
+      quoteEquipmentsList = itemsWithSpecs.map((it, idx) => ({
+        id: it.id || `eq-${idx}`,
+        model: it.bermo_specs?.productModel || it.bermo_specs?.productCode || '',
+        brand: it.bermo_specs?.productBrand || quote.equipment_brand || 'Alfa Laval / BERMO',
+        series: it.bermo_specs?.productSeries || quote.equipment_series || '',
+        quantity: Number(it.quantity) || 1,
+        plateCount:
+          Number(it.bermo_specs?.platesCount) ||
+          (quote.plate_count != null ? Number(quote.plate_count) : 45),
+        plateMaterial: it.bermo_specs?.plateMaterial || quote.plate_material || 'AISI 316L',
+        plateThickness:
+          Number(it.bermo_specs?.plateThickness) ||
+          (quote.plate_thickness != null ? Number(quote.plate_thickness) : 0.5),
+        gasketMaterial: it.bermo_specs?.gasketType || quote.gasket_material || 'EPDM Clip-on',
+        connectionSize:
+          it.bermo_specs?.pipeMeasurement ||
+          it.bermo_specs?.equipmentSize ||
+          quote.connection_size ||
+          'DN100 (4")',
+        pressureTestBar:
+          Number(it.bermo_specs?.testPressure) ||
+          (quote.pressure_test_bar != null ? Number(quote.pressure_test_bar) : 16),
+        workingPressureBar:
+          Number(it.bermo_specs?.operatingPressure) ||
+          (quote.working_pressure_bar != null ? Number(quote.working_pressure_bar) : 10),
+        dimensions:
+          it.bermo_specs?.plateDimensions || quote.dimensions_w_h_d || '1450 x 480 x 1120 mm',
+        weightKg:
+          Number(it.bermo_specs?.weightKg) ||
+          (quote.weight_kg != null ? Number(quote.weight_kg) : 480),
+      }))
+    }
+  }
+
+  if (quoteEquipmentsList.length === 0) {
+    quoteEquipmentsList = [
+      {
+        id: 'eq-default',
+        model: quote.equipment_model || specs?.productModel || specs?.productCode || '',
+        brand: quote.equipment_brand || specs?.productBrand || 'Alfa Laval / BERMO',
+        series: quote.equipment_series || specs?.productSeries || '',
+        quantity: quote.equipment_quantity ?? 1,
+        plateCount:
+          quote.plate_count ?? (specs?.platesCount != null ? Number(specs.platesCount) : 45),
+        plateMaterial: quote.plate_material || specs?.plateMaterial || 'AISI 316L',
+        plateThickness:
+          quote.plate_thickness ??
+          (specs?.plateThickness != null ? Number(specs.plateThickness) : 0.5),
+        gasketMaterial: quote.gasket_material || specs?.gasketType || 'EPDM Clip-on',
+        connectionSize:
+          quote.connection_size || specs?.equipmentSize || specs?.pipeMeasurement || 'DN100 (4")',
+        pressureTestBar:
+          quote.pressure_test_bar ??
+          (specs?.testPressure != null ? Number(specs.testPressure) : 16),
+        workingPressureBar:
+          quote.working_pressure_bar ??
+          (specs?.operatingPressure != null ? Number(specs.operatingPressure) : 10),
+        dimensions: quote.dimensions_w_h_d || specs?.dimensions || '1450 x 480 x 1120 mm',
+        weightKg: quote.weight_kg ?? (specs?.weightKg != null ? Number(specs.weightKg) : 480),
+      },
+    ]
+  }
+
+  const totalEquipmentUnits = quoteEquipmentsList.reduce(
+    (acc, eq) => acc + (Number(eq.quantity) || 1),
+    0,
+  )
+
+  const equipmentQuantity = totalEquipmentUnits || quote.equipment_quantity || 1
   const finalSalePrice = quote.total ?? quote.final_price ?? indirectCosts?.finalSalePrice ?? 0
 
   const adminCostAmount =
@@ -967,7 +1048,7 @@ export function QuotePdfPreviewDialog({
           {/* ========================================================================= */}
 
           {/* Seção: Escopo de Fornecimento & Serviços BERMO */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div
               className={`flex items-center justify-between border-b pb-1 ${
                 isInternal ? 'border-amber-300' : 'border-slate-200'
@@ -981,178 +1062,170 @@ export function QuotePdfPreviewDialog({
                   ? '1. Escopo de Serviços & Detalhes Técnicos'
                   : '1. Escopo de Serviços e Equipamentos'}
               </h3>
+              <span className="text-[10px] text-slate-500 font-semibold">
+                {quoteEquipmentsList.length}{' '}
+                {quoteEquipmentsList.length === 1 ? 'equipamento' : 'equipamentos'} (
+                {totalEquipmentUnits} {totalEquipmentUnits === 1 ? 'unidade' : 'unidades'})
+              </span>
             </div>
 
+            {/* LISTAGEM DE ESPECIFICAÇÕES TÉCNICAS DE CADA EQUIPAMENTO */}
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                Equipamentos Contemplados na Proposta Técnica (Especificações):
+              </span>
+              <div className="grid grid-cols-1 gap-2.5">
+                {quoteEquipmentsList.map((eq, idx) => (
+                  <div
+                    key={eq.id || idx}
+                    className={`p-3 rounded-lg border text-xs space-y-2 ${
+                      isInternal
+                        ? 'bg-amber-50/50 border-amber-200'
+                        : 'bg-teal-50/50 border-teal-100'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-[11.5px]">
+                          Item {idx + 1}: {eq.brand || 'BERMO'} {eq.model || 'Trocador de Calor'}
+                        </span>
+                        {Number(eq.quantity) > 1 && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] px-1.5 py-0 bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 font-mono"
+                          >
+                            {eq.quantity} unidades
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {eq.series || 'Placas Desmontáveis'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-[10.5px] font-mono">
+                      <div>
+                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                          Modelo / Fabricante
+                        </span>
+                        <strong className="text-slate-900">{eq.model || 'N/A'}</strong> (
+                        {eq.brand || 'BERMO'})
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                          Nº de Placas
+                        </span>
+                        <strong className="text-slate-900">{eq.plateCount ?? 'N/A'}</strong> (
+                        {eq.plateMaterial || 'AISI 316L'})
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                          Espessura Placas
+                        </span>
+                        <strong className="text-slate-900">{eq.plateThickness ?? '0.5'} mm</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-sans text-[9.5px] block">Gaxetas</span>
+                        <strong className="text-slate-900">
+                          {eq.gasketMaterial || 'EPDM Clip-on'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                          Conexão / Bitola
+                        </span>
+                        <strong className="text-slate-900">
+                          {eq.connectionSize || 'DN100 (4")'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                          Pressão Trab. / Teste
+                        </span>
+                        <strong className="text-slate-900">
+                          {eq.workingPressureBar ?? 10} bar / {eq.pressureTestBar ?? 16} bar
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                          Dimensões (L x A x P)
+                        </span>
+                        <strong className="text-slate-900">
+                          {eq.dimensions || '1450 x 480 x 1120 mm'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                          Peso Estimado
+                        </span>
+                        <strong className="text-slate-900">{eq.weightKg ?? 480} kg</strong>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ESCOPO GLOBAL E FLUIDO */}
+            {(quote.scope_of_work ||
+              specs?.scopeOfWork ||
+              specs?.workFluid ||
+              quote.work_fluid) && (
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
+                  Escopo Detalhado dos Serviços de Manutenção & Parâmetros Operacionais:
+                </span>
+                <p className="text-[11px] text-slate-700 whitespace-pre-line leading-relaxed">
+                  {quote.scope_of_work ||
+                    specs?.scopeOfWork ||
+                    'Manutenção preventiva e corretiva com desmontagem, limpeza química, inspeção por líquido penetrante, teste hidrostático e montagem.'}
+                </p>
+                {(specs?.workFluid || quote.work_fluid) && (
+                  <div className="text-[10.5px] text-slate-600 font-mono pt-1 border-t border-slate-200">
+                    <span className="font-sans font-semibold text-slate-700">
+                      Fluido de Trabalho:{' '}
+                    </span>
+                    {specs?.workFluid || quote.work_fluid}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TABELA DE VALOR DO SERVIÇO GLOBAL */}
             <div className="border border-slate-200 rounded-lg overflow-hidden">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] font-bold">
                   <tr>
-                    <th className="p-2.5">Descrição Técnica dos Serviços</th>
-                    <th className="p-2.5 text-center w-16">
-                      {equipmentQuantity > 1 ? 'Equip.' : 'Qtd'}
-                    </th>
-                    <th className="p-2.5 text-right w-28">Valor Unitário</th>
-                    <th className="p-2.5 text-right w-28">Total</th>
+                    <th className="p-2.5">Descrição do Pacote de Serviços de Engenharia</th>
+                    <th className="p-2.5 text-center w-28">Equipamentos</th>
+                    <th className="p-2.5 text-right w-36">Total Global</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {quote.items && quote.items.length > 0 ? (
-                    quote.items.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50">
-                        <td className="p-2.5 space-y-1.5">
-                          <div className="font-bold text-slate-900 text-xs">{item.name}</div>
-                          {item.description && (
-                            <div className="text-[11px] text-slate-700 whitespace-pre-line bg-slate-50 p-2.5 rounded border border-slate-100">
-                              {item.description}
-                            </div>
-                          )}
-                          {(item.bermo_specs || specs) && (
-                            <div
-                              className={`p-2 rounded border space-y-1 text-[10.5px] ${
-                                isInternal
-                                  ? 'bg-amber-50/50 border-amber-200'
-                                  : 'bg-teal-50/60 border-teal-100'
-                              }`}
-                            >
-                              <div className="flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[10px]">
-                                {(item.bermo_specs?.productCode ||
-                                  specs?.productCode ||
-                                  specs?.productModel ||
-                                  quote.equipment_model) && (
-                                  <span>
-                                    Modelo:{' '}
-                                    <strong>
-                                      {item.bermo_specs?.productCode ||
-                                        specs?.productCode ||
-                                        specs?.productModel ||
-                                        quote.equipment_model}
-                                    </strong>
-                                    {equipmentQuantity > 1 && (
-                                      <strong className="text-teal-800 dark:text-teal-300">
-                                        {' '}
-                                        — Quantidade: {equipmentQuantity} unidades
-                                      </strong>
-                                    )}
-                                  </span>
-                                )}
-                                {(item.bermo_specs?.productBrand ||
-                                  specs?.productBrand ||
-                                  quote.equipment_brand) && (
-                                  <span>
-                                    Fabricante:{' '}
-                                    <strong>
-                                      {item.bermo_specs?.productBrand ||
-                                        specs?.productBrand ||
-                                        quote.equipment_brand}
-                                    </strong>
-                                  </span>
-                                )}
-                                {(item.bermo_specs?.platesCount ||
-                                  specs?.platesCount ||
-                                  quote.plate_count) && (
-                                  <span>
-                                    Nº Placas:{' '}
-                                    <strong>
-                                      {item.bermo_specs?.platesCount ||
-                                        specs?.platesCount ||
-                                        quote.plate_count}
-                                    </strong>
-                                  </span>
-                                )}
-                                {(item.bermo_specs?.plateDimensions ||
-                                  specs?.dimensions ||
-                                  quote.dimensions_w_h_d) && (
-                                  <span>
-                                    Dimensão Placas:{' '}
-                                    <strong>
-                                      {item.bermo_specs?.plateDimensions ||
-                                        specs?.dimensions ||
-                                        quote.dimensions_w_h_d}
-                                    </strong>
-                                  </span>
-                                )}
-                                {(item.bermo_specs?.gasketType ||
-                                  specs?.gasketType ||
-                                  quote.gasket_material) && (
-                                  <span>
-                                    Gaxetas:{' '}
-                                    <strong>
-                                      {item.bermo_specs?.gasketType ||
-                                        specs?.gasketType ||
-                                        quote.gasket_material}
-                                    </strong>
-                                  </span>
-                                )}
-                                {(item.bermo_specs?.operatingPressure ||
-                                  specs?.operatingPressure ||
-                                  quote.working_pressure_bar) && (
-                                  <span>
-                                    Pressão:{' '}
-                                    <strong>
-                                      {item.bermo_specs?.operatingPressure ||
-                                        specs?.operatingPressure ||
-                                        quote.working_pressure_bar}{' '}
-                                      bar
-                                    </strong>
-                                  </span>
-                                )}
-                                {(item.bermo_specs?.inletTemp || specs?.inletTemp) && (
-                                  <span>
-                                    Temp:{' '}
-                                    <strong>
-                                      {item.bermo_specs?.inletTemp || specs?.inletTemp}°C a{' '}
-                                      {item.bermo_specs?.outletTemp || specs?.outletTemp || 0}°C
-                                    </strong>
-                                  </span>
-                                )}
-                                {(item.bermo_specs?.pipeMeasurement ||
-                                  specs?.equipmentSize ||
-                                  quote.connection_size) && (
-                                  <span>
-                                    Tubulação:{' '}
-                                    <strong>
-                                      {item.bermo_specs?.pipeMeasurement ||
-                                        specs?.equipmentSize ||
-                                        quote.connection_size}
-                                    </strong>
-                                  </span>
-                                )}
-                              </div>
-                              {(item.bermo_specs?.serviceScope ||
-                                specs?.scopeOfWork ||
-                                quote.scope_of_work) && (
-                                <div className="text-slate-600 italic">
-                                  Escopo:{' '}
-                                  {item.bermo_specs?.serviceScope ||
-                                    specs?.scopeOfWork ||
-                                    quote.scope_of_work}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-2.5 text-center font-semibold">{item.quantity}</td>
-                        <td className="p-2.5 text-right font-mono text-slate-700">
-                          {(item.unit_price || 0).toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </td>
-                        <td className="p-2.5 text-right font-mono font-bold text-slate-900">
-                          {(item.total || 0).toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="p-3 text-center text-slate-400">
-                        Nenhum item adicionado
-                      </td>
-                    </tr>
-                  )}
+                  <tr className="hover:bg-slate-50/50">
+                    <td className="p-2.5 space-y-1">
+                      <div className="font-bold text-slate-900 text-xs">
+                        {quote.title ||
+                          `Serviço Especializado de Manutenção e Engenharia (${quoteEquipmentsList.length} ${quoteEquipmentsList.length === 1 ? 'Equipamento' : 'Equipamentos'})`}
+                      </div>
+                      <div className="text-[10.5px] text-slate-600">
+                        Manutenção técnica completa contemplando os equipamentos listados acima, com
+                        mão de obra especializada, testes e relatórios.
+                      </div>
+                    </td>
+                    <td className="p-2.5 text-center font-semibold font-mono text-xs">
+                      {totalEquipmentUnits} un
+                    </td>
+                    <td className="p-2.5 text-right font-mono font-bold text-slate-900 text-sm">
+                      {(quote.total ?? quote.final_price ?? finalSalePrice ?? 0).toLocaleString(
+                        'pt-BR',
+                        {
+                          style: 'currency',
+                          currency: 'BRL',
+                        },
+                      )}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
