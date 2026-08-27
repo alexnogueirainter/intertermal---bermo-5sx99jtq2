@@ -32,12 +32,24 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { PROPOSAL_INCLUSIONS_TEXT } from '@/data/bermo-catalog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { Send, Loader2 } from 'lucide-react'
 
 interface QuotePdfPreviewDialogProps {
   quote: QuoteRecord | null
   open: boolean
   onOpenChange: (open: boolean) => void
   viewMode?: 'client' | 'internal'
+  onApproveQuote?: (quote: QuoteRecord) => Promise<void>
 }
 
 export function QuotePdfPreviewDialog({
@@ -45,9 +57,12 @@ export function QuotePdfPreviewDialog({
   open,
   onOpenChange,
   viewMode = 'client',
+  onApproveQuote,
 }: QuotePdfPreviewDialogProps) {
   const printRef = useRef<HTMLDivElement>(null)
   const [currentViewMode, setCurrentViewMode] = useState<'client' | 'internal'>(viewMode)
+  const [showApprovalConfirm, setShowApprovalConfirm] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
 
   // Sincroniza com a prop viewMode quando o modal abre ou a prop muda
   useEffect(() => {
@@ -57,6 +72,20 @@ export function QuotePdfPreviewDialog({
   }, [open, viewMode])
 
   if (!quote) return null
+
+  const isApproved = quote.status === 'approved'
+  const isRejected = quote.status === 'rejected'
+
+  const handleConfirmApproval = async () => {
+    if (!onApproveQuote) return
+    try {
+      setIsApproving(true)
+      await onApproveQuote(quote)
+      setShowApprovalConfirm(false)
+    } finally {
+      setIsApproving(false)
+    }
+  }
 
   const handlePrint = () => {
     window.print()
@@ -365,8 +394,26 @@ export function QuotePdfPreviewDialog({
               )}
             </div>
             <div>
-              <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 flex-wrap">
                 <span>Visualização de Impressão / PDF</span>
+                <Badge
+                  variant="outline"
+                  className={
+                    isApproved
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200 border-emerald-300 font-bold text-[10px]'
+                      : isRejected
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200 border-rose-300 font-bold text-[10px]'
+                        : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border-slate-300 font-bold text-[10px]'
+                  }
+                >
+                  {isApproved
+                    ? 'Aprovada'
+                    : isRejected
+                      ? 'Rejeitada'
+                      : quote.status === 'sent'
+                        ? 'Enviada'
+                        : 'Rascunho'}
+                </Badge>
                 <Badge
                   variant="outline"
                   className={
@@ -438,6 +485,23 @@ export function QuotePdfPreviewDialog({
               <FileDown className="h-3.5 w-3.5 mr-1.5" />
               Exportar
             </Button>
+
+            {/* Botão Aprovar Proposta no Header (se não estiver aprovada e callback presente) */}
+            {onApproveQuote && !isApproved && (
+              <Button
+                size="sm"
+                onClick={() => setShowApprovalConfirm(true)}
+                disabled={isApproving}
+                className="text-xs h-8 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs ml-1"
+              >
+                {isApproving ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Aprovar Proposta
+              </Button>
+            )}
           </div>
         </DialogHeader>
 
@@ -1360,21 +1424,98 @@ export function QuotePdfPreviewDialog({
           )}
         </div>
 
-        <DialogFooter className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 print:hidden">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="text-xs">
-            Fechar Visualização
-          </Button>
-          <Button
-            onClick={handlePrint}
-            className={`text-xs text-white ${
-              isInternal ? 'bg-amber-700 hover:bg-amber-600' : 'bg-teal-700 hover:bg-teal-600'
-            }`}
-          >
-            <Printer className="h-3.5 w-3.5 mr-1.5" />
-            {isInternal ? 'Imprimir Composição Interna' : 'Imprimir Proposta Oficial'}
-          </Button>
+        <DialogFooter className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 print:hidden flex flex-row items-center justify-between sm:justify-between">
+          <div className="flex items-center gap-2">
+            {isApproved && (
+              <div className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/50 px-3 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <span>
+                  Proposta Aprovada (Notificação enviada a alex.nogueira@intertermal.com.br)
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="text-xs">
+              Fechar Visualização
+            </Button>
+            {onApproveQuote && !isApproved && (
+              <Button
+                onClick={() => setShowApprovalConfirm(true)}
+                disabled={isApproving}
+                className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+              >
+                {isApproving ? (
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                )}
+                Aprovar Proposta
+              </Button>
+            )}
+            <Button
+              onClick={handlePrint}
+              className={`text-xs text-white ${
+                isInternal ? 'bg-amber-700 hover:bg-amber-600' : 'bg-teal-700 hover:bg-teal-600'
+              }`}
+            >
+              <Printer className="h-3.5 w-3.5 mr-1.5" />
+              {isInternal ? 'Imprimir Composição Interna' : 'Imprimir Proposta Oficial'}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
+
+      {/* Confirmação de Aprovação */}
+      <AlertDialog open={showApprovalConfirm} onOpenChange={setShowApprovalConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600">
+                <Send className="h-5 w-5" />
+              </div>
+              <div>
+                <AlertDialogTitle className="text-base font-bold">
+                  Aprovar Proposta Comercial #{quote.quote_number || quote.code}?
+                </AlertDialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Cliente: {quote.client_name || 'Não informado'}
+                </p>
+              </div>
+            </div>
+            <AlertDialogDescription className="text-xs pt-3 leading-relaxed">
+              Deseja aprovar esta proposta? O status será alterado para <strong>Aprovada</strong> e
+              a notificação técnica/comercial com os dados da proposta será enviada para:{' '}
+              <strong className="text-slate-900 dark:text-slate-100 font-mono">
+                alex.nogueira@intertermal.com.br
+              </strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel disabled={isApproving} className="text-xs">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmApproval}
+              disabled={isApproving}
+              className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {isApproving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Aprovando e Enviando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                  Confirmar e Enviar E-mail
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }

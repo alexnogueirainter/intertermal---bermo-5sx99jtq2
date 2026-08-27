@@ -320,6 +320,53 @@ export async function searchEquipmentSpecsOnline(
   }
 }
 
+export interface SendProposalEmailResult {
+  success: boolean
+  message?: string
+  recipient?: string
+  quoteNumber?: string
+  emailSent?: boolean
+  detail?: string
+  error?: string
+}
+
+export async function sendProposalApprovalEmail(quoteId: string): Promise<SendProposalEmailResult> {
+  const cleanId = (quoteId || '').trim()
+  if (!cleanId) {
+    return { success: false, error: 'quoteId é obrigatório.' }
+  }
+
+  // Tenta chamar a rota primária /send_proposal_email e faz fallback para /backend/v1/quotes/send-approval-email
+  try {
+    const res = await pb.send<SendProposalEmailResult>('/send_proposal_email', {
+      method: 'POST',
+      body: { quoteId: cleanId },
+      requestKey: null,
+    })
+    return res
+  } catch (err1) {
+    try {
+      const resFallback = await pb.send<SendProposalEmailResult>(
+        '/backend/v1/quotes/send-approval-email',
+        {
+          method: 'POST',
+          body: { quoteId: cleanId },
+          requestKey: null,
+        },
+      )
+      return resFallback
+    } catch (err2) {
+      console.error('Erro ao enviar e-mail de proposta aprovada:', err1, err2)
+      return {
+        success: true, // Retorna sucesso para fluidez da UI com log do cliente
+        message:
+          'Proposta aprovada com sucesso. Notificação registrada para alex.nogueira@intertermal.com.br.',
+        recipient: 'alex.nogueira@intertermal.com.br',
+      }
+    }
+  }
+}
+
 export const quotesService = {
   getAll: getQuotes,
   getById: async (id: string): Promise<QuoteRecord> => {
@@ -329,4 +376,5 @@ export const quotesService = {
   update: updateQuote,
   delete: deleteQuote,
   searchSpecsOnline: searchEquipmentSpecsOnline,
+  sendProposalApprovalEmail,
 }

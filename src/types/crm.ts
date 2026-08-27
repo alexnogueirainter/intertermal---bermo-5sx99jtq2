@@ -8,7 +8,13 @@ export type DealStage =
   | 'won'
   | 'lost'
 
-export type QuoteStatus = 'draft' | 'pending_approval' | 'sent' | 'approved' | 'rejected'
+export type QuoteStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'sent'
+  | 'approved'
+  | 'rejected'
+  | 'expired'
 
 export type ServiceOrderStatus =
   | 'pending'
