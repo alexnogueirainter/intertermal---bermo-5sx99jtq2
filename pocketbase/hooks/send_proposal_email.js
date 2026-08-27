@@ -63,7 +63,7 @@ routerAdd('POST', '/send_proposal_email', (c) => {
   const validityDays = quoteRecord.get('validity_days') || 15
   const assignedTo = quoteRecord.get('assigned_to') || 'Alex Nogueira - Especialista Técnico'
 
-  // Dados técnicos do equipamento da proposta
+  // Dados técnicos do equipamento da proposta (fallback single)
   const equipBrand = quoteRecord.get('equipment_brand') || 'BERMO'
   const equipModel = quoteRecord.get('equipment_model') || '-'
   const equipSeries = quoteRecord.get('equipment_series') || '-'
@@ -79,18 +79,69 @@ routerAdd('POST', '/send_proposal_email', (c) => {
     quoteRecord.get('scope_of_work') ||
     quoteRecord.get('notes') ||
     'Manutenção e revisão técnica de trocador de calor.'
-  const equipQuantity = quoteRecord.get('equipment_quantity') || 1
+  const equipQuantity = Number(quoteRecord.get('equipment_quantity')) || 1
 
-  // Itens da proposta (visão cliente, sem custos internos)
-  let items = []
+  // Parsear service_details e extrair equipments_list
+  let serviceDetails = null
   try {
-    const rawItems = quoteRecord.get('items')
-    if (typeof rawItems === 'string') {
-      items = JSON.parse(rawItems)
-    } else if (Array.isArray(rawItems)) {
-      items = rawItems
+    const rawServiceDetails = quoteRecord.get('service_details')
+    if (typeof rawServiceDetails === 'string' && rawServiceDetails.trim() !== '') {
+      serviceDetails = JSON.parse(rawServiceDetails)
+    } else if (rawServiceDetails && typeof rawServiceDetails === 'object') {
+      serviceDetails = rawServiceDetails
     }
   } catch (_) {}
+
+  // Parsear campo equipments da proposta caso exista diretamente
+  let equipmentsArray = null
+  try {
+    const rawEquipments = quoteRecord.get('equipments')
+    if (typeof rawEquipments === 'string' && rawEquipments.trim() !== '') {
+      equipmentsArray = JSON.parse(rawEquipments)
+    } else if (Array.isArray(rawEquipments)) {
+      equipmentsArray = rawEquipments
+    }
+  } catch (_) {}
+
+  let equipmentsList = []
+  if (
+    serviceDetails &&
+    serviceDetails.service_technical_specs &&
+    Array.isArray(serviceDetails.service_technical_specs.equipments_list) &&
+    serviceDetails.service_technical_specs.equipments_list.length > 0
+  ) {
+    equipmentsList = serviceDetails.service_technical_specs.equipments_list
+  } else if (
+    serviceDetails &&
+    serviceDetails.technical_scope &&
+    Array.isArray(serviceDetails.technical_scope.equipments_list) &&
+    serviceDetails.technical_scope.equipments_list.length > 0
+  ) {
+    equipmentsList = serviceDetails.technical_scope.equipments_list
+  } else if (Array.isArray(equipmentsArray) && equipmentsArray.length > 0) {
+    equipmentsList = equipmentsArray
+  }
+
+  // Parsear custom_materials (JSON array com { id, description/name, qty/quantity, unitPrice/unit_price })
+  let customMaterials = []
+  try {
+    const rawCustomMaterials = quoteRecord.get('custom_materials')
+    if (typeof rawCustomMaterials === 'string' && rawCustomMaterials.trim() !== '') {
+      customMaterials = JSON.parse(rawCustomMaterials)
+    } else if (Array.isArray(rawCustomMaterials)) {
+      customMaterials = rawCustomMaterials
+    }
+  } catch (_) {}
+
+  // Se não veio no campo custom_materials, tentar de service_details.materials_breakdown.customMaterials
+  if (
+    customMaterials.length === 0 &&
+    serviceDetails &&
+    serviceDetails.materials_breakdown &&
+    Array.isArray(serviceDetails.materials_breakdown.customMaterials)
+  ) {
+    customMaterials = serviceDetails.materials_breakdown.customMaterials
+  }
 
   const formatCurrency = (val) => {
     return (
@@ -101,49 +152,192 @@ routerAdd('POST', '/send_proposal_email', (c) => {
     )
   }
 
-  // Montar linhas de itens
-  let itemsTableRows = ''
-  if (items.length > 0) {
-    itemsTableRows = items
-      .map((item, idx) => {
-        const desc = item.name || item.description || 'Item ' + (idx + 1)
-        const qty = item.quantity || 1
-        const unitPrice = item.unit_price || item.price || (item.total ? item.total / qty : 0)
-        const itemTotal = item.total || qty * unitPrice
-        return (
-          '<tr style="border-bottom: 1px solid #e2e8f0;">' +
-          '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b; font-weight: 500;">' +
-          desc +
-          '</td>' +
-          '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
-          qty +
-          '</td>' +
-          '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
-          formatCurrency(unitPrice) +
-          '</td>' +
-          '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
-          formatCurrency(itemTotal) +
-          '</td>' +
-          '</tr>'
-        )
-      })
-      .join('')
-  } else {
-    itemsTableRows =
-      '<tr style="border-bottom: 1px solid #e2e8f0;">' +
-      '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b; font-weight: 500;">' +
+  // Montar Seção 2: Tabela com todos os equipamentos ou fallback single
+  let equipmentSectionHtml = ''
+  if (equipmentsList && equipmentsList.length > 0) {
+    let eqRows = ''
+    for (let i = 0; i < equipmentsList.length; i++) {
+      const eq = equipmentsList[i] || {}
+      const model =
+        (eq.brand ? eq.brand + ' ' : '') + (eq.model || '-') + (eq.series ? ' / ' + eq.series : '')
+      const plates =
+        (eq.plateCount || eq.platesCount || '-') +
+        (eq.plateThickness ? ' (' + eq.plateThickness + 'mm)' : '')
+      const mat = eq.plateMaterial || '-'
+      const gaskets = eq.gasketMaterial || eq.gasketType || '-'
+      const dims = eq.dimensions || eq.plateDimensions || eq.dimensions_w_h_d || '-'
+      const conn =
+        (eq.connectionType || eq.connection_type || '-') +
+        (eq.connectionSize || eq.connection_size || eq.pipeMeasurement
+          ? ' (' + (eq.connectionSize || eq.connection_size || eq.pipeMeasurement) + ')'
+          : '')
+
+      eqRows +=
+        '<tr style="border-bottom: 1px solid #e2e8f0;">' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #0f172a; font-weight: 600;">' +
+        model +
+        (eq.quantity && Number(eq.quantity) > 1
+          ? ' <span style="color:#0284c7;">(' + eq.quantity + ' un.)</span>'
+          : '') +
+        '</td>' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #334155; text-align: center;">' +
+        plates +
+        '</td>' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #334155; text-align: center;">' +
+        mat +
+        '</td>' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #334155; text-align: center;">' +
+        gaskets +
+        '</td>' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #334155; text-align: center;">' +
+        dims +
+        '</td>' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #334155; text-align: center;">' +
+        conn +
+        '</td>' +
+        '</tr>'
+    }
+
+    equipmentSectionHtml =
+      '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 24px;">' +
+      '  <table style="width: 100%; border-collapse: collapse; font-size: 12px;">' +
+      '    <thead>' +
+      '      <tr style="background-color: #f1f5f9; border-bottom: 1px solid #cbd5e1;">' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: left;">Modelo</th>' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: center;">Placas</th>' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: center;">Material</th>' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: center;">Gaxetas</th>' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: center;">Dimensões</th>' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: center;">Conexão</th>' +
+      '      </tr>' +
+      '    </thead>' +
+      '    <tbody>' +
+      eqRows +
+      '    </tbody>' +
+      '  </table>' +
+      '  <div style="padding: 10px 14px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #475569; background-color: #ffffff;">' +
+      '    <strong>Escopo Técnico:</strong> ' +
       scopeOfWork +
+      '  </div>' +
+      '</div>'
+  } else {
+    // Fallback: Bloco com 1 equipamento
+    equipmentSectionHtml =
+      '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 24px;">' +
+      '  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">' +
+      '    <tbody>' +
+      '      <tr>' +
+      '        <td style="padding: 4px 8px; color: #64748b; width: 35%;"><strong>Fabricante / Marca:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      equipBrand +
       '</td>' +
-      '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
+      '        <td style="padding: 4px 8px; color: #64748b; width: 35%;"><strong>Modelo / Série:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      equipModel +
+      ' / ' +
+      equipSeries +
+      '</td>' +
+      '      </tr>' +
+      '      <tr>' +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Quantidade de Equipamentos:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
       equipQuantity +
+      ' un.</td>' +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Placas / Espessura:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      plateCount +
+      ' placas (' +
+      plateThickness +
+      ' mm)</td>' +
+      '      </tr>' +
+      '      <tr>' +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Material Placas:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      plateMaterial +
       '</td>' +
-      '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
-      formatCurrency(totalValue) +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Material Vedação:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      gasketMaterial +
       '</td>' +
-      '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
-      formatCurrency(totalValue) +
-      '</td>' +
-      '</tr>'
+      '      </tr>' +
+      '      <tr>' +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Conexão:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      connType +
+      ' (' +
+      connSize +
+      ')</td>' +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Pressão Trabalho/Teste:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      workingPressure +
+      ' bar / ' +
+      testPressure +
+      ' bar</td>' +
+      '      </tr>' +
+      '    </tbody>' +
+      '  </table>' +
+      '  <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #475569;">' +
+      '    <strong>Escopo Técnico:</strong> ' +
+      scopeOfWork +
+      '  </div>' +
+      '</div>'
+  }
+
+  // Montar Seção 3: Composição de Valores (Visão Cliente)
+  // Linha 1: Escopo principal do serviço
+  let itemsTableRows =
+    '<tr style="border-bottom: 1px solid #e2e8f0;">' +
+    '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b; font-weight: 500;">' +
+    scopeOfWork +
+    '</td>' +
+    '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
+    equipQuantity +
+    '</td>' +
+    '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
+    formatCurrency(totalValue) +
+    '</td>' +
+    '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
+    formatCurrency(totalValue) +
+    '</td>' +
+    '</tr>'
+
+  // Linhas adicionais para materiais customizados
+  if (Array.isArray(customMaterials) && customMaterials.length > 0) {
+    for (let j = 0; j < customMaterials.length; j++) {
+      const mat = customMaterials[j] || {}
+      const desc = mat.description || mat.name || 'Material Customizado ' + (j + 1)
+      const qty = Number(mat.qty || mat.quantity || 1)
+      const unitPrice = Number(mat.unitPrice || mat.unit_price || mat.price || 0)
+      const matTotal = Number(mat.total || qty * unitPrice)
+
+      itemsTableRows +=
+        '<tr style="border-bottom: 1px solid #e2e8f0; background-color: #fafafa;">' +
+        '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b;">' +
+        desc +
+        '</td>' +
+        '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
+        qty +
+        '</td>' +
+        '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
+        formatCurrency(unitPrice) +
+        '</td>' +
+        '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
+        formatCurrency(matTotal) +
+        '</td>' +
+        '</tr>'
+    }
+  }
+
+  // Seção 4: URL do sistema para Acesso à Proposta Completa
+  let appUrl = ''
+  try {
+    appUrl =
+      $os.getenv('SITE_URL') || $os.getenv('PB_INSTANCE_URL') || 'https://intertermal.goskip.app'
+  } catch (_) {
+    appUrl = 'https://intertermal.goskip.app'
+  }
+  if (!appUrl) {
+    appUrl = 'https://intertermal.goskip.app'
   }
 
   const emailSubject = 'Proposta Aprovada - Intertermal #' + quoteNumber
@@ -213,64 +407,7 @@ routerAdd('POST', '/send_proposal_email', (c) => {
     '        </tbody>' +
     '      </table>' +
     '      <h2 style="font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin: 0 0 12px 0; border-bottom: 2px solid #e0f2fe; padding-bottom: 6px;">2. Especificações do Equipamento</h2>' +
-    '      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 24px;">' +
-    '        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">' +
-    '          <tbody>' +
-    '            <tr>' +
-    '              <td style="padding: 4px 8px; color: #64748b; width: 35%;"><strong>Fabricante / Marca:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    equipBrand +
-    '</td>' +
-    '              <td style="padding: 4px 8px; color: #64748b; width: 35%;"><strong>Modelo / Série:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    equipModel +
-    ' / ' +
-    equipSeries +
-    '</td>' +
-    '            </tr>' +
-    '            <tr>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Quantidade de Equipamentos:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    equipQuantity +
-    ' un.</td>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Placas / Espessura:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    plateCount +
-    ' placas (' +
-    plateThickness +
-    ' mm)</td>' +
-    '            </tr>' +
-    '            <tr>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Material Placas:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    plateMaterial +
-    '</td>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Material Vedação:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    gasketMaterial +
-    '</td>' +
-    '            </tr>' +
-    '            <tr>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Conexão:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    connType +
-    ' (' +
-    connSize +
-    ')</td>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Pressão Trabalho/Teste:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    workingPressure +
-    ' bar / ' +
-    testPressure +
-    ' bar</td>' +
-    '            </tr>' +
-    '          </tbody>' +
-    '        </table>' +
-    '        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #475569;">' +
-    '          <strong>Escopo Técnico:</strong> ' +
-    scopeOfWork +
-    '        </div>' +
-    '      </div>' +
+    equipmentSectionHtml +
     '      <h2 style="font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin: 0 0 12px 0; border-bottom: 2px solid #e0f2fe; padding-bottom: 6px;">3. Composição de Valores (Visão Cliente)</h2>' +
     '      <table style="width: 100%; border-collapse: collapse; margin-bottom: 18px;">' +
     '        <thead>' +
@@ -308,13 +445,22 @@ routerAdd('POST', '/send_proposal_email', (c) => {
     '          </tbody>' +
     '        </table>' +
     '      </div>' +
-    '      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 28px; font-size: 13px; color: #334155;">' +
+    '      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #334155;">' +
     '        <div><strong>Condições de Pagamento:</strong> ' +
     paymentTerms +
     '</div>' +
     '        <div style="margin-top: 4px;"><strong>Validade da Proposta:</strong> ' +
     validityDays +
     ' dias</div>' +
+    '      </div>' +
+    '      <h2 style="font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin: 0 0 12px 0; border-bottom: 2px solid #e0f2fe; padding-bottom: 6px;">4. Acesso à Proposta</h2>' +
+    '      <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 18px 20px; margin-bottom: 28px; text-align: center;">' +
+    '        <p style="margin: 0 0 14px 0; font-size: 13px; color: #0369a1; line-height: 1.5;">Para visualizar o PDF completo com visão cliente e composição interna, acesse o sistema.</p>' +
+    '        <a href="' +
+    appUrl +
+    '" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 13px; padding: 10px 24px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">' +
+    'Visualizar Proposta Completa' +
+    '</a>' +
     '      </div>' +
     '      <div style="border-top: 2px solid #e2e8f0; padding-top: 20px; text-align: center; font-size: 12px; color: #64748b; line-height: 1.6;">' +
     '        <strong style="font-size: 13px; color: #0f172a;">INTERTERMAL - SOLUÇÕES TÉRMICAS INDUSTRIAIS</strong><br>' +
@@ -436,7 +582,7 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
   const validityDays = quoteRecord.get('validity_days') || 15
   const assignedTo = quoteRecord.get('assigned_to') || 'Alex Nogueira - Especialista Técnico'
 
-  // Dados técnicos do equipamento da proposta
+  // Dados técnicos do equipamento da proposta (fallback single)
   const equipBrand = quoteRecord.get('equipment_brand') || 'BERMO'
   const equipModel = quoteRecord.get('equipment_model') || '-'
   const equipSeries = quoteRecord.get('equipment_series') || '-'
@@ -452,18 +598,69 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
     quoteRecord.get('scope_of_work') ||
     quoteRecord.get('notes') ||
     'Manutenção e revisão técnica de trocador de calor.'
-  const equipQuantity = quoteRecord.get('equipment_quantity') || 1
+  const equipQuantity = Number(quoteRecord.get('equipment_quantity')) || 1
 
-  // Itens da proposta (visão cliente, sem custos internos)
-  let items = []
+  // Parsear service_details e extrair equipments_list
+  let serviceDetails = null
   try {
-    const rawItems = quoteRecord.get('items')
-    if (typeof rawItems === 'string') {
-      items = JSON.parse(rawItems)
-    } else if (Array.isArray(rawItems)) {
-      items = rawItems
+    const rawServiceDetails = quoteRecord.get('service_details')
+    if (typeof rawServiceDetails === 'string' && rawServiceDetails.trim() !== '') {
+      serviceDetails = JSON.parse(rawServiceDetails)
+    } else if (rawServiceDetails && typeof rawServiceDetails === 'object') {
+      serviceDetails = rawServiceDetails
     }
   } catch (_) {}
+
+  // Parsear campo equipments da proposta caso exista diretamente
+  let equipmentsArray = null
+  try {
+    const rawEquipments = quoteRecord.get('equipments')
+    if (typeof rawEquipments === 'string' && rawEquipments.trim() !== '') {
+      equipmentsArray = JSON.parse(rawEquipments)
+    } else if (Array.isArray(rawEquipments)) {
+      equipmentsArray = rawEquipments
+    }
+  } catch (_) {}
+
+  let equipmentsList = []
+  if (
+    serviceDetails &&
+    serviceDetails.service_technical_specs &&
+    Array.isArray(serviceDetails.service_technical_specs.equipments_list) &&
+    serviceDetails.service_technical_specs.equipments_list.length > 0
+  ) {
+    equipmentsList = serviceDetails.service_technical_specs.equipments_list
+  } else if (
+    serviceDetails &&
+    serviceDetails.technical_scope &&
+    Array.isArray(serviceDetails.technical_scope.equipments_list) &&
+    serviceDetails.technical_scope.equipments_list.length > 0
+  ) {
+    equipmentsList = serviceDetails.technical_scope.equipments_list
+  } else if (Array.isArray(equipmentsArray) && equipmentsArray.length > 0) {
+    equipmentsList = equipmentsArray
+  }
+
+  // Parsear custom_materials (JSON array com { id, description/name, qty/quantity, unitPrice/unit_price })
+  let customMaterials = []
+  try {
+    const rawCustomMaterials = quoteRecord.get('custom_materials')
+    if (typeof rawCustomMaterials === 'string' && rawCustomMaterials.trim() !== '') {
+      customMaterials = JSON.parse(rawCustomMaterials)
+    } else if (Array.isArray(rawCustomMaterials)) {
+      customMaterials = rawCustomMaterials
+    }
+  } catch (_) {}
+
+  // Se não veio no campo custom_materials, tentar de service_details.materials_breakdown.customMaterials
+  if (
+    customMaterials.length === 0 &&
+    serviceDetails &&
+    serviceDetails.materials_breakdown &&
+    Array.isArray(serviceDetails.materials_breakdown.customMaterials)
+  ) {
+    customMaterials = serviceDetails.materials_breakdown.customMaterials
+  }
 
   const formatCurrency = (val) => {
     return (
@@ -474,49 +671,192 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
     )
   }
 
-  // Montar linhas de itens
-  let itemsTableRows = ''
-  if (items.length > 0) {
-    itemsTableRows = items
-      .map((item, idx) => {
-        const desc = item.name || item.description || 'Item ' + (idx + 1)
-        const qty = item.quantity || 1
-        const unitPrice = item.unit_price || item.price || (item.total ? item.total / qty : 0)
-        const itemTotal = item.total || qty * unitPrice
-        return (
-          '<tr style="border-bottom: 1px solid #e2e8f0;">' +
-          '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b; font-weight: 500;">' +
-          desc +
-          '</td>' +
-          '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
-          qty +
-          '</td>' +
-          '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
-          formatCurrency(unitPrice) +
-          '</td>' +
-          '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
-          formatCurrency(itemTotal) +
-          '</td>' +
-          '</tr>'
-        )
-      })
-      .join('')
-  } else {
-    itemsTableRows =
-      '<tr style="border-bottom: 1px solid #e2e8f0;">' +
-      '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b; font-weight: 500;">' +
+  // Montar Seção 2: Tabela com todos os equipamentos ou fallback single
+  let equipmentSectionHtml = ''
+  if (equipmentsList && equipmentsList.length > 0) {
+    let eqRows = ''
+    for (let i = 0; i < equipmentsList.length; i++) {
+      const eq = equipmentsList[i] || {}
+      const model =
+        (eq.brand ? eq.brand + ' ' : '') + (eq.model || '-') + (eq.series ? ' / ' + eq.series : '')
+      const plates =
+        (eq.plateCount || eq.platesCount || '-') +
+        (eq.plateThickness ? ' (' + eq.plateThickness + 'mm)' : '')
+      const mat = eq.plateMaterial || '-'
+      const gaskets = eq.gasketMaterial || eq.gasketType || '-'
+      const dims = eq.dimensions || eq.plateDimensions || eq.dimensions_w_h_d || '-'
+      const conn =
+        (eq.connectionType || eq.connection_type || '-') +
+        (eq.connectionSize || eq.connection_size || eq.pipeMeasurement
+          ? ' (' + (eq.connectionSize || eq.connection_size || eq.pipeMeasurement) + ')'
+          : '')
+
+      eqRows +=
+        '<tr style="border-bottom: 1px solid #e2e8f0;">' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #0f172a; font-weight: 600;">' +
+        model +
+        (eq.quantity && Number(eq.quantity) > 1
+          ? ' <span style="color:#0284c7;">(' + eq.quantity + ' un.)</span>'
+          : '') +
+        '</td>' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #334155; text-align: center;">' +
+        plates +
+        '</td>' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #334155; text-align: center;">' +
+        mat +
+        '</td>' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #334155; text-align: center;">' +
+        gaskets +
+        '</td>' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #334155; text-align: center;">' +
+        dims +
+        '</td>' +
+        '<td style="padding: 10px 8px; font-size: 12px; color: #334155; text-align: center;">' +
+        conn +
+        '</td>' +
+        '</tr>'
+    }
+
+    equipmentSectionHtml =
+      '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin-bottom: 24px;">' +
+      '  <table style="width: 100%; border-collapse: collapse; font-size: 12px;">' +
+      '    <thead>' +
+      '      <tr style="background-color: #f1f5f9; border-bottom: 1px solid #cbd5e1;">' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: left;">Modelo</th>' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: center;">Placas</th>' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: center;">Material</th>' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: center;">Gaxetas</th>' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: center;">Dimensões</th>' +
+      '        <th style="padding: 8px; font-size: 11px; font-weight: 600; color: #475569; text-align: center;">Conexão</th>' +
+      '      </tr>' +
+      '    </thead>' +
+      '    <tbody>' +
+      eqRows +
+      '    </tbody>' +
+      '  </table>' +
+      '  <div style="padding: 10px 14px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #475569; background-color: #ffffff;">' +
+      '    <strong>Escopo Técnico:</strong> ' +
       scopeOfWork +
+      '  </div>' +
+      '</div>'
+  } else {
+    // Fallback: Bloco com 1 equipamento
+    equipmentSectionHtml =
+      '<div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 24px;">' +
+      '  <table style="width: 100%; border-collapse: collapse; font-size: 13px;">' +
+      '    <tbody>' +
+      '      <tr>' +
+      '        <td style="padding: 4px 8px; color: #64748b; width: 35%;"><strong>Fabricante / Marca:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      equipBrand +
       '</td>' +
-      '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
+      '        <td style="padding: 4px 8px; color: #64748b; width: 35%;"><strong>Modelo / Série:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      equipModel +
+      ' / ' +
+      equipSeries +
+      '</td>' +
+      '      </tr>' +
+      '      <tr>' +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Quantidade de Equipamentos:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
       equipQuantity +
+      ' un.</td>' +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Placas / Espessura:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      plateCount +
+      ' placas (' +
+      plateThickness +
+      ' mm)</td>' +
+      '      </tr>' +
+      '      <tr>' +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Material Placas:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      plateMaterial +
       '</td>' +
-      '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
-      formatCurrency(totalValue) +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Material Vedação:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      gasketMaterial +
       '</td>' +
-      '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
-      formatCurrency(totalValue) +
-      '</td>' +
-      '</tr>'
+      '      </tr>' +
+      '      <tr>' +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Conexão:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      connType +
+      ' (' +
+      connSize +
+      ')</td>' +
+      '        <td style="padding: 4px 8px; color: #64748b;"><strong>Pressão Trabalho/Teste:</strong></td>' +
+      '        <td style="padding: 4px 8px; color: #0f172a;">' +
+      workingPressure +
+      ' bar / ' +
+      testPressure +
+      ' bar</td>' +
+      '      </tr>' +
+      '    </tbody>' +
+      '  </table>' +
+      '  <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #475569;">' +
+      '    <strong>Escopo Técnico:</strong> ' +
+      scopeOfWork +
+      '  </div>' +
+      '</div>'
+  }
+
+  // Montar Seção 3: Composição de Valores (Visão Cliente)
+  // Linha 1: Escopo principal do serviço
+  let itemsTableRows =
+    '<tr style="border-bottom: 1px solid #e2e8f0;">' +
+    '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b; font-weight: 500;">' +
+    scopeOfWork +
+    '</td>' +
+    '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
+    equipQuantity +
+    '</td>' +
+    '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
+    formatCurrency(totalValue) +
+    '</td>' +
+    '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
+    formatCurrency(totalValue) +
+    '</td>' +
+    '</tr>'
+
+  // Linhas adicionais para materiais customizados
+  if (Array.isArray(customMaterials) && customMaterials.length > 0) {
+    for (let j = 0; j < customMaterials.length; j++) {
+      const mat = customMaterials[j] || {}
+      const desc = mat.description || mat.name || 'Material Customizado ' + (j + 1)
+      const qty = Number(mat.qty || mat.quantity || 1)
+      const unitPrice = Number(mat.unitPrice || mat.unit_price || mat.price || 0)
+      const matTotal = Number(mat.total || qty * unitPrice)
+
+      itemsTableRows +=
+        '<tr style="border-bottom: 1px solid #e2e8f0; background-color: #fafafa;">' +
+        '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b;">' +
+        desc +
+        '</td>' +
+        '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
+        qty +
+        '</td>' +
+        '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
+        formatCurrency(unitPrice) +
+        '</td>' +
+        '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
+        formatCurrency(matTotal) +
+        '</td>' +
+        '</tr>'
+    }
+  }
+
+  // Seção 4: URL do sistema para Acesso à Proposta Completa
+  let appUrl = ''
+  try {
+    appUrl =
+      $os.getenv('SITE_URL') || $os.getenv('PB_INSTANCE_URL') || 'https://intertermal.goskip.app'
+  } catch (_) {
+    appUrl = 'https://intertermal.goskip.app'
+  }
+  if (!appUrl) {
+    appUrl = 'https://intertermal.goskip.app'
   }
 
   const emailSubject = 'Proposta Aprovada - Intertermal #' + quoteNumber
@@ -586,64 +926,7 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
     '        </tbody>' +
     '      </table>' +
     '      <h2 style="font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin: 0 0 12px 0; border-bottom: 2px solid #e0f2fe; padding-bottom: 6px;">2. Especificações do Equipamento</h2>' +
-    '      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 24px;">' +
-    '        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">' +
-    '          <tbody>' +
-    '            <tr>' +
-    '              <td style="padding: 4px 8px; color: #64748b; width: 35%;"><strong>Fabricante / Marca:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    equipBrand +
-    '</td>' +
-    '              <td style="padding: 4px 8px; color: #64748b; width: 35%;"><strong>Modelo / Série:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    equipModel +
-    ' / ' +
-    equipSeries +
-    '</td>' +
-    '            </tr>' +
-    '            <tr>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Quantidade de Equipamentos:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    equipQuantity +
-    ' un.</td>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Placas / Espessura:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    plateCount +
-    ' placas (' +
-    plateThickness +
-    ' mm)</td>' +
-    '            </tr>' +
-    '            <tr>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Material Placas:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    plateMaterial +
-    '</td>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Material Vedação:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    gasketMaterial +
-    '</td>' +
-    '            </tr>' +
-    '            <tr>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Conexão:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    connType +
-    ' (' +
-    connSize +
-    ')</td>' +
-    '              <td style="padding: 4px 8px; color: #64748b;"><strong>Pressão Trabalho/Teste:</strong></td>' +
-    '              <td style="padding: 4px 8px; color: #0f172a;">' +
-    workingPressure +
-    ' bar / ' +
-    testPressure +
-    ' bar</td>' +
-    '            </tr>' +
-    '          </tbody>' +
-    '        </table>' +
-    '        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #cbd5e1; font-size: 12px; color: #475569;">' +
-    '          <strong>Escopo Técnico:</strong> ' +
-    scopeOfWork +
-    '        </div>' +
-    '      </div>' +
+    equipmentSectionHtml +
     '      <h2 style="font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin: 0 0 12px 0; border-bottom: 2px solid #e0f2fe; padding-bottom: 6px;">3. Composição de Valores (Visão Cliente)</h2>' +
     '      <table style="width: 100%; border-collapse: collapse; margin-bottom: 18px;">' +
     '        <thead>' +
@@ -681,13 +964,22 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
     '          </tbody>' +
     '        </table>' +
     '      </div>' +
-    '      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 28px; font-size: 13px; color: #334155;">' +
+    '      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #334155;">' +
     '        <div><strong>Condições de Pagamento:</strong> ' +
     paymentTerms +
     '</div>' +
     '        <div style="margin-top: 4px;"><strong>Validade da Proposta:</strong> ' +
     validityDays +
     ' dias</div>' +
+    '      </div>' +
+    '      <h2 style="font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin: 0 0 12px 0; border-bottom: 2px solid #e0f2fe; padding-bottom: 6px;">4. Acesso à Proposta</h2>' +
+    '      <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 18px 20px; margin-bottom: 28px; text-align: center;">' +
+    '        <p style="margin: 0 0 14px 0; font-size: 13px; color: #0369a1; line-height: 1.5;">Para visualizar o PDF completo com visão cliente e composição interna, acesse o sistema.</p>' +
+    '        <a href="' +
+    appUrl +
+    '" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 13px; padding: 10px 24px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">' +
+    'Visualizar Proposta Completa' +
+    '</a>' +
     '      </div>' +
     '      <div style="border-top: 2px solid #e2e8f0; padding-top: 20px; text-align: center; font-size: 12px; color: #64748b; line-height: 1.6;">' +
     '        <strong style="font-size: 13px; color: #0f172a;">INTERTERMAL - SOLUÇÕES TÉRMICAS INDUSTRIAIS</strong><br>' +
