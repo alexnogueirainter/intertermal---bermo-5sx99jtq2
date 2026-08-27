@@ -184,6 +184,7 @@ export function QuotesManager({
     'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
   )
   const [workFluid, setWorkFluid] = useState<string>('')
+  const [customWorkFluid, setCustomWorkFluid] = useState<string>('')
 
   // Novos campos Seção 3A: Integração, PT e Pernoite
   const [integrationNeeded, setIntegrationNeeded] = useState<boolean>(false)
@@ -923,8 +924,16 @@ export function QuotesManager({
     const firstEq = equipments[0] || createDefaultEquipment('1')
     const totalEquipmentQty = equipments.reduce((acc, eq) => acc + (Number(eq.quantity) || 1), 0)
 
+    const effectiveWorkFluid = workFluid === 'Outro' ? customWorkFluid : workFluid
+
     // Estrutura detalhada de service_details para compatibilidade com PDF, OS e histórico
     const serviceDetails = {
+      technical_scope: {
+        workFluid: workFluid,
+        custom_work_fluid: customWorkFluid,
+        effectiveWorkFluid: effectiveWorkFluid,
+        scopeOfWork: scopeOfWork,
+      },
       service_technical_specs: {
         productModel: firstEq.model,
         productBrand: firstEq.brand,
@@ -959,6 +968,7 @@ export function QuotesManager({
         })),
         scopeOfWork: scopeOfWork,
         workFluid: workFluid,
+        custom_work_fluid: customWorkFluid,
       },
       integration_details: {
         integration_needed: integrationNeeded,
@@ -1118,6 +1128,7 @@ export function QuotesManager({
       equipments: equipments,
       scope_of_work: scopeOfWork,
       work_fluid: workFluid,
+      custom_work_fluid: customWorkFluid,
 
       // Mão de Obra (campos individuais + JSON)
       labor_hours: techHours + helperHours + inspectorHours,
@@ -1273,6 +1284,7 @@ export function QuotesManager({
     equipments,
     scopeOfWork,
     workFluid,
+    customWorkFluid,
     integrationNeeded,
     integrationWhen,
     integrationDay,
@@ -1439,6 +1451,8 @@ export function QuotesManager({
     resetForm()
     setQuoteViewMode('internal')
     setQuoteCode(`PROP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`)
+    setWorkFluid('')
+    setCustomWorkFluid('')
     setIsCreateModalOpen(true)
   }
 
@@ -1453,6 +1467,7 @@ export function QuotesManager({
 
     // Extrair dados aninhados em service_details ou items caso existam
     const sDetails = q.service_details || {}
+    const sTechScope = sDetails.technical_scope || {}
     const sSpecs = sDetails.service_technical_specs || {}
     const sIntegration = sDetails.integration_details || {}
     const sLabor = sDetails.labor_costs || {}
@@ -1600,7 +1615,11 @@ export function QuotesManager({
         q.notes ||
         'Abertura, limpeza química por recirculação e imersão em ultrassom, teste hidrostático, troca de gaxetas e remontagem com torquímetro calibrado.',
     )
-    setWorkFluid(sSpecs.workFluid || q.work_fluid || '')
+    const restoredWorkFluid = sTechScope.workFluid || sSpecs.workFluid || q.work_fluid || ''
+    const restoredCustomWorkFluid =
+      sTechScope.custom_work_fluid || sSpecs.custom_work_fluid || q.custom_work_fluid || ''
+    setWorkFluid(restoredWorkFluid)
+    setCustomWorkFluid(restoredCustomWorkFluid)
 
     // Novos campos: Integração, PT e Pernoite
     setIntegrationNeeded(q.integration_needed ?? sIntegration.integration_needed ?? false)
@@ -2706,6 +2725,19 @@ export function QuotesManager({
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                  {workFluid === 'Outro' && (
+                    <div className="pt-2 animate-fade-in">
+                      <Label className="text-[10.5px] font-medium text-slate-600 dark:text-slate-400">
+                        Especifique o Fluido de Trabalho Personalizado
+                      </Label>
+                      <Input
+                        value={customWorkFluid}
+                        onChange={(e) => setCustomWorkFluid(e.target.value)}
+                        placeholder="Ex: Ácido sulfúrico, Etilenoglicol, Solução cáustica..."
+                        className="text-xs h-8 mt-1"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

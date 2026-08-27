@@ -1,0 +1,1486 @@
+{
+  "generatedAt": "2026-08-27T16:02:57.634Z",
+  "collections": [
+    {
+      "name": "users",
+      "type": "auth",
+      "apiRules": {
+        "list": "id = @request.auth.id",
+        "view": "id = @request.auth.id",
+        "create": "",
+        "update": "id = @request.auth.id",
+        "delete": "id = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "avatar",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
+        "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''"
+      ]
+    },
+    {
+      "name": "clients",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "company_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "document",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "whatsapp",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "segment",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "lead",
+            "prospect",
+            "active",
+            "churned",
+            "partner"
+          ]
+        },
+        {
+          "name": "score",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tags",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "assigned_to",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "contacts",
+          "type": "json",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_clients_name ON clients (name)",
+        "CREATE INDEX idx_clients_status ON clients (status)",
+        "CREATE INDEX idx_clients_created ON clients (created DESC)"
+      ]
+    },
+    {
+      "name": "products",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "software",
+            "hardware",
+            "consulting",
+            "maintenance",
+            "subscription",
+            "training"
+          ]
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "price",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "unit",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "specs",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "brand",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "model",
+          "type": "text",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_products_name ON products (name)",
+        "CREATE INDEX idx_products_category ON products (category)"
+      ]
+    },
+    {
+      "name": "deals",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "client_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "value",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "stage",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "prospecting",
+            "qualification",
+            "proposal",
+            "negotiation",
+            "won",
+            "lost"
+          ]
+        },
+        {
+          "name": "probability",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "expected_close_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "assigned_to",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ]
+        },
+        {
+          "name": "loss_reason",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_deals_stage ON deals (stage)",
+        "CREATE INDEX idx_deals_client ON deals (client_id)",
+        "CREATE INDEX idx_deals_created ON deals (created DESC)"
+      ]
+    },
+    {
+      "name": "quotes",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "quote_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "client_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "deal_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "deals"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "draft",
+            "sent",
+            "approved",
+            "rejected",
+            "expired"
+          ]
+        },
+        {
+          "name": "items",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "subtotal",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "discount_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "payment_terms",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "valid_until",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "follow_up_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "assigned_to",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "tech_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tech_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tech_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "helper_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "helper_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "helper_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inspector_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inspector_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "inspector_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "labor_config",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "service_margin",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sales_commission",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pis_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cofins_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "iss_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "csll_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "irpj_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ir_diff_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pricing_config",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origin_cep",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origin_address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "destination_cep",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "destination_address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "distance_km",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_round_trip",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "travel_config",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_brand",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_model",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_series",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plate_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plate_material",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plate_thickness",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "gasket_material",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "connection_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "connection_size",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pressure_test_bar",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "working_pressure_bar",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dimensions_w_h_d",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "weight_kg",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "scope_of_work",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "labor_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "labor_rate_hourly",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "lodging_meals_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "travel_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "materials_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "third_party_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "other_costs",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "discount_amount",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "final_price",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "validity_days",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "payment_conditions",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "technical_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "commercial_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "service_details",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "custom_materials",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "integration_needed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "integration_day",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "integration_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "work_permit_needed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "work_permit_time",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "overnight_needed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_quantity",
+          "type": "number",
+          "required": false,
+          "system": false
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_quotes_number ON quotes (quote_number)",
+        "CREATE INDEX idx_quotes_status ON quotes (status)",
+        "CREATE INDEX idx_quotes_client ON quotes (client_id)"
+      ]
+    },
+    {
+      "name": "tickets",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "ticket_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "client_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "channel",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "whatsapp",
+            "email",
+            "phone",
+            "chat",
+            "in_person"
+          ]
+        },
+        {
+          "name": "subject",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "open",
+            "in_progress",
+            "resolved",
+            "closed"
+          ]
+        },
+        {
+          "name": "assigned_to",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "timeline",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolution_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_tickets_status ON tickets (status)",
+        "CREATE INDEX idx_tickets_channel ON tickets (channel)",
+        "CREATE INDEX idx_tickets_client ON tickets (client_id)"
+      ]
+    },
+    {
+      "name": "services",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "service_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "installation",
+            "training",
+            "support",
+            "maintenance",
+            "consulting",
+            "contract"
+          ]
+        },
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "client_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "deal_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "deals"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "planning",
+            "in_progress",
+            "pending_client",
+            "completed",
+            "cancelled"
+          ]
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contract_renewal_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "monthly_value",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "assigned_to",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "checklist",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "stages",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_services_status ON services (status)",
+        "CREATE INDEX idx_services_type ON services (service_type)",
+        "CREATE INDEX idx_services_client ON services (client_id)"
+      ]
+    },
+    {
+      "name": "activities",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "call",
+            "meeting",
+            "follow_up",
+            "visit",
+            "email",
+            "task"
+          ]
+        },
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "client_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "deal_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "deals"
+        },
+        {
+          "name": "due_date",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "time",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "pending",
+            "completed",
+            "cancelled"
+          ]
+        },
+        {
+          "name": "assigned_to",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "outcome",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_activities_due ON activities (due_date)",
+        "CREATE INDEX idx_activities_status ON activities (status)",
+        "CREATE INDEX idx_activities_client ON activities (client_id)"
+      ]
+    },
+    {
+      "name": "service_orders",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "order_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "quote_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "quotes"
+        },
+        {
+          "name": "quote_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "client_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "pending_approval",
+            "approved",
+            "in_progress",
+            "completed",
+            "rejected",
+            "cancelled"
+          ]
+        },
+        {
+          "name": "services",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total_value",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "priority",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ]
+        },
+        {
+          "name": "assigned_to",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "technical_details",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approval_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "start_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "end_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_service_orders_number ON service_orders (order_number)",
+        "CREATE INDEX idx_service_orders_status ON service_orders (status)",
+        "CREATE INDEX idx_service_orders_client ON service_orders (client_name)"
+      ]
+    }
+  ]
+}

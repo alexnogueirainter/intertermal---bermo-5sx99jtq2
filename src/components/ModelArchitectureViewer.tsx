@@ -27,8 +27,8 @@ export const ModelArchitectureViewer: React.FC = () => {
           Arquitetura Técnica do Intertermal (BERMO CRM)
         </h2>
         <p className="text-xs md:text-sm text-slate-300 mt-1">
-          Visão detalhada do modelo de dados estendido no PocketBase (Skip Cloud), módulos de
-          cálculo (Mapeia e M.O.), catálogo de produtos BERMO e regras fiscais/indiretas.
+          Visão detalhada do modelo de dados estendido no PocketBase, módulos de cálculo (Mapeia e
+          M.O.), catálogo de produtos BERMO e regras fiscais/indiretas.
         </p>
       </div>
 

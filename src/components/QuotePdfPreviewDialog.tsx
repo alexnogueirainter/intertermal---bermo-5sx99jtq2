@@ -64,7 +64,21 @@ export function QuotePdfPreviewDialog({
 
   // Identificação do primeiro item com especificações
   const mainItem = quote.items && quote.items.length > 0 ? quote.items[0] : null
-  const specs = quote.service_details?.service_technical_specs || mainItem?.bermo_specs
+  const specs =
+    quote.service_details?.service_technical_specs ||
+    quote.service_details?.technical_scope ||
+    mainItem?.bermo_specs
+
+  // Determina o fluido de trabalho efetivo
+  const rawFluid = specs?.workFluid || specs?.work_fluid || quote.work_fluid || ''
+  const customFluid =
+    specs?.custom_work_fluid ||
+    specs?.customWorkFluid ||
+    quote.service_details?.technical_scope?.custom_work_fluid ||
+    quote.service_details?.service_technical_specs?.custom_work_fluid ||
+    quote.custom_work_fluid ||
+    ''
+  const effectiveWorkFluid = rawFluid === 'Outro' && customFluid ? customFluid : rawFluid
   const laborDetails = quote.service_details?.labor_costs
   const travelDetails = quote.service_details?.travel_costs
   const lodgingDetails = quote.service_details?.lodging_meals_costs
@@ -1167,10 +1181,7 @@ export function QuotePdfPreviewDialog({
             </div>
 
             {/* ESCOPO GLOBAL E FLUIDO */}
-            {(quote.scope_of_work ||
-              specs?.scopeOfWork ||
-              specs?.workFluid ||
-              quote.work_fluid) && (
+            {(quote.scope_of_work || specs?.scopeOfWork || effectiveWorkFluid) && (
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
                   Escopo Detalhado dos Serviços de Manutenção & Parâmetros Operacionais:
@@ -1180,12 +1191,12 @@ export function QuotePdfPreviewDialog({
                     specs?.scopeOfWork ||
                     'Manutenção preventiva e corretiva com desmontagem, limpeza química, inspeção por líquido penetrante, teste hidrostático e montagem.'}
                 </p>
-                {(specs?.workFluid || quote.work_fluid) && (
+                {effectiveWorkFluid && (
                   <div className="text-[10.5px] text-slate-600 font-mono pt-1 border-t border-slate-200">
                     <span className="font-sans font-semibold text-slate-700">
                       Fluido de Trabalho:{' '}
                     </span>
-                    {specs?.workFluid || quote.work_fluid}
+                    {effectiveWorkFluid}
                   </div>
                 )}
               </div>

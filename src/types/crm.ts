@@ -218,6 +218,7 @@ export interface QuoteRecord {
   weight_kg?: number
   equipments?: QuoteEquipmentItem[]
   work_fluid?: string
+  custom_work_fluid?: string
   scope_of_work?: string
 
   // Mão de obra (Valores individuais e agrupados)
