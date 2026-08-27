@@ -1073,8 +1073,8 @@ export function QuotesManager({
     }
   }
 
-  // 3. Salvar Rascunho
-  const handleSaveDraft = async () => {
+  // 3. Salvar Rascunho (com suporte a silentMode para auto-save)
+  const handleSaveDraft = async (silentMode = false) => {
     setIsSavingDraft(true)
     try {
       const draftData = getFormDataObject('draft')
@@ -1084,21 +1084,125 @@ export function QuotesManager({
       await handleSaveData(draftData)
       setLastSavedDraft(formattedTime)
 
-      toast({
-        title: 'Rascunho salvo com sucesso!',
-        description: formattedTime,
-      })
+      if (!silentMode) {
+        toast({
+          title: 'Rascunho salvo com sucesso!',
+          description: formattedTime,
+        })
+      }
     } catch (err) {
       console.error(err)
-      toast({
-        title: 'Erro ao salvar rascunho',
-        description: 'Tente novamente em instantes.',
-        variant: 'destructive',
-      })
+      if (!silentMode) {
+        toast({
+          title: 'Erro ao salvar rascunho',
+          description: 'Tente novamente em instantes.',
+          variant: 'destructive',
+        })
+      }
     } finally {
       setIsSavingDraft(false)
     }
   }
+
+  // ----------------------------------------------------
+  // AUTO-SAVE COM DEBOUNCE DE 2 SEGUNDOS EM MODO DE EDIÇÃO
+  // ----------------------------------------------------
+  const isFirstEditLoad = useRef(true)
+  const handleSaveDraftRef = useRef(handleSaveDraft)
+  handleSaveDraftRef.current = handleSaveDraft
+
+  useEffect(() => {
+    if (!isCreateModalOpen || !isEditMode || !editingQuoteId) {
+      isFirstEditLoad.current = true
+      return
+    }
+
+    // Pular a primeira renderização do formulário ao carregar os dados
+    if (isFirstEditLoad.current) {
+      isFirstEditLoad.current = false
+      return
+    }
+
+    const timer = setTimeout(() => {
+      handleSaveDraftRef.current(true)
+    }, 2000)
+
+    return () => clearTimeout(timer)
+  }, [
+    isCreateModalOpen,
+    isEditMode,
+    editingQuoteId,
+    clientId,
+    dealId,
+    quoteCode,
+    status,
+    equipmentBrand,
+    equipmentModel,
+    equipmentSeries,
+    equipmentQuantity,
+    plateCount,
+    plateMaterial,
+    plateThickness,
+    gasketMaterial,
+    connectionType,
+    connectionSize,
+    pressureTestBar,
+    workingPressureBar,
+    dimensions,
+    weightKg,
+    scopeOfWork,
+    workFluid,
+    integrationNeeded,
+    integrationWhen,
+    integrationDay,
+    workPermitNeeded,
+    overnightNeeded,
+    materialsCost,
+    customMaterialsList,
+    techCount,
+    techHours,
+    techRate,
+    helperCount,
+    helperHours,
+    helperRate,
+    inspectorCount,
+    inspectorHours,
+    inspectorRate,
+    originCep,
+    originAddress,
+    destinationCep,
+    destinationAddress,
+    distanceKm,
+    isRoundTrip,
+    consumptionKmL,
+    fuelPrice,
+    tollRoadPercent,
+    manualFuelAdj,
+    manualTollAdj,
+    carRentalType,
+    carRentalDailyRate,
+    carRentalDays,
+    hotelDays,
+    hotelRate,
+    mealsDays,
+    mealsRate,
+    serviceMargin,
+    salesCommission,
+    adminOverheadRate,
+    pisRate,
+    cofinsRate,
+    issRate,
+    csllRate,
+    irpjRate,
+    irDiffRate,
+    discountAmount,
+    thirdPartyCost,
+    otherCosts,
+    validityDays,
+    paymentCondition,
+    technicalNotes,
+    commercialNotes,
+  ])
 
   // Submissão oficial da Proposta
   const handleSubmitQuote = async (e: React.FormEvent) => {
@@ -3610,14 +3714,19 @@ export function QuotesManager({
             {/* ========================================================================= */}
             <DialogFooter className="pt-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-200 dark:border-slate-800">
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {lastSavedDraft ? (
+                {isSavingDraft ? (
+                  <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1.5 font-medium text-[11px] animate-pulse">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Salvando...
+                  </span>
+                ) : lastSavedDraft ? (
                   <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium text-[11px]">
                     <CheckCircle2 className="h-3.5 w-3.5" />
                     {lastSavedDraft}
                   </span>
                 ) : (
                   <span className="text-[11px] text-slate-500">
-                    Nenhum rascunho salvo nesta sessão
+                    {isEditMode ? 'Auto-save ativado (2s)' : 'Nenhum rascunho salvo nesta sessão'}
                   </span>
                 )}
               </div>
@@ -3651,7 +3760,7 @@ export function QuotesManager({
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={handleSaveDraft}
+                  onClick={() => handleSaveDraft(false)}
                   disabled={isSavingDraft}
                   className="text-xs font-semibold border border-slate-300 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center gap-1.5"
                 >

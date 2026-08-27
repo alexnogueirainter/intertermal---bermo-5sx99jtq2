@@ -66,7 +66,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
   const approvedQuotesTotal = quotes
     .filter((q) => q.status === 'approved')
-    .reduce((sum, q) => sum + (Number(q.total) || 0), 0)
+    .reduce((sum, q) => sum + (Number(q.total ?? q.final_price) || 0), 0)
 
   const pendingQuotes = quotes.filter((q) => q.status === 'sent' || q.status === 'draft')
   const openTickets = tickets.filter((t) => t.status === 'open' || t.status === 'in_progress')
@@ -161,7 +161,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     ),
                 )
                 .map((q) => {
-                  const finalPrice = Number(q.total || 0)
+                  const finalPrice = Number(q.total ?? q.final_price ?? 0)
                   const internalCost =
                     Number(q.service_details?.service_composition?.directCostsTotal) ||
                     Math.round(finalPrice * 0.62 * 100) / 100
@@ -618,7 +618,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
                     <div className="text-right space-y-1">
                       <span className="font-bold text-slate-900 dark:text-slate-100 block">
-                        {(q.total || 0).toLocaleString('pt-BR', {
+                        {(q.total ?? q.final_price ?? 0).toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
                         })}

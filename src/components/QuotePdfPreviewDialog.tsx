@@ -233,7 +233,8 @@ export function QuotePdfPreviewDialog({
     taxes.totalTaxes ??
     pisPercent + cofinsPercent + issPercent + csllPercent + irpjPercent + irDiffPercent
 
-  const finalSalePrice = indirectCosts?.finalSalePrice ?? quote.final_price ?? quote.total ?? 0
+  const equipmentQuantity = quote.equipment_quantity ?? 1
+  const finalSalePrice = quote.total ?? quote.final_price ?? indirectCosts?.finalSalePrice ?? 0
 
   const adminCostAmount =
     indirectCosts?.adminCostAmount ??
@@ -840,6 +841,22 @@ export function QuotePdfPreviewDialog({
                   </div>
                 </div>
 
+                {/* Indicação de Quantidade de Equipamentos na Composição Interna */}
+                {equipmentQuantity > 1 && (
+                  <div className="p-2.5 bg-amber-100/60 rounded-lg border border-amber-300 text-[11px] text-amber-900 font-medium flex items-center justify-between">
+                    <span>
+                      Escopo com <strong>{equipmentQuantity} unidades</strong> de equipamentos.
+                    </span>
+                    <span className="font-mono text-[10px] text-amber-800">
+                      Custo unitário por equipamento:{' '}
+                      {(directCostsTotal / equipmentQuantity).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
+                  </div>
+                )}
+
                 {/* Detalhamento dos Impostos */}
                 <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block mb-2">
@@ -971,7 +988,9 @@ export function QuotePdfPreviewDialog({
                 <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] font-bold">
                   <tr>
                     <th className="p-2.5">Descrição Técnica dos Serviços</th>
-                    <th className="p-2.5 text-center w-16">Qtd</th>
+                    <th className="p-2.5 text-center w-16">
+                      {equipmentQuantity > 1 ? 'Equip.' : 'Qtd'}
+                    </th>
                     <th className="p-2.5 text-right w-28">Valor Unitário</th>
                     <th className="p-2.5 text-right w-28">Total</th>
                   </tr>
@@ -1008,6 +1027,12 @@ export function QuotePdfPreviewDialog({
                                         specs?.productModel ||
                                         quote.equipment_model}
                                     </strong>
+                                    {equipmentQuantity > 1 && (
+                                      <strong className="text-teal-800 dark:text-teal-300">
+                                        {' '}
+                                        — Quantidade: {equipmentQuantity} unidades
+                                      </strong>
+                                    )}
                                   </span>
                                 )}
                                 {(item.bermo_specs?.productBrand ||
@@ -1179,7 +1204,7 @@ export function QuotePdfPreviewDialog({
                   isInternal ? 'text-amber-950' : 'text-teal-900'
                 }`}
               >
-                {(quote.total || finalSalePrice || 0).toLocaleString('pt-BR', {
+                {(quote.total ?? quote.final_price ?? finalSalePrice ?? 0).toLocaleString('pt-BR', {
                   style: 'currency',
                   currency: 'BRL',
                 })}
