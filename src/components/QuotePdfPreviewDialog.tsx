@@ -88,11 +88,21 @@ export function QuotePdfPreviewDialog({
   }
 
   const handlePrint = () => {
-    // Fecha outros diálogos que possam estar abertos (ex: modal de edição do QuotesManager)
-    // antes de imprimir, garantindo que apenas o PDF apareça
+    // Marca o portal que contém o PDF como visível para impressão
+    // Isso é mais confiável que seletores CSS :has() em @media print
+    document.querySelectorAll('[data-radix-portal]').forEach((portal) => {
+      if (portal.querySelector('#quote-printable-document')) {
+        portal.classList.add('print-visible-portal')
+      }
+    })
+
     setTimeout(() => {
       window.print()
-    }, 150)
+      // Limpa a classe após a impressão
+      document.querySelectorAll('[data-radix-portal].print-visible-portal').forEach((portal) => {
+        portal.classList.remove('print-visible-portal')
+      })
+    }, 200)
   }
 
   // Identificação do primeiro item com especificações

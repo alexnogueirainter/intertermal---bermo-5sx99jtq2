@@ -309,18 +309,23 @@
     display: none !important;
   }
 
-  /* Esconde todos os portais que NÃO contêm o documento PDF */
-  [data-radix-portal]:not(:has(#quote-printable-document)) {
+  /* Esconde TODOS os portais Radix por padrão */
+  [data-radix-portal] {
     display: none !important;
   }
 
-  /* Esconde o overlay escuro do diálogo Radix */
-  [data-radix-portal]:has(#quote-printable-document) [data-radix-dialog-overlay] {
+  /* Mostra APENAS o portal marcado como visível via JS */
+  [data-radix-portal].print-visible-portal {
+    display: block !important;
+  }
+
+  /* Esconde o overlay escuro do diálogo */
+  .print-visible-portal [data-radix-dialog-overlay] {
     display: none !important;
   }
 
-  /* Reset do container do diálogo para fluir na página impressa */
-  [data-radix-portal]:has(#quote-printable-document) [role='dialog'] {
+  /* Reset completo do container do diálogo para fluir na página impressa */
+  .print-visible-portal [role='dialog'] {
     position: static !important;
     max-width: none !important;
     width: 100% !important;
@@ -330,14 +335,11 @@
     border: none !important;
     padding: 0 !important;
     margin: 0 !important;
-  }
-
-  /* Remove restrições de altura/overflow do DialogContent (shadcn/ui) */
-  [data-radix-portal]:has(#quote-printable-document) [role='dialog'],
-  [data-radix-portal]:has(#quote-printable-document) [role='dialog'] > div {
     overflow: visible !important;
     max-height: none !important;
     height: auto !important;
+    display: block !important;
+    border-radius: 0 !important;
   }
 
   /* Garante que o documento ocupe a página */
@@ -348,20 +350,13 @@
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 12pt !important; /* padding mínimo para o documento respirar */
+    padding: 12pt !important;
     border: none !important;
     box-shadow: none !important;
     background: white !important;
     overflow: visible !important;
-    font-size: 10pt !important; /* fonte menor para caber em uma página */
+    font-size: 10pt !important;
     line-height: 1.3 !important;
-  }
-
-  /* Reduzir espaçamento entre seções na impressão */
-  #quote-printable-document .space-y-6 {
-    --tw-space-y-reverse: 0;
-    margin-top: calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));
-    margin-bottom: calc(0.75rem * calc(var(--tw-space-y-reverse)));
   }
 
   /* Garantir que tabelas não quebrem entre páginas */
