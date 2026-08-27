@@ -513,7 +513,7 @@ export function QuotePdfPreviewDialog({
         <div
           id="quote-printable-document"
           ref={printRef}
-          className="relative p-8 sm:p-12 space-y-6 text-slate-900 bg-white font-sans text-xs leading-relaxed print:p-0 print:text-[11px] overflow-hidden"
+          className="relative p-8 sm:p-12 space-y-6 print:space-y-2 text-slate-900 bg-white font-sans text-xs leading-relaxed print:p-0 print:text-[11px] overflow-hidden"
         >
           {/* Marca d'água discreta para Composição Interna */}
           {isInternal && (
@@ -528,10 +528,10 @@ export function QuotePdfPreviewDialog({
 
           {/* Banner de Identificação Interna (quando no modo internal) */}
           {isInternal && (
-            <div className="bg-amber-50 border-2 border-dashed border-amber-300 rounded-lg p-2.5 flex items-center justify-between text-amber-900">
+            <div className="bg-amber-50 border-2 border-dashed border-amber-300 rounded-lg p-2.5 print:p-1.5 flex items-center justify-between text-amber-900">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
-                <span className="font-bold text-[11px] uppercase tracking-wide">
+                <span className="font-bold text-[11px] print:text-[10px] uppercase tracking-wide">
                   DOCUMENTO INTERNO — RELATÓRIO DE COMPOSIÇÃO DE CUSTOS & ENGENHARIA DE PREÇO
                 </span>
               </div>
@@ -543,14 +543,14 @@ export function QuotePdfPreviewDialog({
 
           {/* Cabeçalho Corporativo Intertermal / BERMO */}
           <div
-            className={`border-b-2 pb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${
+            className={`border-b-2 pb-5 print:pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:gap-2 ${
               isInternal ? 'border-amber-600' : 'border-teal-700'
             }`}
           >
-            <div className="space-y-1">
+            <div className="space-y-1 print:space-y-0.5">
               <div className="flex items-center gap-2">
                 <span
-                  className={`font-extrabold text-2xl tracking-tighter ${
+                  className={`font-extrabold text-2xl print:text-xl tracking-tighter ${
                     isInternal ? 'text-amber-950' : 'text-teal-900'
                   }`}
                 >
@@ -564,11 +564,11 @@ export function QuotePdfPreviewDialog({
                   {isInternal ? 'Engenharia de Custos' : 'Engenharia Térmica'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium">
+              <p className="text-[11px] print:text-[10px] text-slate-500 font-medium">
                 Assistência Técnica Autorizada & Especialista em Trocadores de Calor e Válvulas
                 BERMO
               </p>
-              <p className="text-[10px] text-slate-400 leading-relaxed">
+              <p className="text-[10px] print:text-[9px] text-slate-400 leading-relaxed">
                 <a
                   href="https://www.google.com/maps/search/?api=1&query=Rua+Ananias+Pires+do+Amaral,+98+-+Sorocaba+-+SP"
                   target="_blank"
@@ -584,26 +584,26 @@ export function QuotePdfPreviewDialog({
             </div>
 
             <div
-              className={`text-right sm:text-right space-y-1 p-3 rounded-lg border ${
+              className={`text-right sm:text-right space-y-1 print:space-y-0.5 p-3 print:p-2 rounded-lg border ${
                 isInternal ? 'bg-amber-50/60 border-amber-200' : 'bg-slate-50 border-slate-200'
               }`}
             >
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">
+              <span className="text-[10px] print:text-[9px] font-bold uppercase tracking-widest text-slate-400 block">
                 {isInternal ? 'Memória de Cálculo Interna' : 'Proposta Comercial de Serviços'}
               </span>
               <div
-                className={`font-mono text-base font-black ${
+                className={`font-mono text-base print:text-sm font-black ${
                   isInternal ? 'text-amber-900' : 'text-teal-800'
                 }`}
               >
                 {quote.quote_number || quote.code}
               </div>
-              <div className="text-[11px] text-slate-600 flex items-center gap-1 justify-end">
+              <div className="text-[11px] print:text-[9.5px] text-slate-600 flex items-center gap-1 justify-end">
                 <Calendar className="h-3 w-3 text-slate-400" />
                 Data: {new Date(quote.created || Date.now()).toLocaleDateString('pt-BR')}
               </div>
               <div
-                className={`text-[11px] font-semibold ${
+                className={`text-[11px] print:text-[9.5px] font-semibold ${
                   isInternal ? 'text-amber-700' : 'text-teal-700'
                 }`}
               >
@@ -613,35 +613,35 @@ export function QuotePdfPreviewDialog({
           </div>
 
           {/* Dados do Cliente e Responsável Técnico */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <div className="space-y-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 print:gap-2 bg-slate-50 p-4 print:p-2 rounded-xl border border-slate-200">
+            <div className="space-y-1 print:space-y-0.5">
               <span
-                className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 ${
+                className={`text-[10px] print:text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 ${
                   isInternal ? 'text-amber-800' : 'text-teal-800'
                 }`}
               >
                 <Building2 className="h-3 w-3" />
                 Dados do Cliente
               </span>
-              <div className="font-bold text-sm text-slate-900">
+              <div className="font-bold text-sm print:text-xs text-slate-900">
                 {quote.client_name || 'Empresa Cliente'}
               </div>
               {travelDetails?.destinationAddress && (
-                <div className="text-slate-600 flex items-start gap-1 text-[11px]">
+                <div className="text-slate-600 flex items-start gap-1 text-[11px] print:text-[9.5px]">
                   <MapPin className="h-3 w-3 text-slate-400 shrink-0 mt-0.5" />
                   <span>Planta/Local: {travelDetails.destinationAddress}</span>
                 </div>
               )}
               {quote.client_document && (
-                <div className="text-[10.5px] text-slate-500 font-mono">
+                <div className="text-[10.5px] print:text-[9.5px] text-slate-500 font-mono">
                   CNPJ/CPF: {quote.client_document}
                 </div>
               )}
             </div>
 
-            <div className="space-y-1 sm:text-right">
+            <div className="space-y-1 print:space-y-0.5 sm:text-right">
               <span
-                className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 sm:justify-end ${
+                className={`text-[10px] print:text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 sm:justify-end ${
                   isInternal ? 'text-amber-800' : 'text-teal-800'
                 }`}
               >
@@ -651,10 +651,10 @@ export function QuotePdfPreviewDialog({
                   ? 'Responsáveis Técnicos / Comerciais'
                   : 'Responsável Técnico Intertermal'}
               </span>
-              <div className="font-semibold text-slate-800">
+              <div className="font-semibold text-slate-800 print:text-xs">
                 {quote.assigned_to || 'Alex Nogueira'}
               </div>
-              <div className="text-[11px] text-slate-500">
+              <div className="text-[11px] print:text-[9.5px] text-slate-500">
                 Departamento de Engenharia e Manutenção de Campo
               </div>
             </div>
@@ -664,17 +664,17 @@ export function QuotePdfPreviewDialog({
           {/* SEÇÕES EXCLUSIVAS DA COMPOSIÇÃO INTERNA (viewMode === 'internal')        */}
           {/* ========================================================================= */}
           {isInternal && (
-            <div className="space-y-6">
+            <div className="space-y-6 print:space-y-2">
               {/* Seção Interna A: Mão de Obra Especializada */}
-              <div className="space-y-2">
+              <div className="space-y-2 print:space-y-1">
                 <div className="flex items-center justify-between border-b border-amber-300 pb-1">
-                  <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                  <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5 text-amber-700" />
                     Composição de Mão de Obra Especializada
                   </h3>
                   <Badge
                     variant="outline"
-                    className="text-[10px] font-mono border-amber-300 text-amber-800"
+                    className="text-[10px] print:text-[9px] font-mono border-amber-300 text-amber-800"
                   >
                     Subtotal Mão de Obra:{' '}
                     {totalLabor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -682,28 +682,28 @@ export function QuotePdfPreviewDialog({
                 </div>
 
                 <div className="border border-slate-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-amber-50/70 text-slate-700 uppercase text-[10px] font-bold border-b border-slate-200">
+                  <table className="w-full text-left text-xs print:text-[10px]">
+                    <thead className="bg-amber-50/70 text-slate-700 uppercase text-[10px] print:text-[9px] font-bold border-b border-slate-200">
                       <tr>
-                        <th className="p-2.5">Função Especializada</th>
-                        <th className="p-2.5 text-center w-20">Quantidade</th>
-                        <th className="p-2.5 text-center w-20">Horas</th>
-                        <th className="p-2.5 text-right w-28">Valor / Hora</th>
-                        <th className="p-2.5 text-right w-28">Total</th>
+                        <th className="p-2.5 print:p-1.5">Função Especializada</th>
+                        <th className="p-2.5 print:p-1.5 text-center w-20">Quantidade</th>
+                        <th className="p-2.5 print:p-1.5 text-center w-20">Horas</th>
+                        <th className="p-2.5 print:p-1.5 text-right w-28">Valor / Hora</th>
+                        <th className="p-2.5 print:p-1.5 text-right w-28">Total</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       <tr className="hover:bg-slate-50/50">
-                        <td className="p-2.5 font-medium text-slate-900">
+                        <td className="p-2.5 print:p-1.5 font-medium text-slate-900">
                           Técnico Mecânico de Campo
                         </td>
-                        <td className="p-2.5 text-center font-mono">{techCount} un</td>
-                        <td className="p-2.5 text-center font-mono">{techHours}h</td>
-                        <td className="p-2.5 text-right font-mono text-slate-700">
+                        <td className="p-2.5 print:p-1.5 text-center font-mono">{techCount} un</td>
+                        <td className="p-2.5 print:p-1.5 text-center font-mono">{techHours}h</td>
+                        <td className="p-2.5 print:p-1.5 text-right font-mono text-slate-700">
                           {techRate.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           /h
                         </td>
-                        <td className="p-2.5 text-right font-mono font-bold text-slate-900">
+                        <td className="p-2.5 print:p-1.5 text-right font-mono font-bold text-slate-900">
                           {techTotal.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
@@ -711,19 +711,21 @@ export function QuotePdfPreviewDialog({
                         </td>
                       </tr>
                       <tr className="hover:bg-slate-50/50">
-                        <td className="p-2.5 font-medium text-slate-900">
+                        <td className="p-2.5 print:p-1.5 font-medium text-slate-900">
                           Ajudante / Auxiliar Técnico
                         </td>
-                        <td className="p-2.5 text-center font-mono">{helperCount} un</td>
-                        <td className="p-2.5 text-center font-mono">{helperHours}h</td>
-                        <td className="p-2.5 text-right font-mono text-slate-700">
+                        <td className="p-2.5 print:p-1.5 text-center font-mono">
+                          {helperCount} un
+                        </td>
+                        <td className="p-2.5 print:p-1.5 text-center font-mono">{helperHours}h</td>
+                        <td className="p-2.5 print:p-1.5 text-right font-mono text-slate-700">
                           {helperRate.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
                           })}
                           /h
                         </td>
-                        <td className="p-2.5 text-right font-mono font-bold text-slate-900">
+                        <td className="p-2.5 print:p-1.5 text-right font-mono font-bold text-slate-900">
                           {helperTotal.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
@@ -731,19 +733,23 @@ export function QuotePdfPreviewDialog({
                         </td>
                       </tr>
                       <tr className="hover:bg-slate-50/50">
-                        <td className="p-2.5 font-medium text-slate-900">
+                        <td className="p-2.5 print:p-1.5 font-medium text-slate-900">
                           Inspetor de Qualidade / END / Solda
                         </td>
-                        <td className="p-2.5 text-center font-mono">{inspectorCount} un</td>
-                        <td className="p-2.5 text-center font-mono">{inspectorHours}h</td>
-                        <td className="p-2.5 text-right font-mono text-slate-700">
+                        <td className="p-2.5 print:p-1.5 text-center font-mono">
+                          {inspectorCount} un
+                        </td>
+                        <td className="p-2.5 print:p-1.5 text-center font-mono">
+                          {inspectorHours}h
+                        </td>
+                        <td className="p-2.5 print:p-1.5 text-right font-mono text-slate-700">
                           {inspectorRate.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
                           })}
                           /h
                         </td>
-                        <td className="p-2.5 text-right font-mono font-bold text-slate-900">
+                        <td className="p-2.5 print:p-1.5 text-right font-mono font-bold text-slate-900">
                           {inspectorTotal.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
@@ -753,10 +759,10 @@ export function QuotePdfPreviewDialog({
                     </tbody>
                     <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
                       <tr>
-                        <td colSpan={4} className="p-2.5 text-right text-slate-700">
+                        <td colSpan={4} className="p-2.5 print:p-1.5 text-right text-slate-700">
                           Soma Mão de Obra:
                         </td>
-                        <td className="p-2.5 text-right font-mono text-amber-900">
+                        <td className="p-2.5 print:p-1.5 text-right font-mono text-amber-900">
                           {totalLabor.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
@@ -769,15 +775,15 @@ export function QuotePdfPreviewDialog({
               </div>
 
               {/* Seção Interna B: Deslocamento & Rotas */}
-              <div className="space-y-2">
+              <div className="space-y-2 print:space-y-1">
                 <div className="flex items-center justify-between border-b border-amber-300 pb-1">
-                  <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                  <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <Truck className="h-3.5 w-3.5 text-amber-700" />
                     Composição de Deslocamento & Logística (ViaCEP / Mapeia)
                   </h3>
                   <Badge
                     variant="outline"
-                    className="text-[10px] font-mono border-amber-300 text-amber-800"
+                    className="text-[10px] print:text-[9px] font-mono border-amber-300 text-amber-800"
                   >
                     Subtotal Deslocamento:{' '}
                     {totalTravelCost.toLocaleString('pt-BR', {
@@ -788,45 +794,47 @@ export function QuotePdfPreviewDialog({
                 </div>
 
                 <div
-                  className={`grid grid-cols-1 ${carRentalType !== 'none' ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px]`}
+                  className={`grid grid-cols-1 ${carRentalType !== 'none' ? 'sm:grid-cols-5' : 'sm:grid-cols-4'} gap-3 print:gap-1.5 bg-slate-50 p-3 print:p-2 rounded-lg border border-slate-200 text-[11px] print:text-[9.5px]`}
                 >
                   <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                    <span className="text-[10px] print:text-[9px] font-bold text-slate-500 uppercase block">
                       Distância / Rota
                     </span>
                     <div className="font-bold text-slate-900 font-mono">
                       {distanceKm} km {isRoundTrip ? '(Ida + Volta)' : '(Só Ida)'}
                     </div>
-                    <div className="text-[10px] text-slate-500">Consumo: {consumptionKmL} km/L</div>
+                    <div className="text-[10px] print:text-[8.5px] text-slate-500">
+                      Consumo: {consumptionKmL} km/L
+                    </div>
                   </div>
 
                   <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                    <span className="text-[10px] print:text-[9px] font-bold text-slate-500 uppercase block">
                       Combustível
                     </span>
                     <div className="font-bold text-slate-900 font-mono">
                       {baseFuelCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </div>
-                    <div className="text-[10px] text-slate-500">
+                    <div className="text-[10px] print:text-[8.5px] text-slate-500">
                       {litersFuel.toFixed(1)} L a R$ {fuelPrice.toFixed(2)}/L
                     </div>
                   </div>
 
                   <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                    <span className="text-[10px] print:text-[9px] font-bold text-slate-500 uppercase block">
                       Pedágios Estimados
                     </span>
                     <div className="font-bold text-slate-900 font-mono">
                       {baseTollCost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </div>
-                    <div className="text-[10px] text-slate-500">
+                    <div className="text-[10px] print:text-[8.5px] text-slate-500">
                       ~{estimatedTolls} praças ({tollRoadPercent}% rodovia pedagiada)
                     </div>
                   </div>
 
                   {carRentalType !== 'none' && (
                     <div className="space-y-0.5">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                      <span className="text-[10px] print:text-[9px] font-bold text-slate-500 uppercase block">
                         Aluguel de Carro
                       </span>
                       <div className="font-bold text-slate-900 font-mono">
@@ -835,7 +843,7 @@ export function QuotePdfPreviewDialog({
                           currency: 'BRL',
                         })}
                       </div>
-                      <div className="text-[10px] text-slate-500">
+                      <div className="text-[10px] print:text-[8.5px] text-slate-500">
                         {carRentalDays} diária(s) ×{' '}
                         {carRentalDailyRate.toLocaleString('pt-BR', {
                           style: 'currency',
@@ -845,17 +853,17 @@ export function QuotePdfPreviewDialog({
                     </div>
                   )}
 
-                  <div className="space-y-0.5 bg-amber-50/80 p-2 rounded border border-amber-200">
-                    <span className="text-[10px] font-bold text-amber-900 uppercase block">
+                  <div className="space-y-0.5 bg-amber-50/80 p-2 print:p-1.5 rounded border border-amber-200">
+                    <span className="text-[10px] print:text-[9px] font-bold text-amber-900 uppercase block">
                       Total Deslocamento
                     </span>
-                    <div className="font-bold text-amber-900 font-mono text-sm">
+                    <div className="font-bold text-amber-900 font-mono text-sm print:text-xs">
                       {totalTravelCost.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
                       })}
                     </div>
-                    <div className="text-[9.5px] text-amber-700">
+                    <div className="text-[9.5px] print:text-[8px] text-amber-700">
                       {carRentalType !== 'none'
                         ? 'Combustível + Pedágios + Carro'
                         : 'Combustível + Pedágios'}
@@ -865,15 +873,15 @@ export function QuotePdfPreviewDialog({
               </div>
 
               {/* Seção Interna C: Hospedagem & Alimentação */}
-              <div className="space-y-2">
+              <div className="space-y-2 print:space-y-1">
                 <div className="flex items-center justify-between border-b border-amber-300 pb-1">
-                  <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                  <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <Hotel className="h-3.5 w-3.5 text-amber-700" />
                     Composição de Hospedagem & Alimentação
                   </h3>
                   <Badge
                     variant="outline"
-                    className="text-[10px] font-mono border-amber-300 text-amber-800"
+                    className="text-[10px] print:text-[9px] font-mono border-amber-300 text-amber-800"
                   >
                     Subtotal Estadia:{' '}
                     {totalLodgingMeals.toLocaleString('pt-BR', {
@@ -883,46 +891,46 @@ export function QuotePdfPreviewDialog({
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px]">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 print:gap-1.5 bg-slate-50 p-3 print:p-2 rounded-lg border border-slate-200 text-[11px] print:text-[9.5px]">
                   <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                    <span className="text-[10px] print:text-[9px] font-bold text-slate-500 uppercase block">
                       Diárias de Hotel
                     </span>
                     <div className="font-bold text-slate-900 font-mono">
                       {hotelDays} diárias ×{' '}
                       {hotelRate.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </div>
-                    <div className="text-[10px] text-slate-600 font-mono">
+                    <div className="text-[10px] print:text-[8.5px] text-slate-600 font-mono">
                       Total:{' '}
                       {hotelTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </div>
                   </div>
 
                   <div className="space-y-0.5">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                    <span className="text-[10px] print:text-[9px] font-bold text-slate-500 uppercase block">
                       Refeições / Alimentação
                     </span>
                     <div className="font-bold text-slate-900 font-mono">
                       {mealsDays} refeições ×{' '}
                       {mealsRate.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </div>
-                    <div className="text-[10px] text-slate-600 font-mono">
+                    <div className="text-[10px] print:text-[8.5px] text-slate-600 font-mono">
                       Total:{' '}
                       {mealsTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </div>
                   </div>
 
-                  <div className="space-y-0.5 bg-amber-50/80 p-2 rounded border border-amber-200">
-                    <span className="text-[10px] font-bold text-amber-900 uppercase block">
+                  <div className="space-y-0.5 bg-amber-50/80 p-2 print:p-1.5 rounded border border-amber-200">
+                    <span className="text-[10px] print:text-[9px] font-bold text-amber-900 uppercase block">
                       Total Hospedagem & Refeições
                     </span>
-                    <div className="font-bold text-amber-900 font-mono text-sm">
+                    <div className="font-bold text-amber-900 font-mono text-sm print:text-xs">
                       {totalLodgingMeals.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
                       })}
                     </div>
-                    <div className="text-[9.5px] text-amber-700">
+                    <div className="text-[9.5px] print:text-[8px] text-amber-700">
                       Diárias de Hotel + Alimentação
                     </div>
                   </div>
@@ -930,15 +938,15 @@ export function QuotePdfPreviewDialog({
               </div>
 
               {/* Seção Interna D: Custos Indiretos, Margem & Tributos */}
-              <div className="space-y-2">
+              <div className="space-y-2 print:space-y-1">
                 <div className="flex items-center justify-between border-b border-amber-300 pb-1">
-                  <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                  <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <Percent className="h-3.5 w-3.5 text-amber-700" />
                     Custos Indiretos, Margens e Tributos Fiscais
                   </h3>
                   <Badge
                     variant="outline"
-                    className="text-[10px] font-mono border-amber-300 text-amber-800"
+                    className="text-[10px] print:text-[9px] font-mono border-amber-300 text-amber-800"
                   >
                     Markup Indireto:{' '}
                     {totalIndirectMarkupSum.toLocaleString('pt-BR', {
@@ -948,27 +956,27 @@ export function QuotePdfPreviewDialog({
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-[11px]">
-                  <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 print:gap-1.5 text-[11px] print:text-[9.5px]">
+                  <div className="p-2.5 print:p-1.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1 print:space-y-0.5">
+                    <span className="text-[10px] print:text-[8.5px] font-bold text-slate-500 uppercase block">
                       Margem de Serviço
                     </span>
-                    <div className="font-mono font-bold text-emerald-700 text-sm">
+                    <div className="font-mono font-bold text-emerald-700 text-sm print:text-xs">
                       {serviceMarginPercent}%
                     </div>
-                    <div className="text-[10px] text-slate-600 font-mono">
+                    <div className="text-[10px] print:text-[8.5px] text-slate-600 font-mono">
                       {marginAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                  <div className="p-2.5 print:p-1.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1 print:space-y-0.5">
+                    <span className="text-[10px] print:text-[8.5px] font-bold text-slate-500 uppercase block">
                       Comissão de Vendas
                     </span>
-                    <div className="font-mono font-bold text-blue-700 text-sm">
+                    <div className="font-mono font-bold text-blue-700 text-sm print:text-xs">
                       {salesCommissionPercent}%
                     </div>
-                    <div className="text-[10px] text-slate-600 font-mono">
+                    <div className="text-[10px] print:text-[8.5px] text-slate-600 font-mono">
                       {commissionAmount.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
@@ -976,14 +984,14 @@ export function QuotePdfPreviewDialog({
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                  <div className="p-2.5 print:p-1.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1 print:space-y-0.5">
+                    <span className="text-[10px] print:text-[8.5px] font-bold text-slate-500 uppercase block">
                       Administração / Overhead
                     </span>
-                    <div className="font-mono font-bold text-purple-700 text-sm">
+                    <div className="font-mono font-bold text-purple-700 text-sm print:text-xs">
                       {adminCostPercent}%
                     </div>
-                    <div className="text-[10px] text-slate-600 font-mono">
+                    <div className="text-[10px] print:text-[8.5px] text-slate-600 font-mono">
                       {adminCostAmount.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
@@ -991,14 +999,14 @@ export function QuotePdfPreviewDialog({
                     </div>
                   </div>
 
-                  <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase block">
+                  <div className="p-2.5 print:p-1.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1 print:space-y-0.5">
+                    <span className="text-[10px] print:text-[8.5px] font-bold text-slate-500 uppercase block">
                       Carga Tributária Total
                     </span>
-                    <div className="font-mono font-bold text-rose-700 text-sm">
+                    <div className="font-mono font-bold text-rose-700 text-sm print:text-xs">
                       {totalTaxesPercent.toFixed(2)}%
                     </div>
-                    <div className="text-[10px] text-slate-600 font-mono">
+                    <div className="text-[10px] print:text-[8.5px] text-slate-600 font-mono">
                       {taxesAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </div>
                   </div>
@@ -1006,11 +1014,11 @@ export function QuotePdfPreviewDialog({
 
                 {/* Indicação de Quantidade de Equipamentos na Composição Interna */}
                 {equipmentQuantity > 1 && (
-                  <div className="p-2.5 bg-amber-100/60 rounded-lg border border-amber-300 text-[11px] text-amber-900 font-medium flex items-center justify-between">
+                  <div className="p-2.5 print:p-1.5 bg-amber-100/60 rounded-lg border border-amber-300 text-[11px] print:text-[9.5px] text-amber-900 font-medium flex items-center justify-between">
                     <span>
                       Escopo com <strong>{equipmentQuantity} unidades</strong> de equipamentos.
                     </span>
-                    <span className="font-mono text-[10px] text-amber-800">
+                    <span className="font-mono text-[10px] print:text-[8.5px] text-amber-800">
                       Custo unitário por equipamento:{' '}
                       {(directCostsTotal / equipmentQuantity).toLocaleString('pt-BR', {
                         style: 'currency',
@@ -1021,33 +1029,45 @@ export function QuotePdfPreviewDialog({
                 )}
 
                 {/* Detalhamento dos Impostos */}
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block mb-2">
+                <div className="p-3 print:p-2 bg-slate-50 rounded-lg border border-slate-200">
+                  <span className="text-[10px] print:text-[8.5px] font-bold uppercase tracking-wider text-slate-600 block mb-2 print:mb-1">
                     Abertura de Alíquotas Fiscais Aplicadas sobre a Receita Bruta:
                   </span>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-[10.5px] font-mono text-center">
-                    <div className="p-1.5 bg-white rounded border border-slate-200">
-                      <span className="text-[9.5px] text-slate-500 block font-sans">PIS</span>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 print:gap-1 text-[10.5px] print:text-[8.5px] font-mono text-center">
+                    <div className="p-1.5 print:p-1 bg-white rounded border border-slate-200">
+                      <span className="text-[9.5px] print:text-[8px] text-slate-500 block font-sans">
+                        PIS
+                      </span>
                       <strong>{pisPercent}%</strong>
                     </div>
-                    <div className="p-1.5 bg-white rounded border border-slate-200">
-                      <span className="text-[9.5px] text-slate-500 block font-sans">COFINS</span>
+                    <div className="p-1.5 print:p-1 bg-white rounded border border-slate-200">
+                      <span className="text-[9.5px] print:text-[8px] text-slate-500 block font-sans">
+                        COFINS
+                      </span>
                       <strong>{cofinsPercent}%</strong>
                     </div>
-                    <div className="p-1.5 bg-white rounded border border-slate-200">
-                      <span className="text-[9.5px] text-slate-500 block font-sans">ISS</span>
+                    <div className="p-1.5 print:p-1 bg-white rounded border border-slate-200">
+                      <span className="text-[9.5px] print:text-[8px] text-slate-500 block font-sans">
+                        ISS
+                      </span>
                       <strong>{issPercent}%</strong>
                     </div>
-                    <div className="p-1.5 bg-white rounded border border-slate-200">
-                      <span className="text-[9.5px] text-slate-500 block font-sans">CSLL</span>
+                    <div className="p-1.5 print:p-1 bg-white rounded border border-slate-200">
+                      <span className="text-[9.5px] print:text-[8px] text-slate-500 block font-sans">
+                        CSLL
+                      </span>
                       <strong>{csllPercent}%</strong>
                     </div>
-                    <div className="p-1.5 bg-white rounded border border-slate-200">
-                      <span className="text-[9.5px] text-slate-500 block font-sans">IRPJ</span>
+                    <div className="p-1.5 print:p-1 bg-white rounded border border-slate-200">
+                      <span className="text-[9.5px] print:text-[8px] text-slate-500 block font-sans">
+                        IRPJ
+                      </span>
                       <strong>{irpjPercent}%</strong>
                     </div>
-                    <div className="p-1.5 bg-white rounded border border-slate-200">
-                      <span className="text-[9.5px] text-slate-500 block font-sans">IR Dif</span>
+                    <div className="p-1.5 print:p-1 bg-white rounded border border-slate-200">
+                      <span className="text-[9.5px] print:text-[8px] text-slate-500 block font-sans">
+                        IR Dif
+                      </span>
                       <strong>{irDiffPercent}%</strong>
                     </div>
                   </div>
@@ -1055,70 +1075,76 @@ export function QuotePdfPreviewDialog({
               </div>
 
               {/* Seção Interna E: Consolidação Geral dos Custos Diretos vs Indiretos vs Preço Final */}
-              <div className="p-4 rounded-xl bg-amber-50/80 border-2 border-amber-300 space-y-3">
+              <div className="p-4 print:p-2 rounded-xl bg-amber-50/80 border-2 border-amber-300 space-y-3 print:space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold uppercase tracking-wider text-xs text-amber-950 flex items-center gap-1.5">
+                  <span className="font-bold uppercase tracking-wider text-xs print:text-[10px] text-amber-950 flex items-center gap-1.5">
                     <Calculator className="h-4 w-4 text-amber-700" />
                     Consolidação Financeira da Proposta (Formação de Preço Divisor)
                   </span>
-                  <Badge className="bg-amber-700 text-white font-mono text-[10px]">
+                  <Badge className="bg-amber-700 text-white font-mono text-[10px] print:text-[8.5px]">
                     RESUMO GERENCIAL
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  <div className="bg-white p-2.5 rounded-lg border border-amber-200 space-y-0.5">
-                    <span className="text-[10px] text-slate-500 uppercase font-semibold block">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:gap-1.5 text-xs print:text-[10px]">
+                  <div className="bg-white p-2.5 print:p-1.5 rounded-lg border border-amber-200 space-y-0.5">
+                    <span className="text-[10px] print:text-[8.5px] text-slate-500 uppercase font-semibold block">
                       Custos Diretos Totais
                     </span>
-                    <div className="font-mono font-bold text-slate-900 text-sm">
+                    <div className="font-mono font-bold text-slate-900 text-sm print:text-xs">
                       {directCostsTotal.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
                       })}
                     </div>
-                    <div className="text-[9.5px] text-slate-500">
+                    <div className="text-[9.5px] print:text-[8px] text-slate-500">
                       Mão de obra + Logística + Hotel
                     </div>
                   </div>
 
-                  <div className="bg-white p-2.5 rounded-lg border border-amber-200 space-y-0.5">
-                    <span className="text-[10px] text-slate-500 uppercase font-semibold block">
+                  <div className="bg-white p-2.5 print:p-1.5 rounded-lg border border-amber-200 space-y-0.5">
+                    <span className="text-[10px] print:text-[8.5px] text-slate-500 uppercase font-semibold block">
                       Custos Indiretos & Adm
                     </span>
-                    <div className="font-mono font-bold text-purple-800 text-sm">
+                    <div className="font-mono font-bold text-purple-800 text-sm print:text-xs">
                       {adminCostAmount.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
                       })}
                     </div>
-                    <div className="text-[9.5px] text-slate-500">Overhead operacional</div>
+                    <div className="text-[9.5px] print:text-[8px] text-slate-500">
+                      Overhead operacional
+                    </div>
                   </div>
 
-                  <div className="bg-white p-2.5 rounded-lg border border-amber-200 space-y-0.5">
-                    <span className="text-[10px] text-slate-500 uppercase font-semibold block">
+                  <div className="bg-white p-2.5 print:p-1.5 rounded-lg border border-amber-200 space-y-0.5">
+                    <span className="text-[10px] print:text-[8.5px] text-slate-500 uppercase font-semibold block">
                       Margem + Comis + Impostos
                     </span>
-                    <div className="font-mono font-bold text-amber-800 text-sm">
+                    <div className="font-mono font-bold text-amber-800 text-sm print:text-xs">
                       {totalIndirectMarkupSum.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
                       })}
                     </div>
-                    <div className="text-[9.5px] text-slate-500">Markup divisor aplicado</div>
+                    <div className="text-[9.5px] print:text-[8px] text-slate-500">
+                      Markup divisor aplicado
+                    </div>
                   </div>
 
-                  <div className="bg-amber-900 text-white p-2.5 rounded-lg space-y-0.5">
-                    <span className="text-[10px] text-amber-200 uppercase font-bold block">
+                  <div className="bg-amber-900 text-white p-2.5 print:p-1.5 rounded-lg space-y-0.5">
+                    <span className="text-[10px] print:text-[8.5px] text-amber-200 uppercase font-bold block">
                       Preço Final Homologado
                     </span>
-                    <div className="font-mono font-black text-white text-base">
+                    <div className="font-mono font-black text-white text-base print:text-sm">
                       {finalSalePrice.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
                       })}
                     </div>
-                    <div className="text-[9.5px] text-amber-300">Valor de Venda ao Cliente</div>
+                    <div className="text-[9.5px] print:text-[8px] text-amber-300">
+                      Valor de Venda ao Cliente
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1130,13 +1156,13 @@ export function QuotePdfPreviewDialog({
           {/* ========================================================================= */}
 
           {/* Seção: Escopo de Fornecimento & Serviços BERMO */}
-          <div className="space-y-3">
+          <div className="space-y-3 print:space-y-1.5">
             <div
               className={`flex items-center justify-between border-b pb-1 ${
                 isInternal ? 'border-amber-300' : 'border-slate-200'
               }`}
             >
-              <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
+              <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                 <Wrench
                   className={`h-3.5 w-3.5 ${isInternal ? 'text-amber-700' : 'text-teal-700'}`}
                 />
@@ -1144,7 +1170,7 @@ export function QuotePdfPreviewDialog({
                   ? '1. Escopo de Serviços & Detalhes Técnicos'
                   : '1. Escopo de Serviços e Equipamentos'}
               </h3>
-              <span className="text-[10px] text-slate-500 font-semibold">
+              <span className="text-[10px] print:text-[9px] text-slate-500 font-semibold">
                 {quoteEquipmentsList.length}{' '}
                 {quoteEquipmentsList.length === 1 ? 'equipamento' : 'equipamentos'} (
                 {totalEquipmentUnits} {totalEquipmentUnits === 1 ? 'unidade' : 'unidades'})
@@ -1152,23 +1178,23 @@ export function QuotePdfPreviewDialog({
             </div>
 
             {/* LISTAGEM DE ESPECIFICAÇÕES TÉCNICAS DE CADA EQUIPAMENTO */}
-            <div className="space-y-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+            <div className="space-y-2 print:space-y-1">
+              <span className="text-[10px] print:text-[9px] font-bold uppercase tracking-wider text-slate-500 block">
                 Equipamentos Contemplados na Proposta Técnica (Especificações):
               </span>
-              <div className="grid grid-cols-1 gap-2.5">
+              <div className="grid grid-cols-1 gap-2.5 print:gap-1.5">
                 {quoteEquipmentsList.map((eq, idx) => (
                   <div
                     key={eq.id || idx}
-                    className={`p-3 rounded-lg border text-xs space-y-2 ${
+                    className={`p-3 print:p-2 rounded-lg border text-xs print:text-[10px] space-y-2 print:space-y-1 ${
                       isInternal
                         ? 'bg-amber-50/50 border-amber-200'
                         : 'bg-teal-50/50 border-teal-100'
                     }`}
                   >
-                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-1.5">
+                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-1.5 print:pb-0.5">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-[11.5px]">
+                        <span className="font-bold text-slate-900 text-[11.5px] print:text-[10.5px]">
                           Item {idx + 1}: {eq.brand || 'BERMO'} {eq.model || 'Trocador de Calor'}
                         </span>
                         {Number(eq.quantity) > 1 && (
@@ -1180,40 +1206,42 @@ export function QuotePdfPreviewDialog({
                           </Badge>
                         )}
                       </div>
-                      <span className="text-[10px] text-muted-foreground font-mono">
+                      <span className="text-[10px] print:text-[9px] text-muted-foreground font-mono">
                         {eq.series || 'Placas Desmontáveis'}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-[10.5px] font-mono">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 print:gap-x-2 print:gap-y-0.5 text-[10.5px] print:text-[9.5px] font-mono">
                       <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[8.5px] block">
                           Modelo / Fabricante
                         </span>
                         <strong className="text-slate-900">{eq.model || 'N/A'}</strong> (
                         {eq.brand || 'BERMO'})
                       </div>
                       <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[8.5px] block">
                           Nº de Placas
                         </span>
                         <strong className="text-slate-900">{eq.plateCount ?? 'N/A'}</strong> (
                         {eq.plateMaterial || 'AISI 316L'})
                       </div>
                       <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[8.5px] block">
                           Espessura Placas
                         </span>
                         <strong className="text-slate-900">{eq.plateThickness ?? '0.5'} mm</strong>
                       </div>
                       <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] block">Gaxetas</span>
+                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[8.5px] block">
+                          Gaxetas
+                        </span>
                         <strong className="text-slate-900">
                           {eq.gasketMaterial || 'EPDM Clip-on'}
                         </strong>
                       </div>
                       <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[8.5px] block">
                           Conexão / Bitola
                         </span>
                         <strong className="text-slate-900">
@@ -1221,7 +1249,7 @@ export function QuotePdfPreviewDialog({
                         </strong>
                       </div>
                       <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[8.5px] block">
                           Pressão Trab. / Teste
                         </span>
                         <strong className="text-slate-900">
@@ -1229,7 +1257,7 @@ export function QuotePdfPreviewDialog({
                         </strong>
                       </div>
                       <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[8.5px] block">
                           Dimensões (L x A x P)
                         </span>
                         <strong className="text-slate-900">
@@ -1237,7 +1265,7 @@ export function QuotePdfPreviewDialog({
                         </strong>
                       </div>
                       <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] block">
+                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[8.5px] block">
                           Peso Estimado
                         </span>
                         <strong className="text-slate-900">{eq.weightKg ?? 480} kg</strong>
@@ -1250,17 +1278,17 @@ export function QuotePdfPreviewDialog({
 
             {/* ESCOPO GLOBAL E FLUIDO */}
             {(quote.scope_of_work || specs?.scopeOfWork || effectiveWorkFluid) && (
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
+              <div className="p-3 print:p-2 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5 print:space-y-1">
+                <span className="text-[10px] print:text-[9px] font-bold uppercase tracking-wider text-slate-600 block">
                   Escopo Detalhado dos Serviços de Manutenção & Parâmetros Operacionais:
                 </span>
-                <p className="text-[11px] text-slate-700 whitespace-pre-line leading-relaxed">
+                <p className="text-[11px] print:text-[10px] text-slate-700 whitespace-pre-line leading-relaxed">
                   {quote.scope_of_work ||
                     specs?.scopeOfWork ||
                     'Manutenção preventiva e corretiva com desmontagem, limpeza química, inspeção por líquido penetrante, teste hidrostático e montagem.'}
                 </p>
                 {effectiveWorkFluid && (
-                  <div className="text-[10.5px] text-slate-600 font-mono pt-1 border-t border-slate-200">
+                  <div className="text-[10.5px] print:text-[9.5px] text-slate-600 font-mono pt-1 border-t border-slate-200">
                     <span className="font-sans font-semibold text-slate-700">
                       Fluido de Trabalho:{' '}
                     </span>
@@ -1272,30 +1300,32 @@ export function QuotePdfPreviewDialog({
 
             {/* TABELA DE VALOR DO SERVIÇO GLOBAL */}
             <div className="border border-slate-200 rounded-lg overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] font-bold">
+              <table className="w-full text-left text-xs print:text-[10px]">
+                <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] print:text-[9px] font-bold">
                   <tr>
-                    <th className="p-2.5">Descrição do Pacote de Serviços de Engenharia</th>
-                    <th className="p-2.5 text-center w-28">Equipamentos</th>
-                    <th className="p-2.5 text-right w-36">Total Global</th>
+                    <th className="p-2.5 print:p-1.5">
+                      Descrição do Pacote de Serviços de Engenharia
+                    </th>
+                    <th className="p-2.5 print:p-1.5 text-center w-28">Equipamentos</th>
+                    <th className="p-2.5 print:p-1.5 text-right w-36">Total Global</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   <tr className="hover:bg-slate-50/50">
-                    <td className="p-2.5 space-y-1">
-                      <div className="font-bold text-slate-900 text-xs">
+                    <td className="p-2.5 print:p-1.5 space-y-1 print:space-y-0.5">
+                      <div className="font-bold text-slate-900 text-xs print:text-[10.5px]">
                         {quote.title ||
                           `Serviço Especializado de Manutenção e Engenharia (${quoteEquipmentsList.length} ${quoteEquipmentsList.length === 1 ? 'Equipamento' : 'Equipamentos'})`}
                       </div>
-                      <div className="text-[10.5px] text-slate-600">
+                      <div className="text-[10.5px] print:text-[9.5px] text-slate-600">
                         Manutenção técnica completa contemplando os equipamentos listados acima, com
                         mão de obra especializada, testes e relatórios.
                       </div>
                     </td>
-                    <td className="p-2.5 text-center font-semibold font-mono text-xs">
+                    <td className="p-2.5 print:p-1.5 text-center font-semibold font-mono text-xs print:text-[10px]">
                       {totalEquipmentUnits} un
                     </td>
-                    <td className="p-2.5 text-right font-mono font-bold text-slate-900 text-sm">
+                    <td className="p-2.5 print:p-1.5 text-right font-mono font-bold text-slate-900 text-sm print:text-xs">
                       {(quote.total ?? quote.final_price ?? finalSalePrice ?? 0).toLocaleString(
                         'pt-BR',
                         {
@@ -1312,12 +1342,12 @@ export function QuotePdfPreviewDialog({
 
           {/* Seção: Incluso no Valor (CONFORME ESPECIFICAÇÃO INSTITUCIONAL) */}
           <div
-            className={`p-3.5 rounded-xl border text-xs text-slate-800 space-y-1.5 ${
+            className={`p-3.5 print:p-2 rounded-xl border text-xs text-slate-800 space-y-1.5 print:space-y-1 ${
               isInternal ? 'bg-amber-50/70 border-amber-200' : 'bg-teal-50/70 border-teal-200'
             }`}
           >
             <div
-              className={`flex items-center gap-1.5 font-bold uppercase text-[11px] tracking-wider ${
+              className={`flex items-center gap-1.5 font-bold uppercase text-[11px] print:text-[10px] tracking-wider ${
                 isInternal ? 'text-amber-950' : 'text-teal-900'
               }`}
             >
@@ -1326,33 +1356,33 @@ export function QuotePdfPreviewDialog({
               />
               Incluso no valor
             </div>
-            <p className="text-[11px] text-slate-700 leading-relaxed text-justify">
+            <p className="text-[11px] print:text-[9.5px] text-slate-700 leading-relaxed text-justify">
               {PROPOSAL_INCLUSIONS_TEXT}
             </p>
           </div>
 
           {/* Seção: Condições Comerciais & Pagamento */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <div className="space-y-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 print:gap-2 bg-slate-50 p-4 print:p-2 rounded-xl border border-slate-200">
+            <div className="space-y-1.5 print:space-y-0.5">
+              <span className="text-[10px] print:text-[9px] font-bold uppercase tracking-wider text-slate-500 block">
                 Condições Comerciais de Faturamento
               </span>
               <div
-                className={`font-bold text-xs ${isInternal ? 'text-amber-900' : 'text-teal-800'}`}
+                className={`font-bold text-xs print:text-[10.5px] ${isInternal ? 'text-amber-900' : 'text-teal-800'}`}
               >
                 Condição: {quote.payment_terms || '28 DDL (28 dias do dia líquido)'}
               </div>
-              <div className="text-[11px] text-slate-600">
+              <div className="text-[11px] print:text-[9.5px] text-slate-600">
                 Faturamento direto contra CNPJ cadastrado após homologação do serviço.
               </div>
             </div>
 
-            <div className="space-y-1.5 text-right sm:text-right">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+            <div className="space-y-1.5 print:space-y-0.5 text-right sm:text-right">
+              <span className="text-[10px] print:text-[9px] font-bold uppercase tracking-wider text-slate-500 block">
                 Valor Total da Proposta
               </span>
               <div
-                className={`text-xl font-black font-mono ${
+                className={`text-xl print:text-base font-black font-mono ${
                   isInternal ? 'text-amber-950' : 'text-teal-900'
                 }`}
               >
@@ -1361,7 +1391,7 @@ export function QuotePdfPreviewDialog({
                   currency: 'BRL',
                 })}
               </div>
-              <div className="text-[10px] text-slate-500 font-medium">
+              <div className="text-[10px] print:text-[8.5px] text-slate-500 font-medium">
                 Impostos, mão de obra e deslocamento inclusos
               </div>
             </div>
@@ -1369,18 +1399,18 @@ export function QuotePdfPreviewDialog({
 
           {/* Observações Gerais */}
           {quote.notes && (
-            <div className="p-3 rounded-lg border border-slate-200 text-[11px] text-slate-600 space-y-1">
+            <div className="p-3 print:p-2 rounded-lg border border-slate-200 text-[11px] print:text-[9.5px] text-slate-600 space-y-1">
               <span className="font-bold text-slate-800 block">Observações:</span>
               <p className="whitespace-pre-line leading-relaxed">{quote.notes}</p>
             </div>
           )}
 
           {/* Assinatura / Aceite da Proposta */}
-          <div className="pt-8 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-[10px] text-slate-600">
-            <div className="space-y-6">
-              <div className="border-b border-slate-400 mx-8"></div>
+          <div className="pt-8 print:pt-3 border-t border-slate-200 grid grid-cols-2 gap-8 print:gap-4 text-center text-[10px] print:text-[9px] text-slate-600">
+            <div className="space-y-6 print:space-y-3">
+              <div className="border-b border-slate-400 mx-8 print:mx-4"></div>
               <div>
-                <strong className="block text-slate-900 font-bold text-[11px]">
+                <strong className="block text-slate-900 font-bold text-[11px] print:text-[10px]">
                   Intertermal Serviços
                 </strong>
                 {quote.assigned_to ? (
@@ -1400,19 +1430,19 @@ export function QuotePdfPreviewDialog({
                 ) : (
                   <span className="block text-slate-700 font-medium mt-1">Alex Nogueira</span>
                 )}
-                <span className="text-[9.5px] text-slate-400 mt-0.5 block">
+                <span className="text-[9.5px] print:text-[8.5px] text-slate-400 mt-0.5 block">
                   Depto. de Engenharia e Serviços
                 </span>
               </div>
             </div>
 
-            <div className="space-y-6">
-              <div className="border-b border-slate-400 mx-8"></div>
+            <div className="space-y-6 print:space-y-3">
+              <div className="border-b border-slate-400 mx-8 print:mx-4"></div>
               <div>
-                <strong className="block text-slate-900 font-bold text-[11px]">
+                <strong className="block text-slate-900 font-bold text-[11px] print:text-[10px]">
                   {quote.client_name || 'De acordo do Cliente'}
                 </strong>
-                <span className="text-[9.5px] text-slate-400 mt-0.5 block">
+                <span className="text-[9.5px] print:text-[8.5px] text-slate-400 mt-0.5 block">
                   Assinatura do Responsável / Carimbo CNPJ
                 </span>
               </div>
@@ -1421,7 +1451,7 @@ export function QuotePdfPreviewDialog({
 
           {/* Rodapé Interno quando for Composição Interna */}
           {isInternal && (
-            <div className="pt-4 border-t-2 border-dashed border-amber-300 text-center text-[10px] font-bold text-amber-900 tracking-wider uppercase">
+            <div className="pt-4 print:pt-2 border-t-2 border-dashed border-amber-300 text-center text-[10px] print:text-[9px] font-bold text-amber-900 tracking-wider uppercase">
               *** DOCUMENTO INTERNO — USO GERENCIAL EXCLUSIVO INTERTERMAL / BERMO — PROIBIDA A
               DIVULGAÇÃO EXTERNA ***
             </div>
