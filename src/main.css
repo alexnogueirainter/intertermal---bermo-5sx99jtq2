@@ -309,44 +309,51 @@
     display: none !important;
   }
 
-  /* Esconde TUDO que está fora do #root (incluindo portais) por padrão */
-  body > *:not([data-radix-portal]) {
+  /* Esconde todos os portais que NÃO contêm o documento PDF */
+  [data-radix-portal]:not(:has(#quote-printable-document)) {
     display: none !important;
   }
 
-  /* Esconde TODOS os portais por padrão */
-  [data-radix-portal] {
+  /* Esconde o overlay escuro do diálogo Radix */
+  [data-radix-portal]:has(#quote-printable-document) [data-radix-dialog-overlay] {
     display: none !important;
   }
 
-  /* Mostra APENAS o portal que contém #quote-printable-document */
-  [data-radix-portal]:has(#quote-printable-document) {
-    display: block !important;
+  /* Reset do container do diálogo para fluir na página impressa */
+  [data-radix-portal]:has(#quote-printable-document) [role='dialog'] {
+    position: static !important;
+    max-width: none !important;
+    width: 100% !important;
+    transform: none !important;
+    background: white !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
-  /* Dentro desse portal, esconde tudo exceto o documento */
-  [data-radix-portal]:has(#quote-printable-document) > * {
-    display: none !important;
-  }
-
-  /* Mostra o documento e todo o seu conteúdo */
-  [data-radix-portal] #quote-printable-document,
-  [data-radix-portal] #quote-printable-document * {
-    display: revert !important;
-    visibility: visible !important;
-  }
-
-  /* Garante que o conteúdo do documento ocupe a página */
+  /* Garante que o documento ocupe a página */
   #quote-printable-document {
+    display: block !important;
+    visibility: visible !important;
     position: relative !important;
-    left: 0 !important;
-    top: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
+    background: white !important;
     overflow: visible !important;
+  }
+
+  /* Garante que TODOS os elementos dentro do documento sejam visíveis */
+  #quote-printable-document * {
+    visibility: visible !important;
+  }
+
+  /* Esconde elementos com a classe print:hidden (headers, botões, footer) */
+  .print\:hidden {
+    display: none !important;
   }
 }
