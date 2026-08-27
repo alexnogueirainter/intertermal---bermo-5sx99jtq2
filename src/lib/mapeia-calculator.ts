@@ -5,6 +5,13 @@ export interface Coordinates {
   state?: string
 }
 
+export const SOROCABA_COORDS: Coordinates = {
+  lat: -23.5015,
+  lng: -47.4526,
+  city: 'Sorocaba',
+  state: 'SP',
+}
+
 export const BLUMENAU_COORDS: Coordinates = {
   lat: -26.9194,
   lng: -49.0661,
@@ -14,6 +21,7 @@ export const BLUMENAU_COORDS: Coordinates = {
 
 // Cidades com coordenadas mapeadas para cálculo offline rápido
 const KNOWN_CITY_COORDS: Record<string, Coordinates> = {
+  sorocaba: { lat: -23.5015, lng: -47.4526, city: 'Sorocaba', state: 'SP' },
   chapeco: { lat: -27.1004, lng: -52.6152, city: 'Chapecó', state: 'SC' },
   joinville: { lat: -26.3045, lng: -48.8487, city: 'Joinville', state: 'SC' },
   itajai: { lat: -26.9078, lng: -48.6619, city: 'Itajaí', state: 'SC' },
@@ -78,7 +86,7 @@ export async function geocodeCity(cityName: string): Promise<Coordinates | null>
 export async function fetchCepCoordinates(cep: string): Promise<Coordinates> {
   const cleanCep = cep.replace(/\D/g, '')
   if (cleanCep.length !== 8) {
-    return BLUMENAU_COORDS
+    return SOROCABA_COORDS
   }
 
   try {
@@ -87,7 +95,7 @@ export async function fetchCepCoordinates(cep: string): Promise<Coordinates> {
     const data = await res.json()
 
     if (data.erro) {
-      return BLUMENAU_COORDS
+      return SOROCABA_COORDS
     }
 
     const cityLower = (data.localidade || '').toLowerCase()
@@ -124,7 +132,7 @@ export async function fetchCepCoordinates(cep: string): Promise<Coordinates> {
     }
   } catch (err) {
     console.warn('Erro ao consultar ViaCEP:', err)
-    return BLUMENAU_COORDS
+    return SOROCABA_COORDS
   }
 }
 

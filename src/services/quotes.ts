@@ -21,14 +21,8 @@ export const INITIAL_QUOTES_DATA: QuoteRecord[] = [
         unit_price: 18450,
         discount: 0,
         total: 18450,
-        description: `A metodologia aplicada seguiu rigorosamente as normas técnicas de manutenção industrial e as recomendações dos fabricantes (Bermo), consistindo nas seguintes etapas:
-
-1. Desmontagem: Abertura do feixe de placas com registro prévio da Medida A (distância entre as placas de aperto) para referência de remontagem.
-2. Limpeza: Remoção de incrustações e resíduos de processo através de limpeza mecânica manual e/ou química, preservando a integridade do material das placas.
-3. Inspeção de Placas: Análise visual individualizada para detecção de furos, deformações, pontos de corrosão ou desgaste prematuro.
-4. Inspeção de Gaxetas: Verificação da elasticidade, presença de trincas, ressecamento ou perda de perfil de vedação.
-5. Montagem: Fechamento do equipamento com aplicação de torque gradual e uniforme, respeitando a Medida A final especificada.
-6. Teste de Estanqueidade: Verificação pós-montagem para garantia de ausência de vazamentos externos sob pressão de operação.`,
+        description:
+          'Serviço Especializado de Manutenção Preventiva e Corretiva em Trocador de Calor.',
         include_product_cost: false,
         bermo_specs: {
           productCode: 'BP30',
@@ -64,9 +58,20 @@ export const INITIAL_QUOTES_DATA: QuoteRecord[] = [
     total: 18450,
     payment_terms: '28 DDL (28 dias do dia líquido)',
     valid_until: '2025-04-30T00:00:00.000Z',
-    notes:
-      'Orçamento inclui emissão de Relatório Técnico de Inspeção com registro fotográfico e laudo de ensaio por líquido penetrante conforme ASME Sec. V.',
-    assigned_to: 'Alex Nogueira - Especialista Técnico Intertermal',
+    notes: `RESPONSABILIDADES DA INTERPROJECT
+
+8.1. Executar os serviços conforme a proposta aprovada, normas técnicas aplicáveis e boas práticas de engenharia.
+8.2. Disponibilizar mão de obra qualificada e equipe de segurança compatível com a atividade.
+8.3. Responder pelos vícios e defeitos comprovadamente decorrentes de sua execução, bem como pelos danos diretos a terceiros e ao local de execução causados por culpa de sua equipe, observados os limites do escopo contratado e da legislação aplicável.
+8.4. Cumprir, quando em serviço in loco, as normas de segurança do trabalho aplicáveis, incluindo as Normas Regulamentadoras (NRs) do Ministério do Trabalho, e as normas internas do CLIENTE previamente informadas.
+
+RESPONSABILIDADES DO CLIENTE
+
+9.1. Disponibilizar acesso ao local, informações técnicas completas e corretas, liberações de segurança, permissões de trabalho e condições adequadas para a execução dos serviços.
+9.2. Informar previamente qualquer particularidade, interferência, risco ou condição especial do local que possa impactar a execução, a segurança ou o prazo dos serviços.
+9.3. Comunicar formalmente à INTERPROJECT qualquer ocorrência, falha ou divergência relacionada aos serviços.
+9.4. Manter o local em condições adequadas de segurança, acesso e operação, bem como cumprir as condições comerciais e prazos de pagamento.`,
+    assigned_to: 'Alex Nogueira',
     service_details: {
       service_technical_specs: {
         productCode: 'BP30',
@@ -96,8 +101,9 @@ export const INITIAL_QUOTES_DATA: QuoteRecord[] = [
         totalLabor: 3040,
       },
       travel_costs: {
-        originCep: '89066-000',
-        originAddress: 'Rua Bernardo Reiter, 500 - Blumenau/SC',
+        originCep: '18016-456',
+        originAddress:
+          'Rua Ananias Pires do Amaral, 98 - Sorocaba - SP - CEP 18016-456 - Jd Gonçalves',
         destinationCep: '89801-000',
         destinationAddress: 'Chapecó / SC',
         distanceKm: 480,

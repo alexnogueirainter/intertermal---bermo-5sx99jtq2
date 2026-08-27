@@ -404,9 +404,18 @@ export function QuotePdfPreviewDialog({
                 Assistência Técnica Autorizada & Especialista em Trocadores de Calor e Válvulas
                 BERMO
               </p>
-              <p className="text-[10px] text-slate-400">
-                Rua Bernardo Reiter, 500 - Blumenau/SC • Tel: (47) 3333-0000 •
-                contato@intertermal.com.br
+              <p className="text-[10px] text-slate-400 leading-relaxed">
+                <a
+                  href="https://www.google.com/maps/search/?api=1&query=Rua+Ananias+Pires+do+Amaral,+98+-+Sorocaba+-+SP"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:underline hover:text-teal-700 transition-colors"
+                >
+                  Rua Ananias Pires do Amaral, 98 - Sorocaba - SP - CEP 18016-456 - Jd Gonçalves
+                </a>
+                <br />
+                Fone: (11) 99407-7786 / (15) 3228-3956 • E-mail: alex.nogueira@intertermal.com.br •
+                Site: www.interproject.com.br
               </p>
             </div>
 
@@ -473,10 +482,13 @@ export function QuotePdfPreviewDialog({
                 }`}
               >
                 <User className="h-3 w-3" />
-                Responsável Técnico Intertermal
+                {quote.assigned_to &&
+                (quote.assigned_to.includes(',') || quote.assigned_to.includes(';'))
+                  ? 'Responsáveis Técnicos / Comerciais'
+                  : 'Responsável Técnico Intertermal'}
               </span>
               <div className="font-semibold text-slate-800">
-                {quote.assigned_to || 'Alex Nogueira - Especialista Técnico'}
+                {quote.assigned_to || 'Alex Nogueira'}
               </div>
               <div className="text-[11px] text-slate-500">
                 Departamento de Engenharia e Manutenção de Campo
@@ -1121,66 +1133,6 @@ export function QuotePdfPreviewDialog({
             </div>
           </div>
 
-          {/* Seção: Metodologia e Especificações Técnicas de Campo (6 Etapas) */}
-          <div className="space-y-2">
-            <div
-              className={`flex items-center justify-between border-b pb-1 ${
-                isInternal ? 'border-amber-300' : 'border-slate-200'
-              }`}
-            >
-              <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
-                <ShieldCheck
-                  className={`h-3.5 w-3.5 ${isInternal ? 'text-amber-700' : 'text-teal-700'}`}
-                />
-                2. Metodologia de Execução Técnica em 6 Etapas & Segurança
-              </h3>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-[10.5px] text-slate-700">
-              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                <span className="font-bold text-slate-900 block">1. Desmontagem</span>
-                <p className="text-[10px] leading-tight text-slate-600">
-                  Abertura do feixe de placas com registro prévio da Medida A (distância entre as
-                  placas de aperto) para referência de remontagem.
-                </p>
-              </div>
-              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                <span className="font-bold text-slate-900 block">2. Limpeza</span>
-                <p className="text-[10px] leading-tight text-slate-600">
-                  Remoção de incrustações e resíduos de processo através de limpeza mecânica manual
-                  e/ou química, preservando a integridade do material das placas.
-                </p>
-              </div>
-              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                <span className="font-bold text-slate-900 block">3. Inspeção de Placas</span>
-                <p className="text-[10px] leading-tight text-slate-600">
-                  Análise visual individualizada para detecção de furos, deformações, pontos de
-                  corrosão ou desgaste prematuro.
-                </p>
-              </div>
-              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                <span className="font-bold text-slate-900 block">4. Inspeção de Gaxetas</span>
-                <p className="text-[10px] leading-tight text-slate-600">
-                  Verificação da elasticidade, presença de trincas, ressecamento ou perda de perfil
-                  de vedação.
-                </p>
-              </div>
-              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                <span className="font-bold text-slate-900 block">5. Montagem</span>
-                <p className="text-[10px] leading-tight text-slate-600">
-                  Fechamento do equipamento com aplicação de torque gradual e uniforme, respeitando
-                  a Medida A final especificada.
-                </p>
-              </div>
-              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50 space-y-1">
-                <span className="font-bold text-slate-900 block">6. Teste de Estanqueidade</span>
-                <p className="text-[10px] leading-tight text-slate-600">
-                  Verificação pós-montagem e ensaio hidrostático para garantia de ausência de
-                  vazamentos externos sob pressão de operação.
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Seção: Incluso no Valor (CONFORME ESPECIFICAÇÃO INSTITUCIONAL) */}
           <div
             className={`p-3.5 rounded-xl border text-xs text-slate-800 space-y-1.5 ${
@@ -1241,30 +1193,51 @@ export function QuotePdfPreviewDialog({
           {/* Observações Gerais */}
           {quote.notes && (
             <div className="p-3 rounded-lg border border-slate-200 text-[11px] text-slate-600 space-y-1">
-              <span className="font-bold text-slate-800 block">Observações Técnicas:</span>
-              <p>{quote.notes}</p>
+              <span className="font-bold text-slate-800 block">Observações:</span>
+              <p className="whitespace-pre-line leading-relaxed">{quote.notes}</p>
             </div>
           )}
 
           {/* Assinatura / Aceite da Proposta */}
           <div className="pt-8 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-[10px] text-slate-600">
-            <div className="space-y-10">
+            <div className="space-y-6">
               <div className="border-b border-slate-400 mx-8"></div>
               <div>
-                <strong className="block text-slate-800">
-                  {quote.assigned_to || 'Intertermal Manutenção Industrial'}
+                <strong className="block text-slate-900 font-bold text-[11px]">
+                  Intertermal Serviços
                 </strong>
-                <span>Depto. de Engenharia e Serviços BERMO</span>
+                {quote.assigned_to ? (
+                  <div className="space-y-0.5 mt-1">
+                    {(quote.assigned_to.includes(',') || quote.assigned_to.includes(';')
+                      ? quote.assigned_to
+                          .split(/[,;]/)
+                          .map((n) => n.trim())
+                          .filter(Boolean)
+                      : [quote.assigned_to]
+                    ).map((resp, idx) => (
+                      <span key={idx} className="block text-slate-700 font-medium">
+                        {resp}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="block text-slate-700 font-medium mt-1">Alex Nogueira</span>
+                )}
+                <span className="text-[9.5px] text-slate-400 mt-0.5 block">
+                  Depto. de Engenharia e Serviços
+                </span>
               </div>
             </div>
 
-            <div className="space-y-10">
+            <div className="space-y-6">
               <div className="border-b border-slate-400 mx-8"></div>
               <div>
-                <strong className="block text-slate-800">
+                <strong className="block text-slate-900 font-bold text-[11px]">
                   {quote.client_name || 'De acordo do Cliente'}
                 </strong>
-                <span>Assinatura do Responsável / Carimbo CNPJ</span>
+                <span className="text-[9.5px] text-slate-400 mt-0.5 block">
+                  Assinatura do Responsável / Carimbo CNPJ
+                </span>
               </div>
             </div>
           </div>
