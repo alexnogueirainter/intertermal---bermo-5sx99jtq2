@@ -2204,6 +2204,68 @@ export function QuotesManager({
                 </Select>
               </div>
 
+              {/* Metodologia Padrão de Manutenção Técnica */}
+              <div className="p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg space-y-3">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-200 border-teal-300 text-[10px] font-bold">
+                    Procedimento Homologado BERMO
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                  A metodologia aplicada seguiu rigorosamente as normas técnicas de manutenção
+                  industrial e as recomendações dos fabricantes (Bermo), consistindo nas seguintes
+                  etapas:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="text-[11px] text-slate-700 dark:text-slate-300 space-y-1">
+                    <p>
+                      <span className="font-bold text-teal-700 dark:text-teal-300">
+                        1. Desmontagem:
+                      </span>{' '}
+                      Abertura do feixe de placas com registro prévio da Medida A (distância entre
+                      as placas de aperto) para referência de remontagem.
+                    </p>
+                    <p>
+                      <span className="font-bold text-teal-700 dark:text-teal-300">
+                        2. Limpeza:
+                      </span>{' '}
+                      Remoção de incrustações e resíduos de processo através de limpeza mecânica
+                      manual e/ou química, preservando a integridade do material das placas.
+                    </p>
+                    <p>
+                      <span className="font-bold text-teal-700 dark:text-teal-300">
+                        3. Inspeção de Placas:
+                      </span>{' '}
+                      Análise visual individualizada para detecção de furos, deformações, pontos de
+                      corrosão ou desgaste prematuro.
+                    </p>
+                  </div>
+                  <div className="text-[11px] text-slate-700 dark:text-slate-300 space-y-1">
+                    <p>
+                      <span className="font-bold text-teal-700 dark:text-teal-300">
+                        4. Inspeção de Gaxetas:
+                      </span>{' '}
+                      Verificação da elasticidade, presença de trincas, ressecamento ou perda de
+                      perfil de vedação.
+                    </p>
+                    <p>
+                      <span className="font-bold text-teal-700 dark:text-teal-300">
+                        5. Montagem:
+                      </span>{' '}
+                      Fechamento do equipamento com aplicação de torque gradual e uniforme,
+                      respeitando a Medida A final especificada.
+                    </p>
+                    <p>
+                      <span className="font-bold text-teal-700 dark:text-teal-300">
+                        6. Teste de Estanqueidade:
+                      </span>{' '}
+                      Verificação pós-montagem para garantia de ausência de vazamentos externos sob
+                      pressão de operação.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Novos Campos: Integração, PT e Pernoite */}
               <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-800">
                 {/* a) Necessidade de Integração de Funcionários */}
