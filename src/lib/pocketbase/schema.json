@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-27T12:50:50.533Z",
+  "generatedAt": "2026-08-27T13:08:29.374Z",
   "collections": [
     {
       "name": "users",
@@ -866,6 +866,12 @@
         {
           "name": "overnight_needed",
           "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_quantity",
+          "type": "number",
           "required": false,
           "system": false
         }

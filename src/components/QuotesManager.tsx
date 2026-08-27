@@ -151,6 +151,7 @@ export function QuotesManager({
   const [equipmentBrand, setEquipmentBrand] = useState('Alfa Laval / BERMO')
   const [equipmentModel, setEquipmentModel] = useState('')
   const [equipmentSeries, setEquipmentSeries] = useState('')
+  const [equipmentQuantity, setEquipmentQuantity] = useState<number>(1)
   const [plateCount, setPlateCount] = useState<number>(45)
   const [plateMaterial, setPlateMaterial] = useState('AISI 316L')
   const [plateThickness, setPlateThickness] = useState<number>(0.5)
@@ -970,6 +971,7 @@ export function QuotesManager({
       equipment_brand: equipmentBrand,
       equipment_model: equipmentModel,
       equipment_series: equipmentSeries,
+      equipment_quantity: Number(equipmentQuantity) || 1,
       plate_count: Number(plateCount),
       plate_material: plateMaterial,
       plate_thickness: Number(plateThickness),
@@ -1141,6 +1143,7 @@ export function QuotesManager({
     setEquipmentBrand('Alfa Laval / BERMO')
     setEquipmentModel('')
     setEquipmentSeries('')
+    setEquipmentQuantity(1)
     setPlateCount(45)
     setPlateMaterial('AISI 316L')
     setPlateThickness(0.5)
@@ -1263,6 +1266,12 @@ export function QuotesManager({
         '',
     )
     setEquipmentSeries(q.equipment_series || sSpecs.productSeries || '')
+    setEquipmentQuantity(
+      q.equipment_quantity ??
+        (sSpecs.equipmentQuantity ? Number(sSpecs.equipmentQuantity) : undefined) ??
+        (firstItem?.quantity ? Number(firstItem.quantity) : undefined) ??
+        1,
+    )
     setPlateCount(
       q.plate_count ??
         (sSpecs.platesCount ? Number(sSpecs.platesCount) : undefined) ??
@@ -2051,6 +2060,22 @@ export function QuotesManager({
                       <span>Cadastrar novo equipamento</span>
                     </Button>
                   </div>
+                </div>
+              </div>
+
+              {/* CAMPO DE QUANTIDADE LOGO APÓS MODELO E ANTES DO NÚMERO DE PLACAS */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                    Quantidade
+                  </Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={equipmentQuantity}
+                    onChange={(e) => setEquipmentQuantity(Number(e.target.value))}
+                    className="text-xs h-8"
+                  />
                 </div>
               </div>
 

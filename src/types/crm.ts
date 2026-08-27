@@ -185,6 +185,7 @@ export interface QuoteRecord {
   equipment_brand?: string
   equipment_model?: string
   equipment_series?: string
+  equipment_quantity?: number
   plate_count?: number
   plate_material?: string
   plate_thickness?: number
