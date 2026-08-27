@@ -680,7 +680,7 @@ export default function IndexPage() {
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex items-center text-xs text-muted-foreground mr-2">
               <span className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-              Skip Cloud PocketBase Ativo
+              Backend Conectado
             </div>
 
             <Button

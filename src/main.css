@@ -305,15 +305,14 @@
     overflow: visible !important;
   }
 
-  /* Oculta toda a interface geral do CRM e elementos normais */
-  body * {
-    visibility: hidden;
+  /* Remove a aplicação principal do fluxo de impressão */
+  #root {
+    display: none !important;
   }
 
-  /* Radix Portal e Dialog Overlay/Content handling */
-  [data-radix-portal],
-  [data-radix-portal] * {
-    visibility: visible;
+  /* Mantém o portal Radix e o documento visíveis */
+  [data-radix-portal] {
+    display: block !important;
   }
 
   /* Esconde o overlay preto/escuro do Radix Dialog na impressão */
@@ -347,13 +346,11 @@
   /* Elementos com classe print:hidden continuam ocultos */
   .print\:hidden {
     display: none !important;
-    visibility: hidden !important;
   }
 
   /* Exibe o documento imprimível */
-  #quote-printable-document,
-  #quote-printable-document * {
-    visibility: visible !important;
+  #quote-printable-document {
+    display: block !important;
   }
 
   #quote-printable-document {
