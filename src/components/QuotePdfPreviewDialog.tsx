@@ -1404,11 +1404,25 @@ export function QuotePdfPreviewDialog({
             </div>
           </div>
 
-          {/* Observações Gerais */}
-          {quote.notes && (
+          {/* Mensagem ao Cliente */}
+          {quote.commercial_notes && quote.commercial_notes.trim() && (
+            <div className="quote-print-card p-3.5 print:p-3 rounded-lg border border-slate-200 text-[11px] print:text-[10.5pt] text-slate-600 space-y-1">
+              <span className="font-bold text-slate-800 block">Mensagem:</span>
+              <p className="whitespace-pre-line leading-relaxed">{quote.commercial_notes}</p>
+            </div>
+          )}
+
+          {/* Observações Gerais / Observações da Proposta */}
+          {(quote.technical_notes && quote.technical_notes.trim()
+            ? quote.technical_notes
+            : (!quote.commercial_notes || !quote.commercial_notes.trim()) && quote.notes) && (
             <div className="quote-print-card p-3.5 print:p-3 rounded-lg border border-slate-200 text-[11px] print:text-[10.5pt] text-slate-600 space-y-1">
               <span className="font-bold text-slate-800 block">Observações:</span>
-              <p className="whitespace-pre-line leading-relaxed">{quote.notes}</p>
+              <p className="whitespace-pre-line leading-relaxed">
+                {quote.technical_notes && quote.technical_notes.trim()
+                  ? quote.technical_notes
+                  : quote.notes}
+              </p>
             </div>
           )}
 

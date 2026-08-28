@@ -4190,6 +4190,25 @@ export function QuotesManager({
                 </div>
               </div>
 
+              {/* Campo Editável de Mensagem ao Cliente */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    Mensagem
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground">
+                    Opcional — Insira a mensagem que deseja enviar ao cliente
+                  </span>
+                </div>
+                <Textarea
+                  value={commercialNotes}
+                  onChange={(e) => setCommercialNotes(e.target.value)}
+                  placeholder="Insira aqui a mensagem que deseja enviar ao cliente..."
+                  rows={3}
+                  className="text-xs"
+                />
+              </div>
+
               {/* Campo Editável de Observações da Proposta */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
@@ -4197,13 +4216,13 @@ export function QuotesManager({
                     Observações da Proposta
                   </Label>
                   <span className="text-[10px] text-muted-foreground">
-                    Opcional — Deixe em branco ou insira informações específicas para o cliente
+                    Opcional — Deixe em branco ou insira informações técnicas adicionais
                   </span>
                 </div>
                 <Textarea
                   value={technicalNotes}
                   onChange={(e) => setTechnicalNotes(e.target.value)}
-                  placeholder="Insira aqui observações técnicas ou comerciais adicionais para esta proposta (opcional)..."
+                  placeholder="Insira aqui observações técnicas adicionais para esta proposta (opcional)..."
                   rows={3}
                   className="text-xs"
                 />
