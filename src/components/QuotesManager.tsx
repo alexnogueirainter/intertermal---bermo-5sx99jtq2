@@ -279,12 +279,8 @@ export function QuotesManager({
   // Seção 3F: Prazo & Condições Comerciais
   const [validityDays, setValidityDays] = useState<number>(10)
   const [paymentCondition, setPaymentCondition] = useState<PaymentConditionType>('28_ddl')
-  const [technicalNotes, setTechnicalNotes] = useState(
-    'Incluso certificado de estanqueidade e laudo de ensaio por líquido penetrante conforme ASME Sec VIII Div 1.',
-  )
-  const [commercialNotes, setCommercialNotes] = useState(
-    'Faturamento direto via BERMO / Intertermal. Garantia de 12 meses contra defeitos de montagem e vedação.',
-  )
+  const [technicalNotes, setTechnicalNotes] = useState('')
+  const [commercialNotes, setCommercialNotes] = useState('')
 
   // Modal Novo Cliente rápido
   const [newClientName, setNewClientName] = useState('')
@@ -1219,7 +1215,10 @@ export function QuotesManager({
       payment_terms: `${paymentCondition.toUpperCase()} (${validityDays} dias de validade)`,
       technical_notes: technicalNotes,
       commercial_notes: commercialNotes,
-      notes: technicalNotes ? `${technicalNotes} ${commercialNotes}`.trim() : scopeOfWork,
+      notes:
+        technicalNotes && commercialNotes
+          ? `${technicalNotes} ${commercialNotes}`.trim()
+          : technicalNotes || commercialNotes || '',
       service_details: serviceDetails,
       items: items,
     }
@@ -1454,12 +1453,8 @@ export function QuotesManager({
     // Condições Comerciais
     setValidityDays(10)
     setPaymentCondition('28_ddl')
-    setTechnicalNotes(
-      'Incluso certificado de estanqueidade e laudo de ensaio por líquido penetrante conforme ASME Sec VIII Div 1.',
-    )
-    setCommercialNotes(
-      'Faturamento direto via BERMO / Intertermal. Garantia de 12 meses contra defeitos de montagem e vedação.',
-    )
+    setTechnicalNotes('')
+    setCommercialNotes('')
     setLastSavedDraft(null)
   }
 
@@ -4145,52 +4140,73 @@ export function QuotesManager({
             )}
 
             {/* ========================================================================= */}
-            {/* SEÇÃO 3F: PRAZO & CONDIÇÕES COMERCIAIS                                   */}
+            {/* SEÇÃO 3F: PRAZO, CONDIÇÕES COMERCIAIS & OBSERVAÇÕES                      */}
             {/* ========================================================================= */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-200 dark:border-slate-800">
-              <div className="space-y-1">
-                <Label className="text-xs font-medium">Prazo de Validade da Proposta</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    value={validityDays}
-                    onChange={(e) => setValidityDays(Number(e.target.value))}
-                    className="text-xs w-24"
-                  />
-                  <span className="text-xs text-muted-foreground">dias corridos</span>
+            <div className="space-y-3 pt-1 border-t border-slate-200 dark:border-slate-800">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Prazo de Validade da Proposta</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      value={validityDays}
+                      onChange={(e) => setValidityDays(Number(e.target.value))}
+                      className="text-xs w-24"
+                    />
+                    <span className="text-xs text-muted-foreground">dias corridos</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Condições de Pagamento</Label>
+                  <Select
+                    value={paymentCondition}
+                    onValueChange={(val) => setPaymentCondition(val as PaymentConditionType)}
+                  >
+                    <SelectTrigger className="text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="14_ddl" className="text-xs">
+                        14 DDL (14 dias do dia líquido)
+                      </SelectItem>
+                      <SelectItem value="28_ddl" className="text-xs">
+                        28 DDL (28 dias do dia líquido)
+                      </SelectItem>
+                      <SelectItem value="30_ddl" className="text-xs">
+                        30 DDL (30 dias negociados)
+                      </SelectItem>
+                      <SelectItem value="45_ddl" className="text-xs">
+                        45 DDL (45 dias negociados)
+                      </SelectItem>
+                      <SelectItem value="60_ddl" className="text-xs">
+                        60 DDL (60 dias negociados)
+                      </SelectItem>
+                      <SelectItem value="custom" className="text-xs">
+                        Outras Condições Especiais
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
+              {/* Campo Editável de Observações da Proposta */}
               <div className="space-y-1">
-                <Label className="text-xs font-medium">Condições de Pagamento</Label>
-                <Select
-                  value={paymentCondition}
-                  onValueChange={(val) => setPaymentCondition(val as PaymentConditionType)}
-                >
-                  <SelectTrigger className="text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="14_ddl" className="text-xs">
-                      14 DDL (14 dias do dia líquido)
-                    </SelectItem>
-                    <SelectItem value="28_ddl" className="text-xs">
-                      28 DDL (28 dias do dia líquido)
-                    </SelectItem>
-                    <SelectItem value="30_ddl" className="text-xs">
-                      30 DDL (30 dias negociados)
-                    </SelectItem>
-                    <SelectItem value="45_ddl" className="text-xs">
-                      45 DDL (45 dias negociados)
-                    </SelectItem>
-                    <SelectItem value="60_ddl" className="text-xs">
-                      60 DDL (60 dias negociados)
-                    </SelectItem>
-                    <SelectItem value="custom" className="text-xs">
-                      Outras Condições Especiais
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    Observações da Proposta
+                  </Label>
+                  <span className="text-[10px] text-muted-foreground">
+                    Opcional — Deixe em branco ou insira informações específicas para o cliente
+                  </span>
+                </div>
+                <Textarea
+                  value={technicalNotes}
+                  onChange={(e) => setTechnicalNotes(e.target.value)}
+                  placeholder="Insira aqui observações técnicas ou comerciais adicionais para esta proposta (opcional)..."
+                  rows={3}
+                  className="text-xs"
+                />
               </div>
             </div>
 
