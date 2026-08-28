@@ -528,7 +528,7 @@ export function QuotePdfPreviewDialog({
         <div
           id="quote-printable-document"
           ref={printRef}
-          className="relative p-8 sm:p-12 space-y-6 print:space-y-5 text-slate-900 bg-white font-sans text-xs leading-relaxed print:p-0 print:text-[11.5pt] print:leading-relaxed overflow-visible"
+          className="relative p-8 sm:p-12 space-y-6 print:space-y-5 text-slate-900 bg-white font-sans text-xs leading-relaxed print:p-0 print:text-[11.5pt] print:leading-relaxed print:shadow-none print:drop-shadow-none overflow-visible"
         >
           {/* Marca d'água discreta para Composição Interna */}
           {isInternal && (

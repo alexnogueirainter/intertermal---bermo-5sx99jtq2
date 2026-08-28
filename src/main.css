@@ -400,6 +400,8 @@
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
+    filter: none !important;
+    text-shadow: none !important;
     background: #ffffff !important;
     overflow: visible !important;
     font-size: 11pt !important;
@@ -409,9 +411,17 @@
     break-inside: auto !important;
   }
 
-  /* Garante visibilidade e fluxo de todos os filhos do documento */
-  #quote-printable-document * {
+  /* Garante visibilidade, fluxo e remoção TOTAL de qualquer sombreamento (box-shadow, drop-shadow, text-shadow) em todos os filhos do documento */
+  #quote-printable-document,
+  #quote-printable-document *,
+  #quote-printable-document *::before,
+  #quote-printable-document *::after {
     visibility: visible !important;
+    box-shadow: none !important;
+    -webkit-box-shadow: none !important;
+    filter: none !important;
+    -webkit-filter: none !important;
+    text-shadow: none !important;
   }
 
   /* Cabeçalho da proposta não quebra internamente */
