@@ -291,22 +291,40 @@
 
 @media print {
   @page {
-    margin: 8mm 10mm 8mm 10mm;
-    size: auto;
+    size: A4 portrait;
+    margin: 12mm 14mm 12mm 14mm;
+  }
+
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-sizing: border-box !important;
   }
 
   html,
   body {
-    background: white !important;
-    color: black !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
     height: auto !important;
     min-height: 100% !important;
     overflow: visible !important;
+    font-family:
+      'Roboto',
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      Roboto,
+      sans-serif !important;
   }
 
-  /* Remove a aplicação principal do fluxo de impressão */
+  /* Remove a aplicação principal do fluxo de impressão (sidebar, menus, dashboards) */
   #root {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
   }
 
   /* Esconde TODOS os portais Radix por padrão */
@@ -314,23 +332,31 @@
     display: none !important;
   }
 
-  /* Mostra APENAS o portal marcado como visível via JS */
-  [data-radix-portal].print-visible-portal {
+  /* Mostra APENAS o portal que contém o documento a ser impresso */
+  [data-radix-portal].print-visible-portal,
+  [data-radix-portal]:has(#quote-printable-document) {
     display: block !important;
+    position: static !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
   /* Esconde o overlay escuro do diálogo */
-  .print-visible-portal [data-radix-dialog-overlay] {
+  .print-visible-portal [data-radix-dialog-overlay],
+  [data-radix-portal]:has(#quote-printable-document) [data-radix-dialog-overlay] {
     display: none !important;
   }
 
-  /* Reset completo do container do diálogo para fluir na página impressa */
-  .print-visible-portal [role='dialog'] {
+  /* Reset completo do container do diálogo para fluir naturalmente na página impressa */
+  .print-visible-portal [role='dialog'],
+  [data-radix-portal]:has(#quote-printable-document) [role='dialog'] {
     position: static !important;
-    max-width: none !important;
+    max-width: 100% !important;
     width: 100% !important;
+    min-width: 100% !important;
     transform: none !important;
-    background: white !important;
+    background: #ffffff !important;
     box-shadow: none !important;
     border: none !important;
     padding: 0 !important;
@@ -342,40 +368,82 @@
     border-radius: 0 !important;
   }
 
-  /* Garante que o documento ocupe a página */
+  /* Container do documento comercial */
   #quote-printable-document {
     display: block !important;
     visibility: visible !important;
-    position: relative !important;
+    position: static !important;
     width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 12pt !important;
+    padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    background: white !important;
+    background: #ffffff !important;
     overflow: visible !important;
     font-size: 10pt !important;
-    line-height: 1.3 !important;
+    line-height: 1.35 !important;
+    color: #0f172a !important;
   }
 
-  /* Garantir que tabelas não quebrem entre páginas */
-  #quote-printable-document table {
-    page-break-inside: avoid;
-  }
-
-  /* Evitar quebras ruins entre seções */
-  #quote-printable-document > div {
-    page-break-inside: avoid;
-  }
-
-  /* Garante que TODOS os elementos dentro do documento sejam visíveis */
+  /* Garante visibilidade e fluxo de todos os filhos */
   #quote-printable-document * {
     visibility: visible !important;
   }
 
-  /* Esconde elementos com a classe print:hidden (headers, botões, footer) */
+  /* Cabeçalho da proposta não quebra internamente */
+  .quote-print-header {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 12pt !important;
+  }
+
+  /* Bloco de dados do cliente e técnico */
+  .quote-print-client-info {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 12pt !important;
+  }
+
+  /* Blocos individuais pequenos (itens de equipamento, tabelas pequenas, assinaturas) evitam quebra interna */
+  .quote-print-keep-together,
+  .quote-print-card,
+  .quote-print-signatures,
+  .quote-print-terms {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Tabelas mantêm cabeçalhos e evitam quebra de linha individual */
+  #quote-printable-document table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  #quote-printable-document thead {
+    display: table-header-group !important;
+  }
+
+  #quote-printable-document tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Rodapé do documento */
+  .quote-print-footer {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-top: 14pt !important;
+  }
+
+  /* Esconde explicitamente elementos marcados com print:hidden */
   .print\:hidden {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }

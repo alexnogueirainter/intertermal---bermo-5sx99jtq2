@@ -523,11 +523,11 @@ export function QuotePdfPreviewDialog({
         <div
           id="quote-printable-document"
           ref={printRef}
-          className="relative p-8 sm:p-12 space-y-6 print:space-y-2 text-slate-900 bg-white font-sans text-xs leading-relaxed print:p-0 print:text-[11px] overflow-hidden"
+          className="relative p-8 sm:p-12 space-y-6 print:space-y-4 text-slate-900 bg-white font-sans text-xs leading-relaxed print:p-0 print:text-[11px] overflow-visible"
         >
           {/* Marca d'água discreta para Composição Interna */}
           {isInternal && (
-            <div className="pointer-events-none select-none absolute inset-0 flex items-center justify-center opacity-[0.04] z-0">
+            <div className="pointer-events-none select-none absolute inset-0 flex items-center justify-center opacity-[0.04] z-0 print:hidden">
               <div className="text-6xl sm:text-8xl font-black tracking-widest text-slate-900 rotate-[-30deg] text-center uppercase">
                 USO GERENCIAL
                 <br />
@@ -538,7 +538,7 @@ export function QuotePdfPreviewDialog({
 
           {/* Banner de Identificação Interna (quando no modo internal) */}
           {isInternal && (
-            <div className="bg-amber-50 border-2 border-dashed border-amber-300 rounded-lg p-2.5 print:p-1.5 flex items-center justify-between text-amber-900">
+            <div className="quote-print-keep-together bg-amber-50 border-2 border-dashed border-amber-300 rounded-lg p-2.5 print:p-2 flex items-center justify-between text-amber-900">
               <div className="flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
                 <span className="font-bold text-[11px] print:text-[10px] uppercase tracking-wide">
@@ -553,7 +553,7 @@ export function QuotePdfPreviewDialog({
 
           {/* Cabeçalho Corporativo Intertermal / BERMO */}
           <div
-            className={`border-b-2 pb-5 print:pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:gap-2 ${
+            className={`quote-print-header border-b-2 pb-5 print:pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:gap-3 ${
               isInternal ? 'border-amber-600' : 'border-teal-700'
             }`}
           >
@@ -574,19 +574,12 @@ export function QuotePdfPreviewDialog({
                   {isInternal ? 'Engenharia de Custos' : 'Engenharia Térmica'}
                 </span>
               </div>
-              <p className="text-[11px] print:text-[10px] text-slate-500 font-medium">
+              <p className="text-[11px] print:text-[10px] text-slate-600 font-medium">
                 Assistência Técnica Autorizada & Especialista em Trocadores de Calor e Válvulas
                 BERMO
               </p>
-              <p className="text-[10px] print:text-[9px] text-slate-400 leading-relaxed">
-                <a
-                  href="https://www.google.com/maps/search/?api=1&query=Rua+Ananias+Pires+do+Amaral,+98+-+Sorocaba+-+SP"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:underline hover:text-teal-700 transition-colors"
-                >
-                  Rua Ananias Pires do Amaral, 98 - Sorocaba - SP - CEP 18016-456 - Jd Gonçalves
-                </a>
+              <p className="text-[10px] print:text-[9.5px] text-slate-500 leading-relaxed">
+                Rua Ananias Pires do Amaral, 98 - Sorocaba - SP - CEP 18016-456 - Jd Gonçalves
                 <br />
                 Fone: (11) 99407-7786 / (15) 3228-3956 • E-mail: alex.nogueira@intertermal.com.br •
                 Site: www.interproject.com.br
@@ -594,11 +587,11 @@ export function QuotePdfPreviewDialog({
             </div>
 
             <div
-              className={`text-right sm:text-right space-y-1 print:space-y-0.5 p-3 print:p-2 rounded-lg border ${
+              className={`text-right sm:text-right space-y-1 print:space-y-0.5 p-3 print:p-2 rounded-lg border shrink-0 ${
                 isInternal ? 'bg-amber-50/60 border-amber-200' : 'bg-slate-50 border-slate-200'
               }`}
             >
-              <span className="text-[10px] print:text-[9px] font-bold uppercase tracking-widest text-slate-400 block">
+              <span className="text-[10px] print:text-[9px] font-bold uppercase tracking-widest text-slate-500 block">
                 {isInternal ? 'Memória de Cálculo Interna' : 'Proposta Comercial de Serviços'}
               </span>
               <div
@@ -623,7 +616,7 @@ export function QuotePdfPreviewDialog({
           </div>
 
           {/* Dados do Cliente e Responsável Técnico */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 print:gap-2 bg-slate-50 p-4 print:p-2 rounded-xl border border-slate-200">
+          <div className="quote-print-client-info grid grid-cols-1 sm:grid-cols-2 gap-4 print:gap-3 bg-slate-50 p-4 print:p-3 rounded-xl border border-slate-200">
             <div className="space-y-1 print:space-y-0.5">
               <span
                 className={`text-[10px] print:text-[9px] font-bold uppercase tracking-wider flex items-center gap-1 ${
@@ -669,14 +662,13 @@ export function QuotePdfPreviewDialog({
               </div>
             </div>
           </div>
-
           {/* ========================================================================= */}
           {/* SEÇÕES EXCLUSIVAS DA COMPOSIÇÃO INTERNA (viewMode === 'internal')        */}
           {/* ========================================================================= */}
           {isInternal && (
             <div className="space-y-6 print:space-y-2">
               {/* Seção Interna A: Mão de Obra Especializada */}
-              <div className="space-y-2 print:space-y-1">
+              <div className="quote-print-card space-y-2 print:space-y-1">
                 <div className="flex items-center justify-between border-b border-amber-300 pb-1">
                   <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5 text-amber-700" />
@@ -785,7 +777,7 @@ export function QuotePdfPreviewDialog({
               </div>
 
               {/* Seção Interna B: Deslocamento & Rotas */}
-              <div className="space-y-2 print:space-y-1">
+              <div className="quote-print-card space-y-2 print:space-y-1">
                 <div className="flex items-center justify-between border-b border-amber-300 pb-1">
                   <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <Truck className="h-3.5 w-3.5 text-amber-700" />
@@ -883,7 +875,7 @@ export function QuotePdfPreviewDialog({
               </div>
 
               {/* Seção Interna C: Hospedagem & Alimentação */}
-              <div className="space-y-2 print:space-y-1">
+              <div className="quote-print-card space-y-2 print:space-y-1">
                 <div className="flex items-center justify-between border-b border-amber-300 pb-1">
                   <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <Hotel className="h-3.5 w-3.5 text-amber-700" />
@@ -948,7 +940,7 @@ export function QuotePdfPreviewDialog({
               </div>
 
               {/* Seção Interna D: Custos Indiretos, Margem & Tributos */}
-              <div className="space-y-2 print:space-y-1">
+              <div className="quote-print-card space-y-2 print:space-y-1">
                 <div className="flex items-center justify-between border-b border-amber-300 pb-1">
                   <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <Percent className="h-3.5 w-3.5 text-amber-700" />
@@ -1085,7 +1077,7 @@ export function QuotePdfPreviewDialog({
               </div>
 
               {/* Seção Interna E: Consolidação Geral dos Custos Diretos vs Indiretos vs Preço Final */}
-              <div className="p-4 print:p-2 rounded-xl bg-amber-50/80 border-2 border-amber-300 space-y-3 print:space-y-1.5">
+              <div className="quote-print-card p-4 print:p-2 rounded-xl bg-amber-50/80 border-2 border-amber-300 space-y-3 print:space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold uppercase tracking-wider text-xs print:text-[10px] text-amber-950 flex items-center gap-1.5">
                     <Calculator className="h-4 w-4 text-amber-700" />
@@ -1166,7 +1158,7 @@ export function QuotePdfPreviewDialog({
           {/* ========================================================================= */}
 
           {/* Seção: Escopo de Fornecimento & Serviços BERMO */}
-          <div className="space-y-3 print:space-y-1.5">
+          <div className="space-y-3 print:space-y-2">
             <div
               className={`flex items-center justify-between border-b pb-1 ${
                 isInternal ? 'border-amber-300' : 'border-slate-200'
@@ -1188,21 +1180,21 @@ export function QuotePdfPreviewDialog({
             </div>
 
             {/* LISTAGEM DE ESPECIFICAÇÕES TÉCNICAS DE CADA EQUIPAMENTO */}
-            <div className="space-y-2 print:space-y-1">
+            <div className="space-y-2 print:space-y-1.5">
               <span className="text-[10px] print:text-[9px] font-bold uppercase tracking-wider text-slate-500 block">
                 Equipamentos Contemplados na Proposta Técnica (Especificações):
               </span>
-              <div className="grid grid-cols-1 gap-2.5 print:gap-1.5">
+              <div className="grid grid-cols-1 gap-2.5 print:gap-2">
                 {quoteEquipmentsList.map((eq, idx) => (
                   <div
                     key={eq.id || idx}
-                    className={`p-3 print:p-2 rounded-lg border text-xs print:text-[10px] space-y-2 print:space-y-1 ${
+                    className={`quote-print-card p-3 print:p-2.5 rounded-lg border text-xs print:text-[10px] space-y-2 print:space-y-1.5 ${
                       isInternal
                         ? 'bg-amber-50/50 border-amber-200'
                         : 'bg-teal-50/50 border-teal-100'
                     }`}
                   >
-                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-1.5 print:pb-0.5">
+                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-1.5 print:pb-1">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900 text-[11.5px] print:text-[10.5px]">
                           Item {idx + 1}: {eq.brand || 'BERMO'} {eq.model || 'Trocador de Calor'}
@@ -1221,7 +1213,7 @@ export function QuotePdfPreviewDialog({
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 print:gap-x-2 print:gap-y-0.5 text-[10.5px] print:text-[9.5px] font-mono">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 print:gap-x-3 print:gap-y-1 text-[10.5px] print:text-[9.5px] font-mono">
                       <div>
                         <span className="text-slate-500 font-sans text-[9.5px] print:text-[8.5px] block">
                           Modelo / Fabricante
@@ -1288,7 +1280,7 @@ export function QuotePdfPreviewDialog({
 
             {/* ESCOPO GLOBAL E FLUIDO */}
             {(quote.scope_of_work || specs?.scopeOfWork || effectiveWorkFluid) && (
-              <div className="p-3 print:p-2 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5 print:space-y-1">
+              <div className="quote-print-card p-3 print:p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5 print:space-y-1">
                 <span className="text-[10px] print:text-[9px] font-bold uppercase tracking-wider text-slate-600 block">
                   Escopo Detalhado dos Serviços de Manutenção & Parâmetros Operacionais:
                 </span>
@@ -1309,7 +1301,7 @@ export function QuotePdfPreviewDialog({
             )}
 
             {/* TABELA DE VALOR DO SERVIÇO GLOBAL */}
-            <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <div className="quote-print-keep-together border border-slate-200 rounded-lg overflow-hidden">
               <table className="w-full text-left text-xs print:text-[10px]">
                 <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] print:text-[9px] font-bold">
                   <tr>
@@ -1352,7 +1344,7 @@ export function QuotePdfPreviewDialog({
 
           {/* Seção: Incluso no Valor (CONFORME ESPECIFICAÇÃO INSTITUCIONAL) */}
           <div
-            className={`p-3.5 print:p-2 rounded-xl border text-xs text-slate-800 space-y-1.5 print:space-y-1 ${
+            className={`quote-print-card p-3.5 print:p-2.5 rounded-xl border text-xs text-slate-800 space-y-1.5 print:space-y-1 ${
               isInternal ? 'bg-amber-50/70 border-amber-200' : 'bg-teal-50/70 border-teal-200'
             }`}
           >
@@ -1372,7 +1364,7 @@ export function QuotePdfPreviewDialog({
           </div>
 
           {/* Seção: Condições Comerciais & Pagamento */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 print:gap-2 bg-slate-50 p-4 print:p-2 rounded-xl border border-slate-200">
+          <div className="quote-print-terms grid grid-cols-1 sm:grid-cols-2 gap-4 print:gap-3 bg-slate-50 p-4 print:p-3 rounded-xl border border-slate-200">
             <div className="space-y-1.5 print:space-y-0.5">
               <span className="text-[10px] print:text-[9px] font-bold uppercase tracking-wider text-slate-500 block">
                 Condições Comerciais de Faturamento
@@ -1409,14 +1401,14 @@ export function QuotePdfPreviewDialog({
 
           {/* Observações Gerais */}
           {quote.notes && (
-            <div className="p-3 print:p-2 rounded-lg border border-slate-200 text-[11px] print:text-[9.5px] text-slate-600 space-y-1">
+            <div className="quote-print-card p-3 print:p-2.5 rounded-lg border border-slate-200 text-[11px] print:text-[9.5px] text-slate-600 space-y-1">
               <span className="font-bold text-slate-800 block">Observações:</span>
               <p className="whitespace-pre-line leading-relaxed">{quote.notes}</p>
             </div>
           )}
 
           {/* Assinatura / Aceite da Proposta */}
-          <div className="pt-8 print:pt-3 border-t border-slate-200 grid grid-cols-2 gap-8 print:gap-4 text-center text-[10px] print:text-[9px] text-slate-600">
+          <div className="quote-print-signatures pt-8 print:pt-4 border-t border-slate-200 grid grid-cols-2 gap-8 print:gap-6 text-center text-[10px] print:text-[9px] text-slate-600">
             <div className="space-y-6 print:space-y-3">
               <div className="border-b border-slate-400 mx-8 print:mx-4"></div>
               <div>
@@ -1459,9 +1451,15 @@ export function QuotePdfPreviewDialog({
             </div>
           </div>
 
+          {/* Rodapé Corporativo e Informativo de Validade */}
+          <div className="quote-print-footer pt-4 print:pt-3 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-[9.5px] print:text-[8.5px] text-slate-400">
+            <span>Intertermal Assistência Técnica e Manutenção Industrial Ltda.</span>
+            <span>Documento oficial gerado pelo Sistema Intertermal CRM</span>
+          </div>
+
           {/* Rodapé Interno quando for Composição Interna */}
           {isInternal && (
-            <div className="pt-4 print:pt-2 border-t-2 border-dashed border-amber-300 text-center text-[10px] print:text-[9px] font-bold text-amber-900 tracking-wider uppercase">
+            <div className="quote-print-keep-together pt-3 print:pt-2 border-t-2 border-dashed border-amber-300 text-center text-[10px] print:text-[9px] font-bold text-amber-900 tracking-wider uppercase">
               *** DOCUMENTO INTERNO — USO GERENCIAL EXCLUSIVO INTERTERMAL / BERMO — PROIBIDA A
               DIVULGAÇÃO EXTERNA ***
             </div>
