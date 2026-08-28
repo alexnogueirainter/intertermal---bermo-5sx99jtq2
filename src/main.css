@@ -335,6 +335,11 @@
     visibility: hidden !important;
   }
 
+  [data-radix-dialog-overlay] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
   /* Mostra APENAS o portal que contém o documento da proposta a ser impresso */
   [data-radix-portal].print-visible-portal,
   [data-radix-portal]:has(#quote-printable-document) {
