@@ -327,30 +327,41 @@
     overflow: hidden !important;
   }
 
-  /* Esconde TODOS os portais Radix por padrão */
-  [data-radix-portal] {
+  /* Esconde TODOS os portais Radix e diálogos por padrão */
+  [data-radix-portal],
+  [role='dialog'],
+  [data-radix-dialog-overlay] {
     display: none !important;
+    visibility: hidden !important;
   }
 
-  /* Mostra APENAS o portal que contém o documento a ser impresso */
+  /* Mostra APENAS o portal que contém o documento da proposta a ser impresso */
   [data-radix-portal].print-visible-portal,
   [data-radix-portal]:has(#quote-printable-document) {
     display: block !important;
+    visibility: visible !important;
     position: static !important;
     width: 100% !important;
     height: auto !important;
+    max-height: none !important;
     overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
-  /* Esconde o overlay escuro do diálogo */
+  /* Esconde backdrop/overlay escuro */
   .print-visible-portal [data-radix-dialog-overlay],
   [data-radix-portal]:has(#quote-printable-document) [data-radix-dialog-overlay] {
     display: none !important;
+    visibility: hidden !important;
   }
 
-  /* Reset completo do container do diálogo para fluir naturalmente na página impressa */
+  /* Reset completo do container do diálogo para fluir naturalmente na página impressa sem altura limitada */
   .print-visible-portal [role='dialog'],
-  [data-radix-portal]:has(#quote-printable-document) [role='dialog'] {
+  [data-radix-portal]:has(#quote-printable-document) [role='dialog'],
+  [role='dialog']:has(#quote-printable-document) {
+    display: block !important;
+    visibility: visible !important;
     position: static !important;
     max-width: 100% !important;
     width: 100% !important;
@@ -364,8 +375,18 @@
     overflow: visible !important;
     max-height: none !important;
     height: auto !important;
-    display: block !important;
     border-radius: 0 !important;
+  }
+
+  /* Garante que outros diálogos/modais fiquem 100% ocultos durante a impressão */
+  body.quote-printing-active
+    [data-radix-portal]:not(.print-visible-portal):not(:has(#quote-printable-document)),
+  body.quote-printing-active [role='dialog']:not(:has(#quote-printable-document)) {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
   }
 
   /* Container do documento comercial */
@@ -381,12 +402,14 @@
     box-shadow: none !important;
     background: #ffffff !important;
     overflow: visible !important;
-    font-size: 10pt !important;
-    line-height: 1.35 !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
     color: #0f172a !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
   }
 
-  /* Garante visibilidade e fluxo de todos os filhos */
+  /* Garante visibilidade e fluxo de todos os filhos do documento */
   #quote-printable-document * {
     visibility: visible !important;
   }
@@ -395,7 +418,7 @@
   .quote-print-header {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    margin-bottom: 12pt !important;
+    margin-bottom: 14pt !important;
   }
 
   /* Bloco de dados do cliente e técnico */
