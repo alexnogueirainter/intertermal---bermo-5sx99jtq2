@@ -283,49 +283,111 @@ routerAdd('POST', '/send_proposal_email', (c) => {
       '</div>'
   }
 
+  // Calcular quantidade total real de equipamentos
+  let totalEquipmentUnits = equipQuantity
+  if (equipmentsList && equipmentsList.length > 0) {
+    let sumUnits = 0
+    for (let eqIdx = 0; eqIdx < equipmentsList.length; eqIdx++) {
+      const eqItem = equipmentsList[eqIdx] || {}
+      sumUnits += Number(eqItem.quantity || eqItem.qty || 1)
+    }
+    if (sumUnits > 0) {
+      totalEquipmentUnits = sumUnits
+    }
+  }
+
+  // Descrição limpa do serviço para a visão cliente (não usar o texto longo da metodologia)
+  let serviceDescription = quoteRecord.get('title')
+  if (
+    !serviceDescription ||
+    typeof serviceDescription !== 'string' ||
+    serviceDescription.trim() === ''
+  ) {
+    serviceDescription =
+      'Serviço técnico especializado de manutenção, limpeza e revisão de trocador(es) de calor BERMO'
+  } else {
+    serviceDescription = serviceDescription.trim()
+  }
+
+  // Filtrar materiais customizados reais com descrição e valor > 0
+  const validCustomMaterials = []
+  if (Array.isArray(customMaterials) && customMaterials.length > 0) {
+    for (let j = 0; j < customMaterials.length; j++) {
+      const mat = customMaterials[j] || {}
+      const desc = String(mat.description || mat.name || '').trim()
+      const unitPrice = Number(mat.unitPrice || mat.unit_price || mat.price || 0)
+      const qty = Number(mat.qty || mat.quantity || 1)
+      const matTotal = Number(mat.total || qty * unitPrice)
+
+      // Pular materiais sem descrição válida ou com valor <= 0
+      if (!desc || (unitPrice <= 0 && matTotal <= 0)) {
+        continue
+      }
+      // Pular linhas genéricas "Material Customizado X" com valor 0
+      if (desc.toLowerCase().startsWith('material customizado') && unitPrice <= 0) {
+        continue
+      }
+
+      validCustomMaterials.push({
+        description: desc,
+        qty: qty,
+        unitPrice: unitPrice,
+        total: matTotal > 0 ? matTotal : qty * unitPrice,
+      })
+    }
+  }
+
   // Montar Seção 3: Composição de Valores (Visão Cliente)
+  // O valor total da proposta (totalValue) é o preço final de venda homologado.
+  // Se houver materiais reais com valor > 0 cobrados à parte, deduz do serviço para a soma bater perfeitamente;
+  // caso contrário, a linha de serviço recebe o valor total da proposta.
+  let customMaterialsSum = 0
+  for (let m = 0; m < validCustomMaterials.length; m++) {
+    customMaterialsSum += validCustomMaterials[m].total
+  }
+
+  let serviceLineTotal = totalValue
+  if (customMaterialsSum > 0 && customMaterialsSum < totalValue) {
+    serviceLineTotal = totalValue - customMaterialsSum
+  }
+  const serviceUnitPrice =
+    totalEquipmentUnits > 0 ? serviceLineTotal / totalEquipmentUnits : serviceLineTotal
+
   // Linha 1: Escopo principal do serviço
   let itemsTableRows =
     '<tr style="border-bottom: 1px solid #e2e8f0;">' +
     '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b; font-weight: 500;">' +
-    scopeOfWork +
+    serviceDescription +
     '</td>' +
     '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
-    equipQuantity +
+    totalEquipmentUnits +
     '</td>' +
     '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
-    formatCurrency(totalValue) +
+    formatCurrency(serviceUnitPrice) +
     '</td>' +
     '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
-    formatCurrency(totalValue) +
+    formatCurrency(serviceLineTotal) +
     '</td>' +
     '</tr>'
 
-  // Linhas adicionais para materiais customizados
-  if (Array.isArray(customMaterials) && customMaterials.length > 0) {
-    for (let j = 0; j < customMaterials.length; j++) {
-      const mat = customMaterials[j] || {}
-      const desc = mat.description || mat.name || 'Material Customizado ' + (j + 1)
-      const qty = Number(mat.qty || mat.quantity || 1)
-      const unitPrice = Number(mat.unitPrice || mat.unit_price || mat.price || 0)
-      const matTotal = Number(mat.total || qty * unitPrice)
-
-      itemsTableRows +=
-        '<tr style="border-bottom: 1px solid #e2e8f0; background-color: #fafafa;">' +
-        '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b;">' +
-        desc +
-        '</td>' +
-        '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
-        qty +
-        '</td>' +
-        '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
-        formatCurrency(unitPrice) +
-        '</td>' +
-        '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
-        formatCurrency(matTotal) +
-        '</td>' +
-        '</tr>'
-    }
+  // Linhas adicionais APENAS para materiais customizados reais e válidos
+  for (let j = 0; j < validCustomMaterials.length; j++) {
+    const mat = validCustomMaterials[j]
+    itemsTableRows +=
+      '<tr style="border-bottom: 1px solid #e2e8f0; background-color: #fafafa;">' +
+      '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b;">' +
+      mat.description +
+      '</td>' +
+      '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
+      mat.qty +
+      '</td>' +
+      '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
+      formatCurrency(mat.unitPrice) +
+      '</td>' +
+      '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
+      formatCurrency(mat.total) +
+      '</td>' +
+      '</tr>'
   }
 
   // Gerar ou recuperar token único de aprovação pelo cliente
@@ -443,22 +505,16 @@ routerAdd('POST', '/send_proposal_email', (c) => {
     '        </tbody>' +
     '      </table>' +
     '      <div style="display: flex; justify-content: flex-end; margin-bottom: 24px;">' +
-    '        <table style="min-width: 260px; font-size: 13px; border-collapse: collapse;">' +
+    '        <table style="min-width: 280px; font-size: 13px; border-collapse: collapse;">' +
     '          <tbody>' +
-    '            <tr>' +
-    '              <td style="padding: 6px 10px; color: #64748b;">Subtotal:</td>' +
-    '              <td style="padding: 6px 10px; text-align: right; color: #1e293b; font-weight: 500;">' +
-    formatCurrency(subtotalValue) +
-    '</td>' +
-    '            </tr>' +
     (discountTotal > 0
       ? '<tr><td style="padding: 6px 10px; color: #16a34a;">Desconto Comercial:</td><td style="padding: 6px 10px; text-align: right; color: #16a34a; font-weight: 500;">- ' +
         formatCurrency(discountTotal) +
         '</td></tr>'
       : '') +
     '            <tr style="border-top: 2px solid #0284c7; background-color: #f0f9ff;">' +
-    '              <td style="padding: 10px; font-size: 15px; font-weight: 700; color: #0369a1;">VALOR TOTAL:</td>' +
-    '              <td style="padding: 10px; font-size: 16px; font-weight: 800; color: #0284c7; text-align: right;">' +
+    '              <td style="padding: 12px 14px; font-size: 15px; font-weight: 700; color: #0369a1;">VALOR TOTAL:</td>' +
+    '              <td style="padding: 12px 14px; font-size: 17px; font-weight: 800; color: #0284c7; text-align: right;">' +
     formatCurrency(totalValue) +
     '</td>' +
     '            </tr>' +
@@ -839,49 +895,111 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
       '</div>'
   }
 
+  // Calcular quantidade total real de equipamentos
+  let totalEquipmentUnits = equipQuantity
+  if (equipmentsList && equipmentsList.length > 0) {
+    let sumUnits = 0
+    for (let eqIdx = 0; eqIdx < equipmentsList.length; eqIdx++) {
+      const eqItem = equipmentsList[eqIdx] || {}
+      sumUnits += Number(eqItem.quantity || eqItem.qty || 1)
+    }
+    if (sumUnits > 0) {
+      totalEquipmentUnits = sumUnits
+    }
+  }
+
+  // Descrição limpa do serviço para a visão cliente (não usar o texto longo da metodologia)
+  let serviceDescription = quoteRecord.get('title')
+  if (
+    !serviceDescription ||
+    typeof serviceDescription !== 'string' ||
+    serviceDescription.trim() === ''
+  ) {
+    serviceDescription =
+      'Serviço técnico especializado de manutenção, limpeza e revisão de trocador(es) de calor BERMO'
+  } else {
+    serviceDescription = serviceDescription.trim()
+  }
+
+  // Filtrar materiais customizados reais com descrição e valor > 0
+  const validCustomMaterials = []
+  if (Array.isArray(customMaterials) && customMaterials.length > 0) {
+    for (let j = 0; j < customMaterials.length; j++) {
+      const mat = customMaterials[j] || {}
+      const desc = String(mat.description || mat.name || '').trim()
+      const unitPrice = Number(mat.unitPrice || mat.unit_price || mat.price || 0)
+      const qty = Number(mat.qty || mat.quantity || 1)
+      const matTotal = Number(mat.total || qty * unitPrice)
+
+      // Pular materiais sem descrição válida ou com valor <= 0
+      if (!desc || (unitPrice <= 0 && matTotal <= 0)) {
+        continue
+      }
+      // Pular linhas genéricas "Material Customizado X" com valor 0
+      if (desc.toLowerCase().startsWith('material customizado') && unitPrice <= 0) {
+        continue
+      }
+
+      validCustomMaterials.push({
+        description: desc,
+        qty: qty,
+        unitPrice: unitPrice,
+        total: matTotal > 0 ? matTotal : qty * unitPrice,
+      })
+    }
+  }
+
   // Montar Seção 3: Composição de Valores (Visão Cliente)
+  // O valor total da proposta (totalValue) é o preço final de venda homologado.
+  // Se houver materiais reais com valor > 0 cobrados à parte, deduz do serviço para a soma bater perfeitamente;
+  // caso contrário, a linha de serviço recebe o valor total da proposta.
+  let customMaterialsSum = 0
+  for (let m = 0; m < validCustomMaterials.length; m++) {
+    customMaterialsSum += validCustomMaterials[m].total
+  }
+
+  let serviceLineTotal = totalValue
+  if (customMaterialsSum > 0 && customMaterialsSum < totalValue) {
+    serviceLineTotal = totalValue - customMaterialsSum
+  }
+  const serviceUnitPrice =
+    totalEquipmentUnits > 0 ? serviceLineTotal / totalEquipmentUnits : serviceLineTotal
+
   // Linha 1: Escopo principal do serviço
   let itemsTableRows =
     '<tr style="border-bottom: 1px solid #e2e8f0;">' +
     '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b; font-weight: 500;">' +
-    scopeOfWork +
+    serviceDescription +
     '</td>' +
     '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
-    equipQuantity +
+    totalEquipmentUnits +
     '</td>' +
     '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
-    formatCurrency(totalValue) +
+    formatCurrency(serviceUnitPrice) +
     '</td>' +
     '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
-    formatCurrency(totalValue) +
+    formatCurrency(serviceLineTotal) +
     '</td>' +
     '</tr>'
 
-  // Linhas adicionais para materiais customizados
-  if (Array.isArray(customMaterials) && customMaterials.length > 0) {
-    for (let j = 0; j < customMaterials.length; j++) {
-      const mat = customMaterials[j] || {}
-      const desc = mat.description || mat.name || 'Material Customizado ' + (j + 1)
-      const qty = Number(mat.qty || mat.quantity || 1)
-      const unitPrice = Number(mat.unitPrice || mat.unit_price || mat.price || 0)
-      const matTotal = Number(mat.total || qty * unitPrice)
-
-      itemsTableRows +=
-        '<tr style="border-bottom: 1px solid #e2e8f0; background-color: #fafafa;">' +
-        '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b;">' +
-        desc +
-        '</td>' +
-        '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
-        qty +
-        '</td>' +
-        '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
-        formatCurrency(unitPrice) +
-        '</td>' +
-        '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
-        formatCurrency(matTotal) +
-        '</td>' +
-        '</tr>'
-    }
+  // Linhas adicionais APENAS para materiais customizados reais e válidos
+  for (let j = 0; j < validCustomMaterials.length; j++) {
+    const mat = validCustomMaterials[j]
+    itemsTableRows +=
+      '<tr style="border-bottom: 1px solid #e2e8f0; background-color: #fafafa;">' +
+      '<td style="padding: 10px 12px; font-size: 13px; color: #1e293b;">' +
+      mat.description +
+      '</td>' +
+      '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: center;">' +
+      mat.qty +
+      '</td>' +
+      '<td style="padding: 10px 12px; font-size: 13px; color: #475569; text-align: right;">' +
+      formatCurrency(mat.unitPrice) +
+      '</td>' +
+      '<td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 600; text-align: right;">' +
+      formatCurrency(mat.total) +
+      '</td>' +
+      '</tr>'
   }
 
   // Seção 4: URL do sistema para Acesso à Proposta Completa
@@ -979,22 +1097,16 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
     '        </tbody>' +
     '      </table>' +
     '      <div style="display: flex; justify-content: flex-end; margin-bottom: 24px;">' +
-    '        <table style="min-width: 260px; font-size: 13px; border-collapse: collapse;">' +
+    '        <table style="min-width: 280px; font-size: 13px; border-collapse: collapse;">' +
     '          <tbody>' +
-    '            <tr>' +
-    '              <td style="padding: 6px 10px; color: #64748b;">Subtotal:</td>' +
-    '              <td style="padding: 6px 10px; text-align: right; color: #1e293b; font-weight: 500;">' +
-    formatCurrency(subtotalValue) +
-    '</td>' +
-    '            </tr>' +
     (discountTotal > 0
       ? '<tr><td style="padding: 6px 10px; color: #16a34a;">Desconto Comercial:</td><td style="padding: 6px 10px; text-align: right; color: #16a34a; font-weight: 500;">- ' +
         formatCurrency(discountTotal) +
         '</td></tr>'
       : '') +
     '            <tr style="border-top: 2px solid #0284c7; background-color: #f0f9ff;">' +
-    '              <td style="padding: 10px; font-size: 15px; font-weight: 700; color: #0369a1;">VALOR TOTAL:</td>' +
-    '              <td style="padding: 10px; font-size: 16px; font-weight: 800; color: #0284c7; text-align: right;">' +
+    '              <td style="padding: 12px 14px; font-size: 15px; font-weight: 700; color: #0369a1;">VALOR TOTAL:</td>' +
+    '              <td style="padding: 12px 14px; font-size: 17px; font-weight: 800; color: #0284c7; text-align: right;">' +
     formatCurrency(totalValue) +
     '</td>' +
     '            </tr>' +
