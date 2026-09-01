@@ -18,6 +18,7 @@ import {
   Package,
   Shield,
   Flame,
+  History as HistoryIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -56,6 +57,8 @@ import { ClientsManager } from '@/components/ClientsManager'
 import { PipelineKanban } from '@/components/PipelineKanban'
 import { QuotesManager } from '@/components/QuotesManager'
 import { ServicesManager } from '@/components/ServicesManager'
+import { ServiceOrdersKanban } from '@/components/ServiceOrdersKanban'
+import { EquipmentServiceHistory } from '@/components/EquipmentServiceHistory'
 import { TicketsSupport } from '@/components/TicketsSupport'
 import { ActivitiesManager } from '@/components/ActivitiesManager'
 import { CopilotAssistant } from '@/components/CopilotAssistant'
@@ -64,16 +67,17 @@ import { BermoCatalogViewer } from '@/components/BermoCatalogViewer'
 
 type ActiveTab =
   | 'overview'
-  | 'clients'
-  | 'deals'
   | 'quotes'
   | 'catalog'
+  | 'deals'
+  | 'clients'
   | 'services'
+  | 'service_kanban'
+  | 'equipment_history'
   | 'tickets'
   | 'activities'
   | 'copilot'
   | 'architecture'
-
 export default function IndexPage() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
@@ -249,33 +253,16 @@ export default function IndexPage() {
       // Se a proposta for aprovada, gerar automaticamente uma Ordem de Serviço (OS)
       if (status === 'approved') {
         try {
-          const client = clients.find((c) => c.id === updated.client_id)
-          const newOrderNumber = updated.quote_number || `INT-${Date.now().toString().slice(-4)}`
-
-          const createdOS = await serviceOrdersService.create({
-            order_number: newOrderNumber,
-            quote_id: updated.id,
-            quote_number: updated.quote_number,
-            client_id: updated.client_id,
-            client_name: updated.client_name || client?.name || 'Cliente Industrial',
-            title: `OS ${newOrderNumber} - ${updated.title || 'Manutenção em Equipamento BERMO'}`,
-            status: 'pending_approval',
-            total_value: updated.total || 0,
-            final_price: updated.total || 0,
-            internal_cost:
-              updated.service_details?.service_composition?.directCostsTotal ||
-              Math.round((updated.total || 0) * 0.65 * 100) / 100,
-            priority: 'high',
-            assigned_to: updated.assigned_to || 'Alex Nogueira',
-            services: updated.items || [],
-            technical_details: updated.service_details || {},
-            notes: `Ordem de Serviço gerada automaticamente a partir da proposta aprovada ${updated.quote_number}. Aguardando validação do gestor técnico.`,
+          const createdOS = await serviceOrdersService.createFromApprovedQuote(updated)
+          setServiceOrders((prev) => {
+            const exists = prev.some((o) => o.id === createdOS.id)
+            return exists
+              ? prev.map((o) => (o.id === createdOS.id ? createdOS : o))
+              : [createdOS, ...prev]
           })
-
-          setServiceOrders((prev) => [createdOS, ...prev])
           toast({
             title: '🎉 Proposta Aprovada & OS Gerada!',
-            description: `Ordem de Serviço #${newOrderNumber} gerada com status "Pendente de Aprovação".`,
+            description: `Ordem de Serviço #${createdOS.order_number || updated.quote_number} gerada no Pipeline de Serviços Técnicos (Vistoria).`,
           })
         } catch (osErr: any) {
           console.error('Erro ao gerar OS automática:', osErr)
@@ -297,91 +284,54 @@ export default function IndexPage() {
     id: string,
     status: ServiceOrderStatus,
     notes?: string,
+    authorName?: string,
   ) => {
+    const author = authorName || 'Alex Nogueira (Especialista BERMO)'
     try {
+      const currentOrder = serviceOrders.find((o) => o.id === id)
       const updated = await serviceOrdersService.updateStatus(
         id,
         status,
         notes,
-        'Alex Nogueira (Gestor Técnico)',
+        author,
+        currentOrder?.status_history,
       )
       setServiceOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...updated } : o)))
 
-      // Se a OS foi aprovada ou movida para em execução, mover o card correspondente no Kanban para "Fechado (Ganho)" / Em Execução
-      const targetOrder = serviceOrders.find((so) => so.id === id) || updated
-      if (status === 'approved' || status === 'in_execution') {
-        const matchingDeal = deals.find(
-          (d) =>
-            (targetOrder.deal_id && d.id === targetOrder.deal_id) ||
-            (targetOrder.quote_id && d.id === targetOrder.quote_id) ||
-            (targetOrder.quote_number && d.title?.includes(targetOrder.quote_number)) ||
-            (targetOrder.order_number && d.title?.includes(targetOrder.order_number)) ||
-            (targetOrder.client_id && d.client_id === targetOrder.client_id),
-        )
-
-        if (matchingDeal && matchingDeal.stage !== 'won') {
-          try {
-            await dealsService.updateStage(matchingDeal.id, 'won')
-            setDeals((prev) =>
-              prev.map((d) => (d.id === matchingDeal.id ? { ...d, stage: 'won' } : d)),
-            )
-          } catch {
-            setDeals((prev) =>
-              prev.map((d) => (d.id === matchingDeal.id ? { ...d, stage: 'won' } : d)),
-            )
-          }
-        }
-      }
-
+      // Notificação visual com Toast rico
       toast({
-        title:
-          status === 'approved'
-            ? '✅ OS Aprovada pelo Gestor!'
-            : status === 'rejected'
-              ? '❌ Ordem de Serviço Rejeitada'
-              : 'OS Atualizada',
-        description: `Ordem de Serviço #${targetOrder.order_number || id} atualizada para ${status}. Kanban sincronizado.`,
+        title: `🔄 OS #${updated.order_number || id}: Transição para "${status.toUpperCase()}"`,
+        description: `Registrado por ${author}. ${notes ? `"${notes}"` : ''}`,
       })
     } catch (err: any) {
-      // Fallback local caso falhe a persistência remota
+      console.error('Erro ao atualizar OS:', err)
+      // Fallback local com histórico
       const now = new Date().toISOString()
       setServiceOrders((prev) =>
         prev.map((so) => {
           if (so.id === id) {
+            const hist = Array.isArray(so.status_history) ? [...so.status_history] : []
+            hist.push({
+              from_status: so.status,
+              to_status: status,
+              date: now,
+              user_name: author,
+              note: notes || `Movido para ${status}`,
+            })
             return {
               ...so,
               status,
-              approval_notes:
-                status === 'approved' || status === 'in_execution' ? notes : so.approval_notes,
-              approved_at:
-                status === 'approved' || status === 'in_execution' ? now : so.approved_at,
-              approved_by:
-                status === 'approved' || status === 'in_execution'
-                  ? 'Alex Nogueira'
-                  : so.approved_by,
-              rejection_notes: status === 'rejected' ? notes : so.rejection_notes,
-              rejected_at: status === 'rejected' ? now : so.rejected_at,
-              rejected_by: status === 'rejected' ? 'Alex Nogueira' : so.rejected_by,
+              status_history: hist,
+              notes: notes || so.notes,
             }
           }
           return so
         }),
       )
 
-      const targetOrder = serviceOrders.find((so) => so.id === id)
-      if (targetOrder && (status === 'approved' || status === 'in_execution')) {
-        setDeals((prev) =>
-          prev.map((d) =>
-            d.client_id === targetOrder.client_id || d.title?.includes(targetOrder.order_number)
-              ? { ...d, stage: 'won' }
-              : d,
-          ),
-        )
-      }
-
       toast({
-        title: 'Status da OS Atualizado',
-        description: `Ordem de Serviço atualizada localmente para "${status}".`,
+        title: `Status da OS Atualizado para ${status.toUpperCase()}`,
+        description: `Transição salva localmente.`,
       })
     }
   }
@@ -548,6 +498,23 @@ export default function IndexPage() {
             </button>
 
             <button
+              onClick={() => setActiveTab('service_kanban')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'service_kanban'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Kanban className="h-4 w-4 text-amber-500" />
+                Pipeline de OS (Kanban)
+              </div>
+              <Badge className="bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[10px] px-1.5">
+                {serviceOrders.length}
+              </Badge>
+            </button>
+
+            <button
               onClick={() => setActiveTab('services')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'services'
@@ -557,10 +524,27 @@ export default function IndexPage() {
             >
               <div className="flex items-center gap-3">
                 <Wrench className="h-4 w-4" />
-                Ordens de Serviço
+                Ordens & Contratos
               </div>
               <Badge variant="outline" className="text-[10px] px-1.5">
                 {services.length}
+              </Badge>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('equipment_history')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'equipment_history'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <HistoryIcon className="h-4 w-4 text-teal-500" />
+                Histórico de Serviços
+              </div>
+              <Badge variant="outline" className="text-[9px] px-1 text-slate-500">
+                Equipamentos
               </Badge>
             </button>
 
@@ -667,7 +651,10 @@ export default function IndexPage() {
                 {activeTab === 'catalog' && 'Catálogo de Produtos & Válvulas BERMO'}
                 {activeTab === 'deals' && 'Pipeline Comercial (Funil)'}
                 {activeTab === 'clients' && 'Gestão de Clientes Industriais'}
-                {activeTab === 'services' && 'Ordens de Serviço'}
+                {activeTab === 'service_kanban' && 'Pipeline de Serviços Técnicos (Kanban)'}
+                {activeTab === 'equipment_history' &&
+                  'Histórico de Manutenções por Cliente & Equipamento'}
+                {activeTab === 'services' && 'Ordens de Serviço & Contratos'}
                 {activeTab === 'tickets' && 'Suporte Técnico & Pós-Venda'}
                 {activeTab === 'activities' && 'Agenda & Visitas de Campo'}
                 {activeTab === 'copilot' && 'Copiloto de Engenharia'}
@@ -745,6 +732,23 @@ export default function IndexPage() {
               onSelectClient={setSelectedClient}
               onCreateClient={handleCreateClient}
               onUpdateClient={handleUpdateClient}
+            />
+          )}
+
+          {activeTab === 'service_kanban' && (
+            <ServiceOrdersKanban
+              serviceOrders={serviceOrders}
+              clients={clients}
+              quotes={quotes}
+              onUpdateStatus={handleUpdateServiceOrderStatus}
+            />
+          )}
+
+          {activeTab === 'equipment_history' && (
+            <EquipmentServiceHistory
+              clients={clients}
+              serviceOrders={serviceOrders}
+              quotes={quotes}
             />
           )}
 

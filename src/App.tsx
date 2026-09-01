@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import Index from './pages/Index'
 import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
+import { PublicProposalApprovalPage } from './pages/PublicProposalApprovalPage'
 
 // ONLY IMPORT AND RENDER WORKING PAGES, NEVER ADD PLACEHOLDER COMPONENTS OR PAGES IN THIS FILE
 // AVOID REMOVING ANY CONTEXT PROVIDERS FROM THIS FILE (e.g. TooltipProvider, Toaster, Sonner)
@@ -16,6 +17,10 @@ const App = () => (
       <Toaster />
       <Sonner />
       <Routes>
+        {/* Rota pública de aprovação de proposta via link seguro com token (sem login) */}
+        <Route path="/aprovar/:token" element={<PublicProposalApprovalPage />} />
+        <Route path="/proposta/:token" element={<PublicProposalApprovalPage />} />
+
         <Route element={<Layout />}>
           <Route path="/" element={<Index />} />
           {/* ADD ALL CUSTOM ROUTES MUST BE ADDED HERE */}

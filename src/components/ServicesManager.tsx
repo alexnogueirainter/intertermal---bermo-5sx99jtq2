@@ -351,68 +351,34 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                             })}
                           </span>
                         </div>
-                        {/* Botões de Ação do Gestor / Operação */}
+                        {/* Botões de Transição Rápida de Etapas do Pipeline */}
                         {onUpdateServiceOrderStatus && (
                           <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                            {isPending && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    setSelectedOrderForApproval(so)
-                                    setActionType('reject')
-                                    setApprovalNotes('')
-                                    setIsApproveModalOpen(true)
-                                  }}
-                                  className="h-7 px-2 text-[11px] text-rose-600 hover:bg-rose-50 border-rose-200"
-                                >
-                                  <XCircle className="h-3.5 w-3.5 mr-1" /> Rejeitar
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedOrderForApproval(so)
-                                    setActionType('approve')
-                                    setApprovalNotes('')
-                                    setIsApproveModalOpen(true)
-                                  }}
-                                  className="h-7 px-2.5 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-xs"
-                                >
-                                  <CheckCircle className="h-3.5 w-3.5 mr-1" /> Aprovar OS
-                                </Button>
-                              </>
-                            )}
-
-                            {isApproved && (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedOrderForApproval(so)
-                                  setActionType('execute')
-                                  setApprovalNotes('')
-                                  setIsApproveModalOpen(true)
-                                }}
-                                className="h-7 px-2.5 text-[11px] bg-blue-600 hover:bg-blue-500 text-white font-semibold"
-                              >
-                                <Wrench className="h-3.5 w-3.5 mr-1" /> Iniciar Execução
-                              </Button>
-                            )}
-
-                            {(so.status === 'in_execution' || so.status === 'in_progress') && (
-                              <Button
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedOrderForApproval(so)
-                                  setActionType('complete')
-                                  setApprovalNotes('')
-                                  setIsApproveModalOpen(true)
-                                }}
-                                className="h-7 px-2.5 text-[11px] bg-teal-700 hover:bg-teal-600 text-white font-semibold"
-                              >
-                                <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Concluir OS
-                              </Button>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedOrderForApproval(so)
+                                setActionType('execute')
+                                setApprovalNotes('')
+                                setIsApproveModalOpen(true)
+                              }}
+                              className="h-7 px-2 text-[11px] text-blue-600 hover:bg-blue-50 border-blue-200"
+                            >
+                              <Wrench className="h-3.5 w-3.5 mr-1" /> Executar
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setSelectedOrderForApproval(so)
+                                setActionType('complete')
+                                setApprovalNotes('')
+                                setIsApproveModalOpen(true)
+                              }}
+                              className="h-7 px-2.5 text-[11px] bg-teal-700 hover:bg-teal-600 text-white font-semibold"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Fechar
+                            </Button>
                           </div>
                         )}{' '}
                       </div>
@@ -567,10 +533,11 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
               disabled={actionType === 'reject' && !approvalNotes.trim()}
               onClick={async () => {
                 if (selectedOrderForApproval && onUpdateServiceOrderStatus) {
-                  let nextStatus: ServiceOrderStatus = 'approved'
+                  let nextStatus: ServiceOrderStatus = 'execucao'
                   if (actionType === 'reject') nextStatus = 'rejected'
-                  if (actionType === 'execute') nextStatus = 'in_execution'
-                  if (actionType === 'complete') nextStatus = 'completed'
+                  if (actionType === 'execute') nextStatus = 'execucao'
+                  if (actionType === 'complete') nextStatus = 'fechado'
+                  if (actionType === 'approve') nextStatus = 'execucao'
 
                   await onUpdateServiceOrderStatus(
                     selectedOrderForApproval.id,

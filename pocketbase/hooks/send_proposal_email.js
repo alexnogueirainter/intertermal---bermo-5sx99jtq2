@@ -328,19 +328,39 @@ routerAdd('POST', '/send_proposal_email', (c) => {
     }
   }
 
-  // Seção 4: URL do sistema para Acesso à Proposta Completa
+  // Gerar ou recuperar token único de aprovação pelo cliente
+  let approvalToken = quoteRecord.get('approval_token')
+  if (!approvalToken || approvalToken.trim() === '') {
+    approvalToken =
+      'tok_' +
+      quoteId.substring(0, 8) +
+      '_' +
+      Math.random().toString(36).substring(2, 10) +
+      Date.now().toString(36)
+    try {
+      quoteRecord.set('approval_token', approvalToken)
+      $app.save(quoteRecord)
+    } catch (_) {}
+  }
+
+  // Seção 4: URL do sistema para Acesso à Proposta Completa e Link de Aprovação do Cliente
   let appUrl = ''
   try {
-    appUrl =
-      $os.getenv('SITE_URL') || $os.getenv('PB_INSTANCE_URL') || 'https://intertermal.goskip.app'
+    appUrl = $os.getenv('SITE_URL') || $os.getenv('PB_INSTANCE_URL') || ''
   } catch (_) {
-    appUrl = 'https://intertermal.goskip.app'
+    appUrl = ''
   }
   if (!appUrl) {
     appUrl = 'https://intertermal.goskip.app'
   }
+  // Remover barra final se houver
+  if (appUrl.endsWith('/')) {
+    appUrl = appUrl.slice(0, -1)
+  }
 
-  const emailSubject = 'Proposta Aprovada - Intertermal #' + quoteNumber
+  const publicApprovalLink = appUrl + '/aprovar/' + approvalToken
+
+  const emailSubject = 'Proposta Técnica & Comercial - Intertermal #' + quoteNumber
 
   const emailHtml =
     '<!DOCTYPE html>' +
@@ -453,13 +473,30 @@ routerAdd('POST', '/send_proposal_email', (c) => {
     validityDays +
     ' dias</div>' +
     '      </div>' +
-    '      <h2 style="font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin: 0 0 12px 0; border-bottom: 2px solid #e0f2fe; padding-bottom: 6px;">4. Acesso à Proposta</h2>' +
-    '      <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 18px 20px; margin-bottom: 28px; text-align: center;">' +
-    '        <p style="margin: 0 0 14px 0; font-size: 13px; color: #0369a1; line-height: 1.5;">Para visualizar o PDF completo com visão cliente e composição interna, acesse o sistema.</p>' +
+    '      <h2 style="font-size: 15px; text-transform: uppercase; letter-spacing: 0.05em; color: #0284c7; margin: 0 0 12px 0; border-bottom: 2px solid #e0f2fe; padding-bottom: 6px;">4. Aprovação Digital pelo Cliente (Link Seguro)</h2>' +
+    '      <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; margin-bottom: 24px; text-align: center;">' +
+    '        <p style="margin: 0 0 12px 0; font-size: 14px; color: #166534; font-weight: 600; line-height: 1.4;">' +
+    '          Acesse a Proposta Técnica Oficial e realize a aprovação digital sem necessidade de login:' +
+    '        </p>' +
+    '        <a href="' +
+    publicApprovalLink +
+    '" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #10b981; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 28px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 8px;">' +
+    'Visualizar & Aprovar Proposta Online' +
+    '</a>' +
+    '        <div style="font-size: 11px; color: #475569; word-break: break-all; margin-top: 8px;">' +
+    '          Link direto: <a href="' +
+    publicApprovalLink +
+    '" style="color: #0284c7;">' +
+    publicApprovalLink +
+    '</a>' +
+    '        </div>' +
+    '      </div>' +
+    '      <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 14px 18px; margin-bottom: 28px; text-align: center;">' +
+    '        <p style="margin: 0 0 10px 0; font-size: 12px; color: #0369a1; line-height: 1.5;">Acesso interno ao sistema de engenharia Intertermal:</p>' +
     '        <a href="' +
     appUrl +
-    '" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 13px; padding: 10px 24px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">' +
-    'Visualizar Proposta Completa' +
+    '" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; font-weight: 600; font-size: 12px; padding: 8px 20px; border-radius: 6px;">' +
+    'Acessar Sistema Intertermal' +
     '</a>' +
     '      </div>' +
     '      <div style="border-top: 2px solid #e2e8f0; padding-top: 20px; text-align: center; font-size: 12px; color: #64748b; line-height: 1.6;">' +

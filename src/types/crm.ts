@@ -17,6 +17,11 @@ export type QuoteStatus =
   | 'expired'
 
 export type ServiceOrderStatus =
+  | 'vistoria'
+  | 'proposta'
+  | 'execucao'
+  | 'inspecao'
+  | 'fechado'
   | 'pending'
   | 'pending_approval'
   | 'approved'
@@ -319,13 +324,26 @@ export interface QuoteRecord {
   overnight_cost?: number
   notes?: string
   assigned_to?: string
+  approval_token?: string
+  approved_by_client_name?: string
+  approved_by_client_date?: string
+  rejected_by_client_reason?: string
+  rejected_by_client_date?: string
   created?: string
   updated?: string
 }
 
+export interface ServiceOrderStatusHistoryItem {
+  from_status: string
+  to_status: string
+  date: string
+  user_name?: string
+  note?: string
+}
+
 export interface ServiceOrderRecord {
   id: string
-  code: string
+  code?: string
   order_number?: string
   quote_number?: string
   title?: string
@@ -350,6 +368,10 @@ export interface ServiceOrderRecord {
   rejected_by?: string
   rejected_at?: string
   rejection_notes?: string
+  equipment_model?: string
+  equipment_brand?: string
+  equipment_info?: any
+  status_history?: ServiceOrderStatusHistoryItem[]
   created?: string
   updated?: string
 }

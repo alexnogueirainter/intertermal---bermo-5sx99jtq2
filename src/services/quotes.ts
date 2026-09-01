@@ -377,4 +377,39 @@ export const quotesService = {
   delete: deleteQuote,
   searchSpecsOnline: searchEquipmentSpecsOnline,
   sendProposalApprovalEmail,
+  async getPublicProposal(
+    token: string,
+  ): Promise<{ success: boolean; quote?: any; error?: string }> {
+    try {
+      const res = await fetch(`${pb.baseUrl}/api/public/proposals/${encodeURIComponent(token)}`)
+      const json = await res.json()
+      return json
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Erro ao carregar proposta pública.' }
+    }
+  },
+  async actionPublicProposal(
+    token: string,
+    action: 'approve' | 'reject',
+    data: { client_name?: string; reason?: string },
+  ): Promise<{ success: boolean; action?: string; message?: string; error?: string }> {
+    try {
+      const res = await fetch(
+        `${pb.baseUrl}/api/public/proposals/${encodeURIComponent(token)}/action`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action,
+            client_name: data.client_name,
+            reason: data.reason,
+          }),
+        },
+      )
+      const json = await res.json()
+      return json
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Erro ao processar ação na proposta pública.' }
+    }
+  },
 }

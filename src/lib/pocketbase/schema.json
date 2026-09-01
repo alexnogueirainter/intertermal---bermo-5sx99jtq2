@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-28T21:43:53.426Z",
+  "generatedAt": "2026-09-01T18:12:14.147Z",
   "collections": [
     {
       "name": "users",
@@ -874,6 +874,36 @@
           "type": "number",
           "required": false,
           "system": false
+        },
+        {
+          "name": "approval_token",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_by_client_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_by_client_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rejected_by_client_reason",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rejected_by_client_date",
+          "type": "date",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -1275,6 +1305,11 @@
           "required": false,
           "system": false,
           "selectValues": [
+            "vistoria",
+            "proposta",
+            "execucao",
+            "inspecao",
+            "fechado",
             "pending_approval",
             "approved",
             "in_progress",
@@ -1363,6 +1398,30 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "status_history",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_info",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_model",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_brand",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

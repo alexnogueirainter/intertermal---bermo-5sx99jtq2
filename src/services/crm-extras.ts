@@ -108,26 +108,110 @@ export const serviceOrdersService = {
 
   async updateStatus(
     id: string,
-    status: ServiceOrderRecord['status'],
+    newStatus: ServiceOrderRecord['status'],
     notes?: string,
     authorName?: string,
+    currentHistory?: any[],
   ): Promise<ServiceOrderRecord> {
-    const payload: Partial<ServiceOrderRecord> = { status }
     const now = new Date().toISOString()
+    const author = authorName || 'Alex Nogueira (Gestor Técnico)'
 
-    if (status === 'approved' || status === 'in_execution') {
+    // Obter dados atuais se não tiver histórico passado
+    let currentSo: ServiceOrderRecord | null = null
+    let historyList: any[] = Array.isArray(currentHistory) ? [...currentHistory] : []
+
+    if (!currentHistory) {
+      try {
+        currentSo = await pb.collection('service_orders').getOne<ServiceOrderRecord>(id)
+        if (currentSo?.status_history && Array.isArray(currentSo.status_history)) {
+          historyList = [...currentSo.status_history]
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+
+    const previousStatus = currentSo?.status || 'desconhecido'
+    const newHistoryEntry = {
+      from_status: previousStatus,
+      to_status: newStatus,
+      date: now,
+      user_name: author,
+      note: notes || `Transição de status para ${newStatus}`,
+    }
+    historyList.push(newHistoryEntry)
+
+    const payload: Partial<ServiceOrderRecord> = {
+      status: newStatus,
+      status_history: historyList,
+    }
+
+    if (newStatus === 'approved' || newStatus === 'execucao' || newStatus === 'in_execution') {
       payload.approved_at = now
-      payload.approved_by = authorName || 'Alex Nogueira (Gestor Técnico)'
+      payload.approved_by = author
       if (notes !== undefined) payload.approval_notes = notes
-    } else if (status === 'rejected') {
+    } else if (newStatus === 'rejected') {
       payload.rejected_at = now
-      payload.rejected_by = authorName || 'Alex Nogueira (Gestor Técnico)'
+      payload.rejected_by = author
       if (notes !== undefined) payload.rejection_notes = notes
-    } else {
-      if (notes !== undefined) payload.notes = notes
+    } else if (notes !== undefined) {
+      payload.notes = notes
     }
 
     return await pb.collection('service_orders').update<ServiceOrderRecord>(id, payload)
+  },
+
+  async createFromApprovedQuote(quote: any): Promise<ServiceOrderRecord> {
+    const orderNumber = quote.code || quote.quote_number || `OS-${Date.now().toString().slice(-6)}`
+    const nowIso = new Date().toISOString()
+    const equipModel = quote.equipment_model || 'Trocador BERMO'
+    const equipBrand = quote.equipment_brand || 'BERMO'
+
+    // Evitar duplicidade
+    try {
+      const existing = await pb.collection('service_orders').getFullList<ServiceOrderRecord>({
+        filter: `quote_id = "${quote.id}" || order_number = "${orderNumber}" || quote_number = "${orderNumber}"`,
+      })
+      if (existing.length > 0) {
+        return existing[0]
+      }
+    } catch {
+      /* intentionally ignored */
+    }
+
+    const record = await pb.collection('service_orders').create<ServiceOrderRecord>({
+      order_number: orderNumber,
+      quote_id: quote.id,
+      quote_number: quote.quote_number || quote.code || '',
+      client_id: quote.client_id || '',
+      client_name: quote.client_name || 'Cliente',
+      title: `OS ${orderNumber} - ${quote.title || 'Manutenção de Trocador de Calor BERMO'}`,
+      status: 'vistoria',
+      priority: 'high',
+      assigned_to: quote.assigned_to || 'Alex Nogueira - Especialista BERMO',
+      total_value: quote.final_price || quote.total || 0,
+      services: quote.items || [],
+      technical_details: quote.service_details || {},
+      equipment_model: equipModel,
+      equipment_brand: equipBrand,
+      equipment_info: {
+        brand: equipBrand,
+        model: equipModel,
+        equipments: quote.equipments || [],
+        details: quote.service_details || {},
+      },
+      status_history: [
+        {
+          from_status: 'proposta',
+          to_status: 'vistoria',
+          date: nowIso,
+          user_name: quote.approved_by_client_name || quote.assigned_to || 'Sistema Intertermal',
+          note: 'OS gerada automaticamente a partir da proposta aprovada.',
+        },
+      ],
+      notes: `Ordem de Serviço gerada a partir da proposta técnica aprovada #${orderNumber}.`,
+    })
+    return record
   },
 
   async delete(id: string): Promise<boolean> {

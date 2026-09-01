@@ -820,6 +820,51 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                     </div>
                   )}
                 </div>
+                {/* Histórico de Manutenções por Equipamento deste Cliente */}
+                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-teal-800 dark:text-teal-400 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Wrench className="h-3.5 w-3.5" />
+                      Histórico Técnico de Trocadores & OS Concluídas (
+                      {activeClientServiceOrders.length})
+                    </span>
+                  </h4>
+                  {activeClientServiceOrders.length === 0 ? (
+                    <div className="text-xs text-muted-foreground p-3 border border-dashed rounded-lg text-center bg-slate-50/40 dark:bg-slate-900/40">
+                      Nenhuma Ordem de Serviço emitida para este cliente até o momento.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                      {activeClientServiceOrders.map((so) => (
+                        <div
+                          key={so.id}
+                          className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs space-y-1 hover:border-teal-400 transition-all"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-bold text-teal-700 dark:text-teal-400 text-[11px]">
+                              OS #{so.order_number || so.quote_number || so.id.slice(0, 6)}
+                            </span>
+                            <Badge variant="outline" className="text-[9px] uppercase">
+                              {so.status}
+                            </Badge>
+                          </div>
+                          <p className="font-semibold text-slate-900 dark:text-slate-100 text-[11px]">
+                            {so.title}
+                          </p>
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
+                            <span>🔧 {so.equipment_model || 'Trocador BERMO'}</span>
+                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                              {(so.total_value || so.final_price || 0).toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {/* Histórico de Oportunidades do Funil */}
                 <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center justify-between">
