@@ -116,22 +116,27 @@ export const serviceOrdersService = {
     const now = new Date().toISOString()
     const author = authorName || 'Alex Nogueira (Gestor Técnico)'
 
-    // Obter dados atuais se não tiver histórico passado
+    // Sempre buscar o registro atual para obter o status anterior correto
     let currentSo: ServiceOrderRecord | null = null
-    let historyList: any[] = Array.isArray(currentHistory) ? [...currentHistory] : []
-
-    if (!currentHistory) {
-      try {
-        currentSo = await pb.collection('service_orders').getOne<ServiceOrderRecord>(id)
-        if (currentSo?.status_history && Array.isArray(currentSo.status_history)) {
-          historyList = [...currentSo.status_history]
-        }
-      } catch {
-        /* intentionally ignored */
-      }
+    try {
+      currentSo = await pb.collection('service_orders').getOne<ServiceOrderRecord>(id)
+    } catch {
+      /* intentionally ignored */
     }
 
-    const previousStatus = currentSo?.status || 'desconhecido'
+    // Manter historyList baseado no parâmetro ou fallback para o registro do banco
+    let historyList: any[] = Array.isArray(currentHistory) ? [...currentHistory] : []
+    if (
+      !Array.isArray(currentHistory) &&
+      currentSo?.status_history &&
+      Array.isArray(currentSo.status_history)
+    ) {
+      historyList = [...currentSo.status_history]
+    }
+
+    const lastToStatus =
+      historyList.length > 0 ? historyList[historyList.length - 1]?.to_status : undefined
+    const previousStatus = currentSo?.status || lastToStatus || 'desconhecido'
     const newHistoryEntry = {
       from_status: previousStatus,
       to_status: newStatus,
