@@ -165,6 +165,7 @@ export function QuotesManager({
   // ----------------------------------------------------
   const [clientId, setClientId] = useState('')
   const [dealId, setDealId] = useState('')
+  const [dealTitle, setDealTitle] = useState('')
   const [quoteCode, setQuoteCode] = useState('')
   const [status, setStatus] = useState<QuoteStatus>('draft')
 
@@ -1121,6 +1122,7 @@ export function QuotesManager({
       client_name: selectedClient?.name || 'Cliente Não Identificado',
       client_document: selectedClient?.document || '',
       deal_id: dealId || undefined,
+      deal_title: dealTitle.trim() || undefined,
 
       // Equipamento & Parâmetros Técnicos (compatibilidade com primeiro equipamento)
       equipment_brand: firstEq.brand,
@@ -1294,6 +1296,7 @@ export function QuotesManager({
     editingQuoteId,
     clientId,
     dealId,
+    dealTitle,
     quoteCode,
     status,
     equipments,
@@ -1390,6 +1393,7 @@ export function QuotesManager({
     setIsEditMode(false)
     setClientId('')
     setDealId('')
+    setDealTitle('')
     setQuoteCode('')
     setStatus('draft')
     setEquipments([createDefaultEquipment('1')])
@@ -1474,6 +1478,9 @@ export function QuotesManager({
     setQuoteCode(q.code || q.quote_number || '')
     setClientId(q.client_id || '')
     setDealId(q.deal_id || '')
+    setDealTitle(
+      q.deal_title || (q.deal_id ? deals.find((d) => d.id === q.deal_id)?.title || '' : ''),
+    )
     setStatus(q.status || 'draft')
 
     // Extrair dados aninhados em service_details ou items caso existam
@@ -2339,14 +2346,47 @@ export function QuotesManager({
                 </Select>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold">Oportunidade / Negócio (CRM)</Label>
-                <Select value={dealId} onValueChange={setDealId}>
-                  <SelectTrigger className="text-xs">
-                    <SelectValue placeholder="Vincular a Negócio (Opcional)" />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-semibold">Oportunidade / Negócio (CRM)</Label>
+                  <span className="text-[10px] text-muted-foreground">Texto livre ou Vincular</span>
+                </div>
+                <Input
+                  value={dealTitle}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setDealTitle(val)
+                    if (dealId && dealId !== 'none') {
+                      const matchedDeal = deals.find((d) => d.id === dealId)
+                      if (matchedDeal && matchedDeal.title !== val) {
+                        setDealId('')
+                      }
+                    }
+                  }}
+                  placeholder="Nome / Identificação da Oportunidade..."
+                  className="text-xs h-8"
+                />
+                <Select
+                  value={dealId || 'none'}
+                  onValueChange={(val) => {
+                    if (val === 'none') {
+                      setDealId('')
+                    } else {
+                      setDealId(val)
+                      const matchedDeal = deals.find((d) => d.id === val)
+                      if (matchedDeal) {
+                        setDealTitle(matchedDeal.title)
+                      }
+                    }
+                  }}
+                >
+                  <SelectTrigger className="text-xs h-7 bg-slate-100/80 dark:bg-slate-800/80 border-dashed">
+                    <SelectValue placeholder="Ou selecionar negócio existente..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Nenhum (Avulso)</SelectItem>
+                    <SelectItem value="none" className="text-xs">
+                      Nenhum / Não vinculado (Apenas texto)
+                    </SelectItem>
                     {deals.map((d) => (
                       <SelectItem key={d.id} value={d.id} className="text-xs">
                         {d.title} ({d.stage})

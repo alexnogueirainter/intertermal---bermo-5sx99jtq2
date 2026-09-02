@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-01T20:21:21.709Z",
+  "generatedAt": "2026-09-02T18:49:28.551Z",
   "collections": [
     {
       "name": "users",
@@ -902,6 +902,12 @@
         {
           "name": "rejected_by_client_date",
           "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "deal_title",
+          "type": "text",
           "required": false,
           "system": false
         }

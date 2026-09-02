@@ -645,6 +645,14 @@ export function QuotePdfPreviewDialog({
                   CNPJ/CPF: {quote.client_document}
                 </div>
               )}
+              {isInternal && (quote.deal_title || quote.deal_id) && (
+                <div className="text-[11px] print:text-[10pt] text-amber-900 bg-amber-100/70 border border-amber-300 rounded px-2 py-1 mt-1 inline-block">
+                  <span className="font-semibold uppercase text-[9.5px] print:text-[9pt] text-amber-800 mr-1">
+                    Oportunidade / Negócio:
+                  </span>
+                  <span className="font-bold">{quote.deal_title || `ID: ${quote.deal_id}`}</span>
+                </div>
+              )}
             </div>
 
             <div className="space-y-1.5 print:space-y-1 sm:text-right">

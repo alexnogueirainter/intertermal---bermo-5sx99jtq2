@@ -213,6 +213,7 @@ export interface QuoteRecord {
   client_name?: string
   client_document?: string
   deal_id?: string
+  deal_title?: string
   equipment_brand?: string
   equipment_model?: string
   equipment_series?: string
