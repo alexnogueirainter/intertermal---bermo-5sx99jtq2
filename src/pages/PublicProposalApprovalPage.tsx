@@ -73,16 +73,49 @@ export const PublicProposalApprovalPage: React.FC = () => {
     loadProposal()
   }, [token])
 
+  // Notificar outros componentes/abas sobre alteração no status da proposta
+  const notifyProposalChange = (
+    status: 'approved' | 'rejected',
+    extraData?: Record<string, any>,
+  ) => {
+    const quoteId = quote?.id
+    const payload = {
+      type: 'PROPOSAL_STATUS_CHANGED',
+      quoteId,
+      status,
+      timestamp: Date.now(),
+      ...extraData,
+    }
+
+    try {
+      window.dispatchEvent(new CustomEvent('intertermal:proposal-updated', { detail: payload }))
+    } catch {
+      /* intentionally ignored */
+    }
+
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        const bc = new BroadcastChannel('intertermal_proposals_channel')
+        bc.postMessage(payload)
+        bc.close()
+      }
+    } catch {
+      /* intentionally ignored */
+    }
+  }
+
   const handleApprove = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!clientApproverName.trim()) return
 
     setSubmittingAction(true)
     try {
+      const approverName = clientApproverName.trim()
       const res = await quotesService.actionPublicProposal(token!, 'approve', {
-        client_name: clientApproverName.trim(),
+        client_name: approverName,
       })
       if (res.success) {
+        notifyProposalChange('approved', { client_name: approverName })
         setActionSuccessMessage(
           res.message || 'Proposta aprovada com sucesso! A Ordem de Serviço foi emitida.',
         )
@@ -102,10 +135,12 @@ export const PublicProposalApprovalPage: React.FC = () => {
     e.preventDefault()
     setSubmittingAction(true)
     try {
+      const reasonText = rejectReason.trim() || 'Sem motivo detalhado'
       const res = await quotesService.actionPublicProposal(token!, 'reject', {
-        reason: rejectReason.trim() || 'Sem motivo detalhado',
+        reason: reasonText,
       })
       if (res.success) {
+        notifyProposalChange('rejected', { reason: reasonText })
         setActionSuccessMessage(
           res.message || 'Proposta marcada como reprovada. Entraremos em contato para ajustes.',
         )

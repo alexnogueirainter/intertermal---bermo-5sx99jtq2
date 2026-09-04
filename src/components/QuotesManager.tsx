@@ -28,6 +28,7 @@ import {
   ChevronDown,
   ChevronUp,
   Boxes,
+  XCircle,
 } from 'lucide-react'
 import {
   QuoteRecord,
@@ -141,6 +142,12 @@ export function QuotesManager({
   const [quoteToApprove, setQuoteToApprove] = useState<QuoteRecord | null>(null)
   const [isApprovalConfirmOpen, setIsApprovalConfirmOpen] = useState(false)
   const [isApprovingProposal, setIsApprovingProposal] = useState(false)
+
+  // Modal de Confirmação de Recusa / Reprovação
+  const [quoteToReject, setQuoteToReject] = useState<QuoteRecord | null>(null)
+  const [isRejectConfirmOpen, setIsRejectConfirmOpen] = useState(false)
+  const [rejectReasonInput, setRejectReasonInput] = useState('')
+  const [isRejectingProposal, setIsRejectingProposal] = useState(false)
 
   // Modal e controle de Confirmação de Exclusão
   const [quoteToDelete, setQuoteToDelete] = useState<QuoteRecord | null>(null)
@@ -1385,6 +1392,28 @@ export function QuotesManager({
         description: `Código: ${quoteData.code} | Valor Final: ${computation.finalClientPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
       })
 
+      // Notificar outros componentes / abas
+      const payload = {
+        type: 'PROPOSAL_STATUS_CHANGED',
+        quoteId: editingQuoteId || undefined,
+        status: quoteData.status,
+        timestamp: Date.now(),
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('intertermal:proposal-updated', { detail: payload }))
+      } catch {
+        /* intentionally ignored */
+      }
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('intertermal_proposals_channel')
+          bc.postMessage(payload)
+          bc.close()
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+
       setIsCreateModalOpen(false)
       resetForm()
     } catch (err) {
@@ -1801,6 +1830,70 @@ export function QuotesManager({
     }
   }
 
+  // Ação de atualização de status direto da tabela / selects
+  const handleDirectStatusUpdate = async (id: string, newStatus: QuoteStatus) => {
+    if (newStatus === 'approved') {
+      const target = quotes.find((q) => q.id === id)
+      if (target) {
+        handleRequestApproval(target)
+        return
+      }
+    }
+    if (newStatus === 'rejected') {
+      const target = quotes.find((q) => q.id === id)
+      if (target) {
+        handleRequestReject(target)
+        return
+      }
+    }
+
+    try {
+      if (onUpdateQuoteStatus) {
+        await onUpdateQuoteStatus(id, newStatus)
+      } else if (onUpdateStatus) {
+        await onUpdateStatus(id, newStatus)
+      } else if (onUpdateQuote) {
+        await onUpdateQuote(id, { status: newStatus })
+      } else {
+        await quotesService.update(id, { status: newStatus })
+      }
+
+      // Notificar outros componentes / abas
+      const payload = {
+        type: 'PROPOSAL_STATUS_CHANGED',
+        quoteId: id,
+        status: newStatus,
+        timestamp: Date.now(),
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('intertermal:proposal-updated', { detail: payload }))
+      } catch {
+        /* intentionally ignored */
+      }
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('intertermal_proposals_channel')
+          bc.postMessage(payload)
+          bc.close()
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+
+      toast({
+        title: 'Status atualizado',
+        description: `Status da proposta alterado para ${newStatus}.`,
+      })
+    } catch (err: any) {
+      console.error('Erro ao atualizar status:', err)
+      toast({
+        title: 'Erro ao atualizar status',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
   // Ação de aprovação de proposta + envio de e-mail automático
   const handleApproveQuote = async (targetQuote: QuoteRecord) => {
     if (!targetQuote?.id) return
@@ -1830,6 +1923,28 @@ export function QuotesManager({
       // 2. Chamar endpoint do backend para envio de e-mail
       const emailResult = await quotesService.sendProposalApprovalEmail(targetQuote.id)
 
+      // Notificar componentes / outras abas
+      const payload = {
+        type: 'PROPOSAL_STATUS_CHANGED',
+        quoteId: targetQuote.id,
+        status: 'approved',
+        timestamp: Date.now(),
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('intertermal:proposal-updated', { detail: payload }))
+      } catch {
+        /* intentionally ignored */
+      }
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('intertermal_proposals_channel')
+          bc.postMessage(payload)
+          bc.close()
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+
       toast({
         title: 'Proposta Aprovada com Sucesso!',
         description:
@@ -1855,6 +1970,93 @@ export function QuotesManager({
   const handleRequestApproval = (quote: QuoteRecord) => {
     setQuoteToApprove(quote)
     setIsApprovalConfirmOpen(true)
+  }
+
+  const handleRequestReject = (quote: QuoteRecord) => {
+    setQuoteToReject(quote)
+    setRejectReasonInput(quote.rejected_by_client_reason || '')
+    setIsRejectConfirmOpen(true)
+  }
+
+  // Ação de recusa de proposta
+  const handleRejectQuote = async (targetQuote: QuoteRecord, reason?: string) => {
+    if (!targetQuote?.id) return
+    setIsRejectingProposal(true)
+    try {
+      const finalReason = reason?.trim() || 'Recusada pelo cliente / usuário'
+
+      if (onUpdateQuote) {
+        await onUpdateQuote(targetQuote.id, {
+          status: 'rejected',
+          rejected_by_client_reason: finalReason,
+        })
+      } else if (onUpdateQuoteStatus) {
+        await onUpdateQuoteStatus(targetQuote.id, 'rejected')
+      } else if (onUpdateStatus) {
+        await onUpdateStatus(targetQuote.id, 'rejected')
+      } else {
+        await quotesService.update(targetQuote.id, {
+          status: 'rejected',
+          rejected_by_client_reason: finalReason,
+        })
+      }
+
+      // Se estiver editando esta proposta no formulário, atualizar o estado de status
+      if (editingQuoteId === targetQuote.id) {
+        setStatus('rejected')
+      }
+
+      // Atualizar objeto em prévia de PDF se for o mesmo
+      if (quoteForPdf && quoteForPdf.id === targetQuote.id) {
+        setQuoteForPdf({
+          ...quoteForPdf,
+          status: 'rejected',
+          rejected_by_client_reason: finalReason,
+        })
+      }
+
+      // Notificar componentes / outras abas
+      const payload = {
+        type: 'PROPOSAL_STATUS_CHANGED',
+        quoteId: targetQuote.id,
+        status: 'rejected',
+        reason: finalReason,
+        timestamp: Date.now(),
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('intertermal:proposal-updated', { detail: payload }))
+      } catch {
+        /* intentionally ignored */
+      }
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('intertermal_proposals_channel')
+          bc.postMessage(payload)
+          bc.close()
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+
+      toast({
+        title: 'Proposta marcada como Recusada',
+        description: `Status da proposta #${targetQuote.quote_number || targetQuote.code || ''} alterado para Recusada. O dashboard foi atualizado.`,
+        className: 'bg-rose-600 text-white font-medium border-rose-700',
+      })
+
+      setIsRejectConfirmOpen(false)
+      setQuoteToReject(null)
+      setRejectReasonInput('')
+    } catch (err: any) {
+      console.error('Erro ao recusar proposta:', err)
+      toast({
+        title: 'Erro ao recusar proposta',
+        description: err?.message || 'Não foi possível registrar a recusa da proposta.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsRejectingProposal(false)
+    }
   }
 
   // Abertura do Modal de Exclusão de Proposta com Verificação de OS Vinculada
@@ -1912,6 +2114,28 @@ export function QuotesManager({
         await onDeleteQuote(quoteToDelete.id)
       } else {
         await quotesService.delete(quoteToDelete.id)
+      }
+
+      // Notificar outros componentes / abas
+      const payload = {
+        type: 'PROPOSAL_STATUS_CHANGED',
+        quoteId: quoteToDelete.id,
+        status: 'deleted',
+        timestamp: Date.now(),
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('intertermal:proposal-updated', { detail: payload }))
+      } catch {
+        /* intentionally ignored */
+      }
+      try {
+        if (typeof BroadcastChannel !== 'undefined') {
+          const bc = new BroadcastChannel('intertermal_proposals_channel')
+          bc.postMessage(payload)
+          bc.close()
+        }
+      } catch {
+        /* intentionally ignored */
       }
 
       toast({
@@ -2254,6 +2478,19 @@ export function QuotesManager({
                               <span className="hidden sm:inline">Aprovar</span>
                             </Button>
                           )}
+                          {/* Botão Recusar Proposta (visível quando status != 'rejected') */}
+                          {q.status !== 'rejected' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRequestReject(q)}
+                              title="Recusar / Reprovar Proposta"
+                              className="h-7 px-2 text-[11px] font-bold border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950 flex items-center gap-1 shadow-2xs"
+                            >
+                              <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                              <span className="hidden sm:inline">Recusar</span>
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -2380,11 +2617,35 @@ export function QuotesManager({
                   </Button>
                 )}
 
+                {/* Botão Recusar Proposta no Header do Modal de Edição (se não estiver recusada) */}
+                {isEditMode && editingQuoteId && status !== 'rejected' && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      const currentQuoteData = getFormDataObject(status) as QuoteRecord
+                      handleRequestReject(currentQuoteData)
+                    }}
+                    className="h-7 px-2.5 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs flex items-center gap-1"
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                    Recusar Proposta
+                  </Button>
+                )}
+
                 {/* Badge de Aprovada no Header do Modal de Edição */}
                 {status === 'approved' && (
                   <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 text-xs font-bold">
                     <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                     Proposta Aprovada
+                  </Badge>
+                )}
+
+                {/* Badge de Recusada no Header do Modal de Edição */}
+                {status === 'rejected' && (
+                  <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border-rose-300 text-xs font-bold">
+                    <XCircle className="h-3.5 w-3.5 mr-1" />
+                    Proposta Recusada
                   </Badge>
                 )}
 
@@ -4472,6 +4733,22 @@ export function QuotesManager({
                   </Button>
                 )}
 
+                {/* BOTÃO "RECUSAR PROPOSTA" NO FOOTER DO MODAL (quando não recusada) */}
+                {status !== 'rejected' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const currentQuoteData = getFormDataObject(status) as QuoteRecord
+                      handleRequestReject(currentQuoteData)
+                    }}
+                    className="text-xs border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950 font-bold shadow-xs flex items-center gap-1.5"
+                  >
+                    <XCircle className="h-3.5 w-3.5 text-rose-600" />
+                    Recusar Proposta
+                  </Button>
+                )}
+
                 {/* BOTÃO "EMITIR PROPOSTA" / "SALVAR ALTERAÇÕES" */}
                 <Button
                   type="submit"
@@ -4924,6 +5201,97 @@ export function QuotesManager({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* MODAL DE CONFIRMAÇÃO DE RECUSA / REPROVAÇÃO DE PROPOSTA */}
+      <Dialog open={isRejectConfirmOpen} onOpenChange={setIsRejectConfirmOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-full bg-rose-100 dark:bg-rose-950 text-rose-600">
+                <XCircle className="h-5 w-5" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-bold text-rose-800 dark:text-rose-300">
+                  Recusar Proposta #
+                  {quoteToReject?.quote_number || quoteToReject?.code || quoteCode}
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Cliente:{' '}
+                  {quoteToReject?.client_name ||
+                    clients.find((c) => c.id === clientId)?.name ||
+                    'Não informado'}
+                </p>
+              </div>
+            </div>
+            <DialogDescription className="text-xs pt-2 text-slate-600 dark:text-slate-300">
+              Ao registrar a recusa, o status da proposta será atualizado para{' '}
+              <strong>Recusada</strong> e todos os contadores e métricas do Dashboard serão
+              recalculados automaticamente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (quoteToReject) {
+                handleRejectQuote(quoteToReject, rejectReasonInput)
+              }
+            }}
+            className="space-y-4 py-2 text-xs"
+          >
+            <div className="space-y-1.5">
+              <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                Motivo da Recusa / Observações do Cliente
+              </Label>
+              <Textarea
+                rows={3}
+                placeholder="Ex: Preço acima do orçamento previsto, cliente optou por adiar manutenção, prazo não atende..."
+                value={rejectReasonInput}
+                onChange={(e) => setRejectReasonInput(e.target.value)}
+                className="text-xs"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Este motivo ficará salvo no histórico da proposta para análise comercial.
+              </p>
+            </div>
+
+            <DialogFooter className="mt-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isRejectingProposal}
+                onClick={() => {
+                  setIsRejectConfirmOpen(false)
+                  setQuoteToReject(null)
+                  setRejectReasonInput('')
+                }}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isRejectingProposal}
+                className="text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white"
+              >
+                {isRejectingProposal ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    Registrando Recusa...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                    Confirmar Recusa da Proposta
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* MODAL DE CONFIRMAÇÃO DE APROVAÇÃO E ENVIO DE E-MAIL */}
       <AlertDialog open={isApprovalConfirmOpen} onOpenChange={setIsApprovalConfirmOpen}>

@@ -59,16 +59,32 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const [periodFilter, setPeriodFilter] = React.useState<'all' | 'month' | 'quarter' | 'year'>(
     'all',
   )
-  // Cálculos de métricas
+  // Cálculos de métricas de propostas
+  const approvedQuotes = quotes.filter((q) => q.status === 'approved')
+  const rejectedQuotes = quotes.filter((q) => q.status === 'rejected')
+  const pendingQuotes = quotes.filter(
+    (q) => q.status === 'sent' || q.status === 'draft' || q.status === 'pending_approval',
+  )
+
+  const approvedQuotesTotal = approvedQuotes.reduce(
+    (sum, q) => sum + (Number(q.total ?? q.final_price) || 0),
+    0,
+  )
+
+  const rejectedQuotesTotal = rejectedQuotes.reduce(
+    (sum, q) => sum + (Number(q.total ?? q.final_price) || 0),
+    0,
+  )
+
+  const totalQuotesValue = quotes.reduce(
+    (sum, q) => sum + (Number(q.total ?? q.final_price) || 0),
+    0,
+  )
+
   const totalPipelineValue = deals
     .filter((d) => d.stage !== 'lost')
     .reduce((sum, d) => sum + (Number(d.value) || 0), 0)
 
-  const approvedQuotesTotal = quotes
-    .filter((q) => q.status === 'approved')
-    .reduce((sum, q) => sum + (Number(q.total ?? q.final_price) || 0), 0)
-
-  const pendingQuotes = quotes.filter((q) => q.status === 'sent' || q.status === 'draft')
   const openTickets = tickets.filter((t) => t.status === 'open' || t.status === 'in_progress')
   const activeServices = services.filter(
     (s) => s.status === 'in_progress' || s.status === 'planning',
@@ -488,31 +504,89 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             </div>
           </div>
 
-          {/* Grid de KPIs Principais */}
+          {/* Grid de KPIs de Propostas e Status Comercial */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+            <Card
+              onClick={() => onNavigate('quotes')}
+              className="border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-emerald-400 transition-all"
+            >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Orçamentos Aprovados
+                  Propostas Aprovadas
                 </CardTitle>
                 <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                   <CheckCircle2 className="h-4 w-4" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
                   {approvedQuotesTotal.toLocaleString('pt-BR', {
                     style: 'currency',
                     currency: 'BRL',
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  {quotes.filter((q) => q.status === 'approved').length} propostas fechadas
+                  {approvedQuotes.length} de {quotes.length} propostas fechadas
                 </p>
               </CardContent>
             </Card>
 
-            <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+            <Card
+              onClick={() => onNavigate('quotes')}
+              className="border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-rose-400 transition-all"
+            >
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Propostas Recusadas
+                </CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
+                  <TrendingDown className="h-4 w-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-rose-700 dark:text-rose-400">
+                  {rejectedQuotesTotal.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {rejectedQuotes.length} propostas recusadas pelo cliente
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              onClick={() => onNavigate('quotes')}
+              className="border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-amber-400 transition-all"
+            >
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Pendentes / Em Negociação
+                </CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <Clock className="h-4 w-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-amber-700 dark:text-amber-400">
+                  {pendingQuotes
+                    .reduce((sum, q) => sum + (Number(q.total ?? q.final_price) || 0), 0)
+                    .toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {pendingQuotes.length} propostas em análise
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              onClick={() => onNavigate('pipeline')}
+              className="border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-teal-400 transition-all"
+            >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Pipeline Comercial BERMO
@@ -529,12 +603,18 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  {deals.length} oportunidades em andamento
+                  {deals.length} oportunidades no CRM
                 </p>
               </CardContent>
             </Card>
+          </div>
 
-            <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+          {/* Segunda linha de KPIs: Operação e Suporte */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card
+              onClick={() => onNavigate('services')}
+              className="border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-blue-400 transition-all"
+            >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Ordens de Serviço em Campo
@@ -553,7 +633,10 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </CardContent>
             </Card>
 
-            <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+            <Card
+              onClick={() => onNavigate('tickets')}
+              className="border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-amber-400 transition-all"
+            >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Chamados & Suporte
@@ -568,6 +651,31 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
                   Atendimento pós-venda industrial
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              onClick={() => onNavigate('quotes')}
+              className="border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-teal-400 transition-all"
+            >
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Volume Total em Propostas
+                </CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center">
+                  <DollarSign className="h-4 w-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                  {totalQuotesValue.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {quotes.length} propostas emitidas no histórico
                 </p>
               </CardContent>
             </Card>
@@ -624,22 +732,28 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                         })}
                       </span>
                       <Badge
-                        variant={
+                        variant="outline"
+                        className={`text-[9px] uppercase px-1.5 font-bold ${
                           q.status === 'approved'
-                            ? 'default'
-                            : q.status === 'sent'
-                              ? 'secondary'
-                              : 'outline'
-                        }
-                        className="text-[9px] uppercase px-1.5"
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                            : q.status === 'rejected'
+                              ? 'bg-rose-50 text-rose-700 border-rose-300'
+                              : q.status === 'sent'
+                                ? 'bg-blue-50 text-blue-700 border-blue-300'
+                                : q.status === 'pending_approval'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-300'
+                                  : 'bg-slate-100 text-slate-700 border-slate-300'
+                        }`}
                       >
                         {q.status === 'approved'
                           ? 'Aprovado'
-                          : q.status === 'sent'
-                            ? 'Enviado'
-                            : q.status === 'draft'
-                              ? 'Rascunho'
-                              : q.status}
+                          : q.status === 'rejected'
+                            ? 'Recusado'
+                            : q.status === 'sent'
+                              ? 'Enviado'
+                              : q.status === 'pending_approval'
+                                ? 'Em Aprovação'
+                                : 'Rascunho'}
                       </Badge>
                     </div>
                   </div>

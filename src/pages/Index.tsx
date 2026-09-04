@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
+import { useRealtime } from '@/hooks/use-realtime'
 
 // Services & Types
 import { clientsService } from '@/services/clients'
@@ -97,10 +98,20 @@ export default function IndexPage() {
   const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(null)
   const [selectedQuote, setSelectedQuote] = useState<QuoteRecord | null>(null)
 
-  // Carregar dados iniciais
-  const loadAllData = async () => {
+  // Carregar dados de propostas de forma silenciosa e rápida
+  const refreshQuotes = async () => {
     try {
-      setIsLoading(true)
+      const quotesRes = await quotesService.getAll()
+      setQuotes(quotesRes)
+    } catch (err) {
+      console.warn('Erro ao atualizar propostas em background:', err)
+    }
+  }
+
+  // Carregar todos os dados (com indicador opcional de loading)
+  const loadAllData = async (silent = false) => {
+    try {
+      if (!silent) setIsLoading(true)
       const [
         clientsRes,
         dealsRes,
@@ -131,18 +142,111 @@ export default function IndexPage() {
       setActivities(activitiesRes)
     } catch (err: any) {
       console.error('Erro ao carregar dados:', err)
-      toast({
-        title: 'Erro ao conectar ao banco',
-        description: err.message || 'Verifique as coleções do PocketBase.',
-        variant: 'destructive',
-      })
+      if (!silent) {
+        toast({
+          title: 'Erro ao conectar ao banco',
+          description: err.message || 'Verifique as coleções do PocketBase.',
+          variant: 'destructive',
+        })
+      }
     } finally {
-      setIsLoading(false)
+      if (!silent) setIsLoading(false)
     }
   }
 
   useEffect(() => {
     loadAllData()
+  }, [])
+
+  // Inscrição em Realtime para a coleção 'quotes'
+  useRealtime<any>('quotes', (e) => {
+    const record = e.record as unknown as QuoteRecord
+    if (e.action === 'create') {
+      setQuotes((prev) => {
+        const exists = prev.some((q) => q.id === record.id)
+        return exists
+          ? prev.map((q) => (q.id === record.id ? { ...q, ...record } : q))
+          : [record, ...prev]
+      })
+    } else if (e.action === 'update') {
+      setQuotes((prev) => prev.map((q) => (q.id === record.id ? { ...q, ...record } : q)))
+      setSelectedQuote((prev) => (prev?.id === record.id ? { ...prev, ...record } : prev))
+    } else if (e.action === 'delete') {
+      setQuotes((prev) => prev.filter((q) => q.id !== record.id))
+      setSelectedQuote((prev) => (prev?.id === record.id ? null : prev))
+    }
+  })
+
+  // Inscrição em Realtime para a coleção 'service_orders' (quando OS é criada após aprovação)
+  useRealtime<any>('service_orders', (e) => {
+    const record = e.record as unknown as ServiceOrderRecord
+    if (e.action === 'create') {
+      setServiceOrders((prev) => {
+        const exists = prev.some((o) => o.id === record.id)
+        return exists
+          ? prev.map((o) => (o.id === record.id ? { ...o, ...record } : o))
+          : [record, ...prev]
+      })
+    } else if (e.action === 'update') {
+      setServiceOrders((prev) => prev.map((o) => (o.id === record.id ? { ...o, ...record } : o)))
+    } else if (e.action === 'delete') {
+      setServiceOrders((prev) => prev.filter((o) => o.id !== record.id))
+    }
+  })
+
+  // Listener para eventos customizados da aplicação e BroadcastChannel entre abas
+  useEffect(() => {
+    const handleProposalStatusUpdated = (evt?: any) => {
+      refreshQuotes()
+      loadAllData(true)
+      const detail = evt?.detail
+      if (detail?.quoteId && detail?.status) {
+        setQuotes((prev) =>
+          prev.map((q) =>
+            q.id === detail.quoteId
+              ? {
+                  ...q,
+                  status: detail.status,
+                  ...(detail.reason ? { rejected_by_client_reason: detail.reason } : {}),
+                  ...(detail.client_name ? { approved_by_client_name: detail.client_name } : {}),
+                }
+              : q,
+          ),
+        )
+      }
+    }
+
+    // Ouvir CustomEvent local emitido pela mesma janela
+    window.addEventListener('intertermal:proposal-updated', handleProposalStatusUpdated)
+
+    // Ouvir BroadcastChannel para sincronização instantânea entre abas no mesmo navegador
+    let bc: BroadcastChannel | null = null
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('intertermal_proposals_channel')
+        bc.onmessage = (msgEvent) => {
+          if (msgEvent.data?.type === 'PROPOSAL_STATUS_CHANGED') {
+            handleProposalStatusUpdated({ detail: msgEvent.data })
+          }
+        }
+      }
+    } catch {
+      /* intentionally ignored */
+    }
+
+    // Refetch ao retomar o foco da janela ou aba (ex: voltou da aba do cliente / aprovação)
+    const handleFocus = () => {
+      refreshQuotes()
+    }
+    window.addEventListener('focus', handleFocus)
+
+    return () => {
+      window.removeEventListener('intertermal:proposal-updated', handleProposalStatusUpdated)
+      window.removeEventListener('focus', handleFocus)
+      if (bc) {
+        bc.close()
+      }
+    }
   }, [])
 
   // Handler de seleção de produto do catálogo para abrir o orçamento
