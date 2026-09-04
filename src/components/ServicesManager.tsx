@@ -39,7 +39,20 @@ import {
   ShieldCheck,
   Info,
   DollarSign,
+  Trash2,
+  Ban,
+  Loader2,
 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import type {
   ServiceRecord,
   ServiceOrderRecord,
@@ -61,6 +74,8 @@ interface ServicesManagerProps {
     status: ServiceOrderStatus,
     approvalNotes?: string,
   ) => Promise<void> | void
+  onDeleteServiceOrder?: (id: string) => Promise<void> | void
+  onCancelServiceOrder?: (id: string, reason?: string) => Promise<void> | void
 }
 
 export const ServicesManager: React.FC<ServicesManagerProps> = ({
@@ -70,6 +85,8 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
   deals,
   onCreateService,
   onUpdateServiceOrderStatus,
+  onDeleteServiceOrder,
+  onCancelServiceOrder,
 }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'services'>('orders')
   const [searchTerm, setSearchTerm] = useState('')
@@ -82,6 +99,48 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
   const [actionType, setActionType] = useState<'approve' | 'reject' | 'execute' | 'complete'>(
     'approve',
   )
+
+  // Modais de exclusão e cancelamento de OS
+  const [orderToDelete, setOrderToDelete] = useState<ServiceOrderRecord | null>(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const [orderToCancel, setOrderToCancel] = useState<ServiceOrderRecord | null>(null)
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [isCancelling, setIsCancelling] = useState(false)
+
+  const handleConfirmDeleteOS = async () => {
+    if (!orderToDelete) return
+    setIsDeleting(true)
+    try {
+      if (onDeleteServiceOrder) {
+        await onDeleteServiceOrder(orderToDelete.id)
+      }
+      setIsDeleteModalOpen(false)
+      setOrderToDelete(null)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleConfirmCancelOS = async () => {
+    if (!orderToCancel) return
+    setIsCancelling(true)
+    try {
+      const reason = cancelReason.trim() || 'Cancelado pelo usuário na aba de Serviços'
+      if (onCancelServiceOrder) {
+        await onCancelServiceOrder(orderToCancel.id, reason)
+      } else if (onUpdateServiceOrderStatus) {
+        await onUpdateServiceOrderStatus(orderToCancel.id, 'cancelled', reason)
+      }
+      setIsCancelModalOpen(false)
+      setOrderToCancel(null)
+      setCancelReason('')
+    } finally {
+      setIsCancelling(false)
+    }
+  }
   // Form State
   const [title, setTitle] = useState('')
   const [serviceType, setServiceType] = useState<ServiceType>('maintenance')
@@ -222,7 +281,8 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
             <SelectItem value="in_progress">Em Andamento</SelectItem>
             <SelectItem value="completed">Concluída</SelectItem>
             <SelectItem value="rejected">Rejeitada</SelectItem>
-          </SelectContent>
+            <SelectItem value="cancelled">Cancelada</SelectItem>
+          </SelectContent>{' '}
         </Select>{' '}
       </div>
 
@@ -284,7 +344,49 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                           <Badge className="bg-rose-600 text-white text-[10px] flex items-center gap-1">
                             <XCircle className="h-3 w-3" /> Rejeitada
                           </Badge>
+                        )}
+                        {so.status === 'cancelled' && (
+                          <Badge className="bg-slate-500 text-white text-[10px] flex items-center gap-1">
+                            <Ban className="h-3 w-3" /> Cancelada
+                          </Badge>
                         )}{' '}
+                        <div className="flex items-center gap-1 ml-auto">
+                          {/* Cancelar OS */}
+                          {so.status !== 'cancelled' && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setOrderToCancel(so)
+                                setCancelReason(
+                                  `Cancelada a partir da proposta #${so.quote_number || so.order_number || ''}`,
+                                )
+                                setIsCancelModalOpen(true)
+                              }}
+                              className="h-6 w-6 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                              title="Cancelar Ordem de Serviço"
+                              aria-label={`Cancelar OS #${so.order_number || so.id}`}
+                            >
+                              <Ban className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {/* Excluir OS */}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setOrderToDelete(so)
+                              setIsDeleteModalOpen(true)
+                            }}
+                            className="h-6 w-6 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                            title="Excluir Ordem de Serviço"
+                            aria-label={`Excluir OS #${so.order_number || so.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
 
                       <CardTitle className="text-sm font-bold mt-2 text-slate-900 dark:text-slate-100 line-clamp-2">
@@ -668,6 +770,178 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* AlertDialog de Exclusão de OS */}
+      <AlertDialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <AlertDialogContent className="sm:max-w-[480px]">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div className="overflow-hidden">
+                <AlertDialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  Excluir Ordem de Serviço #{orderToDelete?.order_number || orderToDelete?.id}?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-xs text-muted-foreground mt-0.5 truncate">
+                  Cliente: {orderToDelete?.client_name || 'Cliente Industrial'}
+                </AlertDialogDescription>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-3 text-xs">
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Número da OS:</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                    OS #{orderToDelete?.order_number || orderToDelete?.id}
+                  </span>
+                </div>
+                {orderToDelete?.quote_number && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Proposta Vinculada:</span>
+                    <span className="font-mono text-teal-700 dark:text-teal-400 font-semibold">
+                      #{orderToDelete.quote_number}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Status Atual:</span>
+                  <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                    {orderToDelete?.status}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Valor Total:</span>
+                  <strong className="text-emerald-700 dark:text-emerald-400 font-mono">
+                    {(orderToDelete?.total_value || orderToDelete?.final_price || 0).toLocaleString(
+                      'pt-BR',
+                      { style: 'currency', currency: 'BRL' },
+                    )}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs">
+                <p className="font-semibold text-rose-900 dark:text-rose-100 flex items-center gap-1.5 mb-1">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                  Ação permanente e irreversível!
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  Esta Ordem de Serviço será permanentemente excluída. O vínculo com a proposta
+                  comercial será liberado, permitindo que a proposta possa ser excluída caso
+                  desejado.
+                </p>
+              </div>
+            </div>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="mt-3">
+            <AlertDialogCancel
+              disabled={isDeleting}
+              className="text-xs"
+              onClick={() => {
+                setIsDeleteModalOpen(false)
+                setOrderToDelete(null)
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirmDeleteOS()
+              }}
+              className="text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Excluindo OS...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                  Sim, Excluir OS
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* AlertDialog de Cancelamento de OS */}
+      <AlertDialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+        <AlertDialogContent className="sm:max-w-[480px]">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 shrink-0">
+                <Ban className="h-5 w-5" />
+              </div>
+              <div className="overflow-hidden">
+                <AlertDialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  Cancelar Ordem de Serviço #{orderToCancel?.order_number || orderToCancel?.id}?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-xs text-muted-foreground mt-0.5 truncate">
+                  Cliente: {orderToCancel?.client_name || 'Cliente Industrial'}
+                </AlertDialogDescription>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-3 text-xs">
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                O cancelamento altera o status da OS para <strong>"cancelado"</strong> mantendo o
+                registro histórico para fins contábeis e auditoria no CRM.
+              </p>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Motivo do Cancelamento</Label>
+                <Textarea
+                  placeholder="Ex: Cliente cancelou a contratação, escopo renegociado..."
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="text-xs h-20"
+                />
+              </div>
+            </div>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="mt-3">
+            <AlertDialogCancel
+              disabled={isCancelling}
+              className="text-xs"
+              onClick={() => {
+                setIsCancelModalOpen(false)
+                setOrderToCancel(null)
+                setCancelReason('')
+              }}
+            >
+              Voltar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isCancelling}
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirmCancelOS()
+              }}
+              className="text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {isCancelling ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Cancelando OS...
+                </>
+              ) : (
+                <>
+                  <Ban className="h-3.5 w-3.5 mr-1.5" />
+                  Confirmar Cancelamento
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

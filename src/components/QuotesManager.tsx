@@ -1865,10 +1865,17 @@ export function QuotesManager({
     setIsDeleteModalOpen(true)
 
     try {
-      // Buscar se há Ordens de Serviço vinculadas a esta proposta
+      // Buscar se há Ordens de Serviço ativas (não canceladas) vinculadas a esta proposta
       const allOrders = await serviceOrdersService.getAll()
       const quoteCodeOrNum = (quote.quote_number || quote.code || '').trim()
       const matching = allOrders.filter((o) => {
+        // Se a OS já foi cancelada, ela não bloqueia a exclusão da proposta
+        if (
+          String(o.status).toLowerCase() === 'cancelled' ||
+          String(o.status).toLowerCase() === 'cancelado'
+        )
+          return false
+
         if (o.quote_id && o.quote_id === quote.id) return true
         if (quoteCodeOrNum) {
           if (o.order_number && o.order_number === quoteCodeOrNum) return true

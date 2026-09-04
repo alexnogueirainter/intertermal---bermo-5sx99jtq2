@@ -9,6 +9,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -34,11 +44,16 @@ import {
   History,
   ShieldCheck,
   AlertCircle,
+  AlertTriangle,
   FileCheck2,
   FileText,
   DollarSign,
   User,
   Filter,
+  Trash2,
+  Ban,
+  Loader2,
+  Eye,
 } from 'lucide-react'
 import type {
   ServiceOrderRecord,
@@ -58,6 +73,8 @@ interface ServiceOrdersKanbanProps {
     notes?: string,
     authorName?: string,
   ) => Promise<void> | void
+  onDeleteServiceOrder?: (id: string) => Promise<void> | void
+  onCancelServiceOrder?: (id: string, reason?: string) => Promise<void> | void
   onCreateServiceOrder?: (data: Partial<ServiceOrderRecord>) => void
   onSelectServiceOrder?: (order: ServiceOrderRecord) => void
 }
@@ -155,6 +172,8 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   clients,
   quotes = [],
   onUpdateStatus,
+  onDeleteServiceOrder,
+  onCancelServiceOrder,
   onCreateServiceOrder,
   onSelectServiceOrder,
 }) => {
@@ -169,6 +188,16 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   } | null>(null)
   const [transitionNote, setTransitionNote] = useState('')
   const [draggedOrderId, setDraggedOrderId] = useState<string | null>(null)
+
+  // Modais de Exclusão e Cancelamento de OS
+  const [orderToDelete, setOrderToDelete] = useState<ServiceOrderRecord | null>(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const [orderToCancel, setOrderToCancel] = useState<ServiceOrderRecord | null>(null)
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [isCancelling, setIsCancelling] = useState(false)
 
   // Filtragem
   const filteredOrders = serviceOrders.filter((so) => {
@@ -223,6 +252,45 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
     )
     setIsTransitionModalOpen(false)
     setTransitionTarget(null)
+  }
+
+  // Confirmação de Exclusão de OS
+  const handleConfirmDelete = async () => {
+    if (!orderToDelete) return
+    setIsDeleting(true)
+    try {
+      if (onDeleteServiceOrder) {
+        await onDeleteServiceOrder(orderToDelete.id)
+      }
+      setIsDeleteModalOpen(false)
+      setOrderToDelete(null)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  // Confirmação de Cancelamento de OS (status "cancelled")
+  const handleConfirmCancel = async () => {
+    if (!orderToCancel) return
+    setIsCancelling(true)
+    try {
+      const reason = cancelReason.trim() || 'Cancelado pelo usuário no Pipeline Técnico'
+      if (onCancelServiceOrder) {
+        await onCancelServiceOrder(orderToCancel.id, reason)
+      } else {
+        await onUpdateStatus(
+          orderToCancel.id,
+          'cancelled',
+          reason,
+          'Alex Nogueira (Especialista BERMO)',
+        )
+      }
+      setIsCancelModalOpen(false)
+      setOrderToCancel(null)
+      setCancelReason('')
+    } finally {
+      setIsCancelling(false)
+    }
   }
 
   // Drag and Drop simples nativo HTML5
@@ -358,16 +426,56 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                         onDragStart={(e) => handleDragStart(e, order.id)}
                         className="p-3 shadow-2xs hover:shadow-md transition-all border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 cursor-grab active:cursor-grabbing space-y-2 group relative hover:border-teal-500/60"
                       >
-                        {/* Topo do Card: Número da OS & Badges */}
+                        {/* Topo do Card: Número da OS & Badges + Ações Rápidas */}
                         <div className="flex items-start justify-between gap-1.5">
                           <span className="font-mono text-[11px] font-bold text-teal-800 dark:text-teal-300 bg-teal-50 dark:bg-teal-950/80 px-1.5 py-0.5 rounded border border-teal-200 dark:border-teal-800">
                             OS #{order.order_number || order.quote_number || order.id.slice(0, 6)}
                           </span>
-                          {order.priority === 'urgent' || order.priority === 'high' ? (
-                            <Badge variant="destructive" className="text-[9px] px-1 py-0">
-                              Alta Prioridade
-                            </Badge>
-                          ) : null}
+
+                          <div className="flex items-center gap-1">
+                            {order.priority === 'urgent' || order.priority === 'high' ? (
+                              <Badge variant="destructive" className="text-[9px] px-1 py-0 mr-0.5">
+                                Alta
+                              </Badge>
+                            ) : null}
+
+                            {/* Botão Cancelar OS */}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setOrderToCancel(order)
+                                setCancelReason(
+                                  `Cancelada a partir da proposta #${order.quote_number || order.order_number || ''}`,
+                                )
+                                setIsCancelModalOpen(true)
+                              }}
+                              className="h-6 w-6 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors"
+                              title="Cancelar Ordem de Serviço (mantém histórico)"
+                              aria-label={`Cancelar OS #${order.order_number || order.id}`}
+                            >
+                              <Ban className="h-3.5 w-3.5" />
+                            </Button>
+
+                            {/* Botão Excluir OS (Lixeira no padrão visual do QuotesManager) */}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setOrderToDelete(order)
+                                setIsDeleteModalOpen(true)
+                              }}
+                              className="h-6 w-6 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                              title="Excluir Ordem de Serviço permanentemente"
+                              aria-label={`Excluir OS #${order.order_number || order.id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
 
                         {/* Título e Cliente */}
@@ -525,6 +633,180 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE ORDEM DE SERVIÇO (AlertDialog) */}
+      <AlertDialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <AlertDialogContent className="sm:max-w-[480px]">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-full bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 shrink-0">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div className="overflow-hidden">
+                <AlertDialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  Excluir Ordem de Serviço #{orderToDelete?.order_number || orderToDelete?.id}?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-xs text-muted-foreground mt-0.5 truncate">
+                  Cliente: {orderToDelete?.client_name || 'Cliente Industrial'}
+                </AlertDialogDescription>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-3 text-xs">
+              {/* Resumo dos dados da OS */}
+              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Número da OS:</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                    OS #{orderToDelete?.order_number || orderToDelete?.id}
+                  </span>
+                </div>
+                {orderToDelete?.quote_number && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Proposta Vinculada:</span>
+                    <span className="font-mono text-teal-700 dark:text-teal-400 font-semibold">
+                      #{orderToDelete.quote_number}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Status Atual:</span>
+                  <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                    {orderToDelete?.status}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Valor Total:</span>
+                  <strong className="text-emerald-700 dark:text-emerald-400 font-mono">
+                    {(orderToDelete?.total_value || orderToDelete?.final_price || 0).toLocaleString(
+                      'pt-BR',
+                      { style: 'currency', currency: 'BRL' },
+                    )}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Alerta de Ação Permanente e Irreversível */}
+              <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs">
+                <p className="font-semibold text-rose-900 dark:text-rose-100 flex items-center gap-1.5 mb-1">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                  Ação permanente e irreversível!
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  Esta Ordem de Serviço será permanentemente excluída do Pipeline Técnico. O vínculo
+                  com a proposta comercial correspondente será liberado, permitindo que a proposta
+                  possa ser excluída se desejado.
+                </p>
+              </div>
+            </div>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="mt-3">
+            <AlertDialogCancel
+              disabled={isDeleting}
+              className="text-xs"
+              onClick={() => {
+                setIsDeleteModalOpen(false)
+                setOrderToDelete(null)
+              }}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirmDelete()
+              }}
+              className="text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Excluindo OS...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                  Sim, Excluir OS
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* MODAL DE CONFIRMAÇÃO DE CANCELAMENTO DE ORDEM DE SERVIÇO */}
+      <AlertDialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+        <AlertDialogContent className="sm:max-w-[480px]">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 shrink-0">
+                <Ban className="h-5 w-5" />
+              </div>
+              <div className="overflow-hidden">
+                <AlertDialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  Cancelar Ordem de Serviço #{orderToCancel?.order_number || orderToCancel?.id}?
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-xs text-muted-foreground mt-0.5 truncate">
+                  Cliente: {orderToCancel?.client_name || 'Cliente Industrial'}
+                </AlertDialogDescription>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-3 text-xs">
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                O cancelamento altera o status da OS para <strong>"cancelado"</strong> mantendo o
+                registro operacional e a trilha de auditoria salvos no CRM.
+              </p>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold">Motivo do Cancelamento</Label>
+                <Textarea
+                  placeholder="Ex: Proposta renegociada, cliente suspendeu o cronograma ou cancelamento comercial..."
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  className="text-xs h-20"
+                />
+              </div>
+            </div>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="mt-3">
+            <AlertDialogCancel
+              disabled={isCancelling}
+              className="text-xs"
+              onClick={() => {
+                setIsCancelModalOpen(false)
+                setOrderToCancel(null)
+                setCancelReason('')
+              }}
+            >
+              Voltar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isCancelling}
+              onClick={(e) => {
+                e.preventDefault()
+                handleConfirmCancel()
+              }}
+              className="text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {isCancelling ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Cancelando OS...
+                </>
+              ) : (
+                <>
+                  <Ban className="h-3.5 w-3.5 mr-1.5" />
+                  Confirmar Cancelamento
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal Histórico Detalhado de Notificações e Transições da OS */}
       <Dialog open={isHistoryModalOpen} onOpenChange={setIsHistoryModalOpen}>

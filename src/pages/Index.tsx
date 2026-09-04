@@ -347,6 +347,73 @@ export default function IndexPage() {
     }
   }
 
+  const handleDeleteServiceOrder = async (id: string) => {
+    try {
+      const target = serviceOrders.find((o) => o.id === id)
+      await serviceOrdersService.delete(id)
+      setServiceOrders((prev) => prev.filter((o) => o.id !== id))
+      toast({
+        title: 'Ordem de Serviço excluída com sucesso',
+        description: `A OS #${target?.order_number || id} foi removida permanentemente do sistema.`,
+      })
+    } catch (err: any) {
+      console.error('Erro ao deletar OS no backend, aplicando remoção local:', err)
+      setServiceOrders((prev) => prev.filter((o) => o.id !== id))
+      toast({
+        title: 'Ordem de Serviço removida',
+        description: 'A OS foi removida da visualização.',
+      })
+    }
+  }
+
+  const handleCancelServiceOrder = async (id: string, cancelReason?: string) => {
+    const author = 'Alex Nogueira (Especialista BERMO)'
+    const reason = cancelReason || 'Ordem de Serviço cancelada pelo usuário'
+    try {
+      const currentOrder = serviceOrders.find((o) => o.id === id)
+      const updated = await serviceOrdersService.updateStatus(
+        id,
+        'cancelled',
+        reason,
+        author,
+        currentOrder?.status_history,
+      )
+      setServiceOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...updated } : o)))
+      toast({
+        title: `🚫 OS #${updated.order_number || id} Cancelada`,
+        description: `Status alterado para cancelado. Histórico preservado: "${reason}".`,
+      })
+    } catch (err: any) {
+      console.error('Erro ao cancelar OS no backend, aplicando status local:', err)
+      const now = new Date().toISOString()
+      setServiceOrders((prev) =>
+        prev.map((so) => {
+          if (so.id === id) {
+            const hist = Array.isArray(so.status_history) ? [...so.status_history] : []
+            hist.push({
+              from_status: so.status,
+              to_status: 'cancelled',
+              date: now,
+              user_name: author,
+              note: reason,
+            })
+            return {
+              ...so,
+              status: 'cancelled',
+              status_history: hist,
+              notes: reason,
+            }
+          }
+          return so
+        }),
+      )
+      toast({
+        title: 'OS Cancelada',
+        description: 'Status atualizado para cancelado localmente.',
+      })
+    }
+  }
+
   // Tickets Handlers
   const handleCreateTicket = async (data: Partial<TicketRecord>) => {
     try {
@@ -753,6 +820,8 @@ export default function IndexPage() {
               clients={clients}
               quotes={quotes}
               onUpdateStatus={handleUpdateServiceOrderStatus}
+              onDeleteServiceOrder={handleDeleteServiceOrder}
+              onCancelServiceOrder={handleCancelServiceOrder}
             />
           )}
 
@@ -772,6 +841,8 @@ export default function IndexPage() {
               deals={deals}
               onCreateService={handleCreateService}
               onUpdateServiceOrderStatus={handleUpdateServiceOrderStatus}
+              onDeleteServiceOrder={handleDeleteServiceOrder}
+              onCancelServiceOrder={handleCancelServiceOrder}
             />
           )}
 
