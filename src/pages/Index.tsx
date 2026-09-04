@@ -244,6 +244,17 @@ export default function IndexPage() {
     }
   }
 
+  const handleDeleteQuote = async (id: string) => {
+    try {
+      await quotesService.delete(id)
+      setQuotes((prev) => prev.filter((q) => q.id !== id))
+      if (selectedQuote?.id === id) setSelectedQuote(null)
+    } catch (err: any) {
+      console.error('Erro ao deletar proposta:', err)
+      throw err
+    }
+  }
+
   const handleUpdateQuoteStatus = async (id: string, status: QuoteStatus) => {
     try {
       const updated = await quotesService.update(id, { status })
@@ -702,6 +713,7 @@ export default function IndexPage() {
               selectedQuote={selectedQuote}
               onCreateQuote={handleCreateQuote}
               onUpdateQuote={handleUpdateQuote}
+              onDeleteQuote={handleDeleteQuote}
               onUpdateQuoteStatus={handleUpdateQuoteStatus}
               onCreateClient={handleCreateClient}
               onOpenCatalog={() => setActiveTab('catalog')}

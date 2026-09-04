@@ -261,8 +261,8 @@ export async function deleteQuote(id: string): Promise<boolean> {
   try {
     return await pb.collection(QUOTES_COLLECTION).delete(id)
   } catch (error) {
-    console.warn('Erro ao excluir quote no backend:', error)
-    return true
+    console.error('Erro ao excluir proposta no backend:', error)
+    throw error
   }
 }
 

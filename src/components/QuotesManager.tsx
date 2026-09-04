@@ -8,6 +8,8 @@ import {
   Eye,
   Edit,
   Trash2,
+  AlertTriangle,
+  AlertCircle,
   DollarSign,
   Layers,
   Wrench,
@@ -44,7 +46,7 @@ import {
   registerSupplierEquipment,
   SupplierPlateHeatExchanger,
 } from '@/data/fornecedores'
-import { productsService } from '@/services/crm-extras'
+import { productsService, serviceOrdersService } from '@/services/crm-extras'
 import { calculateQuotePricing, PricingCalculationResult } from '@/lib/quote-calculator'
 import {
   fetchCepCoordinates,
@@ -139,6 +141,13 @@ export function QuotesManager({
   const [quoteToApprove, setQuoteToApprove] = useState<QuoteRecord | null>(null)
   const [isApprovalConfirmOpen, setIsApprovalConfirmOpen] = useState(false)
   const [isApprovingProposal, setIsApprovingProposal] = useState(false)
+
+  // Modal e controle de Confirmação de Exclusão
+  const [quoteToDelete, setQuoteToDelete] = useState<QuoteRecord | null>(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [isCheckingLinkedOS, setIsCheckingLinkedOS] = useState(false)
+  const [linkedOrders, setLinkedOrders] = useState<any[]>([])
+  const [isDeletingQuote, setIsDeletingQuote] = useState(false)
 
   // Formulário do Modal de Cadastrar Novo Equipamento
   const [eqModalTargetEqId, setEqModalTargetEqId] = useState<string | null>(null)
@@ -1848,6 +1857,76 @@ export function QuotesManager({
     setIsApprovalConfirmOpen(true)
   }
 
+  // Abertura do Modal de Exclusão de Proposta com Verificação de OS Vinculada
+  const handleRequestDelete = async (quote: QuoteRecord) => {
+    setQuoteToDelete(quote)
+    setIsCheckingLinkedOS(true)
+    setLinkedOrders([])
+    setIsDeleteModalOpen(true)
+
+    try {
+      // Buscar se há Ordens de Serviço vinculadas a esta proposta
+      const allOrders = await serviceOrdersService.getAll()
+      const quoteCodeOrNum = (quote.quote_number || quote.code || '').trim()
+      const matching = allOrders.filter((o) => {
+        if (o.quote_id && o.quote_id === quote.id) return true
+        if (quoteCodeOrNum) {
+          if (o.order_number && o.order_number === quoteCodeOrNum) return true
+          if (o.quote_number && o.quote_number === quoteCodeOrNum) return true
+        }
+        return false
+      })
+      setLinkedOrders(matching)
+    } catch (err) {
+      console.warn('Erro ao verificar OSs vinculadas à proposta:', err)
+      setLinkedOrders([])
+    } finally {
+      setIsCheckingLinkedOS(false)
+    }
+  }
+
+  // Confirmação e Execução da Exclusão
+  const handleConfirmDelete = async () => {
+    if (!quoteToDelete) return
+
+    // Se houver OS vinculada, bloqueia a exclusão para não quebrar o histórico
+    if (linkedOrders.length > 0) {
+      toast({
+        title: 'Exclusão bloqueada',
+        description: `Esta proposta possui ${linkedOrders.length} Ordem(ns) de Serviço vinculada(s). Exclua ou cancele a OS antes de deletar a proposta.`,
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsDeletingQuote(true)
+    try {
+      if (onDeleteQuote) {
+        await onDeleteQuote(quoteToDelete.id)
+      } else {
+        await quotesService.delete(quoteToDelete.id)
+      }
+
+      toast({
+        title: 'Proposta excluída com sucesso',
+        description: `A proposta ${quoteToDelete.quote_number || quoteToDelete.code || ''} foi permanentemente removida.`,
+      })
+
+      setIsDeleteModalOpen(false)
+      setQuoteToDelete(null)
+      setLinkedOrders([])
+    } catch (err: any) {
+      console.error('Erro ao excluir proposta:', err)
+      toast({
+        title: 'Erro ao excluir proposta',
+        description: err?.message || 'Ocorreu um erro ao tentar excluir a proposta do sistema.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsDeletingQuote(false)
+    }
+  }
+
   // Filtragem de propostas
   const filteredQuotes = useMemo(() => {
     return quotes.filter((q) => {
@@ -2189,17 +2268,16 @@ export function QuotesManager({
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </Button>
-                          {onDeleteQuote && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => onDeleteQuote(q.id)}
-                              title="Excluir"
-                              className="h-7 w-7 text-slate-600 hover:text-rose-600"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRequestDelete(q)}
+                            title="Excluir Proposta"
+                            aria-label={`Excluir proposta ${q.code || q.quote_number || q.id}`}
+                            className="h-7 w-7 text-slate-600 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -4681,6 +4759,164 @@ export function QuotesManager({
           await handleApproveQuote(q)
         }}
       />
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO DE PROPOSTA */}
+      <AlertDialog
+        open={isDeleteModalOpen}
+        onOpenChange={(open) => {
+          if (!isDeletingQuote) {
+            setIsDeleteModalOpen(open)
+            if (!open) {
+              setQuoteToDelete(null)
+              setLinkedOrders([])
+            }
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div
+                className={`p-2.5 rounded-full ${
+                  linkedOrders.length > 0
+                    ? 'bg-amber-100 dark:bg-amber-950 text-amber-600'
+                    : 'bg-rose-100 dark:bg-rose-950 text-rose-600'
+                }`}
+              >
+                {linkedOrders.length > 0 ? (
+                  <AlertTriangle className="h-5 w-5" />
+                ) : (
+                  <Trash2 className="h-5 w-5" />
+                )}
+              </div>
+              <div className="flex-1">
+                <AlertDialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  {linkedOrders.length > 0
+                    ? 'Exclusão Bloqueada: OS Vinculada'
+                    : 'Confirmar Exclusão de Proposta'}
+                </AlertDialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Proposta:{' '}
+                  <strong className="text-slate-900 dark:text-slate-100 font-mono">
+                    {quoteToDelete?.quote_number || quoteToDelete?.code || quoteToDelete?.id || '—'}
+                  </strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-3 text-xs leading-relaxed space-y-2.5 text-slate-600 dark:text-slate-300">
+              <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Cliente:</span>
+                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                    {quoteToDelete?.client_name || 'Não informado'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Valor Total:</span>
+                  <span className="font-mono font-bold text-emerald-600">
+                    {(quoteToDelete?.final_price || quoteToDelete?.total || 0).toLocaleString(
+                      'pt-BR',
+                      { style: 'currency', currency: 'BRL' },
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Status Atual:</span>
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">
+                    {quoteToDelete?.status === 'approved'
+                      ? 'Aprovada'
+                      : quoteToDelete?.status === 'sent'
+                        ? 'Enviada'
+                        : quoteToDelete?.status === 'rejected'
+                          ? 'Recusada'
+                          : quoteToDelete?.status === 'pending_approval'
+                            ? 'Em Aprovação'
+                            : 'Rascunho'}
+                  </Badge>
+                </div>
+              </div>
+
+              {isCheckingLinkedOS ? (
+                <div className="flex items-center justify-center gap-2 py-3 text-muted-foreground text-xs">
+                  <Loader2 className="h-4 w-4 animate-spin text-teal-600" />
+                  <span>Verificando Ordens de Serviço vinculadas...</span>
+                </div>
+              ) : linkedOrders.length > 0 ? (
+                <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span>Atenção: Existem Ordens de Serviço ativas vinculadas</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Esta proposta gerou a(s) seguinte(s) OS no Pipeline Técnico:
+                  </p>
+                  <ul className="list-disc list-inside text-[11px] font-mono space-y-0.5">
+                    {linkedOrders.map((os) => (
+                      <li key={os.id}>
+                        OS #{os.order_number || os.id} ({os.status}) - {os.title || 'Serviço'}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium pt-1">
+                    Para manter a integridade do histórico operacional e faturamento, exclua ou
+                    cancele primeiro a Ordem de Serviço na aba de Serviços antes de deletar esta
+                    proposta.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs">
+                  <p className="font-semibold text-rose-900 dark:text-rose-100 flex items-center gap-1.5 mb-1">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                    Ação permanente e irreversível!
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    A proposta será removida definitivamente da base do CRM. Todas as composições de
+                    custos, dados de logística e cotações vinculadas serão apagados.
+                  </p>
+                </div>
+              )}
+            </div>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel
+              disabled={isDeletingQuote}
+              className="text-xs"
+              onClick={() => {
+                setIsDeleteModalOpen(false)
+                setQuoteToDelete(null)
+                setLinkedOrders([])
+              }}
+            >
+              {linkedOrders.length > 0 ? 'Entendido / Fechar' : 'Cancelar'}
+            </AlertDialogCancel>
+
+            {linkedOrders.length === 0 && (
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault()
+                  handleConfirmDelete()
+                }}
+                disabled={isDeletingQuote || isCheckingLinkedOS}
+                className="text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white"
+              >
+                {isDeletingQuote ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                    Sim, Excluir Proposta
+                  </>
+                )}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* MODAL DE CONFIRMAÇÃO DE APROVAÇÃO E ENVIO DE E-MAIL */}
       <AlertDialog open={isApprovalConfirmOpen} onOpenChange={setIsApprovalConfirmOpen}>
