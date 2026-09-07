@@ -173,7 +173,10 @@ export async function getQuotes(): Promise<QuoteRecord[]> {
       sort: '-created',
       requestKey: null,
     })
-    if (records && records.length > 0) return records
+    // Se o backend respondeu com sucesso (mesmo array vazio []), retorna os dados reais
+    if (Array.isArray(records)) {
+      return records
+    }
   } catch (error) {
     console.warn('Erro ao carregar quotes do backend:', error)
   }

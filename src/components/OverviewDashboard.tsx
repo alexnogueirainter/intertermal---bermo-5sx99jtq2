@@ -59,36 +59,108 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const [periodFilter, setPeriodFilter] = React.useState<'all' | 'month' | 'quarter' | 'year'>(
     'all',
   )
+  // Função utilitária para extrair o valor monetário real de uma proposta
+  const getQuoteNumericValue = (q: QuoteRecord): number => {
+    const val =
+      q.total !== undefined && q.total !== null && !isNaN(Number(q.total)) && Number(q.total) > 0
+        ? Number(q.total)
+        : q.final_price !== undefined &&
+            q.final_price !== null &&
+            !isNaN(Number(q.final_price)) &&
+            Number(q.final_price) > 0
+          ? Number(q.final_price)
+          : Number(q.subtotal ?? q.total_cost) || 0
+    return isNaN(val) ? 0 : val
+  }
+
+  // Normalização de status de propostas (abrange 'aprovada', 'approved', etc.)
+  const isApprovedQuote = (status?: string): boolean => {
+    if (!status) return false
+    const s = status.toLowerCase().trim()
+    return s === 'approved' || s === 'aprovada' || s === 'aprovado'
+  }
+
+  const isRejectedQuote = (status?: string): boolean => {
+    if (!status) return false
+    const s = status.toLowerCase().trim()
+    return (
+      s === 'rejected' ||
+      s === 'recusada' ||
+      s === 'recusado' ||
+      s === 'rejeitada' ||
+      s === 'rejeitado'
+    )
+  }
+
+  const isPendingQuote = (status?: string): boolean => {
+    if (!status) return true // por padrão propostas sem status definido contam como pendente/em análise
+    const s = status.toLowerCase().trim()
+    return (
+      s === 'sent' ||
+      s === 'enviada' ||
+      s === 'enviado' ||
+      s === 'draft' ||
+      s === 'rascunho' ||
+      s === 'pending_approval' ||
+      s === 'pending' ||
+      s === 'pendente' ||
+      s === 'em_negociacao' ||
+      s === 'em_aprovacao'
+    )
+  }
+
   // Cálculos de métricas de propostas
-  const approvedQuotes = quotes.filter((q) => q.status === 'approved')
-  const rejectedQuotes = quotes.filter((q) => q.status === 'rejected')
-  const pendingQuotes = quotes.filter(
-    (q) => q.status === 'sent' || q.status === 'draft' || q.status === 'pending_approval',
-  )
+  const approvedQuotes = quotes.filter((q) => isApprovedQuote(q.status))
+  const rejectedQuotes = quotes.filter((q) => isRejectedQuote(q.status))
+  const pendingQuotes = quotes.filter((q) => isPendingQuote(q.status))
 
-  const approvedQuotesTotal = approvedQuotes.reduce(
-    (sum, q) => sum + (Number(q.total ?? q.final_price) || 0),
-    0,
-  )
+  const approvedQuotesTotal = approvedQuotes.reduce((sum, q) => sum + getQuoteNumericValue(q), 0)
 
-  const rejectedQuotesTotal = rejectedQuotes.reduce(
-    (sum, q) => sum + (Number(q.total ?? q.final_price) || 0),
-    0,
-  )
+  const rejectedQuotesTotal = rejectedQuotes.reduce((sum, q) => sum + getQuoteNumericValue(q), 0)
 
-  const totalQuotesValue = quotes.reduce(
-    (sum, q) => sum + (Number(q.total ?? q.final_price) || 0),
-    0,
-  )
+  const pendingQuotesTotal = pendingQuotes.reduce((sum, q) => sum + getQuoteNumericValue(q), 0)
+
+  const totalQuotesValue = quotes.reduce((sum, q) => sum + getQuoteNumericValue(q), 0)
 
   const totalPipelineValue = deals
     .filter((d) => d.stage !== 'lost')
     .reduce((sum, d) => sum + (Number(d.value) || 0), 0)
 
-  const openTickets = tickets.filter((t) => t.status === 'open' || t.status === 'in_progress')
-  const activeServices = services.filter(
-    (s) => s.status === 'in_progress' || s.status === 'planning',
+  // Status de Ordens de Serviço (service_orders) reais do banco
+  // OS ativas em campo: tudo que não estiver 'fechado', 'completed' ou 'cancelled'/'rejeitado'
+  const isFieldServiceOrderActive = (status?: string): boolean => {
+    if (!status) return true
+    const s = status.toLowerCase().trim()
+    return (
+      s === 'vistoria' ||
+      s === 'proposta' ||
+      s === 'execucao' ||
+      s === 'in_execution' ||
+      s === 'in_progress' ||
+      s === 'inspecao' ||
+      s === 'pending_approval' ||
+      s === 'pending' ||
+      s === 'approved'
+    )
+  }
+
+  const activeServiceOrders = serviceOrders.filter((so) => isFieldServiceOrderActive(so.status))
+  const activeServiceOrdersTotal = activeServiceOrders.reduce(
+    (sum, so) => sum + (Number(so.total_value ?? so.final_price) || 0),
+    0,
   )
+
+  // Chamados & Suporte (tickets)
+  const openTickets = tickets.filter((t) => {
+    const s = (t.status || '').toLowerCase().trim()
+    return (
+      s === 'open' ||
+      s === 'in_progress' ||
+      s === 'waiting' ||
+      s === 'aberto' ||
+      s === 'em_andamento'
+    )
+  })
 
   return (
     <div className="space-y-6">
@@ -171,16 +243,18 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               ...quotes
                 .filter(
                   (q) =>
-                    q.status === 'approved' &&
+                    isApprovedQuote(q.status) &&
                     !serviceOrders.some(
                       (so) => so.quote_id === q.id || so.order_number === q.quote_number,
                     ),
                 )
                 .map((q) => {
-                  const finalPrice = Number(q.total ?? q.final_price ?? 0)
+                  const finalPrice = getQuoteNumericValue(q)
                   const internalCost =
                     Number(q.service_details?.service_composition?.directCostsTotal) ||
-                    Math.round(finalPrice * 0.62 * 100) / 100
+                    (Number(q.total_cost) > 0
+                      ? Number(q.total_cost)
+                      : Math.round(finalPrice * 0.62 * 100) / 100)
                   const grossProfit = finalPrice - internalCost
                   const realMargin = finalPrice > 0 ? (grossProfit / finalPrice) * 100 : 0
                   return {
@@ -570,15 +644,13 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </CardHeader>
               <CardContent>
                 <div className="text-xl font-bold text-amber-700 dark:text-amber-400">
-                  {pendingQuotes
-                    .reduce((sum, q) => sum + (Number(q.total ?? q.final_price) || 0), 0)
-                    .toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
+                  {pendingQuotesTotal.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  {pendingQuotes.length} propostas em análise
+                  {pendingQuotes.length} de {quotes.length} propostas em análise
                 </p>
               </CardContent>
             </Card>
@@ -612,7 +684,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           {/* Segunda linha de KPIs: Operação e Suporte */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card
-              onClick={() => onNavigate('services')}
+              onClick={() => onNavigate('service_kanban')}
               className="border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-blue-400 transition-all"
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -625,10 +697,15 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               </CardHeader>
               <CardContent>
                 <div className="text-xl font-bold text-slate-900 dark:text-slate-100">
-                  {activeServices.length} ativas
+                  {activeServiceOrdersTotal > 0
+                    ? activeServiceOrdersTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })
+                    : `${activeServiceOrders.length} ativas`}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Manutenções e revisões térmicas
+                  {activeServiceOrders.length} OS em campo ({serviceOrders.length} no total)
                 </p>
               </CardContent>
             </Card>
@@ -650,7 +727,9 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   {openTickets.length} abertos
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Atendimento pós-venda industrial
+                  {tickets.length > 0
+                    ? `${openTickets.length} de ${tickets.length} chamados ativos`
+                    : 'Atendimento pós-venda industrial'}
                 </p>
               </CardContent>
             </Card>
@@ -726,7 +805,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
                     <div className="text-right space-y-1">
                       <span className="font-bold text-slate-900 dark:text-slate-100 block">
-                        {(q.total ?? q.final_price ?? 0).toLocaleString('pt-BR', {
+                        {getQuoteNumericValue(q).toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
                         })}
@@ -734,9 +813,9 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                       <Badge
                         variant="outline"
                         className={`text-[9px] uppercase px-1.5 font-bold ${
-                          q.status === 'approved'
+                          isApprovedQuote(q.status)
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                            : q.status === 'rejected'
+                            : isRejectedQuote(q.status)
                               ? 'bg-rose-50 text-rose-700 border-rose-300'
                               : q.status === 'sent'
                                 ? 'bg-blue-50 text-blue-700 border-blue-300'
@@ -745,9 +824,9 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                   : 'bg-slate-100 text-slate-700 border-slate-300'
                         }`}
                       >
-                        {q.status === 'approved'
+                        {isApprovedQuote(q.status)
                           ? 'Aprovado'
-                          : q.status === 'rejected'
+                          : isRejectedQuote(q.status)
                             ? 'Recusado'
                             : q.status === 'sent'
                               ? 'Enviado'
