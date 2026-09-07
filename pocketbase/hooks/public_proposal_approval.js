@@ -149,8 +149,70 @@ routerAdd('POST', '/api/public/proposals/{token}/action', (c) => {
     quoteRecord.set('approved_by_client_date', nowIso)
     $app.save(quoteRecord)
 
-    // CRIAR OS AUTOMATICAMENTE (Se ainda não existir para esta quote)
-    let createdServiceOrder = null
+    // SINCRONIZAR AUTOMATICAMENTE COM O PIPELINE COMERCIAL (Estágio 'won')
+    try {
+      let dealRecord = null
+      const dealId = quoteRecord.getString('deal_id')
+      if (dealId) {
+        try {
+          dealRecord = $app.findFirstRecordByData('deals', 'id', dealId)
+        } catch (_) {}
+      }
+      if (!dealRecord) {
+        try {
+          const listDeals = $app.findRecordsByFilter(
+            'deals',
+            `title ~ "${quoteNumber}"`,
+            '-created',
+            1,
+            0,
+          )
+          if (listDeals && listDeals.length > 0) {
+            dealRecord = listDeals[0]
+          }
+        } catch (_) {}
+      }
+
+      const clientNameStr = quoteRecord.getString('client_name') || 'Cliente'
+      const dealTitleStr = `Proposta ${quoteNumber} — ${clientNameStr}`
+      let dealVal = quoteRecord.getFloat('total')
+      if (!dealVal || dealVal <= 0) dealVal = quoteRecord.getFloat('final_price')
+      if (!dealVal || dealVal <= 0) dealVal = quoteRecord.getFloat('subtotal')
+      if (!dealVal || dealVal <= 0) dealVal = 0
+
+      if (dealRecord) {
+        dealRecord.set('stage', 'won')
+        dealRecord.set('probability', 100)
+        dealRecord.set('value', dealVal)
+        dealRecord.set(
+          'notes',
+          `Proposta #${quoteNumber} APROVADA digitalmente pelo cliente (${clientApproverName}).`,
+        )
+        $app.save(dealRecord)
+      } else {
+        const dealsCol = $app.findCollectionByNameOrId('deals')
+        const newDeal = new Record(dealsCol)
+        newDeal.set('title', dealTitleStr)
+        newDeal.set('client_id', quoteRecord.getString('client_id') || '')
+        newDeal.set('client_name', clientNameStr)
+        newDeal.set('value', dealVal)
+        newDeal.set('stage', 'won')
+        newDeal.set('probability', 100)
+        newDeal.set('priority', 'urgent')
+        newDeal.set('assigned_to', quoteRecord.getString('assigned_to') || 'Alex Nogueira')
+        newDeal.set(
+          'notes',
+          `Proposta #${quoteNumber} APROVADA digitalmente pelo cliente (${clientApproverName}).`,
+        )
+        $app.save(newDeal)
+        quoteRecord.set('deal_id', newDeal.id)
+        $app.save(quoteRecord)
+      }
+    } catch (dealErr) {
+      console.warn('Erro ao sincronizar deal na aprovação pública:', dealErr)
+    }
+
+    // CRIAR OS AUTOMATICAMENTE (Se ainda não existir para esta quote)    let createdServiceOrder = null
     try {
       const existingSOs = $app.findRecordsByFilter(
         'service_orders',
@@ -252,6 +314,70 @@ routerAdd('POST', '/api/public/proposals/{token}/action', (c) => {
     quoteRecord.set('rejected_by_client_reason', rejectReason || 'Sem motivo especificado')
     quoteRecord.set('rejected_by_client_date', nowIso)
     $app.save(quoteRecord)
+
+    // SINCRONIZAR AUTOMATICAMENTE COM O PIPELINE COMERCIAL (Estágio 'lost')
+    try {
+      let dealRecord = null
+      const dealId = quoteRecord.getString('deal_id')
+      if (dealId) {
+        try {
+          dealRecord = $app.findFirstRecordByData('deals', 'id', dealId)
+        } catch (_) {}
+      }
+      if (!dealRecord) {
+        try {
+          const listDeals = $app.findRecordsByFilter(
+            'deals',
+            `title ~ "${quoteNumber}"`,
+            '-created',
+            1,
+            0,
+          )
+          if (listDeals && listDeals.length > 0) {
+            dealRecord = listDeals[0]
+          }
+        } catch (_) {}
+      }
+
+      const clientNameStr = quoteRecord.getString('client_name') || 'Cliente'
+      const dealTitleStr = `Proposta ${quoteNumber} — ${clientNameStr}`
+      let dealVal = quoteRecord.getFloat('total')
+      if (!dealVal || dealVal <= 0) dealVal = quoteRecord.getFloat('final_price')
+      if (!dealVal || dealVal <= 0) dealVal = quoteRecord.getFloat('subtotal')
+      if (!dealVal || dealVal <= 0) dealVal = 0
+
+      if (dealRecord) {
+        dealRecord.set('stage', 'lost')
+        dealRecord.set('probability', 0)
+        dealRecord.set('loss_reason', rejectReason || 'Recusada pelo cliente')
+        dealRecord.set(
+          'notes',
+          `Proposta #${quoteNumber} recusada pelo cliente: "${rejectReason || 'Sem motivo especificado'}".`,
+        )
+        $app.save(dealRecord)
+      } else {
+        const dealsCol = $app.findCollectionByNameOrId('deals')
+        const newDeal = new Record(dealsCol)
+        newDeal.set('title', dealTitleStr)
+        newDeal.set('client_id', quoteRecord.getString('client_id') || '')
+        newDeal.set('client_name', clientNameStr)
+        newDeal.set('value', dealVal)
+        newDeal.set('stage', 'lost')
+        newDeal.set('probability', 0)
+        newDeal.set('loss_reason', rejectReason || 'Recusada pelo cliente')
+        newDeal.set('priority', 'medium')
+        newDeal.set('assigned_to', quoteRecord.getString('assigned_to') || 'Alex Nogueira')
+        newDeal.set(
+          'notes',
+          `Proposta #${quoteNumber} recusada pelo cliente: "${rejectReason || 'Sem motivo especificado'}".`,
+        )
+        $app.save(newDeal)
+        quoteRecord.set('deal_id', newDeal.id)
+        $app.save(quoteRecord)
+      }
+    } catch (dealErr) {
+      console.warn('Erro ao sincronizar deal na recusa pública:', dealErr)
+    }
 
     return c.json(200, {
       success: true,

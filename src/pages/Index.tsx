@@ -30,6 +30,7 @@ import { useRealtime } from '@/hooks/use-realtime'
 import { clientsService } from '@/services/clients'
 import { dealsService } from '@/services/deals'
 import { quotesService } from '@/services/quotes'
+import { quoteDealSyncService } from '@/services/quotes-deal-sync'
 import {
   servicesExtraService,
   serviceOrdersService,
@@ -140,6 +141,21 @@ export default function IndexPage() {
       setServices(servicesRes)
       setServiceOrders(serviceOrdersRes)
       setActivities(activitiesRes)
+
+      // Sincronização em lote das propostas existentes com o pipeline comercial
+      // Idempotente: atualiza deals vinculados ou cria os faltantes sem alterar os cálculos
+      try {
+        quoteDealSyncService
+          .syncAllQuotes(quotesRes)
+          .then((syncResult) => {
+            if (syncResult && syncResult.syncedCount > 0) {
+              dealsService.getAll().then((freshDeals) => setDeals(freshDeals))
+            }
+          })
+          .catch((e) => console.warn('Erro sync em background:', e))
+      } catch (syncBatchErr) {
+        console.warn('Erro ao disparar sync em background:', syncBatchErr)
+      }
     } catch (err: any) {
       console.error('Erro ao carregar dados:', err)
       if (!silent) {
@@ -168,12 +184,43 @@ export default function IndexPage() {
           ? prev.map((q) => (q.id === record.id ? { ...q, ...record } : q))
           : [record, ...prev]
       })
+      // Sincronizar deals ao receber nova proposta via realtime
+      quoteDealSyncService
+        .syncQuoteToDeal(record)
+        .then(() => {
+          dealsService.getAll().then((freshDeals) => setDeals(freshDeals))
+        })
+        .catch((err) => console.warn('Erro sync realtime quote create:', err))
     } else if (e.action === 'update') {
       setQuotes((prev) => prev.map((q) => (q.id === record.id ? { ...q, ...record } : q)))
       setSelectedQuote((prev) => (prev?.id === record.id ? { ...prev, ...record } : prev))
+      // Sincronizar deals ao receber atualização de proposta via realtime
+      quoteDealSyncService
+        .syncQuoteToDeal(record)
+        .then(() => {
+          dealsService.getAll().then((freshDeals) => setDeals(freshDeals))
+        })
+        .catch((err) => console.warn('Erro sync realtime quote update:', err))
     } else if (e.action === 'delete') {
       setQuotes((prev) => prev.filter((q) => q.id !== record.id))
       setSelectedQuote((prev) => (prev?.id === record.id ? null : prev))
+    }
+  })
+
+  // Inscrição em Realtime para a coleção 'deals'
+  useRealtime<any>('deals', (e) => {
+    const record = e.record as unknown as DealRecord
+    if (e.action === 'create') {
+      setDeals((prev) => {
+        const exists = prev.some((d) => d.id === record.id)
+        return exists
+          ? prev.map((d) => (d.id === record.id ? { ...d, ...record } : d))
+          : [record, ...prev]
+      })
+    } else if (e.action === 'update') {
+      setDeals((prev) => prev.map((d) => (d.id === record.id ? { ...d, ...record } : d)))
+    } else if (e.action === 'delete') {
+      setDeals((prev) => prev.filter((d) => d.id !== record.id))
     }
   })
 
@@ -327,7 +374,15 @@ export default function IndexPage() {
       const created = await quotesService.create(data)
       setQuotes([created, ...quotes])
       setSelectedQuote(created)
-      toast({ title: 'Orçamento de serviços gerado com sucesso!' })
+      // Sincronizar e recarregar os deals para refletir instantaneamente no Pipeline e Dashboard
+      try {
+        await quoteDealSyncService.syncQuoteToDeal(created)
+        const freshDeals = await dealsService.getAll()
+        setDeals(freshDeals)
+      } catch (dealErr) {
+        console.warn('Erro ao atualizar deals após criação de proposta:', dealErr)
+      }
+      toast({ title: 'Orçamento de serviços gerado e conectado ao pipeline comercial!' })
     } catch (err: any) {
       toast({ title: 'Erro ao gerar proposta', description: err.message, variant: 'destructive' })
     }
@@ -338,7 +393,15 @@ export default function IndexPage() {
       const updated = await quotesService.update(id, data)
       setQuotes(quotes.map((q) => (q.id === id ? updated : q)))
       if (selectedQuote?.id === id) setSelectedQuote(updated)
-      toast({ title: 'Orçamento atualizado com sucesso!' })
+      // Sincronizar e recarregar os deals para refletir instantaneamente no Pipeline e Dashboard
+      try {
+        await quoteDealSyncService.syncQuoteToDeal(updated)
+        const freshDeals = await dealsService.getAll()
+        setDeals(freshDeals)
+      } catch (dealErr) {
+        console.warn('Erro ao atualizar deals após alteração de proposta:', dealErr)
+      }
+      toast({ title: 'Orçamento atualizado com sucesso no CRM e no Pipeline!' })
     } catch (err: any) {
       toast({
         title: 'Erro ao atualizar proposta',
@@ -364,6 +427,15 @@ export default function IndexPage() {
       const updated = await quotesService.update(id, { status })
       setQuotes(quotes.map((q) => (q.id === id ? updated : q)))
       if (selectedQuote?.id === id) setSelectedQuote(updated)
+
+      // Sincronizar automaticamente no pipeline comercial (deals)
+      try {
+        await quoteDealSyncService.syncQuoteToDeal(updated)
+        const freshDeals = await dealsService.getAll()
+        setDeals(freshDeals)
+      } catch (dealErr) {
+        console.warn('Erro ao sincronizar status da proposta no pipeline:', dealErr)
+      }
 
       // Se a proposta for aprovada, gerar automaticamente uma Ordem de Serviço (OS)
       if (status === 'approved') {
@@ -899,8 +971,14 @@ export default function IndexPage() {
             <PipelineKanban
               deals={deals}
               clients={clients}
+              quotes={quotes}
               onUpdateDealStage={handleUpdateDealStage}
               onCreateDeal={handleCreateDeal}
+              onNavigateToQuote={(quoteId) => {
+                const target = quotes.find((q) => q.id === quoteId)
+                if (target) setSelectedQuote(target)
+                setActiveTab('quotes')
+              }}
             />
           )}
 

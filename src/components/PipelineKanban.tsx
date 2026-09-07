@@ -29,15 +29,18 @@ import {
   Clock,
   Briefcase,
   AlertCircle,
+  FileSpreadsheet,
 } from 'lucide-react'
-import type { DealRecord, DealStage, ClientRecord } from '@/types/crm'
+import type { DealRecord, DealStage, ClientRecord, QuoteRecord } from '@/types/crm'
 
 interface PipelineKanbanProps {
   deals: DealRecord[]
   clients: ClientRecord[]
+  quotes?: QuoteRecord[]
   onUpdateDealStage: (dealId: string, newStage: DealStage) => void
   onCreateDeal: (data: Partial<DealRecord>) => void
   onSelectDeal?: (deal: DealRecord) => void
+  onNavigateToQuote?: (quoteId: string) => void
 }
 
 const STAGES: { key: DealStage; label: string; color: string; border: string; bg: string }[] = [
@@ -88,9 +91,11 @@ const STAGES: { key: DealStage; label: string; color: string; border: string; bg
 export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
   deals,
   clients,
+  quotes = [],
   onUpdateDealStage,
   onCreateDeal,
   onSelectDeal,
+  onNavigateToQuote,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [newDealTitle, setNewDealTitle] = useState('')
@@ -197,11 +202,19 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
                         <div className="font-semibold text-xs text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 line-clamp-2">
                           {deal.title}
                         </div>
-                        {deal.priority === 'urgent' && (
-                          <Badge variant="destructive" className="text-[9px] px-1 py-0">
+                        {deal.title.toLowerCase().includes('proposta') ? (
+                          <Badge
+                            variant="outline"
+                            className="text-[9px] px-1 py-0 bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border-teal-300 font-mono flex items-center gap-0.5 shrink-0"
+                          >
+                            <FileSpreadsheet className="h-2.5 w-2.5" />
+                            Intertermal
+                          </Badge>
+                        ) : deal.priority === 'urgent' ? (
+                          <Badge variant="destructive" className="text-[9px] px-1 py-0 shrink-0">
                             Urgente
                           </Badge>
-                        )}
+                        ) : null}
                       </div>
 
                       <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground truncate">
