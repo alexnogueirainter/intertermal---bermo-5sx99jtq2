@@ -2143,6 +2143,12 @@ export function QuotesManager({
         description: `A proposta ${quoteToDelete.quote_number || quoteToDelete.code || ''} foi permanentemente removida.`,
       })
 
+      // Se o modal de edição estava aberto para esta proposta, fechar também
+      if (isCreateModalOpen && editingQuoteId === quoteToDelete.id) {
+        setIsCreateModalOpen(false)
+        setEditingQuoteId(null)
+      }
+
       setIsDeleteModalOpen(false)
       setQuoteToDelete(null)
       setLinkedOrders([])
@@ -2630,6 +2636,26 @@ export function QuotesManager({
                   >
                     <XCircle className="h-3.5 w-3.5" />
                     Recusar Proposta
+                  </Button>
+                )}
+
+                {/* Botão Excluir Proposta no Header do Modal de Edição */}
+                {isEditMode && editingQuoteId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentQuote =
+                        quotes.find((q) => q.id === editingQuoteId) ||
+                        (getFormDataObject(status) as QuoteRecord)
+                      handleRequestDelete(currentQuote)
+                    }}
+                    className="h-7 px-2.5 text-xs font-bold border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950 shadow-xs flex items-center gap-1"
+                    title="Excluir esta proposta"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Excluir
                   </Button>
                 )}
 
@@ -4746,6 +4772,24 @@ export function QuotesManager({
                   >
                     <XCircle className="h-3.5 w-3.5 text-rose-600" />
                     Recusar Proposta
+                  </Button>
+                )}
+
+                {/* BOTÃO "EXCLUIR PROPOSTA" NO FOOTER DO MODAL (em modo de edição) */}
+                {isEditMode && editingQuoteId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const currentQuote =
+                        quotes.find((q) => q.id === editingQuoteId) ||
+                        (getFormDataObject(status) as QuoteRecord)
+                      handleRequestDelete(currentQuote)
+                    }}
+                    className="text-xs border-rose-300 text-rose-700 hover:bg-rose-50 dark:border-rose-800 dark:text-rose-300 dark:hover:bg-rose-950 font-bold shadow-xs flex items-center gap-1.5"
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                    Excluir Proposta
                   </Button>
                 )}
 

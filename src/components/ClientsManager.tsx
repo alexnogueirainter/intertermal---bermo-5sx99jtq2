@@ -148,7 +148,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
         type: 'call',
         title: 'Ligação Telefônica - Follow-up de Proposta',
         description:
-          'Cliente confirmou recebimento do orçamento BERMO e solicitou inclusão do custo de integração prévia.',
+          'Cliente confirmou recebimento do orçamento Intertermal e solicitou inclusão do custo de integração prévia.',
         author: 'Alex Nogueira',
         date: new Date(Date.now() - 86400000 * 5).toISOString(),
       },

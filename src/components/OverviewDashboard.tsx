@@ -767,7 +767,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <div>
                   <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                    Orçamentos de Serviços BERMO Recentes
+                    Orçamentos Intertermal Recentes
                   </CardTitle>
                   <CardDescription className="text-xs">
                     Propostas técnicas com cálculo de M.O., Deslocamento e Custos Indiretos

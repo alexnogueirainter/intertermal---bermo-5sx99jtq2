@@ -623,7 +623,7 @@ export default function IndexPage() {
             >
               <div className="flex items-center gap-3">
                 <FileSpreadsheet className="h-4 w-4" />
-                Orçamentos BERMO
+                Orçamentos Intertermal
               </div>
               <Badge className="bg-teal-500/20 text-teal-700 dark:text-teal-300 text-[10px] px-1.5">
                 {quotes.length}
@@ -829,7 +829,7 @@ export default function IndexPage() {
               <span>/</span>
               <span className="capitalize text-slate-900 dark:text-slate-100">
                 {activeTab === 'overview' && 'Painel Geral'}
-                {activeTab === 'quotes' && 'Orçamentos de Serviços BERMO'}
+                {activeTab === 'quotes' && 'Orçamentos de Serviços Intertermal'}
                 {activeTab === 'catalog' && 'Catálogo de Produtos & Válvulas BERMO'}
                 {activeTab === 'deals' && 'Pipeline Comercial (Funil)'}
                 {activeTab === 'clients' && 'Gestão de Clientes Industriais'}
