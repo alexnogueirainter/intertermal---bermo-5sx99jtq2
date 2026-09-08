@@ -122,9 +122,33 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
   const totalQuotesValue = quotes.reduce((sum, q) => sum + getQuoteNumericValue(q), 0)
 
-  const totalPipelineValue = deals
-    .filter((d) => d.stage !== 'lost')
-    .reduce((sum, d) => sum + (Number(d.value) || 0), 0)
+  // Utilitário para verificar se um negócio está ativo (exclui perdidos/lost/recusados)
+  const isDealActive = (deal: DealRecord): boolean => {
+    if (!deal) return false
+    const s = (deal.stage || '').toLowerCase().trim()
+    return s !== 'lost' && s !== 'perdido' && s !== 'recusado' && s !== 'rejeitado'
+  }
+
+  // Função utilitária para extrair o valor monetário real de um negócio (com fallback de campos numéricos)
+  const getDealNumericValue = (deal: DealRecord | any): number => {
+    if (!deal) return 0
+    const rawVal = Number(deal.value)
+    if (!isNaN(rawVal) && rawVal > 0) return rawVal
+
+    const rawTotal = Number(deal.total)
+    if (!isNaN(rawTotal) && rawTotal > 0) return rawTotal
+
+    const rawFinalPrice = Number(deal.final_price)
+    if (!isNaN(rawFinalPrice) && rawFinalPrice > 0) return rawFinalPrice
+
+    const rawSubtotal = Number(deal.subtotal ?? deal.total_cost)
+    if (!isNaN(rawSubtotal) && rawSubtotal > 0) return rawSubtotal
+
+    return 0
+  }
+
+  const activeDeals = deals.filter(isDealActive)
+  const totalPipelineValue = activeDeals.reduce((sum, d) => sum + getDealNumericValue(d), 0)
 
   // Status de Ordens de Serviço (service_orders) reais do banco
   // OS ativas em campo: tudo que não estiver 'fechado', 'completed' ou 'cancelled'/'rejeitado'
@@ -661,7 +685,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             >
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Pipeline Comercial BERMO
+                  Pipeline Comercial
                 </CardTitle>
                 <div className="h-8 w-8 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center">
                   <TrendingUp className="h-4 w-4" />
@@ -675,7 +699,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  {deals.length} oportunidades no CRM
+                  {activeDeals.length} oportunidades ativas no pipeline
                 </p>
               </CardContent>
             </Card>
