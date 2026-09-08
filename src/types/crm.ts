@@ -122,6 +122,15 @@ export interface QuoteLaborConfig {
   inspectorCount: number
   inspectorHours: number
   inspectorRate: number
+  welderCount?: number
+  welderHours?: number
+  welderRate?: number
+  plumberCount?: number
+  plumberHours?: number
+  plumberRate?: number
+  foremanCount?: number
+  foremanHours?: number
+  foremanRate?: number
 }
 
 export interface QuotePricingConfig {
@@ -159,6 +168,10 @@ export interface QuoteLodgingMealsConfig {
   hotelRate?: number
   mealsDays?: number
   mealsRate?: number
+  mealVoucherHousedQty?: number
+  mealVoucherHousedRate?: number
+  mealVoucherUnhousedQty?: number
+  mealVoucherUnhousedRate?: number
 }
 
 export interface QuoteCustomMaterial {
@@ -245,6 +258,15 @@ export interface QuoteRecord {
   inspector_count?: number
   inspector_hours?: number
   inspector_rate?: number
+  welder_count?: number
+  welder_hours?: number
+  welder_rate?: number
+  plumber_count?: number
+  plumber_hours?: number
+  plumber_rate?: number
+  foreman_count?: number
+  foreman_hours?: number
+  foreman_rate?: number
   labor_config?: QuoteLaborConfig
 
   // Deslocamento & Rotas
@@ -270,6 +292,10 @@ export interface QuoteRecord {
   hotel_rate?: number
   meals_days?: number
   meals_rate?: number
+  meal_voucher_housed_qty?: number
+  meal_voucher_housed_rate?: number
+  meal_voucher_unhoused_qty?: number
+  meal_voucher_unhoused_rate?: number
   lodging_meals_config?: QuoteLodgingMealsConfig
 
   // Peças & Consumíveis adicionais

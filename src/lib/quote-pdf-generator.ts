@@ -3,7 +3,7 @@
  * Renderiza o elemento HTML da proposta (ou clona) e compila em PDF A4 via html2pdf.js
  * Faz upload do arquivo binário gerado no campo `pdf_file` da proposta no PocketBase.
  */
-import { pb } from '@/lib/pocketbase/client'
+import pb from '@/lib/pocketbase/client'
 import { QuoteRecord } from '@/types/crm'
 
 declare global {

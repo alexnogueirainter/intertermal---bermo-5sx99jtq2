@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T18:25:02.699Z",
+  "generatedAt": "2026-09-08T19:10:51.336Z",
   "collections": [
     {
       "name": "users",
@@ -914,6 +914,114 @@
         {
           "name": "pdf_file",
           "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "welder_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "welder_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "welder_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plumber_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plumber_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plumber_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "foreman_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "foreman_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "foreman_hours",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hotel_days",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "hotel_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "meals_days",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "meals_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "meal_voucher_housed_qty",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "meal_voucher_housed_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "meal_voucher_unhoused_qty",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "meal_voucher_unhoused_rate",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "lodging_meals_config",
+          "type": "json",
           "required": false,
           "system": false
         }

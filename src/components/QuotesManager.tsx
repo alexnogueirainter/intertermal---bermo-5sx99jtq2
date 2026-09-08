@@ -241,7 +241,7 @@ export function QuotesManager({
   const [newMaterialQty, setNewMaterialQty] = useState(1)
   const [newMaterialPrice, setNewMaterialPrice] = useState(0)
 
-  // Seção 3B: Mão de Obra Especializada (3 Funções)
+  // Seção 3B: Mão de Obra Especializada (6 Funções)
   const [techCount, setTechCount] = useState<number>(1)
   const [techHours, setTechHours] = useState<number>(16)
   const [techRate, setTechRate] = useState<number>(140)
@@ -253,6 +253,19 @@ export function QuotesManager({
   const [inspectorCount, setInspectorCount] = useState<number>(1)
   const [inspectorHours, setInspectorHours] = useState<number>(6)
   const [inspectorRate, setInspectorRate] = useState<number>(190)
+
+  // Novas funções: Soldador, Encanador e Encarregado
+  const [welderCount, setWelderCount] = useState<number>(0)
+  const [welderHours, setWelderHours] = useState<number>(0)
+  const [welderRate, setWelderRate] = useState<number>(160)
+
+  const [plumberCount, setPlumberCount] = useState<number>(0)
+  const [plumberHours, setPlumberHours] = useState<number>(0)
+  const [plumberRate, setPlumberRate] = useState<number>(120)
+
+  const [foremanCount, setForemanCount] = useState<number>(0)
+  const [foremanHours, setForemanHours] = useState<number>(0)
+  const [foremanRate, setForemanRate] = useState<number>(180)
 
   // Seção 3C: Deslocamento, Rotas & Logística (ViaCEP + Haversine Mapeia)
   const [originCep, setOriginCep] = useState('89066-000') // Base Blumenau/SC
@@ -276,6 +289,11 @@ export function QuotesManager({
   const [hotelRate, setHotelRate] = useState<number>(220)
   const [mealsDays, setMealsDays] = useState<number>(4)
   const [mealsRate, setMealsRate] = useState<number>(95)
+  // Vale Refeição para Funcionários (Alojado e Não Alojado)
+  const [mealVoucherHousedQty, setMealVoucherHousedQty] = useState<number>(0)
+  const [mealVoucherHousedRate, setMealVoucherHousedRate] = useState<number>(45)
+  const [mealVoucherUnhousedQty, setMealVoucherUnhousedQty] = useState<number>(0)
+  const [mealVoucherUnhousedRate, setMealVoucherUnhousedRate] = useState<number>(40)
 
   // Toggle de Visão do Modal: "client" (Proposta do Cliente) vs "internal" (Composição Interna)
   const [quoteViewMode, setQuoteViewMode] = useState<'client' | 'internal'>('internal')
@@ -805,9 +823,24 @@ export function QuotesManager({
   const laborTechTotal = techCount * techHours * techRate
   const laborHelperTotal = helperCount * helperHours * helperRate
   const laborInspectorTotal = inspectorCount * inspectorHours * inspectorRate
-  const laborTotal = laborTechTotal + laborHelperTotal + laborInspectorTotal
+  const laborWelderTotal = welderCount * welderHours * welderRate
+  const laborPlumberTotal = plumberCount * plumberHours * plumberRate
+  const laborForemanTotal = foremanCount * foremanHours * foremanRate
+  const laborTotal =
+    laborTechTotal +
+    laborHelperTotal +
+    laborInspectorTotal +
+    laborWelderTotal +
+    laborPlumberTotal +
+    laborForemanTotal
 
-  const lodgingMealsTotal = hotelDays * hotelRate + mealsDays * mealsRate
+  const mealVoucherHousedTotal = mealVoucherHousedQty * mealVoucherHousedRate
+  const mealVoucherUnhousedTotal = mealVoucherUnhousedQty * mealVoucherUnhousedRate
+  const lodgingMealsTotal =
+    hotelDays * hotelRate +
+    mealsDays * mealsRate +
+    mealVoucherHousedTotal +
+    mealVoucherUnhousedTotal
 
   const carRentalSubtotal =
     carRentalType !== 'none' ? Math.max(0, carRentalDailyRate * carRentalDays) : 0
@@ -822,8 +855,20 @@ export function QuotesManager({
   const totalMaterials = materialsCost + customMaterialsTotal
 
   // Cálculos dos Custos Adicionais: Integração, PT e Pernoite
-  const sumRates = techRate + helperRate + inspectorRate
-  const totalTeamCount = techCount + helperCount + inspectorCount
+  const activeRates = [
+    techCount > 0 ? techRate : 0,
+    helperCount > 0 ? helperRate : 0,
+    inspectorCount > 0 ? inspectorRate : 0,
+    welderCount > 0 ? welderRate : 0,
+    plumberCount > 0 ? plumberRate : 0,
+    foremanCount > 0 ? foremanRate : 0,
+  ].filter((r) => r > 0)
+  const sumRates =
+    activeRates.length > 0
+      ? activeRates.reduce((a, b) => a + b, 0)
+      : techRate + helperRate + inspectorRate
+  const totalTeamCount =
+    techCount + helperCount + inspectorCount + welderCount + plumberCount + foremanCount
 
   const integrationCost = useMemo(() => {
     if (!integrationNeeded) return 0
@@ -911,6 +956,15 @@ export function QuotesManager({
       inspectorCount: Number(inspectorCount),
       inspectorHours: Number(inspectorHours),
       inspectorRate: Number(inspectorRate),
+      welderCount: Number(welderCount),
+      welderHours: Number(welderHours),
+      welderRate: Number(welderRate),
+      plumberCount: Number(plumberCount),
+      plumberHours: Number(plumberHours),
+      plumberRate: Number(plumberRate),
+      foremanCount: Number(foremanCount),
+      foremanHours: Number(foremanHours),
+      foremanRate: Number(foremanRate),
     }
 
     const pricingConfig = {
@@ -948,6 +1002,10 @@ export function QuotesManager({
       hotelRate: Number(hotelRate),
       mealsDays: Number(mealsDays),
       mealsRate: Number(mealsRate),
+      mealVoucherHousedQty: Number(mealVoucherHousedQty),
+      mealVoucherHousedRate: Number(mealVoucherHousedRate),
+      mealVoucherUnhousedQty: Number(mealVoucherUnhousedQty),
+      mealVoucherUnhousedRate: Number(mealVoucherUnhousedRate),
     }
 
     // Primeiro equipamento como referência principal (retrocompatibilidade)
@@ -1029,6 +1087,24 @@ export function QuotesManager({
           ratePerHour: inspectorRate,
           total: laborInspectorTotal,
         },
+        welder: {
+          count: welderCount,
+          hours: welderHours,
+          ratePerHour: welderRate,
+          total: laborWelderTotal,
+        },
+        plumber: {
+          count: plumberCount,
+          hours: plumberHours,
+          ratePerHour: plumberRate,
+          total: laborPlumberTotal,
+        },
+        foreman: {
+          count: foremanCount,
+          hours: foremanHours,
+          ratePerHour: foremanRate,
+          total: laborForemanTotal,
+        },
         totalLabor: laborTotal,
       },
       travel_costs: {
@@ -1054,6 +1130,10 @@ export function QuotesManager({
         hotelRatePerDay: hotelRate,
         mealsDays,
         mealsRatePerDay: mealsRate,
+        mealVoucherHousedQty,
+        mealVoucherHousedRatePerDay: mealVoucherHousedRate,
+        mealVoucherUnhousedQty,
+        mealVoucherUnhousedRatePerDay: mealVoucherUnhousedRate,
         totalLodgingMeals: lodgingMealsTotal,
       },
       materials_breakdown: {
@@ -1162,7 +1242,8 @@ export function QuotesManager({
       custom_work_fluid: customWorkFluid,
 
       // Mão de Obra (campos individuais + JSON)
-      labor_hours: techHours + helperHours + inspectorHours,
+      labor_hours:
+        techHours + helperHours + inspectorHours + welderHours + plumberHours + foremanHours,
       labor_rate_hourly: techRate,
       tech_count: Number(techCount),
       tech_hours: Number(techHours),
@@ -1173,6 +1254,15 @@ export function QuotesManager({
       inspector_count: Number(inspectorCount),
       inspector_hours: Number(inspectorHours),
       inspector_rate: Number(inspectorRate),
+      welder_count: Number(welderCount),
+      welder_hours: Number(welderHours),
+      welder_rate: Number(welderRate),
+      plumber_count: Number(plumberCount),
+      plumber_hours: Number(plumberHours),
+      plumber_rate: Number(plumberRate),
+      foreman_count: Number(foremanCount),
+      foreman_hours: Number(foremanHours),
+      foreman_rate: Number(foremanRate),
       labor_config: laborConfig,
 
       // Impostos, Margem e Comissão (campos individuais + JSON)
@@ -1201,6 +1291,14 @@ export function QuotesManager({
       car_rental_total: Number(carRentalSubtotal),
       travel_config: travelConfig,
       lodging_meals_config: lodgingMealsConfig,
+      hotel_days: Number(hotelDays),
+      hotel_rate: Number(hotelRate),
+      meals_days: Number(mealsDays),
+      meals_rate: Number(mealsRate),
+      meal_voucher_housed_qty: Number(mealVoucherHousedQty),
+      meal_voucher_housed_rate: Number(mealVoucherHousedRate),
+      meal_voucher_unhoused_qty: Number(mealVoucherUnhousedQty),
+      meal_voucher_unhoused_rate: Number(mealVoucherUnhousedRate),
 
       // Novos Campos: Integração, PT e Pernoite
       integration_needed: integrationNeeded,
@@ -1336,6 +1434,15 @@ export function QuotesManager({
     inspectorCount,
     inspectorHours,
     inspectorRate,
+    welderCount,
+    welderHours,
+    welderRate,
+    plumberCount,
+    plumberHours,
+    plumberRate,
+    foremanCount,
+    foremanHours,
+    foremanRate,
     originCep,
     originAddress,
     destinationCep,
@@ -1354,6 +1461,10 @@ export function QuotesManager({
     hotelRate,
     mealsDays,
     mealsRate,
+    mealVoucherHousedQty,
+    mealVoucherHousedRate,
+    mealVoucherUnhousedQty,
+    mealVoucherUnhousedRate,
     serviceMargin,
     salesCommission,
     adminOverheadRate,
@@ -1458,6 +1569,15 @@ export function QuotesManager({
     setInspectorCount(1)
     setInspectorHours(6)
     setInspectorRate(190)
+    setWelderCount(0)
+    setWelderHours(0)
+    setWelderRate(160)
+    setPlumberCount(0)
+    setPlumberHours(0)
+    setPlumberRate(120)
+    setForemanCount(0)
+    setForemanHours(0)
+    setForemanRate(180)
 
     // Impostos & Margens
     setServiceMargin(25)
@@ -1492,6 +1612,10 @@ export function QuotesManager({
     setHotelRate(220)
     setMealsDays(4)
     setMealsRate(95)
+    setMealVoucherHousedQty(0)
+    setMealVoucherHousedRate(45)
+    setMealVoucherUnhousedQty(0)
+    setMealVoucherUnhousedRate(40)
 
     // Condições Comerciais
     setValidityDays(10)
@@ -1692,6 +1816,9 @@ export function QuotesManager({
     const techMech = sLabor.techMechanical || {}
     const helperObj = sLabor.helper || {}
     const inspObj = sLabor.inspectorNDT || {}
+    const welderObj = sLabor.welder || {}
+    const plumberObj = sLabor.plumber || {}
+    const foremanObj = sLabor.foreman || {}
 
     setTechRate(
       q.tech_rate ?? laborCfg?.techRate ?? techMech.ratePerHour ?? q.labor_rate_hourly ?? 140,
@@ -1706,6 +1833,19 @@ export function QuotesManager({
     setInspectorRate(q.inspector_rate ?? laborCfg?.inspectorRate ?? inspObj.ratePerHour ?? 190)
     setInspectorCount(q.inspector_count ?? laborCfg?.inspectorCount ?? inspObj.count ?? 1)
     setInspectorHours(q.inspector_hours ?? laborCfg?.inspectorHours ?? inspObj.hours ?? 6)
+
+    // Novas funções: Soldador, Encanador e Encarregado (com fallback seguro 0 para propostas legadas)
+    setWelderRate(q.welder_rate ?? laborCfg?.welderRate ?? welderObj.ratePerHour ?? 160)
+    setWelderCount(q.welder_count ?? laborCfg?.welderCount ?? welderObj.count ?? 0)
+    setWelderHours(q.welder_hours ?? laborCfg?.welderHours ?? welderObj.hours ?? 0)
+
+    setPlumberRate(q.plumber_rate ?? laborCfg?.plumberRate ?? plumberObj.ratePerHour ?? 120)
+    setPlumberCount(q.plumber_count ?? laborCfg?.plumberCount ?? plumberObj.count ?? 0)
+    setPlumberHours(q.plumber_hours ?? laborCfg?.plumberHours ?? plumberObj.hours ?? 0)
+
+    setForemanRate(q.foreman_rate ?? laborCfg?.foremanRate ?? foremanObj.ratePerHour ?? 180)
+    setForemanCount(q.foreman_count ?? laborCfg?.foremanCount ?? foremanObj.count ?? 0)
+    setForemanHours(q.foreman_hours ?? laborCfg?.foremanHours ?? foremanObj.hours ?? 0)
 
     // -------------------------------------------------------------------------
     // PROBLEMA 2: RESTAURAR IMPOSTOS, MARGEM E COMISSÃO
@@ -1797,10 +1937,34 @@ export function QuotesManager({
 
     // Hospedagem & Alimentação
     const lodgingCfg = q.lodging_meals_config || {}
-    setHotelDays(lodgingCfg.hotelDays ?? sLodging.hotelDays ?? 2)
-    setHotelRate(lodgingCfg.hotelRate ?? sLodging.hotelRatePerDay ?? 220)
-    setMealsDays(lodgingCfg.mealsDays ?? sLodging.mealsDays ?? 4)
-    setMealsRate(lodgingCfg.mealsRate ?? sLodging.mealsRatePerDay ?? 95)
+    setHotelDays(lodgingCfg.hotelDays ?? q.hotel_days ?? sLodging.hotelDays ?? 2)
+    setHotelRate(lodgingCfg.hotelRate ?? q.hotel_rate ?? sLodging.hotelRatePerDay ?? 220)
+    setMealsDays(lodgingCfg.mealsDays ?? q.meals_days ?? sLodging.mealsDays ?? 4)
+    setMealsRate(lodgingCfg.mealsRate ?? q.meals_rate ?? sLodging.mealsRatePerDay ?? 95)
+    setMealVoucherHousedQty(
+      lodgingCfg.mealVoucherHousedQty ??
+        q.meal_voucher_housed_qty ??
+        sLodging.mealVoucherHousedQty ??
+        0,
+    )
+    setMealVoucherHousedRate(
+      lodgingCfg.mealVoucherHousedRate ??
+        q.meal_voucher_housed_rate ??
+        sLodging.mealVoucherHousedRatePerDay ??
+        45,
+    )
+    setMealVoucherUnhousedQty(
+      lodgingCfg.mealVoucherUnhousedQty ??
+        q.meal_voucher_unhoused_qty ??
+        sLodging.mealVoucherUnhousedQty ??
+        0,
+    )
+    setMealVoucherUnhousedRate(
+      lodgingCfg.mealVoucherUnhousedRate ??
+        q.meal_voucher_unhoused_rate ??
+        sLodging.mealVoucherUnhousedRatePerDay ??
+        40,
+    )
 
     // Condições Comerciais & Validade
     setValidityDays(q.validity_days || sPayment.validityDays || 10)
@@ -3671,7 +3835,7 @@ export function QuotesManager({
                 <div className="flex items-center gap-2">
                   <UserCheck className="h-4 w-4 text-blue-600" />
                   <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                    3b. Mão de Obra Especializada (3 Funções)
+                    3b. Mão de Obra Especializada (6 Funções)
                   </span>
                 </div>
                 <span className="text-xs font-bold text-blue-600 font-mono">
@@ -3819,6 +3983,162 @@ export function QuotesManager({
                   <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
                     Total:{' '}
                     {laborInspectorTotal.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </div>
+                </div>
+
+                {/* 4. Soldador */}
+                <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs">4. Soldador</span>
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] border-amber-300 text-amber-700 bg-amber-50 dark:bg-amber-950/40"
+                    >
+                      TIG / Eletrodo
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                    <div>
+                      <Label className="text-[9px]">Qtde</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={welderCount}
+                        onChange={(e) => setWelderCount(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">Horas</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={welderHours}
+                        onChange={(e) => setWelderHours(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">R$/Hora</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={welderRate}
+                        onChange={(e) => setWelderRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                    Total:{' '}
+                    {laborWelderTotal.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </div>
+                </div>
+
+                {/* 5. Encanador */}
+                <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs">5. Encanador</span>
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] border-cyan-300 text-cyan-700 bg-cyan-50 dark:bg-cyan-950/40"
+                    >
+                      Tubulações
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                    <div>
+                      <Label className="text-[9px]">Qtde</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={plumberCount}
+                        onChange={(e) => setPlumberCount(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">Horas</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={plumberHours}
+                        onChange={(e) => setPlumberHours(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">R$/Hora</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={plumberRate}
+                        onChange={(e) => setPlumberRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                    Total:{' '}
+                    {laborPlumberTotal.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </div>
+                </div>
+
+                {/* 6. Encarregado */}
+                <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-xs">6. Encarregado</span>
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-950/40"
+                    >
+                      Supervisão
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                    <div>
+                      <Label className="text-[9px]">Qtde</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={foremanCount}
+                        onChange={(e) => setForemanCount(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">Horas</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={foremanHours}
+                        onChange={(e) => setForemanHours(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[9px]">R$/Hora</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={foremanRate}
+                        onChange={(e) => setForemanRate(Number(e.target.value))}
+                        className="text-xs h-7"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                    Total:{' '}
+                    {laborForemanTotal.toLocaleString('pt-BR', {
                       style: 'currency',
                       currency: 'BRL',
                     })}
@@ -4229,6 +4549,114 @@ export function QuotesManager({
                     onChange={(e) => setMealsRate(Number(e.target.value))}
                     className="text-xs h-8"
                   />
+                </div>
+              </div>
+
+              {/* Vale Refeição para Funcionários (Alojado e Não Alojado) */}
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[11px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                    Vale Refeição para Funcionários
+                  </Label>
+                  <span className="text-[11px] font-mono text-purple-700 dark:text-purple-300 font-bold">
+                    Subtotal V.R.:{' '}
+                    {(mealVoucherHousedTotal + mealVoucherUnhousedTotal).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Variante Alojado */}
+                  <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        Vale Refeição — Alojado
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] border-purple-300 text-purple-700 bg-purple-50 dark:bg-purple-950/40"
+                      >
+                        Equipe Hospedada
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div>
+                        <Label className="text-[9px]">Quantidade</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={mealVoucherHousedQty}
+                          onChange={(e) => setMealVoucherHousedQty(Number(e.target.value))}
+                          className="text-xs h-7"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[9px]">Valor Unitário (R$)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={mealVoucherHousedRate}
+                          onChange={(e) => setMealVoucherHousedRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                      Subtotal:{' '}
+                      {mealVoucherHousedTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Variante Não Alojado */}
+                  <div className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        Vale Refeição — Não Alojado
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] border-slate-300 text-slate-700 bg-slate-50 dark:bg-slate-800"
+                      >
+                        Equipe Local
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                      <div>
+                        <Label className="text-[9px]">Quantidade</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={mealVoucherUnhousedQty}
+                          onChange={(e) => setMealVoucherUnhousedQty(Number(e.target.value))}
+                          className="text-xs h-7"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[9px]">Valor Unitário (R$)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={mealVoucherUnhousedRate}
+                          onChange={(e) => setMealVoucherUnhousedRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-right text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono">
+                      Subtotal:{' '}
+                      {mealVoucherUnhousedTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

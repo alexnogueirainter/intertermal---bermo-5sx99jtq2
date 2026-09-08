@@ -184,7 +184,40 @@ export function QuotePdfPreviewDialog({
   const inspectorTotal =
     laborDetails?.inspectorNDT?.total ?? inspectorCount * inspectorHours * inspectorRate
 
-  const totalLabor = laborDetails?.totalLabor ?? techTotal + helperTotal + inspectorTotal
+  // Novas funções: Soldador, Encanador e Encarregado
+  const welderCount =
+    laborDetails?.welder?.count ?? quote.welder_count ?? quote.labor_config?.welderCount ?? 0
+  const welderHours =
+    laborDetails?.welder?.hours ?? quote.welder_hours ?? quote.labor_config?.welderHours ?? 0
+  const welderRate =
+    laborDetails?.welder?.ratePerHour ?? quote.welder_rate ?? quote.labor_config?.welderRate ?? 160
+  const welderTotal = laborDetails?.welder?.total ?? welderCount * welderHours * welderRate
+
+  const plumberCount =
+    laborDetails?.plumber?.count ?? quote.plumber_count ?? quote.labor_config?.plumberCount ?? 0
+  const plumberHours =
+    laborDetails?.plumber?.hours ?? quote.plumber_hours ?? quote.labor_config?.plumberHours ?? 0
+  const plumberRate =
+    laborDetails?.plumber?.ratePerHour ??
+    quote.plumber_rate ??
+    quote.labor_config?.plumberRate ??
+    120
+  const plumberTotal = laborDetails?.plumber?.total ?? plumberCount * plumberHours * plumberRate
+
+  const foremanCount =
+    laborDetails?.foreman?.count ?? quote.foreman_count ?? quote.labor_config?.foremanCount ?? 0
+  const foremanHours =
+    laborDetails?.foreman?.hours ?? quote.foreman_hours ?? quote.labor_config?.foremanHours ?? 0
+  const foremanRate =
+    laborDetails?.foreman?.ratePerHour ??
+    quote.foreman_rate ??
+    quote.labor_config?.foremanRate ??
+    180
+  const foremanTotal = laborDetails?.foreman?.total ?? foremanCount * foremanHours * foremanRate
+
+  const calculatedLabor =
+    techTotal + helperTotal + inspectorTotal + welderTotal + plumberTotal + foremanTotal
+  const totalLabor = laborDetails?.totalLabor ?? calculatedLabor
 
   // Resolução de Deslocamento
   const distanceKm =
@@ -259,8 +292,36 @@ export function QuotePdfPreviewDialog({
     95
   const mealsTotal = mealsDays * mealsRate
 
+  // Vale Refeição para Funcionários (Alojado e Não Alojado)
+  const mealVoucherHousedQty =
+    lodgingDetails?.mealVoucherHousedQty ??
+    quote.meal_voucher_housed_qty ??
+    quote.lodging_meals_config?.mealVoucherHousedQty ??
+    0
+  const mealVoucherHousedRate =
+    lodgingDetails?.mealVoucherHousedRatePerDay ??
+    quote.meal_voucher_housed_rate ??
+    quote.lodging_meals_config?.mealVoucherHousedRate ??
+    45
+  const mealVoucherHousedTotal = mealVoucherHousedQty * mealVoucherHousedRate
+
+  const mealVoucherUnhousedQty =
+    lodgingDetails?.mealVoucherUnhousedQty ??
+    quote.meal_voucher_unhoused_qty ??
+    quote.lodging_meals_config?.mealVoucherUnhousedQty ??
+    0
+  const mealVoucherUnhousedRate =
+    lodgingDetails?.mealVoucherUnhousedRatePerDay ??
+    quote.meal_voucher_unhoused_rate ??
+    quote.lodging_meals_config?.mealVoucherUnhousedRate ??
+    40
+  const mealVoucherUnhousedTotal = mealVoucherUnhousedQty * mealVoucherUnhousedRate
+
+  const mealVouchersTotal = mealVoucherHousedTotal + mealVoucherUnhousedTotal
+
+  const calculatedLodgingMeals = hotelTotal + mealsTotal + mealVouchersTotal
   const totalLodgingMeals =
-    lodgingDetails?.totalLodgingMeals ?? quote.lodging_meals_cost ?? hotelTotal + mealsTotal
+    lodgingDetails?.totalLodgingMeals ?? quote.lodging_meals_cost ?? calculatedLodgingMeals
 
   // Peças e materiais
   const materialsCost =
@@ -781,6 +842,84 @@ export function QuotePdfPreviewDialog({
                           })}
                         </td>
                       </tr>
+                      {welderCount > 0 && (
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="p-2.5 print:p-1.5 font-medium text-slate-900">
+                            Soldador Especializado (TIG / Eletrodo)
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-center font-mono">
+                            {welderCount} un
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-center font-mono">
+                            {welderHours}h
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-right font-mono text-slate-700">
+                            {welderRate.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                            /h
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-right font-mono font-bold text-slate-900">
+                            {welderTotal.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </td>
+                        </tr>
+                      )}
+                      {plumberCount > 0 && (
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="p-2.5 print:p-1.5 font-medium text-slate-900">
+                            Encanador Industrial / Tubulações
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-center font-mono">
+                            {plumberCount} un
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-center font-mono">
+                            {plumberHours}h
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-right font-mono text-slate-700">
+                            {plumberRate.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                            /h
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-right font-mono font-bold text-slate-900">
+                            {plumberTotal.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </td>
+                        </tr>
+                      )}
+                      {foremanCount > 0 && (
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="p-2.5 print:p-1.5 font-medium text-slate-900">
+                            Encarregado de Equipe / Supervisão
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-center font-mono">
+                            {foremanCount} un
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-center font-mono">
+                            {foremanHours}h
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-right font-mono text-slate-700">
+                            {foremanRate.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                            /h
+                          </td>
+                          <td className="p-2.5 print:p-1.5 text-right font-mono font-bold text-slate-900">
+                            {foremanTotal.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                     <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
                       <tr>
@@ -947,7 +1086,7 @@ export function QuotePdfPreviewDialog({
 
                   <div className="space-y-0.5 bg-amber-50/80 p-2 print:p-1.5 rounded border border-amber-200">
                     <span className="text-[10px] print:text-[9px] font-bold text-amber-900 uppercase block">
-                      Total Hospedagem & Refeições
+                      Total Hospedagem & Alimentação
                     </span>
                     <div className="font-bold text-amber-900 font-mono text-sm print:text-xs">
                       {totalLodgingMeals.toLocaleString('pt-BR', {
@@ -956,10 +1095,63 @@ export function QuotePdfPreviewDialog({
                       })}
                     </div>
                     <div className="text-[9.5px] print:text-[8px] text-amber-700">
-                      Diárias de Hotel + Alimentação
+                      Hotel + Refeições + V.R.
                     </div>
                   </div>
                 </div>
+
+                {/* Vale Refeição para Funcionários (Alojado e Não Alojado) */}
+                {(mealVoucherHousedQty > 0 || mealVoucherUnhousedQty > 0) && (
+                  <div className="mt-2 p-2.5 print:p-2 bg-slate-50 rounded-lg border border-slate-200 text-[11px] print:text-[9.5px] space-y-1.5">
+                    <span className="text-[10px] print:text-[8.5px] font-bold uppercase tracking-wider text-slate-600 block">
+                      Vale Refeição para Funcionários:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {mealVoucherHousedQty > 0 && (
+                        <div className="p-2 bg-white rounded border border-slate-200 space-y-0.5">
+                          <span className="text-[9.5px] print:text-[8px] font-bold text-purple-800 uppercase block">
+                            V.R. Alojado (Equipe Hospedada)
+                          </span>
+                          <div className="font-mono text-slate-900 font-bold">
+                            {mealVoucherHousedQty} un ×{' '}
+                            {mealVoucherHousedRate.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </div>
+                          <div className="text-[10px] print:text-[8.5px] text-slate-600 font-mono">
+                            Subtotal:{' '}
+                            {mealVoucherHousedTotal.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {mealVoucherUnhousedQty > 0 && (
+                        <div className="p-2 bg-white rounded border border-slate-200 space-y-0.5">
+                          <span className="text-[9.5px] print:text-[8px] font-bold text-slate-700 uppercase block">
+                            V.R. Não Alojado (Equipe Local)
+                          </span>
+                          <div className="font-mono text-slate-900 font-bold">
+                            {mealVoucherUnhousedQty} un ×{' '}
+                            {mealVoucherUnhousedRate.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </div>
+                          <div className="text-[10px] print:text-[8.5px] text-slate-600 font-mono">
+                            Subtotal:{' '}
+                            {mealVoucherUnhousedTotal.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Seção Interna D: Custos Indiretos, Margem & Tributos */}
