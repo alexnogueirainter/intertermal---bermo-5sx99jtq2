@@ -4,7 +4,7 @@
  * Route: POST /api/public/proposals/:token/action -> aprova ou reprova a proposta, registra nome + data e gera OS automaticamente se aprovada
  */
 
-routerAdd('GET', '/api/public/proposals/{token}', (c) => {
+routerAdd('GET', '/backend/v1/public/proposals/{token}', (c) => {
   const token = c.request.pathValue('token')
   if (!token || token.trim() === '') {
     return c.json(400, { success: false, error: 'Token inválido ou não fornecido.' })
@@ -91,7 +91,7 @@ routerAdd('GET', '/api/public/proposals/{token}', (c) => {
   return c.json(200, { success: true, quote: data })
 })
 
-routerAdd('POST', '/api/public/proposals/{token}/action', (c) => {
+routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
   const token = c.request.pathValue('token')
   const reqInfo =
     typeof $apis !== 'undefined' && $apis.requestInfo ? $apis.requestInfo(c) : c.requestInfo()
@@ -285,20 +285,97 @@ routerAdd('POST', '/api/public/proposals/{token}/action', (c) => {
       console.warn('Erro ao criar OS automática:', soErr)
     }
 
-    // Tentar disparar notificação por e-mail com link do aceite
+    // Tentar disparar e-mail completo de aprovação chamando a rota de notificação com anexo de PDF
     try {
+      let appSiteUrl = ''
+      try {
+        appSiteUrl = $os.getenv('SITE_URL') || $os.getenv('PB_INSTANCE_URL') || ''
+      } catch (_) {
+        appSiteUrl = ''
+      }
+      if (!appSiteUrl) appSiteUrl = 'https://intertermal.goskip.app'
+      if (appSiteUrl.endsWith('/')) appSiteUrl = appSiteUrl.slice(0, -1)
+
+      const pdfFileName = quoteRecord.getString('pdf_file') || ''
+      let pdfDownloadUrl = ''
+      if (pdfFileName) {
+        pdfDownloadUrl =
+          appSiteUrl +
+          '/api/files/' +
+          quoteRecord.collection().id +
+          '/' +
+          quoteRecord.id +
+          '/' +
+          pdfFileName
+      }
+
       const mailClient =
         typeof $app !== 'undefined' && $app.newMailClient ? $app.newMailClient() : null
       if (mailClient) {
+        let pdfAttachmentSection = ''
+        if (pdfDownloadUrl) {
+          pdfAttachmentSection = `<div style="background-color:#f0fdf4; border:2px solid #10b981; border-radius:8px; padding:16px 20px; margin:20px 0;">
+            <strong style="font-size:14px; color:#166534; display:block;">PDF Oficial da Proposta Anexado (Visão Cliente + Composição Interna)</strong>
+            <p style="font-size:12px; color:#15803d; margin:4px 0 10px 0;">O documento técnico completo com composição interna foi anexado a este e-mail.</p>
+            <a href="${pdfDownloadUrl}" target="_blank" style="display:inline-block; background-color:#059669; color:#ffffff; text-decoration:none; font-weight:700; font-size:12px; padding:8px 18px; border-radius:6px;">Baixar PDF Oficial</a>
+          </div>`
+        }
+
         const msg = new MailerMessage({
-          from: { address: 'alex.nogueira@intertermal.com.br', name: 'Intertermal - Notificações' },
+          from: {
+            address: 'alex.nogueira@intertermal.com.br',
+            name: 'Intertermal - Notificações',
+          },
           to: [{ address: 'alex.nogueira@intertermal.com.br' }],
-          subject: `[ACEITE CONFIRMADO] Proposta #${quoteNumber} Aprovada pelo Cliente`,
-          html: `<p>A proposta #${quoteNumber} foi aprovada com sucesso por <strong>${clientApproverName}</strong> em ${new Date().toLocaleString('pt-BR')}.</p><p>A Ordem de Serviço foi gerada automaticamente e enviada para o Pipeline de Execução Técnica.</p>`,
+          subject: `[ACEITE CONFIRMADO] Proposta #${quoteNumber} Aprovada pelo Cliente (${clientApproverName})`,
+          html: `<div style="font-family:sans-serif; max-width:640px; margin:0 auto; padding:24px; color:#1e293b; background:#ffffff; border:1px solid #e2e8f0; border-radius:12px;">
+            <div style="background:linear-gradient(135deg, #0284c7 0%, #0369a1 100%); padding:20px; color:#ffffff; border-radius:8px; margin-bottom:20px;">
+              <h2 style="margin:0 0 6px 0; font-size:20px;">INTERTERMAL • ACEITE CONFIRMADO</h2>
+              <p style="margin:0; font-size:14px; opacity:0.9;">Aprovação Digital realizada pelo cliente</p>
+            </div>
+            <div style="background:#f0fdf4; border-left:4px solid #10b981; padding:12px 16px; margin-bottom:18px;">
+              <div style="font-size:14px; font-weight:700; color:#166534;">Aceite Digital Concluído</div>
+              <div style="font-size:13px; color:#15803d;">A proposta técnica #${quoteNumber} para <strong>${quoteRecord.getString('client_name') || 'Cliente'}</strong> foi aprovada por <strong>${clientApproverName}</strong> em ${new Date().toLocaleString('pt-BR')}.</div>
+            </div>
+            ${pdfAttachmentSection}
+            <p style="font-size:13px; color:#475569;">A Ordem de Serviço correspondente foi gerada automaticamente e enviada para o Pipeline de Execução Técnica.</p>
+            <div style="margin-top:24px; padding-top:16px; border-top:1px solid #e2e8f0; font-size:11px; color:#64748b; text-align:center;">
+              INTERTERMAL - SOLUÇÕES TÉRMICAS INDUSTRIAIS • alex.nogueira@intertermal.com.br
+            </div>
+          </div>`,
+          attachments: {},
         })
-        mailClient.send(msg)
+
+        let fsInst = null
+        let pdfRdr = null
+        if (pdfFileName) {
+          try {
+            fsInst = $app.newFilesystem()
+            const fKey = quoteRecord.baseFilesPath() + '/' + pdfFileName
+            if (fsInst.exists(fKey)) {
+              pdfRdr = fsInst.getReader(fKey)
+              const attachName = 'Proposta_' + quoteNumber.replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf'
+              msg.attachments[attachName] = pdfRdr
+            }
+          } catch (attErr) {
+            console.warn('Erro ao anexar arquivo no e-mail de aprovação pública:', attErr)
+          }
+        }
+
+        try {
+          mailClient.send(msg)
+        } finally {
+          try {
+            if (pdfRdr && typeof pdfRdr.close === 'function') pdfRdr.close()
+          } catch (_) {}
+          try {
+            if (fsInst && typeof fsInst.close === 'function') fsInst.close()
+          } catch (_) {}
+        }
       }
-    } catch (_) {}
+    } catch (mailErr) {
+      console.warn('Erro no envio do e-mail de confirmação de aceite público:', mailErr)
+    }
 
     return c.json(200, {
       success: true,

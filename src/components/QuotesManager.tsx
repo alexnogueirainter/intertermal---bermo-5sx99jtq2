@@ -90,6 +90,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { quotesService } from '@/services/quotes'
+import { generateAndUploadQuotePdf } from '@/lib/quote-pdf-generator'
 import { useToast } from '@/hooks/use-toast'
 
 export interface QuotesManagerProps {
@@ -1899,6 +1900,16 @@ export function QuotesManager({
     if (!targetQuote?.id) return
     setIsApprovingProposal(true)
     try {
+      // 0. Se houver elemento visual aberto no DOM, gerar e salvar PDF oficial
+      try {
+        const docEl = document.getElementById('quote-printable-document')
+        if (docEl && targetQuote.id) {
+          await generateAndUploadQuotePdf(targetQuote, docEl)
+        }
+      } catch (pdfErr) {
+        console.warn('PDF não gerado previamente no DOM:', pdfErr)
+      }
+
       // 1. Atualizar status para 'approved'
       if (onUpdateQuoteStatus) {
         await onUpdateQuoteStatus(targetQuote.id, 'approved')

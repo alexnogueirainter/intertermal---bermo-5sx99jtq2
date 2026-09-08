@@ -394,6 +394,18 @@ export const quotesService = {
   },
   create: createQuote,
   update: updateQuote,
+  uploadPdf: async (quoteId: string, file: File | Blob): Promise<QuoteRecord> => {
+    const formData = new FormData()
+    if (file instanceof File) {
+      formData.append('pdf_file', file)
+    } else {
+      formData.append(
+        'pdf_file',
+        new File([file], `proposta_${quoteId}.pdf`, { type: 'application/pdf' }),
+      )
+    }
+    return await pb.collection(QUOTES_COLLECTION).update<QuoteRecord>(quoteId, formData)
+  },
   delete: deleteQuote,
   searchSpecsOnline: searchEquipmentSpecsOnline,
   sendProposalApprovalEmail,
@@ -401,9 +413,11 @@ export const quotesService = {
     token: string,
   ): Promise<{ success: boolean; quote?: any; error?: string }> {
     try {
-      const res = await fetch(`${pb.baseUrl}/api/public/proposals/${encodeURIComponent(token)}`)
-      const json = await res.json()
-      return json
+      const res = await pb.send<{ success: boolean; quote?: any; error?: string }>(
+        `/backend/v1/public/proposals/${encodeURIComponent(token)}`,
+        { method: 'GET', requestKey: null },
+      )
+      return res
     } catch (err: any) {
       return { success: false, error: err.message || 'Erro ao carregar proposta pública.' }
     }
@@ -414,20 +428,21 @@ export const quotesService = {
     data: { client_name?: string; reason?: string },
   ): Promise<{ success: boolean; action?: string; message?: string; error?: string }> {
     try {
-      const res = await fetch(
-        `${pb.baseUrl}/api/public/proposals/${encodeURIComponent(token)}/action`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action,
-            client_name: data.client_name,
-            reason: data.reason,
-          }),
+      const res = await pb.send<{
+        success: boolean
+        action?: string
+        message?: string
+        error?: string
+      }>(`/backend/v1/public/proposals/${encodeURIComponent(token)}/action`, {
+        method: 'POST',
+        body: {
+          action,
+          client_name: data.client_name,
+          reason: data.reason,
         },
-      )
-      const json = await res.json()
-      return json
+        requestKey: null,
+      })
+      return res
     } catch (err: any) {
       return { success: false, error: err.message || 'Erro ao processar ação na proposta pública.' }
     }

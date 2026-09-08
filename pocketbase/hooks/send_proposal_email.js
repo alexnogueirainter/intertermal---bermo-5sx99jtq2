@@ -570,7 +570,48 @@ routerAdd('POST', '/send_proposal_email', (c) => {
   let emailSent = false
   let sendError = null
 
-  // 1. Tentar envio nativo via PocketBase MailClient ($app.newMailClient())
+  // Montar link direto para download do PDF se o registro possuir pdf_file anexado
+  const pdfFileName = quoteRecord.getString('pdf_file') || ''
+  let pdfDownloadUrl = ''
+  if (pdfFileName) {
+    pdfDownloadUrl =
+      appUrl +
+      '/api/files/' +
+      quoteRecord.collection().id +
+      '/' +
+      quoteRecord.id +
+      '/' +
+      pdfFileName
+  }
+
+  // Bloco HTML do Anexo PDF / Link Direto de Download
+  let pdfSectionHtml = ''
+  if (pdfDownloadUrl) {
+    pdfSectionHtml =
+      '      <div style="background-color: #f0fdf4; border: 2px solid #10b981; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;">' +
+      '        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">' +
+      '          <div>' +
+      '            <strong style="font-size: 14px; color: #166534; display: block;">PDF Oficial Anexado (Visão Cliente + Composição Interna)</strong>' +
+      '            <span style="font-size: 12px; color: #15803d;">Documento técnico formatado no padrão A4 completo com custos e margens.</span>' +
+      '          </div>' +
+      '          <a href="' +
+      pdfDownloadUrl +
+      '" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #059669; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 12px; padding: 8px 18px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">' +
+      'Baixar PDF da Proposta' +
+      '</a>' +
+      '        </div>' +
+      '      </div>'
+  }
+
+  const finalEmailHtml = emailHtml.replace(
+    '      <div style="background-color: #f0fdf4; border-left: 4px solid #10b981;',
+    (pdfSectionHtml ? pdfSectionHtml + '\n' : '') +
+      '      <div style="background-color: #f0fdf4; border-left: 4px solid #10b981;',
+  )
+
+  // 1. Tentar envio nativo via PocketBase MailClient ($app.newMailClient()) com anexo real se disponível
+  let fsInstance = null
+  let pdfFileReader = null
   try {
     if (typeof $app !== 'undefined' && $app.newMailClient) {
       const mailClient = $app.newMailClient()
@@ -581,14 +622,45 @@ routerAdd('POST', '/send_proposal_email', (c) => {
         },
         to: [{ address: targetEmail }],
         subject: emailSubject,
-        html: emailHtml,
+        html: finalEmailHtml,
+        attachments: {},
       })
+
+      // Se existir pdf_file, anexar diretamente como io.Reader via filesystem
+      if (pdfFileName) {
+        try {
+          fsInstance = $app.newFilesystem()
+          const fileKey = quoteRecord.baseFilesPath() + '/' + pdfFileName
+          if (fsInstance.exists(fileKey)) {
+            pdfFileReader = fsInstance.getReader(fileKey)
+            const attachName = 'Proposta_' + quoteNumber.replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf'
+            message.attachments[attachName] = pdfFileReader
+          }
+        } catch (attachErr) {
+          console.warn(
+            'Não foi possível anexar o PDF diretamente ao mailer (link direto permanecerá no e-mail):',
+            attachErr,
+          )
+        }
+      }
+
       mailClient.send(message)
       emailSent = true
     }
   } catch (mErr) {
     sendError = mErr && mErr.message ? mErr.message : String(mErr)
     console.warn('Falha no envio via $app.newMailClient():', sendError)
+  } finally {
+    try {
+      if (pdfFileReader && typeof pdfFileReader.close === 'function') {
+        pdfFileReader.close()
+      }
+    } catch (_) {}
+    try {
+      if (fsInstance && typeof fsInstance.close === 'function') {
+        fsInstance.close()
+      }
+    } catch (_) {}
   }
 
   // 2. Se $app.newMailClient falhou ou SMTP não configurado, registrar log
@@ -1145,7 +1217,48 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
   let emailSent = false
   let sendError = null
 
-  // 1. Tentar envio nativo via PocketBase MailClient ($app.newMailClient())
+  // Montar link direto para download do PDF se o registro possuir pdf_file anexado
+  const pdfFileNameFallback = quoteRecord.getString('pdf_file') || ''
+  let pdfDownloadUrlFallback = ''
+  if (pdfFileNameFallback) {
+    pdfDownloadUrlFallback =
+      appUrl +
+      '/api/files/' +
+      quoteRecord.collection().id +
+      '/' +
+      quoteRecord.id +
+      '/' +
+      pdfFileNameFallback
+  }
+
+  // Bloco HTML do Anexo PDF / Link Direto de Download
+  let pdfSectionHtmlFallback = ''
+  if (pdfDownloadUrlFallback) {
+    pdfSectionHtmlFallback =
+      '      <div style="background-color: #f0fdf4; border: 2px solid #10b981; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;">' +
+      '        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">' +
+      '          <div>' +
+      '            <strong style="font-size: 14px; color: #166534; display: block;">PDF Oficial Anexado (Visão Cliente + Composição Interna)</strong>' +
+      '            <span style="font-size: 12px; color: #15803d;">Documento técnico formatado no padrão A4 completo com custos e margens.</span>' +
+      '          </div>' +
+      '          <a href="' +
+      pdfDownloadUrlFallback +
+      '" target="_blank" rel="noopener noreferrer" style="display: inline-block; background-color: #059669; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 12px; padding: 8px 18px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">' +
+      'Baixar PDF da Proposta' +
+      '</a>' +
+      '        </div>' +
+      '      </div>'
+  }
+
+  const finalEmailHtmlFallback = emailHtml.replace(
+    '      <div style="background-color: #f0fdf4; border-left: 4px solid #10b981;',
+    (pdfSectionHtmlFallback ? pdfSectionHtmlFallback + '\n' : '') +
+      '      <div style="background-color: #f0fdf4; border-left: 4px solid #10b981;',
+  )
+
+  // 1. Tentar envio nativo via PocketBase MailClient ($app.newMailClient()) com anexo real se disponível
+  let fsInstanceFallback = null
+  let pdfFileReaderFallback = null
   try {
     if (typeof $app !== 'undefined' && $app.newMailClient) {
       const mailClient = $app.newMailClient()
@@ -1156,14 +1269,45 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
         },
         to: [{ address: targetEmail }],
         subject: emailSubject,
-        html: emailHtml,
+        html: finalEmailHtmlFallback,
+        attachments: {},
       })
+
+      // Se existir pdf_file, anexar diretamente como io.Reader via filesystem
+      if (pdfFileNameFallback) {
+        try {
+          fsInstanceFallback = $app.newFilesystem()
+          const fileKey = quoteRecord.baseFilesPath() + '/' + pdfFileNameFallback
+          if (fsInstanceFallback.exists(fileKey)) {
+            pdfFileReaderFallback = fsInstanceFallback.getReader(fileKey)
+            const attachName = 'Proposta_' + quoteNumber.replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf'
+            message.attachments[attachName] = pdfFileReaderFallback
+          }
+        } catch (attachErr) {
+          console.warn(
+            'Não foi possível anexar o PDF diretamente ao mailer (link direto permanecerá no e-mail):',
+            attachErr,
+          )
+        }
+      }
+
       mailClient.send(message)
       emailSent = true
     }
   } catch (mErr) {
     sendError = mErr && mErr.message ? mErr.message : String(mErr)
     console.warn('Falha no envio via $app.newMailClient():', sendError)
+  } finally {
+    try {
+      if (pdfFileReaderFallback && typeof pdfFileReaderFallback.close === 'function') {
+        pdfFileReaderFallback.close()
+      }
+    } catch (_) {}
+    try {
+      if (fsInstanceFallback && typeof fsInstanceFallback.close === 'function') {
+        fsInstanceFallback.close()
+      }
+    } catch (_) {}
   }
 
   // 2. Se $app.newMailClient falhou ou SMTP não configurado, registrar log

@@ -330,6 +330,7 @@ export interface QuoteRecord {
   approved_by_client_date?: string
   rejected_by_client_reason?: string
   rejected_by_client_date?: string
+  pdf_file?: string
   created?: string
   updated?: string
 }

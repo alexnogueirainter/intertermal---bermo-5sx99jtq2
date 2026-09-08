@@ -34,6 +34,10 @@ import {
   TrendingDown,
   Sparkles,
   Award,
+  Calendar,
+  FileCheck2,
+  FileX2,
+  Filter,
 } from 'lucide-react'
 
 interface OverviewDashboardProps {
@@ -55,10 +59,59 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   serviceOrders = [],
   onNavigate,
 }) => {
-  const [dashboardTab, setDashboardTab] = React.useState<'overview' | 'profitability'>('overview')
-  const [periodFilter, setPeriodFilter] = React.useState<'all' | 'month' | 'quarter' | 'year'>(
-    'all',
-  )
+  const [dashboardTab, setDashboardTab] = React.useState<
+    'overview' | 'profitability' | 'conversion'
+  >('overview')
+  const [periodFilter, setPeriodFilter] = React.useState<
+    'all' | 'month' | 'quarter' | 'year' | 'custom'
+  >('all')
+  const [customStartDate, setCustomStartDate] = React.useState<string>('')
+  const [customEndDate, setCustomEndDate] = React.useState<string>('')
+  const [reportClientFilter, setReportClientFilter] = React.useState<string>('all')
+
+  // Filtro de propostas por período baseado no campo created (ou updated)
+  const filteredQuotesByPeriod = React.useMemo(() => {
+    if (periodFilter === 'all') return quotes
+
+    const now = new Date()
+    return quotes.filter((q) => {
+      const dateStr = q.created || q.updated
+      if (!dateStr) return true
+      const qDate = new Date(dateStr)
+      if (isNaN(qDate.getTime())) return true
+
+      if (periodFilter === 'month') {
+        return qDate.getMonth() === now.getMonth() && qDate.getFullYear() === now.getFullYear()
+      }
+
+      if (periodFilter === 'quarter') {
+        const currentQuarter = Math.floor(now.getMonth() / 3)
+        const quoteQuarter = Math.floor(qDate.getMonth() / 3)
+        return quoteQuarter === currentQuarter && qDate.getFullYear() === now.getFullYear()
+      }
+
+      if (periodFilter === 'year') {
+        return qDate.getFullYear() === now.getFullYear()
+      }
+
+      if (periodFilter === 'custom') {
+        if (!customStartDate && !customEndDate) return true
+        const qTime = qDate.getTime()
+        if (customStartDate) {
+          const start = new Date(`${customStartDate}T00:00:00`).getTime()
+          if (!isNaN(start) && qTime < start) return false
+        }
+        if (customEndDate) {
+          const end = new Date(`${customEndDate}T23:59:59`).getTime()
+          if (!isNaN(end) && qTime > end) return false
+        }
+        return true
+      }
+
+      return true
+    })
+  }, [quotes, periodFilter, customStartDate, customEndDate])
+
   // Função utilitária para extrair o valor monetário real de uma proposta
   const getQuoteNumericValue = (q: QuoteRecord): number => {
     const val =
@@ -109,18 +162,18 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     )
   }
 
-  // Cálculos de métricas de propostas
-  const approvedQuotes = quotes.filter((q) => isApprovedQuote(q.status))
-  const rejectedQuotes = quotes.filter((q) => isRejectedQuote(q.status))
-  const pendingQuotes = quotes.filter((q) => isPendingQuote(q.status))
+  // Cálculos de métricas de propostas afetados pelo seletor de período
+  const approvedQuotes = filteredQuotesByPeriod.filter((q) => isApprovedQuote(q.status))
+  const rejectedQuotes = filteredQuotesByPeriod.filter((q) => isRejectedQuote(q.status))
+  const pendingQuotes = filteredQuotesByPeriod.filter((q) => isPendingQuote(q.status))
 
   const approvedQuotesTotal = approvedQuotes.reduce((sum, q) => sum + getQuoteNumericValue(q), 0)
-
   const rejectedQuotesTotal = rejectedQuotes.reduce((sum, q) => sum + getQuoteNumericValue(q), 0)
-
   const pendingQuotesTotal = pendingQuotes.reduce((sum, q) => sum + getQuoteNumericValue(q), 0)
-
-  const totalQuotesValue = quotes.reduce((sum, q) => sum + getQuoteNumericValue(q), 0)
+  const totalQuotesValue = filteredQuotesByPeriod.reduce(
+    (sum, q) => sum + getQuoteNumericValue(q),
+    0,
+  )
 
   // Utilitário para verificar se um negócio está ativo (exclui perdidos/lost/recusados)
   const isDealActive = (deal: DealRecord): boolean => {
@@ -189,12 +242,12 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   return (
     <div className="space-y-6">
       {/* Seletor de Sub-Abas do Dashboard */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
-        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-900 p-1 rounded-xl overflow-x-auto">
           <button
             type="button"
             onClick={() => setDashboardTab('overview')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
               dashboardTab === 'overview'
                 ? 'bg-white dark:bg-slate-800 text-teal-700 dark:text-teal-400 shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -206,7 +259,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           <button
             type="button"
             onClick={() => setDashboardTab('profitability')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
               dashboardTab === 'profitability'
                 ? 'bg-teal-700 text-white shadow-xs'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
@@ -215,26 +268,464 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             <PieChartIcon className="h-4 w-4" />
             Dashboard de Rentabilidade & Margem Real
           </button>
+          <button
+            type="button"
+            onClick={() => setDashboardTab('conversion')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+              dashboardTab === 'conversion'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <BarChart3 className="h-4 w-4" />
+            Relatório de Conversão
+          </button>
         </div>
 
-        {dashboardTab === 'profitability' && (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground font-medium">Período:</span>
-            <select
-              value={periodFilter}
-              onChange={(e) => setPeriodFilter(e.target.value as any)}
-              className="text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-200"
-            >
-              <option value="all">Todo o Histórico</option>
-              <option value="month">Este Mês</option>
-              <option value="quarter">Último Trimestre</option>
-              <option value="year">Este Ano</option>
-            </select>
+        {/* Seletor de Período Geral */}
+        <div className="flex flex-wrap items-center gap-2 bg-slate-50 dark:bg-slate-900/60 p-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800">
+          <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300 font-semibold px-1">
+            <Calendar className="h-3.5 w-3.5 text-teal-600" />
+            <span>Período:</span>
           </div>
-        )}
+          <select
+            value={periodFilter}
+            onChange={(e) => setPeriodFilter(e.target.value as any)}
+            className="text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-100 shadow-2xs focus:outline-hidden focus:ring-1 focus:ring-teal-500"
+          >
+            <option value="all">Todo o período</option>
+            <option value="month">Este mês</option>
+            <option value="quarter">Este trimestre</option>
+            <option value="year">Este ano</option>
+            <option value="custom">Personalizado</option>
+          </select>
+
+          {periodFilter === 'custom' && (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-100"
+                placeholder="Início"
+              />
+              <span className="text-xs text-muted-foreground">até</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-100"
+                placeholder="Fim"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {dashboardTab === 'profitability' ? (
+      {dashboardTab === 'conversion' ? (
+        /* ==================== ABA RELATÓRIO DE CONVERSÃO ==================== */
+        <div className="space-y-6">
+          {(() => {
+            // Filtrar quotes pelo cliente selecionado (se aplicável) e pelo período já ativo
+            const quotesForConversion = filteredQuotesByPeriod.filter((q) => {
+              if (reportClientFilter === 'all') return true
+              return q.client_id === reportClientFilter || q.client_name === reportClientFilter
+            })
+
+            const totalIssued = quotesForConversion.length
+            const convApproved = quotesForConversion.filter((q) => isApprovedQuote(q.status))
+            const convRejected = quotesForConversion.filter((q) => isRejectedQuote(q.status))
+            const convPending = quotesForConversion.filter((q) => isPendingQuote(q.status))
+
+            const convApprovedValue = convApproved.reduce(
+              (sum, q) => sum + getQuoteNumericValue(q),
+              0,
+            )
+            const convRejectedValue = convRejected.reduce(
+              (sum, q) => sum + getQuoteNumericValue(q),
+              0,
+            )
+            const convPendingValue = convPending.reduce(
+              (sum, q) => sum + getQuoteNumericValue(q),
+              0,
+            )
+            const convTotalValue = quotesForConversion.reduce(
+              (sum, q) => sum + getQuoteNumericValue(q),
+              0,
+            )
+
+            const approvalRate = totalIssued > 0 ? (convApproved.length / totalIssued) * 100 : 0
+            const rejectionRate = totalIssued > 0 ? (convRejected.length / totalIssued) * 100 : 0
+            const pendingRate = totalIssued > 0 ? (convPending.length / totalIssued) * 100 : 0
+
+            // Agrupamento por cliente para a tabela analítica
+            const clientStatsMap = new Map<
+              string,
+              {
+                id: string
+                name: string
+                issued: number
+                approved: number
+                rejected: number
+                pending: number
+                approvedValue: number
+                totalValue: number
+              }
+            >()
+
+            quotesForConversion.forEach((q) => {
+              const cId = q.client_id || q.client_name || 'outros'
+              const cName =
+                q.client_name ||
+                (q.client_id
+                  ? clients.find((c) => c.id === q.client_id)?.name
+                  : 'Cliente Não Identificado') ||
+                'Cliente Geral'
+              const val = getQuoteNumericValue(q)
+
+              if (!clientStatsMap.has(cId)) {
+                clientStatsMap.set(cId, {
+                  id: cId,
+                  name: cName,
+                  issued: 0,
+                  approved: 0,
+                  rejected: 0,
+                  pending: 0,
+                  approvedValue: 0,
+                  totalValue: 0,
+                })
+              }
+
+              const row = clientStatsMap.get(cId)!
+              row.issued += 1
+              row.totalValue += val
+
+              if (isApprovedQuote(q.status)) {
+                row.approved += 1
+                row.approvedValue += val
+              } else if (isRejectedQuote(q.status)) {
+                row.rejected += 1
+              } else {
+                row.pending += 1
+              }
+            })
+
+            const clientStatsList = Array.from(clientStatsMap.values()).sort(
+              (a, b) => b.approvedValue - a.approvedValue || b.issued - a.issued,
+            )
+
+            return (
+              <div className="space-y-6">
+                {/* Cabeçalho do Relatório com Filtro por Cliente */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-teal-600" />
+                      Relatório Analítico de Conversão de Propostas
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Taxas reais de aprovação, recusa e volume negociado por cliente industrial.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      Filtrar Cliente:
+                    </span>
+                    <select
+                      value={reportClientFilter}
+                      onChange={(e) => setReportClientFilter(e.target.value)}
+                      className="text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-800 dark:text-slate-100 max-w-[200px] truncate"
+                    >
+                      <option value="all">Todos os Clientes</option>
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Métricas Principais de Conversão */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
+                        Taxa de Aprovação (%)
+                      </CardTitle>
+                      <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center font-bold">
+                        <Percent className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">
+                        {approvalRate.toFixed(1)}%
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {convApproved.length} aprovadas de {totalIssued} emitidas
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
+                        Taxa de Recusa (%)
+                      </CardTitle>
+                      <div className="h-8 w-8 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 flex items-center justify-center font-bold">
+                        <TrendingDown className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-rose-700 dark:text-rose-400">
+                        {rejectionRate.toFixed(1)}%
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {convRejected.length} propostas recusadas
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
+                        Em Negociação
+                      </CardTitle>
+                      <div className="h-8 w-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center font-bold">
+                        <Clock className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-amber-700 dark:text-amber-400">
+                        {convPending.length}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        {pendingRate.toFixed(1)}% do total (
+                        {convPendingValue.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                        )
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xs">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
+                        Volume Aprovado (R$)
+                      </CardTitle>
+                      <div className="h-8 w-8 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 flex items-center justify-center font-bold">
+                        <DollarSign className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-teal-700 dark:text-teal-400">
+                        {convApprovedValue.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-1">
+                        Total emitido:{' '}
+                        {convTotalValue.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Volume Aprovado vs Recusado vs Pendente (Distribuição Visual) */}
+                <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <PieChartIcon className="h-4 w-4 text-teal-600" />
+                      Volume: Aprovado vs. Recusado vs. Pendente
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Distribuição financeira total do valor das propostas no período selecionado
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-4 rounded-full overflow-hidden flex">
+                      {convTotalValue > 0 ? (
+                        <>
+                          <div
+                            className="bg-emerald-600 h-full transition-all"
+                            style={{ width: `${(convApprovedValue / convTotalValue) * 100}%` }}
+                            title={`Aprovado: ${convApprovedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
+                          />
+                          <div
+                            className="bg-amber-500 h-full transition-all"
+                            style={{ width: `${(convPendingValue / convTotalValue) * 100}%` }}
+                            title={`Pendente: ${convPendingValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
+                          />
+                          <div
+                            className="bg-rose-500 h-full transition-all"
+                            style={{ width: `${(convRejectedValue / convTotalValue) * 100}%` }}
+                            title={`Recusado: ${convRejectedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
+                          />
+                        </>
+                      ) : (
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 h-full" />
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
+                      <div className="p-3 rounded-lg border border-emerald-100 dark:border-emerald-950/60 bg-emerald-50/40 dark:bg-emerald-950/20">
+                        <div className="flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-400">
+                          <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
+                          <span>Aprovadas ({convApproved.length})</span>
+                        </div>
+                        <div className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+                          {convApprovedValue.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {convTotalValue > 0
+                            ? ((convApprovedValue / convTotalValue) * 100).toFixed(1)
+                            : 0}
+                          % do valor total
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg border border-amber-100 dark:border-amber-950/60 bg-amber-50/40 dark:bg-amber-950/20">
+                        <div className="flex items-center gap-1.5 font-semibold text-amber-700 dark:text-amber-400">
+                          <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                          <span>Pendentes / Em Análise ({convPending.length})</span>
+                        </div>
+                        <div className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+                          {convPendingValue.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {convTotalValue > 0
+                            ? ((convPendingValue / convTotalValue) * 100).toFixed(1)
+                            : 0}
+                          % do valor total
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg border border-rose-100 dark:border-rose-950/60 bg-rose-50/40 dark:bg-rose-950/20">
+                        <div className="flex items-center gap-1.5 font-semibold text-rose-700 dark:text-rose-400">
+                          <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                          <span>Recusadas ({convRejected.length})</span>
+                        </div>
+                        <div className="text-lg font-bold text-slate-900 dark:text-slate-100 mt-1">
+                          {convRejectedValue.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {convTotalValue > 0
+                            ? ((convRejectedValue / convTotalValue) * 100).toFixed(1)
+                            : 0}
+                          % do valor total
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Tabela de Conversão por Cliente */}
+                <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <FileCheck2 className="h-4 w-4 text-teal-600" />
+                      Tabela de Conversão por Cliente Industrial
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Histórico detalhado de propostas emitidas, taxa de sucesso e montante
+                      financeiro fechado
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-50 dark:bg-slate-950/60 text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 font-semibold">
+                          <tr>
+                            <th className="py-3 px-4">Cliente Industrial</th>
+                            <th className="py-3 px-4 text-center">Emitidas</th>
+                            <th className="py-3 px-4 text-center">Aprovadas</th>
+                            <th className="py-3 px-4 text-center">Recusadas</th>
+                            <th className="py-3 px-4 text-center">Em Negociação</th>
+                            <th className="py-3 px-4 text-right">Taxa Conversão (%)</th>
+                            <th className="py-3 px-4 text-right">Valor Aprovado (R$)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                          {clientStatsList.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                                Nenhuma proposta encontrada com os filtros selecionados.
+                              </td>
+                            </tr>
+                          ) : (
+                            clientStatsList.map((row) => {
+                              const convPercent =
+                                row.issued > 0 ? (row.approved / row.issued) * 100 : 0
+                              return (
+                                <tr
+                                  key={row.id}
+                                  className="hover:bg-slate-50/50 dark:hover:bg-slate-950/40"
+                                >
+                                  <td className="py-3 px-4 font-semibold text-slate-900 dark:text-slate-100">
+                                    {row.name}
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-bold text-slate-700 dark:text-slate-300">
+                                    {row.issued}
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-semibold text-emerald-700 dark:text-emerald-400">
+                                    {row.approved}
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-semibold text-rose-600 dark:text-rose-400">
+                                    {row.rejected}
+                                  </td>
+                                  <td className="py-3 px-4 text-center font-semibold text-amber-600 dark:text-amber-400">
+                                    {row.pending}
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-bold">
+                                    <Badge
+                                      className={`text-[10px] font-bold ${
+                                        convPercent >= 50
+                                          ? 'bg-emerald-600 text-white'
+                                          : convPercent > 0
+                                            ? 'bg-amber-500 text-white'
+                                            : 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                      }`}
+                                    >
+                                      {convPercent.toFixed(1)}%
+                                    </Badge>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-bold text-teal-700 dark:text-teal-400">
+                                    {row.approvedValue.toLocaleString('pt-BR', {
+                                      style: 'currency',
+                                      currency: 'BRL',
+                                    })}
+                                  </td>
+                                </tr>
+                              )
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )
+          })()}
+        </div>
+      ) : dashboardTab === 'profitability' ? (
         /* ==================== ABA DASHBOARD DE RENTABILIDADE ==================== */
         <div className="space-y-6">
           {/* Cálculo de Rentabilidade de todas as OSs e Propostas Concluídas/Aprovadas */}
@@ -624,7 +1115,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  {approvedQuotes.length} de {quotes.length} propostas fechadas
+                  {approvedQuotes.length} de {filteredQuotesByPeriod.length} propostas fechadas
                 </p>
               </CardContent>
             </Card>
@@ -674,7 +1165,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  {pendingQuotes.length} de {quotes.length} propostas em análise
+                  {pendingQuotes.length} de {filteredQuotesByPeriod.length} propostas em análise
                 </p>
               </CardContent>
             </Card>
@@ -778,7 +1269,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   })}
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  {quotes.length} propostas emitidas no histórico
+                  {filteredQuotesByPeriod.length} propostas no período selecionado
                 </p>
               </CardContent>
             </Card>

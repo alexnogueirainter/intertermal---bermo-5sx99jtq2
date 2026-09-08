@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-08T17:56:39.661Z",
+  "generatedAt": "2026-09-08T18:25:02.699Z",
   "collections": [
     {
       "name": "users",
@@ -908,6 +908,12 @@
         {
           "name": "deal_title",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pdf_file",
+          "type": "file",
           "required": false,
           "system": false
         }

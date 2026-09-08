@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { QuoteRecord } from '@/types/crm'
+import { generateAndUploadQuotePdf } from '@/lib/quote-pdf-generator'
 import {
   Printer,
   FileDown,
@@ -80,6 +81,15 @@ export function QuotePdfPreviewDialog({
     if (!onApproveQuote) return
     try {
       setIsApproving(true)
+      // Gerar e anexar o PDF oficial real no campo pdf_file da proposta antes do disparo do e-mail
+      try {
+        const docEl = document.getElementById('quote-printable-document')
+        if (docEl && quote?.id) {
+          await generateAndUploadQuotePdf(quote, docEl)
+        }
+      } catch (pdfErr) {
+        console.warn('Erro ao gerar/anexar PDF na aprovação pela prévia:', pdfErr)
+      }
       await onApproveQuote(quote)
       setShowApprovalConfirm(false)
     } finally {

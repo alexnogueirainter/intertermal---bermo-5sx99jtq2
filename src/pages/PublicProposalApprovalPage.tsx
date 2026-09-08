@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { quotesService } from '@/services/quotes'
+import { generateAndUploadQuotePdf } from '@/lib/quote-pdf-generator'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -111,6 +112,18 @@ export const PublicProposalApprovalPage: React.FC = () => {
     setSubmittingAction(true)
     try {
       const approverName = clientApproverName.trim()
+
+      // Tenta gerar e subir o PDF oficial da proposta a partir do documento renderizado na tela pública
+      try {
+        const docEl =
+          document.querySelector('main') || document.querySelector('.max-w-4xl') || document.body
+        if (docEl && quote?.id) {
+          await generateAndUploadQuotePdf(quote, docEl as HTMLElement)
+        }
+      } catch (pdfErr) {
+        console.warn('PDF não gerado previamente no fluxo público:', pdfErr)
+      }
+
       const res = await quotesService.actionPublicProposal(token!, 'approve', {
         client_name: approverName,
       })
