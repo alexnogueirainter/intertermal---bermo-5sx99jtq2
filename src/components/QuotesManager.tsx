@@ -115,12 +115,13 @@ export function QuotesManager({
 
   // Proposta em edição / ativa
   const [activeQuoteId, setActiveQuoteId] = useState<string | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
+  const [isEditing, setIsEditing] = useState(true)
   const [activeTabSection, setActiveTabSection] = useState('escopo')
 
-  // PDF Preview Dialog
+  // PDF Preview Dialog (com suporte a visão interna e cliente)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [quoteForPreview, setQuoteForPreview] = useState<QuoteRecord | null>(null)
+  const [previewViewMode, setPreviewViewMode] = useState<'client' | 'internal'>('client')
 
   // Form Fields - Identificação Geral
   const [clientId, setClientId] = useState('')
@@ -142,7 +143,13 @@ export function QuotesManager({
     'Desmontagem completa, limpeza química/mecânica por imersão, teste de líquido penetrante, substituição das gaxetas e teste hidrostático conforme norma ASME.',
   )
 
-  // Seção 3A: Mão de Obra
+  // Vínculo com Oportunidade CRM e Responsável
+  const [dealId, setDealId] = useState('')
+  const [dealTitle, setDealTitle] = useState('')
+  const [assignedTo, setAssignedTo] = useState('Alex Nogueira')
+  const [approvalToken, setApprovalToken] = useState('')
+
+  // Seção 3A: Mão de Obra (6 Funções Especializadas Suportadas)
   const [techCount, setTechCount] = useState(2)
   const [techHours, setTechHours] = useState(16)
   const [techRate, setTechRate] = useState(85)
@@ -152,6 +159,15 @@ export function QuotesManager({
   const [inspectorCount, setInspectorCount] = useState(0)
   const [inspectorHours, setInspectorHours] = useState(0)
   const [inspectorRate, setInspectorRate] = useState(120)
+  const [welderCount, setWelderCount] = useState(0)
+  const [welderHours, setWelderHours] = useState(0)
+  const [welderRate, setWelderRate] = useState(160)
+  const [plumberCount, setPlumberCount] = useState(0)
+  const [plumberHours, setPlumberHours] = useState(0)
+  const [plumberRate, setPlumberRate] = useState(120)
+  const [foremanCount, setForemanCount] = useState(0)
+  const [foremanHours, setForemanHours] = useState(0)
+  const [foremanRate, setForemanRate] = useState(180)
 
   // Seção 3C: Deslocamento & Rotas
   const [originCep, setOriginCep] = useState('89066-000')
@@ -208,11 +224,17 @@ export function QuotesManager({
   const autoSaveTimerRef = useRef<any>(null)
   const isInitialMount = useRef(true)
 
-  // Cálculos de Mão de Obra
+  // Cálculos de Mão de Obra (6 funções)
   const techTotal = techCount * techHours * techRate
   const helperTotal = helperCount * helperHours * helperRate
   const inspectorTotal = inspectorCount * inspectorHours * inspectorRate
-  const totalLaborCost = techTotal + helperTotal + inspectorTotal
+  const welderTotal = welderCount * welderHours * welderRate
+  const plumberTotal = plumberCount * plumberHours * plumberRate
+  const foremanTotal = foremanCount * foremanHours * foremanRate
+  const totalLaborCost =
+    techTotal + helperTotal + inspectorTotal + welderTotal + plumberTotal + foremanTotal
+  const totalLaborHours =
+    techHours + helperHours + inspectorHours + welderHours + plumberHours + foremanHours
 
   // Cálculos de Deslocamento
   const effectiveDistance = isRoundTrip ? distanceKm * 2 : distanceKm
@@ -288,6 +310,27 @@ export function QuotesManager({
       mealVoucherUnhousedRate,
     }
 
+    const laborConfig: QuoteLaborConfig = {
+      techCount,
+      techHours,
+      techRate,
+      helperCount,
+      helperHours,
+      helperRate,
+      inspectorCount,
+      inspectorHours,
+      inspectorRate,
+      welderCount,
+      welderHours,
+      welderRate,
+      plumberCount,
+      plumberHours,
+      plumberRate,
+      foremanCount,
+      foremanHours,
+      foremanRate,
+    }
+
     return {
       title:
         quoteTitle || `Proposta Técnica ${equipmentModel || 'BERMO'} - ${clientName || 'Cliente'}`,
@@ -295,6 +338,10 @@ export function QuotesManager({
         quoteNumber || `INT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
       client_id: clientId,
       client_name: clientName,
+      deal_id: dealId || undefined,
+      deal_title: dealTitle || undefined,
+      assigned_to: assignedTo || 'Alex Nogueira',
+      approval_token: approvalToken || undefined,
       status,
       equipment_brand: equipmentBrand,
       equipment_model: equipmentModel,
@@ -308,8 +355,8 @@ export function QuotesManager({
       working_pressure_bar: workingPressureBar,
       scope_of_work: scopeOfWork,
 
-      // Custos diretos
-      labor_hours: techHours + helperHours + inspectorHours,
+      // Custos diretos - Mão de Obra (6 funções)
+      labor_hours: totalLaborHours,
       labor_rate_hourly: techRate,
       tech_count: techCount,
       tech_hours: techHours,
@@ -320,6 +367,16 @@ export function QuotesManager({
       inspector_count: inspectorCount,
       inspector_hours: inspectorHours,
       inspector_rate: inspectorRate,
+      welder_count: welderCount,
+      welder_hours: welderHours,
+      welder_rate: welderRate,
+      plumber_count: plumberCount,
+      plumber_hours: plumberHours,
+      plumber_rate: plumberRate,
+      foreman_count: foremanCount,
+      foreman_hours: foremanHours,
+      foreman_rate: foremanRate,
+      labor_config: laborConfig,
 
       // Deslocamento & Rotas
       origin_cep: originCep,
@@ -385,6 +442,10 @@ export function QuotesManager({
     setIsEditing(false)
     setClientId('')
     setClientName('')
+    setDealId('')
+    setDealTitle('')
+    setAssignedTo('Alex Nogueira')
+    setApprovalToken('')
     setQuoteTitle('')
     setQuoteNumber('')
     setStatus('draft')
@@ -410,6 +471,15 @@ export function QuotesManager({
     setInspectorCount(0)
     setInspectorHours(0)
     setInspectorRate(120)
+    setWelderCount(0)
+    setWelderHours(0)
+    setWelderRate(160)
+    setPlumberCount(0)
+    setPlumberHours(0)
+    setPlumberRate(120)
+    setForemanCount(0)
+    setForemanHours(0)
+    setForemanRate(180)
 
     setOriginCep('89066-000')
     setOriginAddress('Rua Bernardo Reiter, 500 - Blumenau/SC')
@@ -459,6 +529,10 @@ export function QuotesManager({
     setIsEditing(true)
     setClientId(quote.client_id || '')
     setClientName(quote.client_name || '')
+    setDealId(quote.deal_id || '')
+    setDealTitle(quote.deal_title || '')
+    setAssignedTo(quote.assigned_to || 'Alex Nogueira')
+    setApprovalToken(quote.approval_token || '')
     setQuoteTitle(quote.title || '')
     setQuoteNumber(quote.quote_number || '')
     setStatus(quote.status || 'draft')
@@ -474,15 +548,24 @@ export function QuotesManager({
     setWorkingPressureBar(quote.working_pressure_bar || 10)
     setScopeOfWork(quote.scope_of_work || '')
 
-    setTechCount(quote.tech_count ?? 2)
-    setTechHours(quote.tech_hours ?? 16)
-    setTechRate(quote.tech_rate ?? 85)
-    setHelperCount(quote.helper_count ?? 1)
-    setHelperHours(quote.helper_hours ?? 16)
-    setHelperRate(quote.helper_rate ?? 55)
-    setInspectorCount(quote.inspector_count ?? 0)
-    setInspectorHours(quote.inspector_hours ?? 0)
-    setInspectorRate(quote.inspector_rate ?? 120)
+    setTechCount(quote.tech_count ?? quote.labor_config?.techCount ?? 2)
+    setTechHours(quote.tech_hours ?? quote.labor_config?.techHours ?? 16)
+    setTechRate(quote.tech_rate ?? quote.labor_config?.techRate ?? 85)
+    setHelperCount(quote.helper_count ?? quote.labor_config?.helperCount ?? 1)
+    setHelperHours(quote.helper_hours ?? quote.labor_config?.helperHours ?? 16)
+    setHelperRate(quote.helper_rate ?? quote.labor_config?.helperRate ?? 55)
+    setInspectorCount(quote.inspector_count ?? quote.labor_config?.inspectorCount ?? 0)
+    setInspectorHours(quote.inspector_hours ?? quote.labor_config?.inspectorHours ?? 0)
+    setInspectorRate(quote.inspector_rate ?? quote.labor_config?.inspectorRate ?? 120)
+    setWelderCount(quote.welder_count ?? quote.labor_config?.welderCount ?? 0)
+    setWelderHours(quote.welder_hours ?? quote.labor_config?.welderHours ?? 0)
+    setWelderRate(quote.welder_rate ?? quote.labor_config?.welderRate ?? 160)
+    setPlumberCount(quote.plumber_count ?? quote.labor_config?.plumberCount ?? 0)
+    setPlumberHours(quote.plumber_hours ?? quote.labor_config?.plumberHours ?? 0)
+    setPlumberRate(quote.plumber_rate ?? quote.labor_config?.plumberRate ?? 120)
+    setForemanCount(quote.foreman_count ?? quote.labor_config?.foremanCount ?? 0)
+    setForemanHours(quote.foreman_hours ?? quote.labor_config?.foremanHours ?? 0)
+    setForemanRate(quote.foreman_rate ?? quote.labor_config?.foremanRate ?? 180)
 
     // Deslocamento & Rotas
     setOriginCep(quote.origin_cep || quote.travel_config?.originCep || '89066-000')
@@ -549,8 +632,11 @@ export function QuotesManager({
   useEffect(() => {
     if (selectedQuote) {
       loadQuoteIntoForm(selectedQuote)
+    } else if (!activeQuoteId && quotes && quotes.length > 0) {
+      // Abre a primeira proposta automaticamente para nunca exibir formulário vazio desconectado
+      loadQuoteIntoForm(quotes[0])
     }
-  }, [selectedQuote])
+  }, [selectedQuote, quotes])
 
   // AUTO-SAVE DE 2 SEGUNDOS: debounced quando alterado em proposta existente
   useEffect(() => {
@@ -605,6 +691,18 @@ export function QuotesManager({
     inspectorCount,
     inspectorHours,
     inspectorRate,
+    welderCount,
+    welderHours,
+    welderRate,
+    plumberCount,
+    plumberHours,
+    plumberRate,
+    foremanCount,
+    foremanHours,
+    foremanRate,
+    dealId,
+    dealTitle,
+    assignedTo,
     originCep,
     originAddress,
     destinationCep,
@@ -744,6 +842,44 @@ export function QuotesManager({
         variant: 'destructive',
       })
     }
+  }
+
+  // Ações de Mudança de Status (Aprovar / Recusar / Reabrir)
+  const handleSetStatus = async (newStatus: QuoteStatus) => {
+    if (!activeQuoteId) {
+      setStatus(newStatus)
+      return
+    }
+
+    try {
+      if (onUpdateQuoteStatus) {
+        await onUpdateQuoteStatus(activeQuoteId, newStatus)
+      } else {
+        await onUpdateQuote(activeQuoteId, { status: newStatus })
+      }
+      setStatus(newStatus)
+      toast({
+        title:
+          newStatus === 'approved'
+            ? '🎉 Proposta Aprovada!'
+            : newStatus === 'rejected'
+              ? 'Proposta Recusada'
+              : `Status alterado para ${newStatus}`,
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao atualizar status',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
+  // Abrir Visualização do PDF nas duas visões
+  const handleOpenPdfPreview = (quoteObj: QuoteRecord, mode: 'client' | 'internal' = 'client') => {
+    setQuoteForPreview(quoteObj)
+    setPreviewViewMode(mode)
+    setIsPreviewOpen(true)
   }
 
   // Filtragem de Lista de Propostas
@@ -911,14 +1047,21 @@ export function QuotesManager({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-slate-500 hover:text-teal-600"
-                            onClick={() => {
-                              setQuoteForPreview(q)
-                              setIsPreviewOpen(true)
-                            }}
-                            title="Visualizar PDF / Impressão"
+                            className="h-6 w-6 text-teal-600 hover:bg-teal-50"
+                            onClick={() => handleOpenPdfPreview(q, 'client')}
+                            title="Visão Cliente (PDF)"
                           >
-                            <Printer className="h-3.5 w-3.5" />
+                            <FileText className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-amber-600 hover:bg-amber-50"
+                            onClick={() => handleOpenPdfPreview(q, 'internal')}
+                            title="Visão Interna (Composição)"
+                          >
+                            <SlidersHorizontal className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             type="button"
@@ -971,21 +1114,86 @@ export function QuotesManager({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Botões Diretos de Visão Cliente vs Visão Interna */}
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => {
                     const currentObj = getFormDataObject() as QuoteRecord
-                    setQuoteForPreview({ ...currentObj, id: activeQuoteId || 'draft' })
-                    setIsPreviewOpen(true)
+                    handleOpenPdfPreview({ ...currentObj, id: activeQuoteId || 'draft' }, 'client')
                   }}
-                  className="text-xs h-8 font-semibold border-slate-300 dark:border-slate-700"
+                  className="text-xs h-8 font-semibold border-teal-300 text-teal-700 hover:bg-teal-50"
+                  title="Visualizar PDF na visão do cliente"
                 >
-                  <Printer className="h-3.5 w-3.5 mr-1 text-teal-600" />
-                  Visualizar PDF
+                  <FileText className="h-3.5 w-3.5 mr-1 text-teal-600" />
+                  Visão Cliente
                 </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const currentObj = getFormDataObject() as QuoteRecord
+                    handleOpenPdfPreview(
+                      { ...currentObj, id: activeQuoteId || 'draft' },
+                      'internal',
+                    )
+                  }}
+                  className="text-xs h-8 font-semibold border-amber-300 text-amber-800 hover:bg-amber-50"
+                  title="Visualizar memória de cálculo e custos internos"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5 mr-1 text-amber-600" />
+                  Visão Interna
+                </Button>
+
+                {/* Botões de Aprovação e Recusa Direta */}
+                {status !== 'approved' && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => handleSetStatus('approved')}
+                    className="text-xs h-8 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                    title="Aprovar proposta comercial e gerar OS"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                    Aprovar
+                  </Button>
+                )}
+
+                {status !== 'rejected' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleSetStatus('rejected')}
+                    className="text-xs h-8 font-semibold border-rose-300 text-rose-700 hover:bg-rose-50"
+                    title="Marcar como recusada"
+                  >
+                    <Ban className="h-3.5 w-3.5 mr-1 text-rose-600" />
+                    Recusar
+                  </Button>
+                )}
+
+                {/* Link Público para Aceite do Cliente se houver token ou proposta salva */}
+                {activeQuoteId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      const token = approvalToken || activeQuoteId
+                      window.open(`/proposta/${token}`, '_blank')
+                    }}
+                    className="text-xs h-8 text-slate-600 hover:text-teal-700"
+                    title="Abrir página pública de aprovação do cliente"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    Link Aceite
+                  </Button>
+                )}
 
                 <Button
                   type="button"
@@ -1062,9 +1270,9 @@ export function QuotesManager({
 
               {/* Seções por Abas */}
               <Tabs value={activeTabSection} onValueChange={setActiveTabSection} className="w-full">
-                <TabsList className="grid grid-cols-4 w-full h-9">
+                <TabsList className="grid grid-cols-5 w-full h-9">
                   <TabsTrigger value="escopo" className="text-xs">
-                    1. Cliente & Escopo
+                    1. Escopo & CRM
                   </TabsTrigger>
                   <TabsTrigger value="labor" className="text-xs">
                     2. Mão de Obra
@@ -1072,8 +1280,11 @@ export function QuotesManager({
                   <TabsTrigger value="travel" className="text-xs">
                     3. Deslocamento
                   </TabsTrigger>
+                  <TabsTrigger value="lodging" className="text-xs">
+                    4. Hospedagem & Alimentação
+                  </TabsTrigger>
                   <TabsTrigger value="pricing" className="text-xs">
-                    4. Margens & Fechamento
+                    5. Margens & Fechamento
                   </TabsTrigger>
                 </TabsList>
 
@@ -1112,6 +1323,64 @@ export function QuotesManager({
                         value={quoteTitle}
                         onChange={(e) => setQuoteTitle(e.target.value)}
                         placeholder="Ex: Manutenção Preventiva Trocador BP30"
+                        className="text-xs h-8"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Vínculo com Oportunidade do Pipeline Comercial & Responsável */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <TrendingUp className="h-3.5 w-3.5 text-teal-600" />
+                        Oportunidade / Negócio no Pipeline Comercial (Funil)
+                      </Label>
+                      <Select
+                        value={dealId || 'none'}
+                        onValueChange={(val) => {
+                          if (val === 'none') {
+                            setDealId('')
+                            setDealTitle('')
+                            return
+                          }
+                          setDealId(val)
+                          const found = deals.find((d) => d.id === val)
+                          if (found) {
+                            setDealTitle(found.title)
+                            if (!clientId && found.client_id) {
+                              setClientId(found.client_id)
+                              setClientName(found.client_name || '')
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="Vincular a uma oportunidade do pipeline..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhum negócio vinculado</SelectItem>
+                          {deals.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.title} ({d.client_name || 'Sem cliente'} -{' '}
+                              {(d.value || 0).toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
+                              )
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Responsável Técnico
+                      </Label>
+                      <Input
+                        value={assignedTo}
+                        onChange={(e) => setAssignedTo(e.target.value)}
+                        placeholder="Ex: Alex Nogueira"
                         className="text-xs h-8"
                       />
                     </div>
@@ -1160,6 +1429,35 @@ export function QuotesManager({
                       onChange={(e) => setScopeOfWork(e.target.value)}
                       className="text-xs leading-relaxed"
                     />
+                  </div>
+
+                  {/* Mensagem ao Cliente e Observações Técnicas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">
+                        Mensagem ao Cliente (Aparece na Proposta / PDF)
+                      </Label>
+                      <Textarea
+                        rows={2}
+                        value={commercialNotes}
+                        onChange={(e) => setCommercialNotes(e.target.value)}
+                        placeholder="Ex: Prezado cliente, apresentamos nossa proposta técnica e comercial..."
+                        className="text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">
+                        Observações Técnicas / Restrições de Campo
+                      </Label>
+                      <Textarea
+                        rows={2}
+                        value={technicalNotes}
+                        onChange={(e) => setTechnicalNotes(e.target.value)}
+                        placeholder="Ex: Ponto de água e energia 220V fornecidos pelo contratante..."
+                        className="text-xs"
+                      />
+                    </div>
                   </div>
                 </TabsContent>
 
@@ -1297,6 +1595,156 @@ export function QuotesManager({
                         })}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Segunda Linha de Funções: Soldador, Encanador e Encarregado */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        Soldador Especializado (TIG / Eletrodo)
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={welderCount}
+                            onChange={(e) => setWelderCount(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={welderHours}
+                            onChange={(e) => setWelderHours(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={welderRate}
+                            onChange={(e) => setWelderRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal:{' '}
+                        {welderTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        Encanador Industrial / Tubulações
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={plumberCount}
+                            onChange={(e) => setPlumberCount(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={plumberHours}
+                            onChange={(e) => setPlumberHours(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={plumberRate}
+                            onChange={(e) => setPlumberRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal:{' '}
+                        {plumberTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        Encarregado de Equipe / Supervisão
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={foremanCount}
+                            onChange={(e) => setForemanCount(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={foremanHours}
+                            onChange={(e) => setForemanHours(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={foremanRate}
+                            onChange={(e) => setForemanRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal:{' '}
+                        {foremanTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-teal-50 dark:bg-teal-950/40 rounded-lg border border-teal-200 dark:border-teal-800">
+                    <span className="text-xs font-bold text-teal-900 dark:text-teal-200">
+                      Total da Mão de Obra ({totalLaborHours} horas homem)
+                    </span>
+                    <span className="font-mono font-bold text-sm text-teal-900 dark:text-teal-200">
+                      {totalLaborCost.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
                   </div>
                 </TabsContent>
 
@@ -1655,7 +2103,180 @@ export function QuotesManager({
                   </div>
                 </TabsContent>
 
-                {/* ABA 4: Margens & Fechamento */}
+                {/* ABA 4: Hospedagem & Alimentação */}
+                <TabsContent value="lodging" className="space-y-4 pt-3">
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                        Composição de Hospedagem & Alimentação em Campo
+                      </span>
+                      <span className="text-xs font-bold text-emerald-600 font-mono">
+                        Subtotal:{' '}
+                        {lodgingMealsTotalCost.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Diárias de Hotel */}
+                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                        <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Diárias de Hotel
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Quantidade de Diárias
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={hotelDays}
+                              onChange={(e) => setHotelDays(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Valor Diária (R$)
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={hotelRate}
+                              onChange={(e) => setHotelRate(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                          Subtotal Hotel:{' '}
+                          {hotelTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Refeições */}
+                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                        <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Refeições / Alimentação Diária
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Quantidade de Refeições
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealsDays}
+                              onChange={(e) => setMealsDays(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Valor Refeição (R$)
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealsRate}
+                              onChange={(e) => setMealsRate(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                          Subtotal Refeições:{' '}
+                          {mealsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Vale Refeição Funcionários (Alojado e Não Alojado) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                        <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                          Vale Refeição Alojado (Equipe Hospedada)
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">Quantidade</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealVoucherHousedQty}
+                              onChange={(e) => setMealVoucherHousedQty(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealVoucherHousedRate}
+                              onChange={(e) => setMealVoucherHousedRate(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                          Subtotal:{' '}
+                          {voucherHousedTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                        <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                          Vale Refeição Não Alojado (Equipe Local)
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">Quantidade</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealVoucherUnhousedQty}
+                              onChange={(e) => setMealVoucherUnhousedQty(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealVoucherUnhousedRate}
+                              onChange={(e) => setMealVoucherUnhousedRate(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                          Subtotal:{' '}
+                          {voucherUnhousedTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* ABA 5: Margens & Fechamento */}
                 <TabsContent value="pricing" className="space-y-4 pt-3">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="space-y-1">
@@ -1715,12 +2336,25 @@ export function QuotesManager({
         </div>
       </div>
 
-      {/* Modal de Impressão e PDF */}
+      {/* Modal de Impressão e PDF (com suporte explícito a visão cliente e interna + aprovação) */}
       {quoteForPreview && (
         <QuotePdfPreviewDialog
           quote={quoteForPreview}
           open={isPreviewOpen}
           onOpenChange={setIsPreviewOpen}
+          viewMode={previewViewMode}
+          onApproveQuote={async (q) => {
+            if (onUpdateQuoteStatus) {
+              await onUpdateQuoteStatus(q.id, 'approved')
+            } else {
+              await onUpdateQuote(q.id, { status: 'approved' })
+            }
+            setStatus('approved')
+            toast({
+              title: '🎉 Proposta Aprovada com Sucesso!',
+              description: 'A Ordem de Serviço foi gerada e o pipeline atualizado.',
+            })
+          }}
         />
       )}
     </div>
