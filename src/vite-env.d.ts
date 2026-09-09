@@ -1,3 +1,6 @@
 /// <reference types="vite/client" />
+import type React from 'react'
 
-declare const Mail: React.ComponentType<{ className?: string }>
+declare global {
+  const Mail: React.ComponentType<{ className?: string }>
+}
