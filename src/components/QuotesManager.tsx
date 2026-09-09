@@ -84,6 +84,7 @@ import {
   QuoteLodgingMealsConfig,
   QuoteLaborConfig,
   QuoteEquipmentItem,
+  QuoteCustomMaterial,
 } from '@/types/crm'
 import { QuotePdfPreviewDialog } from './QuotePdfPreviewDialog'
 import {
@@ -136,6 +137,11 @@ export function QuotesManager({
   const [quoteForPreview, setQuoteForPreview] = useState<QuoteRecord | null>(null)
   const [previewViewMode, setPreviewViewMode] = useState<'client' | 'internal'>('client')
 
+  // Materiais Customizados - input temporário para novo item
+  const [newMaterialDescription, setNewMaterialDescription] = useState('')
+  const [newMaterialQty, setNewMaterialQty] = useState(1)
+  const [newMaterialUnitCost, setNewMaterialUnitCost] = useState(0)
+
   // Form Fields - Identificação Geral
   const [clientId, setClientId] = useState('')
   const [clientName, setClientName] = useState('')
@@ -152,6 +158,23 @@ export function QuotesManager({
   const [connectionSize, setConnectionSize] = useState('DN50 (2")')
   const [pressureTestBar, setPressureTestBar] = useState(16)
   const [workingPressureBar, setWorkingPressureBar] = useState(10)
+  const [dimensionsWHd, setDimensionsWHd] = useState('')
+  const [workFluid, setWorkFluid] = useState('')
+  const [homologatedProcedure, setHomologatedProcedure] = useState('')
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+
+  // Integração de Funcionários & Permissão de Trabalho
+  const [integrationRequired, setIntegrationRequired] = useState(false)
+  const [integrationTiming, setIntegrationTiming] = useState<'same_day' | 'early' | string>(
+    'same_day',
+  )
+  const [integrationWeekday, setIntegrationWeekday] = useState('Segunda-feira')
+  const [integrationCost, setIntegrationCost] = useState(532.0)
+  const [workPermitRequired, setWorkPermitRequired] = useState(false)
+
+  // Materiais Customizados / Peças
+  const [customMaterials, setCustomMaterials] = useState<QuoteCustomMaterial[]>([])
+
   const [equipments, setEquipments] = useState<QuoteEquipmentItem[]>([
     {
       id: 'eq-1',
@@ -374,6 +397,8 @@ export function QuotesManager({
       working_pressure_bar: workingPressureBar || 10,
     }
 
+    const currentSavedTime = new Date().toISOString()
+
     return {
       title:
         quoteTitle ||
@@ -398,7 +423,24 @@ export function QuotesManager({
       connection_size: primaryEq.connection_size || connectionSize || 'DN50 (2")',
       pressure_test_bar: primaryEq.pressure_test_bar ?? pressureTestBar ?? 16,
       working_pressure_bar: primaryEq.working_pressure_bar ?? workingPressureBar ?? 10,
+      dimensions_w_h_d: dimensionsWHd,
+      work_fluid: workFluid,
+      homologated_procedure: homologatedProcedure,
+      last_saved_at: currentSavedTime,
       scope_of_work: scopeOfWork,
+
+      // Integração & Permissão de Trabalho
+      integration_needed: integrationRequired,
+      integration_timing: integrationTiming,
+      integration_when: integrationTiming,
+      integration_weekday: integrationWeekday,
+      integration_day: integrationWeekday,
+      integration_cost: integrationCost,
+      work_permit_needed: workPermitRequired,
+      work_permit_cost: 0,
+
+      // Materiais customizados
+      custom_materials: customMaterials && customMaterials.length > 0 ? customMaterials : undefined,
 
       // Custos diretos - Mão de Obra (6 funções)
       labor_hours: totalLaborHours,
@@ -504,6 +546,16 @@ export function QuotesManager({
     setConnectionSize('DN50 (2")')
     setPressureTestBar(16)
     setWorkingPressureBar(10)
+    setDimensionsWHd('')
+    setWorkFluid('')
+    setHomologatedProcedure('')
+    setLastSavedAt(null)
+    setIntegrationRequired(false)
+    setIntegrationTiming('same_day')
+    setIntegrationWeekday('Segunda-feira')
+    setIntegrationCost(532.0)
+    setWorkPermitRequired(false)
+    setCustomMaterials([])
     setEquipments([
       {
         id: `eq-${Date.now()}-1`,
@@ -584,7 +636,6 @@ export function QuotesManager({
     setTechnicalNotes('')
     setCommercialNotes('')
   }
-
   // Adicionar equipamento dinâmico
   const handleAddEquipment = () => {
     setEquipments((prev) => [
@@ -651,6 +702,44 @@ export function QuotesManager({
     })
   }
 
+  // Adicionar Material Customizado
+  const handleAddCustomMaterial = () => {
+    if (!newMaterialDescription.trim()) {
+      toast({
+        title: 'Descrição obrigatória',
+        description: 'Informe o nome ou descrição do material/peça.',
+        variant: 'destructive',
+      })
+      return
+    }
+    const qty = Math.max(1, newMaterialQty)
+    const unitCost = Math.max(0, newMaterialUnitCost)
+    const subtotal = qty * unitCost
+    const newItem: QuoteCustomMaterial = {
+      id: `mat-${Date.now()}`,
+      description: newMaterialDescription.trim(),
+      quantity: qty,
+      unit_cost: unitCost,
+      subtotal,
+    }
+    const updated = [...customMaterials, newItem]
+    setCustomMaterials(updated)
+    // Recalcular materialsCost para refletir nos custos diretos
+    const sumMat = updated.reduce((acc, m) => acc + (m.subtotal || 0), 0)
+    setMaterialsCost(sumMat)
+    setNewMaterialDescription('')
+    setNewMaterialQty(1)
+    setNewMaterialUnitCost(0)
+  }
+
+  // Remover Material Customizado
+  const handleRemoveCustomMaterial = (id: string) => {
+    const updated = customMaterials.filter((m) => m.id !== id)
+    setCustomMaterials(updated)
+    const sumMat = updated.reduce((acc, m) => acc + (m.subtotal || 0), 0)
+    setMaterialsCost(sumMat)
+  }
+
   // Carregar Proposta Existente no Formulário
   const loadQuoteIntoForm = (quote: QuoteRecord) => {
     setActiveQuoteId(quote.id)
@@ -694,6 +783,25 @@ export function QuotesManager({
           working_pressure_bar: quote.working_pressure_bar || 10,
         },
       ])
+    }
+
+    setDimensionsWHd(quote.dimensions_w_h_d || '')
+    setWorkFluid(quote.work_fluid || '')
+    setHomologatedProcedure(quote.homologated_procedure || '')
+    setLastSavedAt(quote.last_saved_at || quote.updated || null)
+
+    setIntegrationRequired(quote.integration_needed ?? (quote as any).integration_required ?? false)
+    setIntegrationTiming(quote.integration_timing || quote.integration_when || 'same_day')
+    setIntegrationWeekday(
+      quote.integration_day || (quote as any).integration_weekday || 'Segunda-feira',
+    )
+    setIntegrationCost(quote.integration_cost ?? 532.0)
+    setWorkPermitRequired(quote.work_permit_needed ?? (quote as any).work_permit_required ?? false)
+
+    if (quote.custom_materials && Array.isArray(quote.custom_materials)) {
+      setCustomMaterials(quote.custom_materials)
+    } else {
+      setCustomMaterials([])
     }
 
     setScopeOfWork(quote.scope_of_work || '')
@@ -896,6 +1004,21 @@ export function QuotesManager({
     validityDays,
     technicalNotes,
     commercialNotes,
+    dimensionsWHd,
+    workFluid,
+    homologatedProcedure,
+    integrationRequired,
+    integrationTiming,
+    integrationWeekday,
+    integrationCost,
+    workPermitRequired,
+    customMaterials,
+    pisRate,
+    cofinsRate,
+    issRate,
+    csllRate,
+    irpjRate,
+    irDiffRate,
   ])
 
   // Recalcular Rota Mapeia / CEP
@@ -1525,31 +1648,79 @@ export function QuotesManager({
       {/* 5. DIALOG / MODAL DE EDIÇÃO E COMPOSIÇÃO DE PROPOSTA */}
       <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0">
-          <DialogHeader className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 sticky top-0 z-10 backdrop-blur-sm">
+          <DialogHeader className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 sticky top-0 z-10 backdrop-blur-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-6">
               <div>
                 <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Calculator className="h-5 w-5 text-teal-600" />
-                  {activeQuoteId
-                    ? `Editar Proposta #${quoteNumber}`
-                    : 'Nova Proposta Comercial & Técnica'}
+                  Editar Proposta {quoteNumber ? `#${quoteNumber}` : ''}
                 </DialogTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Composição de custos diretos, deslocamento Mapeia, hospedagem e markup industrial.
+                  Layout integral unificado: escopo, mão de obra, deslocamento, hospedagem e
+                  fechamento comercial.
                 </p>
               </div>
 
-              {activeQuoteId && (
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] font-mono text-emerald-700 bg-emerald-50"
-                  >
-                    Auto-save 2s ativo
-                  </Badge>
-                  {getStatusBadge(status)}
-                </div>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const currentObj = getFormDataObject() as QuoteRecord
+                    handleOpenPdfPreview({ ...currentObj, id: activeQuoteId || 'draft' }, 'client')
+                  }}
+                  className="text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
+                >
+                  <FileText className="h-3.5 w-3.5 mr-1" />
+                  Proposta do Cliente
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const currentObj = getFormDataObject() as QuoteRecord
+                    handleOpenPdfPreview(
+                      { ...currentObj, id: activeQuoteId || 'draft' },
+                      'internal',
+                    )
+                  }}
+                  className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                >
+                  <Layers className="h-3.5 w-3.5 mr-1" />
+                  Composição Interna
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const currentObj = getFormDataObject() as QuoteRecord
+                    handleOpenPdfPreview({ ...currentObj, id: activeQuoteId || 'draft' }, 'client')
+                  }}
+                  className="text-xs border-slate-300 text-slate-700 hover:bg-slate-50"
+                >
+                  <Eye className="h-3.5 w-3.5 mr-1" />
+                  Visualizar PDF
+                </Button>
+
+                <Badge
+                  variant="outline"
+                  className="text-[11px] font-mono text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 gap-1"
+                >
+                  <CheckCheck className="h-3 w-3" />
+                  {lastSavedAt
+                    ? `✓ Salvo em ${new Date(lastSavedAt).toLocaleDateString('pt-BR')} às ${new Date(
+                        lastSavedAt,
+                      ).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                    : '✓ Salvo automaticamente'}
+                </Badge>
+
+                {activeQuoteId && getStatusBadge(status)}
+              </div>
             </div>
           </DialogHeader>
 
@@ -1614,843 +1785,885 @@ export function QuotesManager({
               </div>
             </div>
 
-            {/* Abas do Editor */}
-            <Tabs value={activeTabSection} onValueChange={setActiveTabSection} className="w-full">
-              <TabsList className="grid grid-cols-5 w-full h-9">
-                <TabsTrigger value="escopo" className="text-xs">
-                  1. Escopo & CRM
-                </TabsTrigger>
-                <TabsTrigger value="labor" className="text-xs">
-                  2. Mão de Obra
-                </TabsTrigger>
-                <TabsTrigger value="travel" className="text-xs">
-                  3. Deslocamento
-                </TabsTrigger>
-                <TabsTrigger value="lodging" className="text-xs">
-                  4. Hospedagem & Alimentação
-                </TabsTrigger>
-                <TabsTrigger value="pricing" className="text-xs">
-                  5. Margens & Fechamento
-                </TabsTrigger>
-              </TabsList>
-
-              {/* ABA 1: Cliente & Escopo */}
-              <TabsContent value="escopo" className="space-y-4 pt-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Cliente</Label>
-                    <Select
-                      value={clientId}
-                      onValueChange={(val) => {
-                        setClientId(val)
-                        const found = clients.find((c) => c.id === val)
-                        if (found) {
-                          setClientName(found.name || found.company_name || '')
-                          if (found.address) setDestinationAddress(found.address)
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="text-xs h-8">
-                        <SelectValue placeholder="Selecione o cliente..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name || c.company_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Título da Proposta</Label>
-                    <Input
-                      value={quoteTitle}
-                      onChange={(e) => setQuoteTitle(e.target.value)}
-                      placeholder="Ex: Manutenção Preventiva Trocador BP30"
-                      className="text-xs h-8"
-                    />
-                  </div>
-                </div>
-
-                {/* Vínculo com Oportunidade do Pipeline Comercial & Responsável */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                      <TrendingUp className="h-3.5 w-3.5 text-teal-600" />
-                      Vínculo Oportunidade (CRM)
-                    </Label>
-                    <Select
-                      value={dealId || 'none'}
-                      onValueChange={(val) => {
-                        if (val === 'none') {
-                          setDealId('')
-                          return
-                        }
-                        setDealId(val)
-                        const found = deals.find((d) => d.id === val)
-                        if (found) {
-                          setDealTitle(found.title)
-                          if (!clientId && found.client_id) {
-                            setClientId(found.client_id)
-                            setClientName(found.client_name || '')
-                          }
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="text-xs h-8">
-                        <SelectValue placeholder="Selecione a oportunidade..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhum negócio vinculado</SelectItem>
-                        {deals.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.title} ({d.client_name || 'Sem cliente'} -{' '}
-                            {(d.value || 0).toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                            )
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Título Oportunidade / Negócio (Livre)
-                    </Label>
-                    <Input
-                      value={dealTitle}
-                      onChange={(e) => setDealTitle(e.target.value)}
-                      placeholder="Ex: Reforma Trocador Placas Linha 2"
-                      className="text-xs h-8"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Responsável Técnico
-                    </Label>
-                    <Input
-                      value={assignedTo}
-                      onChange={(e) => setAssignedTo(e.target.value)}
-                      placeholder="Ex: Alex Nogueira"
-                      className="text-xs h-8"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Modelo do Equipamento</Label>
-                    <Input
-                      value={equipmentModel}
-                      onChange={(e) => setEquipmentModel(e.target.value)}
-                      placeholder="Ex: BP30 / TL10-BFG"
-                      className="text-xs h-8 font-semibold"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Marca</Label>
-                    <Input
-                      value={equipmentBrand}
-                      onChange={(e) => setEquipmentBrand(e.target.value)}
-                      placeholder="Ex: BERMO / Alfa Laval"
-                      className="text-xs h-8"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Quantidade de Equipamentos</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={equipmentQuantity}
-                      onChange={(e) => setEquipmentQuantity(Math.max(1, Number(e.target.value)))}
-                      className="text-xs h-8 font-mono"
-                    />
-                  </div>
-                </div>
-
-                {/* Especificações Técnicas de Placas / Gaxetas */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">Qtd. de Placas</Label>
-                    <Input
-                      type="number"
-                      value={plateCount}
-                      onChange={(e) => setPlateCount(Number(e.target.value))}
-                      className="text-xs h-7 font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">Material da Placa</Label>
-                    <Input
-                      value={plateMaterial}
-                      onChange={(e) => setPlateMaterial(e.target.value)}
-                      placeholder="AISI 316L"
-                      className="text-xs h-7"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">Espessura (mm)</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      value={plateThickness}
-                      onChange={(e) => setPlateThickness(Number(e.target.value))}
-                      className="text-xs h-7 font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[10px] text-muted-foreground">Gaxeta</Label>
-                    <Input
-                      value={gasketMaterial}
-                      onChange={(e) => setGasketMaterial(e.target.value)}
-                      placeholder="EPDM Clip-on"
-                      className="text-xs h-7"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Escopo Detalhado do Fornecimento</Label>
-                  <Textarea
-                    rows={3}
-                    value={scopeOfWork}
-                    onChange={(e) => setScopeOfWork(e.target.value)}
-                    className="text-xs leading-relaxed"
-                  />
-                </div>
-
-                {/* Mensagem ao Cliente e Observações Técnicas */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">
-                      Mensagem ao Cliente (Aparece na Proposta / PDF)
-                    </Label>
-                    <Textarea
-                      rows={2}
-                      value={commercialNotes}
-                      onChange={(e) => setCommercialNotes(e.target.value)}
-                      placeholder="Ex: Prezado cliente, apresentamos nossa proposta técnica e comercial..."
-                      className="text-xs"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">
-                      Observações Técnicas / Restrições de Campo
-                    </Label>
-                    <Textarea
-                      rows={2}
-                      value={technicalNotes}
-                      onChange={(e) => setTechnicalNotes(e.target.value)}
-                      placeholder="Ex: Ponto de água e energia 220V fornecidos pelo contratante..."
-                      className="text-xs"
-                    />
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* ABA 2: Mão de Obra */}
-              <TabsContent value="labor" className="space-y-4 pt-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                      Técnico Mecânico
-                    </span>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={techCount}
-                          onChange={(e) => setTechCount(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={techHours}
-                          onChange={(e) => setTechHours(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={techRate}
-                          onChange={(e) => setTechRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                    </div>
-                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                      Subtotal:{' '}
-                      {techTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                      Ajudante / Auxiliar
-                    </span>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={helperCount}
-                          onChange={(e) => setHelperCount(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={helperHours}
-                          onChange={(e) => setHelperHours(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={helperRate}
-                          onChange={(e) => setHelperRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                    </div>
-                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                      Subtotal:{' '}
-                      {helperTotal.toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                      Inspetor END / Qualidade
-                    </span>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={inspectorCount}
-                          onChange={(e) => setInspectorCount(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={inspectorHours}
-                          onChange={(e) => setInspectorHours(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={inspectorRate}
-                          onChange={(e) => setInspectorRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                    </div>
-                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                      Subtotal:{' '}
-                      {inspectorTotal.toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Linha 2 de Funções */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                      Soldador Especializado (TIG / Eletrodo)
-                    </span>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={welderCount}
-                          onChange={(e) => setWelderCount(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={welderHours}
-                          onChange={(e) => setWelderHours(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={welderRate}
-                          onChange={(e) => setWelderRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                    </div>
-                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                      Subtotal:{' '}
-                      {welderTotal.toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                      Encanador Industrial / Tubulações
-                    </span>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={plumberCount}
-                          onChange={(e) => setPlumberCount(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={plumberHours}
-                          onChange={(e) => setPlumberHours(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={plumberRate}
-                          onChange={(e) => setPlumberRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                    </div>
-                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                      Subtotal:{' '}
-                      {plumberTotal.toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                      Encarregado de Equipe / Supervisão
-                    </span>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={foremanCount}
-                          onChange={(e) => setForemanCount(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={foremanHours}
-                          onChange={(e) => setForemanHours(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-0.5">
-                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          value={foremanRate}
-                          onChange={(e) => setForemanRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono"
-                        />
-                      </div>
-                    </div>
-                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                      Subtotal:{' '}
-                      {foremanTotal.toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-3 bg-teal-50 dark:bg-teal-950/40 rounded-lg border border-teal-200 dark:border-teal-800">
-                  <span className="text-xs font-bold text-teal-900 dark:text-teal-200">
-                    Total da Mão de Obra ({totalLaborHours} horas homem)
-                  </span>
-                  <span className="font-mono font-bold text-sm text-teal-900 dark:text-teal-200">
-                    {totalLaborCost.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </span>
-                </div>
-              </TabsContent>
-
-              {/* ABA 3: Deslocamento & Rotas */}
-              <TabsContent value="travel" className="space-y-4 pt-3">
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Truck className="h-4 w-4 text-emerald-600" />
-                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                        Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+            {/* SEÇÕES EMPILHADAS (Layout Unificado Versão 0.0.66) */}
+            <div className="space-y-6">
+              {/* SEÇÃO 1: Escopo & CRM */}
+              <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+                <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-bold">
+                        1
                       </span>
+                      1. Escopo & CRM
+                    </CardTitle>
+                    <span className="text-[11px] text-muted-foreground">
+                      Dados do cliente, oportunidade, equipamentos, materiais e escopo técnico
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Cliente</Label>
+                      <Select
+                        value={clientId}
+                        onValueChange={(val) => {
+                          setClientId(val)
+                          const found = clients.find((c) => c.id === val)
+                          if (found) {
+                            setClientName(found.name || found.company_name || '')
+                            if (found.address) setDestinationAddress(found.address)
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="Selecione o cliente..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name || c.company_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                        <ArrowLeftRight
-                          className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
-                        />
-                        <Label
-                          htmlFor="toggle-round-trip-modal"
-                          className="text-xs font-semibold cursor-pointer select-none"
-                        >
-                          {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
-                        </Label>
-                        <Switch
-                          id="toggle-round-trip-modal"
-                          checked={isRoundTrip}
-                          onCheckedChange={setIsRoundTrip}
-                        />
-                      </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Título da Proposta</Label>
+                      <Input
+                        value={quoteTitle}
+                        onChange={(e) => setQuoteTitle(e.target.value)}
+                        placeholder="Ex: Manutenção Preventiva Trocador BP30"
+                        className="text-xs h-8"
+                      />
+                    </div>
+                  </div>
 
-                      <span className="text-xs font-bold text-emerald-600 font-mono">
+                  {/* Vínculo com Oportunidade do Pipeline Comercial & Responsável */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        <TrendingUp className="h-3.5 w-3.5 text-teal-600" />
+                        Vínculo Oportunidade (CRM)
+                      </Label>
+                      <Select
+                        value={dealId || 'none'}
+                        onValueChange={(val) => {
+                          if (val === 'none') {
+                            setDealId('')
+                            return
+                          }
+                          setDealId(val)
+                          const found = deals.find((d) => d.id === val)
+                          if (found) {
+                            setDealTitle(found.title)
+                            if (!clientId && found.client_id) {
+                              setClientId(found.client_id)
+                              setClientName(found.client_name || '')
+                            }
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="Selecione a oportunidade..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Nenhum negócio vinculado</SelectItem>
+                          {deals.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.title} ({d.client_name || 'Sem cliente'} -{' '}
+                              {(d.value || 0).toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
+                              )
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Título Oportunidade / Negócio (Livre)
+                      </Label>
+                      <Input
+                        value={dealTitle}
+                        onChange={(e) => setDealTitle(e.target.value)}
+                        placeholder="Ex: Reforma Trocador Placas Linha 2"
+                        className="text-xs h-8"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Responsável Técnico
+                      </Label>
+                      <Input
+                        value={assignedTo}
+                        onChange={(e) => setAssignedTo(e.target.value)}
+                        placeholder="Ex: Alex Nogueira"
+                        className="text-xs h-8"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Modelo do Equipamento</Label>
+                      <Input
+                        value={equipmentModel}
+                        onChange={(e) => setEquipmentModel(e.target.value)}
+                        placeholder="Ex: BP30 / TL10-BFG"
+                        className="text-xs h-8 font-semibold"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Marca</Label>
+                      <Input
+                        value={equipmentBrand}
+                        onChange={(e) => setEquipmentBrand(e.target.value)}
+                        placeholder="Ex: BERMO / Alfa Laval"
+                        className="text-xs h-8"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Quantidade de Equipamentos</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={equipmentQuantity}
+                        onChange={(e) => setEquipmentQuantity(Math.max(1, Number(e.target.value)))}
+                        className="text-xs h-8 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Especificações Técnicas de Placas / Gaxetas */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Qtd. de Placas</Label>
+                      <Input
+                        type="number"
+                        value={plateCount}
+                        onChange={(e) => setPlateCount(Number(e.target.value))}
+                        className="text-xs h-7 font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Material da Placa</Label>
+                      <Input
+                        value={plateMaterial}
+                        onChange={(e) => setPlateMaterial(e.target.value)}
+                        placeholder="AISI 316L"
+                        className="text-xs h-7"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Espessura (mm)</Label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        value={plateThickness}
+                        onChange={(e) => setPlateThickness(Number(e.target.value))}
+                        className="text-xs h-7 font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">Gaxeta</Label>
+                      <Input
+                        value={gasketMaterial}
+                        onChange={(e) => setGasketMaterial(e.target.value)}
+                        placeholder="EPDM Clip-on"
+                        className="text-xs h-7"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">
+                      Escopo Detalhado do Fornecimento
+                    </Label>
+                    <Textarea
+                      rows={3}
+                      value={scopeOfWork}
+                      onChange={(e) => setScopeOfWork(e.target.value)}
+                      className="text-xs leading-relaxed"
+                    />
+                  </div>
+
+                  {/* Mensagem ao Cliente e Observações Técnicas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">
+                        Mensagem ao Cliente (Aparece na Proposta / PDF)
+                      </Label>
+                      <Textarea
+                        rows={2}
+                        value={commercialNotes}
+                        onChange={(e) => setCommercialNotes(e.target.value)}
+                        placeholder="Ex: Prezado cliente, apresentamos nossa proposta técnica e comercial..."
+                        className="text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">
+                        Observações Técnicas / Restrições de Campo
+                      </Label>
+                      <Textarea
+                        rows={2}
+                        value={technicalNotes}
+                        onChange={(e) => setTechnicalNotes(e.target.value)}
+                        placeholder="Ex: Ponto de água e energia 220V fornecidos pelo contratante..."
+                        className="text-xs"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* SEÇÃO 2: Mão de Obra */}
+              <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+                <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-bold">
+                        2
+                      </span>
+                      2. Mão de Obra
+                    </CardTitle>
+                    <span className="text-xs font-mono font-bold text-teal-700 dark:text-teal-400">
+                      Subtotal:{' '}
+                      {totalLaborCost.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        Técnico Mecânico
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={techCount}
+                            onChange={(e) => setTechCount(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={techHours}
+                            onChange={(e) => setTechHours(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={techRate}
+                            onChange={(e) => setTechRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
                         Subtotal:{' '}
-                        {travelTotalCost.toLocaleString('pt-BR', {
+                        {techTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        Ajudante / Auxiliar
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={helperCount}
+                            onChange={(e) => setHelperCount(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={helperHours}
+                            onChange={(e) => setHelperHours(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={helperRate}
+                            onChange={(e) => setHelperRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal:{' '}
+                        {helperTotal.toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
                         })}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        Inspetor END / Qualidade
                       </span>
-                    </div>
-                  </div>
-
-                  {/* CEPs */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                        Origem (CEP e Endereço da Base)
-                      </Label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={originCep}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            setOriginCep(val)
-                            const clean = val.replace(/\D/g, '')
-                            if (clean.length === 8) {
-                              handleRecalculateRouteByCep(destinationCep, val)
-                            }
-                          }}
-                          placeholder="89066-000"
-                          className="text-xs h-8 w-32 font-mono font-bold"
-                        />
-                        <Input
-                          value={originAddress}
-                          onChange={(e) => setOriginAddress(e.target.value)}
-                          placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
-                          className="text-xs h-8 flex-1"
-                        />
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={inspectorCount}
+                            onChange={(e) => setInspectorCount(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={inspectorHours}
+                            onChange={(e) => setInspectorHours(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={inspectorRate}
+                            onChange={(e) => setInspectorRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
                       </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                        Destino da Fábrica / Cliente (CEP e Cidade)
-                      </Label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={destinationCep}
-                          onChange={(e) => {
-                            const val = e.target.value
-                            setDestinationCep(val)
-                            const clean = val.replace(/\D/g, '')
-                            if (clean.length === 8) {
-                              handleRecalculateRouteByCep(val, originCep)
-                            }
-                          }}
-                          placeholder="Ex: 89801-000"
-                          className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
-                        />
-                        <Input
-                          value={destinationAddress}
-                          onChange={(e) => setDestinationAddress(e.target.value)}
-                          placeholder="Cidade/UF do Cliente"
-                          className="text-xs h-8 flex-1"
-                        />
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal:{' '}
+                        {inspectorTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
                       </div>
                     </div>
                   </div>
 
-                  {/* Parâmetros do percurso */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-[10px] text-muted-foreground">
-                          Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
-                        </Label>
-                        <Badge
-                          variant="outline"
-                          className={`text-[9px] px-1 py-0 ${
-                            isRoundTrip
-                              ? 'text-emerald-700 bg-emerald-50'
-                              : 'text-slate-600 bg-slate-50'
-                          }`}
-                        >
-                          {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
-                        </Badge>
+                  {/* Linha 2 de Funções */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        Soldador Especializado (TIG / Eletrodo)
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={welderCount}
+                            onChange={(e) => setWelderCount(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={welderHours}
+                            onChange={(e) => setWelderHours(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={welderRate}
+                            onChange={(e) => setWelderRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
                       </div>
-                      <Input
-                        type="number"
-                        value={distanceKm}
-                        onChange={(e) => setDistanceKm(Number(e.target.value))}
-                        className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
-                      />
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal:{' '}
+                        {welderTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">
-                        Consumo Veículo (km/L)
-                      </Label>
-                      <Input
-                        type="number"
-                        value={consumptionKmL}
-                        onChange={(e) => setConsumptionKmL(Number(e.target.value))}
-                        className="text-xs h-8"
-                      />
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        Encanador Industrial / Tubulações
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={plumberCount}
+                            onChange={(e) => setPlumberCount(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={plumberHours}
+                            onChange={(e) => setPlumberHours(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={plumberRate}
+                            onChange={(e) => setPlumberRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal:{' '}
+                        {plumberTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
                     </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">
-                        Preço Litro Combustível (R$)
-                      </Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={fuelPrice}
-                        onChange={(e) => setFuelPrice(Number(e.target.value))}
-                        className="text-xs h-8"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">
-                        % Rodovias c/ Pedágio
-                      </Label>
-                      <Input
-                        type="number"
-                        value={tollRoadPercent}
-                        onChange={(e) => setTollRoadPercent(Number(e.target.value))}
-                        className="text-xs h-8"
-                      />
+                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                        Encarregado de Equipe / Supervisão
+                      </span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={foremanCount}
+                            onChange={(e) => setForemanCount(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={foremanHours}
+                            onChange={(e) => setForemanHours(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={foremanRate}
+                            onChange={(e) => setForemanRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal:{' '}
+                        {foremanTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Ajustes Manuais */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                        Ajuste Manual Combustível (+/- R$)
-                      </Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={manualFuelAdj}
-                        onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                        placeholder="0.00"
-                        className="text-xs h-8 font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                        Ajuste Manual Pedágio (+/- R$)
-                      </Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={manualTollAdj}
-                        onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                        placeholder="0.00"
-                        className="text-xs h-8 font-mono"
-                      />
-                    </div>
+                  <div className="flex items-center justify-between p-3 bg-teal-50 dark:bg-teal-950/40 rounded-lg border border-teal-200 dark:border-teal-800">
+                    <span className="text-xs font-bold text-teal-900 dark:text-teal-200">
+                      Total da Mão de Obra ({totalLaborHours} horas homem)
+                    </span>
+                    <span className="font-mono font-bold text-sm text-teal-900 dark:text-teal-200">
+                      {totalLaborCost.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
                   </div>
+                </CardContent>
+              </Card>
 
-                  {/* Aluguel de Carro */}
-                  <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <Car className="h-4 w-4 text-emerald-600" />
-                        <Label className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                          Aluguel de Veículo / Carro
-                        </Label>
+              {/* SEÇÃO 3: Deslocamento & Rotas */}
+              <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+                <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-bold">
+                        3
+                      </span>
+                      3. Deslocamento & Rotas
+                    </CardTitle>
+                    <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                      Subtotal:{' '}
+                      {travelTotalCost.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Truck className="h-4 w-4 text-emerald-600" />
+                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                          Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+                        </span>
                       </div>
-                      {carRentalType !== 'none' && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] font-mono border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40"
-                        >
-                          Subtotal Carro:{' '}
-                          {carRentalSubtotal.toLocaleString('pt-BR', {
+
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                          <ArrowLeftRight
+                            className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
+                          />
+                          <Label
+                            htmlFor="toggle-round-trip-modal"
+                            className="text-xs font-semibold cursor-pointer select-none"
+                          >
+                            {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                          </Label>
+                          <Switch
+                            id="toggle-round-trip-modal"
+                            checked={isRoundTrip}
+                            onCheckedChange={setIsRoundTrip}
+                          />
+                        </div>
+
+                        <span className="text-xs font-bold text-emerald-600 font-mono">
+                          Subtotal:{' '}
+                          {travelTotalCost.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
                           })}
-                        </Badge>
-                      )}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* CEPs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground font-medium">
-                          Categoria do Veículo
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                          Origem (CEP e Endereço da Base)
                         </Label>
-                        <Select value={carRentalType} onValueChange={setCarRentalType}>
-                          <SelectTrigger className="text-xs h-8">
-                            <SelectValue placeholder="Selecione..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Sem aluguel</SelectItem>
-                            <SelectItem value="simple">Carro Simples (R$ 230,00/dia)</SelectItem>
-                            <SelectItem value="complete">Carro Completo (R$ 350,00/dia)</SelectItem>
-                            <SelectItem value="custom">Personalizado</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="flex gap-2">
+                          <Input
+                            value={originCep}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setOriginCep(val)
+                              const clean = val.replace(/\D/g, '')
+                              if (clean.length === 8) {
+                                handleRecalculateRouteByCep(destinationCep, val)
+                              }
+                            }}
+                            placeholder="89066-000"
+                            className="text-xs h-8 w-32 font-mono font-bold"
+                          />
+                          <Input
+                            value={originAddress}
+                            onChange={(e) => setOriginAddress(e.target.value)}
+                            placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                            className="text-xs h-8 flex-1"
+                          />
+                        </div>
                       </div>
 
-                      {carRentalType !== 'none' && (
-                        <>
-                          <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground font-medium">
-                              Valor Diária (R$)
-                            </Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={carRentalDailyRate}
-                              onChange={(e) => setCarRentalDailyRate(Number(e.target.value))}
-                              className="text-xs h-8 font-mono font-semibold"
-                            />
-                          </div>
-
-                          <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground font-medium">
-                              Quantidade de Dias
-                            </Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={carRentalDays}
-                              onChange={(e) =>
-                                setCarRentalDays(Math.max(1, Number(e.target.value)))
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                          Destino da Fábrica / Cliente (CEP e Cidade)
+                        </Label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={destinationCep}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setDestinationCep(val)
+                              const clean = val.replace(/\D/g, '')
+                              if (clean.length === 8) {
+                                handleRecalculateRouteByCep(val, originCep)
                               }
-                              className="text-xs h-8 font-mono font-semibold"
-                            />
-                          </div>
-                        </>
-                      )}
+                            }}
+                            placeholder="Ex: 89801-000"
+                            className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                          />
+                          <Input
+                            value={destinationAddress}
+                            onChange={(e) => setDestinationAddress(e.target.value)}
+                            placeholder="Cidade/UF do Cliente"
+                            className="text-xs h-8 flex-1"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Parâmetros do percurso */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[10px] text-muted-foreground">
+                            Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
+                          </Label>
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] px-1 py-0 ${
+                              isRoundTrip
+                                ? 'text-emerald-700 bg-emerald-50'
+                                : 'text-slate-600 bg-slate-50'
+                            }`}
+                          >
+                            {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
+                          </Badge>
+                        </div>
+                        <Input
+                          type="number"
+                          value={distanceKm}
+                          onChange={(e) => setDistanceKm(Number(e.target.value))}
+                          className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">
+                          Consumo Veículo (km/L)
+                        </Label>
+                        <Input
+                          type="number"
+                          value={consumptionKmL}
+                          onChange={(e) => setConsumptionKmL(Number(e.target.value))}
+                          className="text-xs h-8"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">
+                          Preço Litro Combustível (R$)
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={fuelPrice}
+                          onChange={(e) => setFuelPrice(Number(e.target.value))}
+                          className="text-xs h-8"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground">
+                          % Rodovias c/ Pedágio
+                        </Label>
+                        <Input
+                          type="number"
+                          value={tollRoadPercent}
+                          onChange={(e) => setTollRoadPercent(Number(e.target.value))}
+                          className="text-xs h-8"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Ajustes Manuais */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                          Ajuste Manual Combustível (+/- R$)
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={manualFuelAdj}
+                          onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                          placeholder="0.00"
+                          className="text-xs h-8 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                          Ajuste Manual Pedágio (+/- R$)
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={manualTollAdj}
+                          onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                          placeholder="0.00"
+                          className="text-xs h-8 font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Aluguel de Carro */}
+                    <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Car className="h-4 w-4 text-emerald-600" />
+                          <Label className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                            Aluguel de Veículo / Carro
+                          </Label>
+                        </div>
+                        {carRentalType !== 'none' && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-mono border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40"
+                          >
+                            Subtotal Carro:{' '}
+                            {carRentalSubtotal.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <Label className="text-[10px] text-muted-foreground font-medium">
+                            Categoria do Veículo
+                          </Label>
+                          <Select value={carRentalType} onValueChange={setCarRentalType}>
+                            <SelectTrigger className="text-xs h-8">
+                              <SelectValue placeholder="Selecione..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Sem aluguel</SelectItem>
+                              <SelectItem value="simple">Carro Simples (R$ 230,00/dia)</SelectItem>
+                              <SelectItem value="complete">
+                                Carro Completo (R$ 350,00/dia)
+                              </SelectItem>
+                              <SelectItem value="custom">Personalizado</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {carRentalType !== 'none' && (
+                          <>
+                            <div className="space-y-1">
+                              <Label className="text-[10px] text-muted-foreground font-medium">
+                                Valor Diária (R$)
+                              </Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={carRentalDailyRate}
+                                onChange={(e) => setCarRentalDailyRate(Number(e.target.value))}
+                                className="text-xs h-8 font-mono font-semibold"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-[10px] text-muted-foreground font-medium">
+                                Quantidade de Dias
+                              </Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={carRentalDays}
+                                onChange={(e) =>
+                                  setCarRentalDays(Math.max(1, Number(e.target.value)))
+                                }
+                                className="text-xs h-8 font-mono font-semibold"
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] text-muted-foreground">
+                        * Digite as cidades (ou CEPs) para rota automática via Nominatim/Mapeia.
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isCalculatingRoute}
+                        onClick={() => {
+                          const orig = originAddress.trim()
+                          const dest = destinationAddress.trim()
+                          if (orig.length >= 3 && dest.length >= 3) {
+                            handleRecalculateRouteByCities(orig, dest)
+                          } else {
+                            handleRecalculateRouteByCep()
+                          }
+                        }}
+                        className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                      >
+                        {isCalculatingRoute ? (
+                          <>
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Calculando Rota...
+                          </>
+                        ) : (
+                          'Recalcular Rota Mapeia'
+                        )}
+                      </Button>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
 
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-[10px] text-muted-foreground">
-                      * Digite as cidades (ou CEPs) para rota automática via Nominatim/Mapeia.
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={isCalculatingRoute}
-                      onClick={() => {
-                        const orig = originAddress.trim()
-                        const dest = destinationAddress.trim()
-                        if (orig.length >= 3 && dest.length >= 3) {
-                          handleRecalculateRouteByCities(orig, dest)
-                        } else {
-                          handleRecalculateRouteByCep()
-                        }
-                      }}
-                      className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                    >
-                      {isCalculatingRoute ? (
-                        <>
-                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          Calculando Rota...
-                        </>
-                      ) : (
-                        'Recalcular Rota Mapeia'
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* ABA 4: Hospedagem & Alimentação */}
-              <TabsContent value="lodging" className="space-y-4 pt-3">
-                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+              {/* SEÇÃO 4: Hospedagem & Alimentação */}
+              <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+                <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                      Composição de Hospedagem & Alimentação em Campo
-                    </span>
-                    <span className="text-xs font-bold text-emerald-600 font-mono">
+                    <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-bold">
+                        4
+                      </span>
+                      4. Hospedagem & Alimentação
+                    </CardTitle>
+                    <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">
                       Subtotal:{' '}
                       {lodgingMealsTotalCost.toLocaleString('pt-BR', {
                         style: 'currency',
@@ -2458,236 +2671,271 @@ export function QuotesManager({
                       })}
                     </span>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Diárias de Hotel */}
-                    <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                      <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        Diárias de Hotel
-                      </Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">
-                            Quantidade de Diárias
-                          </Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={hotelDays}
-                            onChange={(e) => setHotelDays(Number(e.target.value))}
-                            className="text-xs h-8 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">
-                            Valor Diária (R$)
-                          </Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={hotelRate}
-                            onChange={(e) => setHotelRate(Number(e.target.value))}
-                            className="text-xs h-8 font-mono"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                        Subtotal Hotel:{' '}
-                        {hotelTotal.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Refeições */}
-                    <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                      <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                        Refeições / Alimentação Diária
-                      </Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">
-                            Quantidade de Refeições
-                          </Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={mealsDays}
-                            onChange={(e) => setMealsDays(Number(e.target.value))}
-                            className="text-xs h-8 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">
-                            Valor Refeição (R$)
-                          </Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={mealsRate}
-                            onChange={(e) => setMealsRate(Number(e.target.value))}
-                            className="text-xs h-8 font-mono"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                        Subtotal Refeições:{' '}
-                        {mealsTotal.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Vale Refeição Funcionários (Alojado e Não Alojado) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                    <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                      <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                        Vale Refeição Alojado (Equipe Hospedada)
-                      </Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Quantidade</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={mealVoucherHousedQty}
-                            onChange={(e) => setMealVoucherHousedQty(Number(e.target.value))}
-                            className="text-xs h-8 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={mealVoucherHousedRate}
-                            onChange={(e) => setMealVoucherHousedRate(Number(e.target.value))}
-                            className="text-xs h-8 font-mono"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                        Composição de Hospedagem & Alimentação em Campo
+                      </span>
+                      <span className="text-xs font-bold text-emerald-600 font-mono">
                         Subtotal:{' '}
-                        {voucherHousedTotal.toLocaleString('pt-BR', {
+                        {lodgingMealsTotalCost.toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
                         })}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Diárias de Hotel */}
+                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                        <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Diárias de Hotel
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Quantidade de Diárias
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={hotelDays}
+                              onChange={(e) => setHotelDays(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Valor Diária (R$)
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={hotelRate}
+                              onChange={(e) => setHotelRate(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                          Subtotal Hotel:{' '}
+                          {hotelTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Refeições */}
+                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                        <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                          Refeições / Alimentação Diária
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Quantidade de Refeições
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealsDays}
+                              onChange={(e) => setMealsDays(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">
+                              Valor Refeição (R$)
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealsRate}
+                              onChange={(e) => setMealsRate(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                          Subtotal Refeições:{' '}
+                          {mealsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                      <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                        Vale Refeição Não Alojado (Equipe Local)
-                      </Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Quantidade</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={mealVoucherUnhousedQty}
-                            onChange={(e) => setMealVoucherUnhousedQty(Number(e.target.value))}
-                            className="text-xs h-8 font-mono"
-                          />
+                    {/* Vale Refeição Funcionários (Alojado e Não Alojado) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                        <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                          Vale Refeição Alojado (Equipe Hospedada)
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">Quantidade</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealVoucherHousedQty}
+                              onChange={(e) => setMealVoucherHousedQty(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealVoucherHousedRate}
+                              onChange={(e) => setMealVoucherHousedRate(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
                         </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={mealVoucherUnhousedRate}
-                            onChange={(e) => setMealVoucherUnhousedRate(Number(e.target.value))}
-                            className="text-xs h-8 font-mono"
-                          />
+                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                          Subtotal:{' '}
+                          {voucherHousedTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
                         </div>
                       </div>
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                        Subtotal:{' '}
-                        {voucherUnhousedTotal.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
+
+                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                        <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                          Vale Refeição Não Alojado (Equipe Local)
+                        </Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">Quantidade</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealVoucherUnhousedQty}
+                              onChange={(e) => setMealVoucherUnhousedQty(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                          <div className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={mealVoucherUnhousedRate}
+                              onChange={(e) => setMealVoucherUnhousedRate(Number(e.target.value))}
+                              className="text-xs h-8 font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                          Subtotal:{' '}
+                          {voucherUnhousedTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </TabsContent>
+                </CardContent>
+              </Card>
 
-              {/* ABA 5: Margens & Fechamento */}
-              <TabsContent value="pricing" className="space-y-4 pt-3">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Margem de Serviço (%)</Label>
-                    <Input
-                      type="number"
-                      value={serviceMargin}
-                      onChange={(e) => setServiceMargin(Number(e.target.value))}
-                      className="text-xs h-8 font-mono font-bold text-emerald-700"
-                    />
+              {/* SEÇÃO 5: Margens & Fechamento */}
+              <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
+                <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-bold">
+                        5
+                      </span>
+                      5. Margens & Fechamento
+                    </CardTitle>
+                    <span className="text-xs font-mono font-extrabold text-teal-800 dark:text-teal-300">
+                      Total:{' '}
+                      {calculatedSalePrice.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Margem de Serviço (%)</Label>
+                      <Input
+                        type="number"
+                        value={serviceMargin}
+                        onChange={(e) => setServiceMargin(Number(e.target.value))}
+                        className="text-xs h-8 font-mono font-bold text-emerald-700"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Comissão de Vendas (%)</Label>
+                      <Input
+                        type="number"
+                        value={salesCommission}
+                        onChange={(e) => setSalesCommission(Number(e.target.value))}
+                        className="text-xs h-8 font-mono font-bold text-blue-700"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Overhead Adm (%)</Label>
+                      <Input
+                        type="number"
+                        value={adminRate}
+                        onChange={(e) => setAdminRate(Number(e.target.value))}
+                        className="text-xs h-8 font-mono"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Validade da Proposta (Dias)</Label>
+                      <Input
+                        type="number"
+                        value={validityDays}
+                        onChange={(e) => setValidityDays(Number(e.target.value))}
+                        className="text-xs h-8 font-mono"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Comissão de Vendas (%)</Label>
-                    <Input
-                      type="number"
-                      value={salesCommission}
-                      onChange={(e) => setSalesCommission(Number(e.target.value))}
-                      className="text-xs h-8 font-mono font-bold text-blue-700"
-                    />
-                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Condições de Pagamento</Label>
+                      <Input
+                        value={paymentTerms}
+                        onChange={(e) => setPaymentTerms(e.target.value)}
+                        placeholder="Ex: 28 DDL faturado após entrega técnica"
+                        className="text-xs h-8"
+                      />
+                    </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Overhead Adm (%)</Label>
-                    <Input
-                      type="number"
-                      value={adminRate}
-                      onChange={(e) => setAdminRate(Number(e.target.value))}
-                      className="text-xs h-8 font-mono"
-                    />
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold">Status Inicial</Label>
+                      <Select value={status} onValueChange={(val) => setStatus(val as QuoteStatus)}>
+                        <SelectTrigger className="text-xs h-8">
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="draft">Rascunho</SelectItem>
+                          <SelectItem value="sent">Enviada ao Cliente</SelectItem>
+                          <SelectItem value="approved">Aprovada</SelectItem>
+                          <SelectItem value="rejected">Rejeitada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Validade da Proposta (Dias)</Label>
-                    <Input
-                      type="number"
-                      value={validityDays}
-                      onChange={(e) => setValidityDays(Number(e.target.value))}
-                      className="text-xs h-8 font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Condições de Pagamento</Label>
-                    <Input
-                      value={paymentTerms}
-                      onChange={(e) => setPaymentTerms(e.target.value)}
-                      placeholder="Ex: 28 DDL faturado após entrega técnica"
-                      className="text-xs h-8"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Status Inicial</Label>
-                    <Select value={status} onValueChange={(val) => setStatus(val as QuoteStatus)}>
-                      <SelectTrigger className="text-xs h-8">
-                        <SelectValue placeholder="Selecione o status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="draft">Rascunho</SelectItem>
-                        <SelectItem value="sent">Enviada ao Cliente</SelectItem>
-                        <SelectItem value="approved">Aprovada</SelectItem>
-                        <SelectItem value="rejected">Rejeitada</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           <DialogFooter className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
