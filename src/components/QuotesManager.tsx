@@ -848,20 +848,34 @@ export function QuotesManager({
   const handleSetStatus = async (newStatus: QuoteStatus) => {
     if (!activeQuoteId) {
       setStatus(newStatus)
+      toast({
+        title:
+          newStatus === 'approved'
+            ? 'Proposta marcada como aprovada'
+            : newStatus === 'rejected'
+              ? 'Proposta marcada como recusada'
+              : `Status alterado para ${newStatus}`,
+        description: 'Salve a proposta para persistir o novo status.',
+      })
       return
     }
 
     try {
+      // Salva dados atuais do formulário e atualiza o status de forma consistente
+      const payload = getFormDataObject()
+      payload.status = newStatus
+
       if (onUpdateQuoteStatus) {
+        await onUpdateQuote(activeQuoteId, payload)
         await onUpdateQuoteStatus(activeQuoteId, newStatus)
       } else {
-        await onUpdateQuote(activeQuoteId, { status: newStatus })
+        await onUpdateQuote(activeQuoteId, payload)
       }
       setStatus(newStatus)
       toast({
         title:
           newStatus === 'approved'
-            ? '🎉 Proposta Aprovada!'
+            ? '🎉 Proposta Aprovada! OS gerada e funil atualizado.'
             : newStatus === 'rejected'
               ? 'Proposta Recusada'
               : `Status alterado para ${newStatus}`,
@@ -1330,17 +1344,16 @@ export function QuotesManager({
 
                   {/* Vínculo com Oportunidade do Pipeline Comercial & Responsável */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <div className="space-y-1 sm:col-span-2">
+                    <div className="space-y-1">
                       <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                         <TrendingUp className="h-3.5 w-3.5 text-teal-600" />
-                        Oportunidade / Negócio no Pipeline Comercial (Funil)
+                        Vínculo Oportunidade (CRM)
                       </Label>
                       <Select
                         value={dealId || 'none'}
                         onValueChange={(val) => {
                           if (val === 'none') {
                             setDealId('')
-                            setDealTitle('')
                             return
                           }
                           setDealId(val)
@@ -1355,7 +1368,7 @@ export function QuotesManager({
                         }}
                       >
                         <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="Vincular a uma oportunidade do pipeline..." />
+                          <SelectValue placeholder="Selecione a oportunidade..." />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Nenhum negócio vinculado</SelectItem>
@@ -1371,6 +1384,18 @@ export function QuotesManager({
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Título Oportunidade / Negócio (Livre)
+                      </Label>
+                      <Input
+                        value={dealTitle}
+                        onChange={(e) => setDealTitle(e.target.value)}
+                        placeholder="Ex: Reforma Trocador Placas Linha 2"
+                        className="text-xs h-8"
+                      />
                     </div>
 
                     <div className="space-y-1">
@@ -1466,7 +1491,7 @@ export function QuotesManager({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Técnico Especialista
+                        Técnico Mecânico
                       </span>
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-0.5">
@@ -1508,7 +1533,7 @@ export function QuotesManager({
 
                     <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Auxiliar Operacional
+                        Ajudante / Auxiliar
                       </span>
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-0.5">
@@ -1553,7 +1578,7 @@ export function QuotesManager({
 
                     <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Inspetor / Encarregado
+                        Inspetor END / Qualidade
                       </span>
                       <div className="grid grid-cols-3 gap-2">
                         <div className="space-y-0.5">
@@ -2339,15 +2364,28 @@ export function QuotesManager({
       {/* Modal de Impressão e PDF (com suporte explícito a visão cliente e interna + aprovação) */}
       {quoteForPreview && (
         <QuotePdfPreviewDialog
-          quote={quoteForPreview}
+          quote={
+            {
+              ...quoteForPreview,
+              ...(activeQuoteId === quoteForPreview.id ? getFormDataObject() : {}),
+              id: quoteForPreview.id,
+            } as QuoteRecord
+          }
           open={isPreviewOpen}
           onOpenChange={setIsPreviewOpen}
           viewMode={previewViewMode}
           onApproveQuote={async (q) => {
+            const quoteId = q.id || activeQuoteId
+            if (!quoteId) return
+
+            const payload = getFormDataObject()
+            payload.status = 'approved'
+
             if (onUpdateQuoteStatus) {
-              await onUpdateQuoteStatus(q.id, 'approved')
+              await onUpdateQuote(quoteId, payload)
+              await onUpdateQuoteStatus(quoteId, 'approved')
             } else {
-              await onUpdateQuote(q.id, { status: 'approved' })
+              await onUpdateQuote(quoteId, payload)
             }
             setStatus('approved')
             toast({
