@@ -270,26 +270,7 @@ export function QuotePdfPreviewDialog({
         carRentalDailyRate * carRentalDays)
       : 0
 
-  const transitVoucherQty =
-    travelDetails?.transit_voucher_qty ??
-    quote.transit_voucher_qty ??
-    quote.travel_config?.transit_voucher_qty ??
-    0
-  const transitVoucherRate =
-    travelDetails?.transit_voucher_rate ??
-    quote.transit_voucher_rate ??
-    quote.travel_config?.transit_voucher_rate ??
-    0
-  const transitVoucherTotal =
-    travelDetails?.transit_voucher_total ??
-    quote.transit_voucher_total ??
-    quote.travel_config?.transit_voucher_total ??
-    Math.max(0, transitVoucherQty * transitVoucherRate)
-
-  const calculatedTravelCost = Math.max(
-    0,
-    baseFuelCost + baseTollCost + carRentalTotal + transitVoucherTotal,
-  )
+  const calculatedTravelCost = Math.max(0, baseFuelCost + baseTollCost + carRentalTotal)
   const totalTravelCost =
     travelDetails?.totalTravelCost ?? quote.travel_cost ?? calculatedTravelCost
 
@@ -986,11 +967,7 @@ export function QuotePdfPreviewDialog({
 
                 <div
                   className={`grid grid-cols-1 ${
-                    carRentalType !== 'none' && transitVoucherTotal > 0
-                      ? 'sm:grid-cols-6'
-                      : carRentalType !== 'none' || transitVoucherTotal > 0
-                        ? 'sm:grid-cols-5'
-                        : 'sm:grid-cols-4'
+                    carRentalType !== 'none' ? 'sm:grid-cols-5' : 'sm:grid-cols-4'
                   } gap-3 print:gap-1.5 bg-slate-50 p-3 print:p-2 rounded-lg border border-slate-200 text-[11px] print:text-[9.5px]`}
                 >
                   <div className="space-y-0.5">
@@ -1050,27 +1027,6 @@ export function QuotePdfPreviewDialog({
                     </div>
                   )}
 
-                  {transitVoucherTotal > 0 && (
-                    <div className="space-y-0.5">
-                      <span className="text-[10px] print:text-[9px] font-bold text-slate-500 uppercase block">
-                        Vale Transporte
-                      </span>
-                      <div className="font-bold text-slate-900 font-mono">
-                        {transitVoucherTotal.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                      <div className="text-[10px] print:text-[8.5px] text-slate-500">
-                        {transitVoucherQty} un ×{' '}
-                        {transitVoucherRate.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                    </div>
-                  )}
-
                   <div className="space-y-0.5 bg-amber-50/80 p-2 print:p-1.5 rounded border border-amber-200">
                     <span className="text-[10px] print:text-[9px] font-bold text-amber-900 uppercase block">
                       Total Deslocamento
@@ -1082,12 +1038,7 @@ export function QuotePdfPreviewDialog({
                       })}
                     </div>
                     <div className="text-[9.5px] print:text-[8px] text-amber-700">
-                      {[
-                        'Combustível',
-                        'Pedágios',
-                        carRentalType !== 'none' ? 'Carro' : null,
-                        transitVoucherTotal > 0 ? 'V.T.' : null,
-                      ]
+                      {['Combustível', 'Pedágios', carRentalType !== 'none' ? 'Carro' : null]
                         .filter(Boolean)
                         .join(' + ')}
                     </div>
