@@ -1023,7 +1023,7 @@ export function QuotesManager({
                     })}
                   </div>
                   <span className="text-[9.5px] text-muted-foreground block">
-                    Combustível + Pedágios + V.T.
+                    Combustível + Pedágios
                   </span>
                 </div>
 
