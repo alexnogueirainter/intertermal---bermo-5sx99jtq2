@@ -88,6 +88,14 @@ type ActiveTab =
   | 'activities'
   | 'copilot'
   | 'architecture'
+// Garantir Mail globalmente acessível para QuotesManager antes da renderização do componente
+if (typeof window !== 'undefined' && !(window as any).Mail) {
+  ;(window as any).Mail = Mail
+}
+if (typeof globalThis !== 'undefined' && !(globalThis as any).Mail) {
+  ;(globalThis as any).Mail = Mail
+}
+
 export default function IndexPage() {
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')

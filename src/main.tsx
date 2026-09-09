@@ -4,9 +4,21 @@ import App from './App.tsx'
 import './main.css'
 import { Mail } from './components/ui/mail-icon'
 
-// Polyfill window.Mail as fallback for components missing local import
+// Polyfill global Mail as fallback for components missing local import
 if (typeof window !== 'undefined') {
   ;(window as any).Mail = Mail
+}
+if (typeof globalThis !== 'undefined') {
+  ;(globalThis as any).Mail = Mail
+}
+try {
+  // @ts-expect-error
+  if (typeof global !== 'undefined') {
+    // @ts-expect-error
+    global.Mail = Mail
+  }
+} catch {
+  /* intentionally ignored */
 }
 
 // @skip-protected: Do not remove. Required for React rendering.
