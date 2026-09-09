@@ -20,6 +20,7 @@ import {
   Flame,
   History as HistoryIcon,
   BarChart3,
+  Mail,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,10 +69,14 @@ import { ActivitiesManager } from '@/components/ActivitiesManager'
 import { CopilotAssistant } from '@/components/CopilotAssistant'
 import { ModelArchitectureViewer } from '@/components/ModelArchitectureViewer'
 import { BermoCatalogViewer } from '@/components/BermoCatalogViewer'
+import { InboundQuoteEmailsTab } from '@/components/InboundQuoteEmailsTab'
+import { inboundQuoteEmailsService } from '@/services/inbound-quote-emails'
+import { InboundQuoteEmailRecord } from '@/types/crm'
 
 type ActiveTab =
   | 'overview'
   | 'quotes'
+  | 'inbound_quotes'
   | 'catalog'
   | 'deals'
   | 'clients'
@@ -101,6 +106,24 @@ export default function IndexPage() {
   // Selection states for cross-view navigation
   const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(null)
   const [selectedQuote, setSelectedQuote] = useState<QuoteRecord | null>(null)
+  const [inboundEmailsList, setInboundEmailsList] = useState<InboundQuoteEmailRecord[]>([])
+  const [isLoadingInboundEmails, setIsLoadingInboundEmails] = useState<boolean>(false)
+
+  const loadInboundEmails = async () => {
+    setIsLoadingInboundEmails(true)
+    try {
+      const list = await inboundQuoteEmailsService.getInboundEmails()
+      setInboundEmailsList(list)
+    } catch (_) {
+      // Ignora silenciosamente
+    } finally {
+      setIsLoadingInboundEmails(false)
+    }
+  }
+
+  useEffect(() => {
+    loadInboundEmails()
+  }, [])
 
   // Carregar dados de propostas de forma silenciosa e rápida
   const refreshQuotes = async () => {
@@ -706,6 +729,23 @@ export default function IndexPage() {
             </button>
 
             <button
+              onClick={() => setActiveTab('inbound_quotes')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'inbound_quotes'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Mail className="h-4 w-4 text-amber-500 group-hover:text-amber-600" />
+                Cotações por E-mail
+              </div>
+              <Badge className="bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[10px] px-1.5">
+                {inboundEmailsList.length}
+              </Badge>
+            </button>
+
+            <button
               onClick={() => setActiveTab('catalog')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'catalog'
@@ -920,6 +960,7 @@ export default function IndexPage() {
               <span className="capitalize text-slate-900 dark:text-slate-100">
                 {activeTab === 'overview' && 'Painel Geral'}
                 {activeTab === 'quotes' && 'Orçamentos de Serviços Intertermal'}
+                {activeTab === 'inbound_quotes' && 'Cotações Recebidas por E-mail (Triagem IA)'}
                 {activeTab === 'catalog' && 'Catálogo de Produtos & Válvulas BERMO'}
                 {activeTab === 'deals' && 'Pipeline Comercial (Funil)'}
                 {activeTab === 'clients' && 'Gestão de Clientes Industriais'}
@@ -967,7 +1008,6 @@ export default function IndexPage() {
               onNavigate={(tab) => setActiveTab(tab as ActiveTab)}
             />
           )}
-
           {activeTab === 'quotes' && (
             <QuotesManager
               quotes={quotes}
@@ -982,10 +1022,34 @@ export default function IndexPage() {
             />
           )}
 
+          {activeTab === 'inbound_quotes' && (
+            <InboundQuoteEmailsTab
+              inboundEmails={inboundEmailsList}
+              quotes={quotes}
+              clients={clients}
+              isLoading={isLoadingInboundEmails}
+              onRefresh={() => {
+                loadInboundEmails()
+                refreshQuotes()
+              }}
+              onOpenEditQuote={(quote) => {
+                setSelectedQuote(quote)
+                setActiveTab('quotes')
+              }}
+              onQuoteCreatedFromInbound={(quoteId) => {
+                loadInboundEmails()
+                refreshQuotes()
+                loadAllData(true)
+                const created = quotes.find((q) => q.id === quoteId)
+                if (created) setSelectedQuote(created)
+                setActiveTab('quotes')
+              }}
+            />
+          )}
+
           {activeTab === 'catalog' && (
             <BermoCatalogViewer onSelectProductForQuote={handleSelectProductForQuote} />
           )}
-
           {activeTab === 'deals' && (
             <PipelineKanban
               deals={deals}
@@ -1000,7 +1064,6 @@ export default function IndexPage() {
               }}
             />
           )}
-
           {activeTab === 'clients' && (
             <ClientsManager
               clients={clients}
@@ -1014,7 +1077,6 @@ export default function IndexPage() {
               onUpdateClient={handleUpdateClient}
             />
           )}
-
           {activeTab === 'service_kanban' && (
             <ServiceOrdersKanban
               serviceOrders={serviceOrders}
@@ -1025,11 +1087,9 @@ export default function IndexPage() {
               onCancelServiceOrder={handleCancelServiceOrder}
             />
           )}
-
           {activeTab === 'service_report' && (
             <ServiceOrdersReport serviceOrders={serviceOrders} clients={clients} quotes={quotes} />
           )}
-
           {activeTab === 'equipment_history' && (
             <EquipmentServiceHistory
               clients={clients}
@@ -1037,7 +1097,6 @@ export default function IndexPage() {
               quotes={quotes}
             />
           )}
-
           {activeTab === 'services' && (
             <ServicesManager
               services={services}
@@ -1050,7 +1109,6 @@ export default function IndexPage() {
               onCancelServiceOrder={handleCancelServiceOrder}
             />
           )}
-
           {activeTab === 'tickets' && (
             <TicketsSupport
               tickets={tickets}
@@ -1059,7 +1117,6 @@ export default function IndexPage() {
               onUpdateTicket={handleUpdateTicket}
             />
           )}
-
           {activeTab === 'activities' && (
             <ActivitiesManager
               activities={activities}
@@ -1068,7 +1125,6 @@ export default function IndexPage() {
               onUpdateActivity={handleUpdateActivity}
             />
           )}
-
           {activeTab === 'copilot' && (
             <CopilotAssistant
               clients={clients}
@@ -1078,7 +1134,6 @@ export default function IndexPage() {
               tickets={tickets}
             />
           )}
-
           {activeTab === 'architecture' && <ModelArchitectureViewer />}
         </div>
       </main>

@@ -494,3 +494,67 @@ export interface TicketRecord {
   created?: string
   updated?: string
 }
+
+export type InboundEmailStatus = 'recebido' | 'rascunho_criado' | 'revisado' | 'erro'
+
+export interface ExtractedQuoteData {
+  client_name?: string
+  contact_name?: string
+  contact_email?: string
+  contact_phone?: string
+  city?: string
+  state?: string
+  postal_code?: string
+  equipment_brand?: string
+  equipment_model?: string
+  equipment_quantity?: number
+  service_scope?: string
+  desired_deadline?: string
+  notes?: string
+  missing_fields?: string[]
+}
+
+export interface InboundQuoteEmailRecord {
+  id: string
+  sender?: string
+  original_sender?: string
+  recipient?: string
+  subject?: string
+  raw_body?: string
+  status: InboundEmailStatus
+  quote_id?: string
+  client_id?: string
+  extracted_data?: ExtractedQuoteData
+  warnings?: string[]
+  created?: string
+  updated?: string
+  expand?: {
+    quote_id?: QuoteRecord
+    client_id?: ClientRecord
+  }
+}
+
+export interface ProcessInboundEmailPayload {
+  subject: string
+  body: string
+  sender?: string
+  original_sender?: string
+  recipient?: string
+}
+
+export interface ProcessInboundEmailResponse {
+  success: boolean
+  message: string
+  quote_id?: string | null
+  quote_number?: string
+  client?: {
+    id?: string | null
+    name?: string
+    email?: string
+  }
+  inbound_email_id?: string | null
+  extracted_data?: ExtractedQuoteData
+  warnings?: string[]
+  extraction_method?: string
+  error?: string
+}
