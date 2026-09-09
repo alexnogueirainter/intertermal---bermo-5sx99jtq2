@@ -150,6 +150,9 @@ export const inboundQuoteEmailsService = {
   ): Promise<ProcessInboundEmailResponse> {
     try {
       const files = payload.files || []
+      const urlWithToken = `/backend/v1/quotes/inbound-email?token=${encodeURIComponent(
+        INBOUND_QUOTE_DEFAULT_SECRET,
+      )}`
 
       // Se houver arquivos anexados, enviar como multipart/form-data
       if (files.length > 0) {
@@ -159,27 +162,53 @@ export const inboundQuoteEmailsService = {
         if (payload.sender) formData.append('sender', payload.sender)
         if (payload.original_sender) formData.append('original_sender', payload.original_sender)
         if (payload.recipient) formData.append('recipient', payload.recipient)
+        formData.append('token', INBOUND_QUOTE_DEFAULT_SECRET)
 
         files.forEach((file) => {
           formData.append('attachments', file)
           formData.append('files', file)
         })
 
-        const res = (await pb.send('/backend/v1/quotes/inbound-email', {
-          method: 'POST',
-          headers: {
-            'X-Inbound-Token': INBOUND_QUOTE_DEFAULT_SECRET,
-          },
-          body: formData,
-        })) as ProcessInboundEmailResponse
+        let res: ProcessInboundEmailResponse
+        try {
+          res = (await pb.send(urlWithToken, {
+            method: 'POST',
+            headers: {
+              'X-Inbound-Token': INBOUND_QUOTE_DEFAULT_SECRET,
+            },
+            body: formData,
+          })) as ProcessInboundEmailResponse
+        } catch (postErr: any) {
+          // Se o endpoint multipart falhar (ex: parser de arquivos específico do goja ou payload),
+          // tentamos fallback imediato enviando os dados de texto via JSON puro,
+          // garantindo que o rascunho seja criado e depois salvando os anexos via SDK.
+          console.warn(
+            'Envio multipart encontrou erro; aplicando fallback com criação em JSON e upload resiliente dos anexos:',
+            postErr,
+          )
 
-        // Se o backend criou o registro mas a rota não gravou os arquivos diretamente via FormData,
-        // garantimos o salvamento resiliente de cada anexo via SDK
-        if (
-          res.success &&
-          res.inbound_email_id &&
-          (!res.attachments_count || res.attachments_count < files.length)
-        ) {
+          const jsonPayload = {
+            subject: payload.subject,
+            body: payload.body,
+            sender: payload.sender,
+            original_sender: payload.original_sender,
+            recipient: payload.recipient,
+            token: INBOUND_QUOTE_DEFAULT_SECRET,
+          }
+
+          res = (await pb.send(urlWithToken, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Inbound-Token': INBOUND_QUOTE_DEFAULT_SECRET,
+            },
+            body: JSON.stringify(jsonPayload),
+          })) as ProcessInboundEmailResponse
+        }
+
+        // Se o backend criou o registro de cotação/inbound_email,
+        // garantimos o salvamento resiliente de cada anexo via SDK caso não tenham sido salvos diretamente no hook
+        if (res.success && res.inbound_email_id) {
           let savedCount = res.attachments_count || 0
           for (const file of files) {
             try {
@@ -200,22 +229,34 @@ export const inboundQuoteEmailsService = {
       }
 
       // Envio tradicional em JSON se não houver arquivos
-      const res = (await pb.send('/backend/v1/quotes/inbound-email', {
+      const res = (await pb.send(urlWithToken, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-Inbound-Token': INBOUND_QUOTE_DEFAULT_SECRET,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          ...payload,
+          token: INBOUND_QUOTE_DEFAULT_SECRET,
+        }),
       })) as ProcessInboundEmailResponse
 
       return res
     } catch (err: any) {
       console.error('Erro ao processar e-mail de cotação via backend:', err)
+      const status = err?.status || err?.response?.status || ''
+      const backendMsg =
+        err?.response?.error ||
+        err?.response?.message ||
+        err?.data?.message ||
+        err?.data?.error ||
+        err?.message ||
+        'Algo deu errado na comunicação com o backend'
+
       return {
         success: false,
-        message: err?.message || 'Falha na comunicação com o serviço de extração de e-mails.',
-        error: err?.message || 'Erro de conexão',
+        message: status ? `Erro ${status}: ${backendMsg}` : backendMsg,
+        error: backendMsg,
       }
     }
   },

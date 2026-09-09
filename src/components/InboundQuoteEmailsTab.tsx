@@ -170,7 +170,11 @@ Gerente de Manutenção Industrial`)
 
       if (res.success && res.quote_id) {
         const attMsg =
-          selectedFiles.length > 0 ? ` (${selectedFiles.length} anexo(s) salvo(s))` : ''
+          res.attachments_count && res.attachments_count > 0
+            ? ` (${res.attachments_count} anexo(s) vinculado(s))`
+            : selectedFiles.length > 0
+              ? ` (${selectedFiles.length} anexo(s) selecionado(s))`
+              : ''
         toast({
           title: 'Rascunho gerado com sucesso!',
           description: `Proposta ${res.quote_number || ''} criada e vinculada a ${res.client?.name || 'Cliente'}${attMsg}. Pronto para revisão humana.`,
@@ -196,17 +200,27 @@ Gerente de Manutenção Industrial`)
           onOpenEditQuote(targetQuote)
         }
       } else {
+        const errorDetail = res.error || res.message || 'Falha desconhecida no backend'
         toast({
           title: 'Atenção ao processar e-mail',
-          description: res.message || 'E-mail registrado, mas verifique os avisos.',
+          description: errorDetail.includes('Something went wrong')
+            ? `Erro retornado pelo backend: ${errorDetail}`
+            : errorDetail,
           variant: 'destructive',
         })
         onRefresh()
       }
     } catch (err: any) {
+      const detailedMessage =
+        err?.response?.message ||
+        err?.response?.error ||
+        err?.data?.message ||
+        err?.message ||
+        'Falha de rede ou timeout ao acionar o servidor.'
+
       toast({
         title: 'Erro no processamento',
-        description: err?.message || 'Falha ao acionar IA de extração de cotações.',
+        description: `Falha ao processar e-mail: ${detailedMessage}`,
         variant: 'destructive',
       })
     } finally {
