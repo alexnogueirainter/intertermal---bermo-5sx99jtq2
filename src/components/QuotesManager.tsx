@@ -2881,13 +2881,57 @@ export function QuotesManager({
                             })}
                           </span>
                         </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={serviceMargin}
-                          onChange={(e) => setServiceMargin(Number(e.target.value))}
-                          className="text-xs h-8 font-mono font-bold text-emerald-700 dark:text-emerald-400"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={serviceMargin}
+                            onChange={(e) => setServiceMargin(Number(e.target.value))}
+                            className="text-xs h-8 font-mono font-bold text-emerald-700 dark:text-emerald-400 flex-1 min-w-0"
+                          />
+                          <Select
+                            value={
+                              [15, 20, 25, 30, 35].includes(serviceMargin)
+                                ? String(serviceMargin)
+                                : 'custom'
+                            }
+                            onValueChange={(val) => {
+                              if (val !== 'custom') setServiceMargin(Number(val))
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-16 h-8 text-[11px] font-mono px-1.5 shrink-0 bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800"
+                              title="Escolher percentual pré-definido"
+                            >
+                              <SelectValue placeholder="Opção" />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectItem value="15" className="text-xs font-mono">
+                                15%
+                              </SelectItem>
+                              <SelectItem value="20" className="text-xs font-mono">
+                                20%
+                              </SelectItem>
+                              <SelectItem value="25" className="text-xs font-mono">
+                                25% (Padrão)
+                              </SelectItem>
+                              <SelectItem value="30" className="text-xs font-mono">
+                                30%
+                              </SelectItem>
+                              <SelectItem value="35" className="text-xs font-mono">
+                                35%
+                              </SelectItem>
+                              {![15, 20, 25, 30, 35].includes(serviceMargin) && (
+                                <SelectItem
+                                  value="custom"
+                                  className="text-xs font-mono text-muted-foreground"
+                                >
+                                  {serviceMargin}% (Outro)
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       <div className="space-y-1">
@@ -2903,13 +2947,63 @@ export function QuotesManager({
                             )}
                           </span>
                         </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={salesCommission}
-                          onChange={(e) => setSalesCommission(Number(e.target.value))}
-                          className="text-xs h-8 font-mono font-bold text-blue-700 dark:text-blue-400"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={salesCommission}
+                            onChange={(e) => setSalesCommission(Number(e.target.value))}
+                            className="text-xs h-8 font-mono font-bold text-blue-700 dark:text-blue-400 flex-1 min-w-0"
+                          />
+                          <Select
+                            value={
+                              [0, 2, 3, 5, 6, 8, 10].includes(salesCommission)
+                                ? String(salesCommission)
+                                : 'custom'
+                            }
+                            onValueChange={(val) => {
+                              if (val !== 'custom') setSalesCommission(Number(val))
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-16 h-8 text-[11px] font-mono px-1.5 shrink-0 bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
+                              title="Escolher percentual pré-definido"
+                            >
+                              <SelectValue placeholder="Opção" />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectItem value="0" className="text-xs font-mono">
+                                0% (Sem)
+                              </SelectItem>
+                              <SelectItem value="2" className="text-xs font-mono">
+                                2%
+                              </SelectItem>
+                              <SelectItem value="3" className="text-xs font-mono">
+                                3%
+                              </SelectItem>
+                              <SelectItem value="5" className="text-xs font-mono">
+                                5%
+                              </SelectItem>
+                              <SelectItem value="6" className="text-xs font-mono">
+                                6% (Padrão)
+                              </SelectItem>
+                              <SelectItem value="8" className="text-xs font-mono">
+                                8%
+                              </SelectItem>
+                              <SelectItem value="10" className="text-xs font-mono">
+                                10%
+                              </SelectItem>
+                              {![0, 2, 3, 5, 6, 8, 10].includes(salesCommission) && (
+                                <SelectItem
+                                  value="custom"
+                                  className="text-xs font-mono text-muted-foreground"
+                                >
+                                  {salesCommission}% (Outro)
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       <div className="space-y-1">
@@ -2922,13 +3016,63 @@ export function QuotesManager({
                             })}
                           </span>
                         </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={adminRate}
-                          onChange={(e) => setAdminRate(Number(e.target.value))}
-                          className="text-xs h-8 font-mono font-bold text-purple-700 dark:text-purple-400"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={adminRate}
+                            onChange={(e) => setAdminRate(Number(e.target.value))}
+                            className="text-xs h-8 font-mono font-bold text-purple-700 dark:text-purple-400 flex-1 min-w-0"
+                          />
+                          <Select
+                            value={
+                              [0, 2, 3, 5, 8, 10, 15].includes(adminRate)
+                                ? String(adminRate)
+                                : 'custom'
+                            }
+                            onValueChange={(val) => {
+                              if (val !== 'custom') setAdminRate(Number(val))
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-16 h-8 text-[11px] font-mono px-1.5 shrink-0 bg-purple-50/50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800"
+                              title="Escolher percentual pré-definido"
+                            >
+                              <SelectValue placeholder="Opção" />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectItem value="0" className="text-xs font-mono">
+                                0% (Sem)
+                              </SelectItem>
+                              <SelectItem value="2" className="text-xs font-mono">
+                                2%
+                              </SelectItem>
+                              <SelectItem value="3" className="text-xs font-mono">
+                                3% (Padrão)
+                              </SelectItem>
+                              <SelectItem value="5" className="text-xs font-mono">
+                                5%
+                              </SelectItem>
+                              <SelectItem value="8" className="text-xs font-mono">
+                                8%
+                              </SelectItem>
+                              <SelectItem value="10" className="text-xs font-mono">
+                                10%
+                              </SelectItem>
+                              <SelectItem value="15" className="text-xs font-mono">
+                                15% (Fixo Adm)
+                              </SelectItem>
+                              {![0, 2, 3, 5, 8, 10, 15].includes(adminRate) && (
+                                <SelectItem
+                                  value="custom"
+                                  className="text-xs font-mono text-muted-foreground"
+                                >
+                                  {adminRate}% (Outro)
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       <div className="space-y-1">
@@ -2979,13 +3123,47 @@ export function QuotesManager({
                             })}
                           </span>
                         </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={pisRate}
-                          onChange={(e) => setPisRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={pisRate}
+                            onChange={(e) => setPisRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
+                          />
+                          <Select
+                            value={[0, 0.65, 1.65].includes(pisRate) ? String(pisRate) : 'custom'}
+                            onValueChange={(val) => {
+                              if (val !== 'custom') setPisRate(Number(val))
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                              title="Opções de PIS"
+                            >
+                              <SelectValue placeholder="%" />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectItem value="0" className="text-xs font-mono">
+                                0% (Isento)
+                              </SelectItem>
+                              <SelectItem value="0.65" className="text-xs font-mono">
+                                0,65% (Cumulativo)
+                              </SelectItem>
+                              <SelectItem value="1.65" className="text-xs font-mono">
+                                1,65% (Não-cumulativo)
+                              </SelectItem>
+                              {![0, 0.65, 1.65].includes(pisRate) && (
+                                <SelectItem
+                                  value="custom"
+                                  className="text-xs font-mono text-muted-foreground"
+                                >
+                                  {pisRate}% (Outro)
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       {/* COFINS */}
@@ -3001,13 +3179,49 @@ export function QuotesManager({
                             })}
                           </span>
                         </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={cofinsRate}
-                          onChange={(e) => setCofinsRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={cofinsRate}
+                            onChange={(e) => setCofinsRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
+                          />
+                          <Select
+                            value={
+                              [0, 3.0, 7.6].includes(cofinsRate) ? String(cofinsRate) : 'custom'
+                            }
+                            onValueChange={(val) => {
+                              if (val !== 'custom') setCofinsRate(Number(val))
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                              title="Opções de COFINS"
+                            >
+                              <SelectValue placeholder="%" />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectItem value="0" className="text-xs font-mono">
+                                0% (Isento)
+                              </SelectItem>
+                              <SelectItem value="3" className="text-xs font-mono">
+                                3,0% (Cumulativo)
+                              </SelectItem>
+                              <SelectItem value="7.6" className="text-xs font-mono">
+                                7,6% (Não-cumulativo)
+                              </SelectItem>
+                              {![0, 3.0, 7.6].includes(cofinsRate) && (
+                                <SelectItem
+                                  value="custom"
+                                  className="text-xs font-mono text-muted-foreground"
+                                >
+                                  {cofinsRate}% (Outro)
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       {/* ISS */}
@@ -3023,13 +3237,60 @@ export function QuotesManager({
                             })}
                           </span>
                         </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={issRate}
-                          onChange={(e) => setIssRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={issRate}
+                            onChange={(e) => setIssRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
+                          />
+                          <Select
+                            value={
+                              [0, 2.0, 2.5, 3.0, 4.0, 5.0].includes(issRate)
+                                ? String(issRate)
+                                : 'custom'
+                            }
+                            onValueChange={(val) => {
+                              if (val !== 'custom') setIssRate(Number(val))
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                              title="Opções de ISS"
+                            >
+                              <SelectValue placeholder="%" />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectItem value="0" className="text-xs font-mono">
+                                0% (Isento)
+                              </SelectItem>
+                              <SelectItem value="2" className="text-xs font-mono">
+                                2,0% (Mínimo)
+                              </SelectItem>
+                              <SelectItem value="2.5" className="text-xs font-mono">
+                                2,5%
+                              </SelectItem>
+                              <SelectItem value="3" className="text-xs font-mono">
+                                3,0%
+                              </SelectItem>
+                              <SelectItem value="4" className="text-xs font-mono">
+                                4,0%
+                              </SelectItem>
+                              <SelectItem value="5" className="text-xs font-mono">
+                                5,0% (Padrão)
+                              </SelectItem>
+                              {![0, 2.0, 2.5, 3.0, 4.0, 5.0].includes(issRate) && (
+                                <SelectItem
+                                  value="custom"
+                                  className="text-xs font-mono text-muted-foreground"
+                                >
+                                  {issRate}% (Outro)
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       {/* CSLL */}
@@ -3045,13 +3306,47 @@ export function QuotesManager({
                             })}
                           </span>
                         </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={csllRate}
-                          onChange={(e) => setCsllRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={csllRate}
+                            onChange={(e) => setCsllRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
+                          />
+                          <Select
+                            value={[0, 1.08, 2.88].includes(csllRate) ? String(csllRate) : 'custom'}
+                            onValueChange={(val) => {
+                              if (val !== 'custom') setCsllRate(Number(val))
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                              title="Opções de CSLL"
+                            >
+                              <SelectValue placeholder="%" />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectItem value="0" className="text-xs font-mono">
+                                0% (Isento)
+                              </SelectItem>
+                              <SelectItem value="1.08" className="text-xs font-mono">
+                                1,08%
+                              </SelectItem>
+                              <SelectItem value="2.88" className="text-xs font-mono">
+                                2,88% (Padrão)
+                              </SelectItem>
+                              {![0, 1.08, 2.88].includes(csllRate) && (
+                                <SelectItem
+                                  value="custom"
+                                  className="text-xs font-mono text-muted-foreground"
+                                >
+                                  {csllRate}% (Outro)
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       {/* IRPJ */}
@@ -3067,13 +3362,47 @@ export function QuotesManager({
                             })}
                           </span>
                         </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={irpjRate}
-                          onChange={(e) => setIrpjRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={irpjRate}
+                            onChange={(e) => setIrpjRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
+                          />
+                          <Select
+                            value={[0, 1.2, 4.8].includes(irpjRate) ? String(irpjRate) : 'custom'}
+                            onValueChange={(val) => {
+                              if (val !== 'custom') setIrpjRate(Number(val))
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                              title="Opções de IRPJ"
+                            >
+                              <SelectValue placeholder="%" />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectItem value="0" className="text-xs font-mono">
+                                0% (Isento)
+                              </SelectItem>
+                              <SelectItem value="1.2" className="text-xs font-mono">
+                                1,2%
+                              </SelectItem>
+                              <SelectItem value="4.8" className="text-xs font-mono">
+                                4,8% (Padrão)
+                              </SelectItem>
+                              {![0, 1.2, 4.8].includes(irpjRate) && (
+                                <SelectItem
+                                  value="custom"
+                                  className="text-xs font-mono text-muted-foreground"
+                                >
+                                  {irpjRate}% (Outro)
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
                       {/* Dif. IR */}
@@ -3089,13 +3418,54 @@ export function QuotesManager({
                             })}
                           </span>
                         </div>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={irDiffRate}
-                          onChange={(e) => setIrDiffRate(Number(e.target.value))}
-                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
-                        />
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={irDiffRate}
+                            onChange={(e) => setIrDiffRate(Number(e.target.value))}
+                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
+                          />
+                          <Select
+                            value={
+                              [0, 0.96, 1.5, 2.0].includes(irDiffRate)
+                                ? String(irDiffRate)
+                                : 'custom'
+                            }
+                            onValueChange={(val) => {
+                              if (val !== 'custom') setIrDiffRate(Number(val))
+                            }}
+                          >
+                            <SelectTrigger
+                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                              title="Opções de Dif. IR"
+                            >
+                              <SelectValue placeholder="%" />
+                            </SelectTrigger>
+                            <SelectContent align="end">
+                              <SelectItem value="0" className="text-xs font-mono">
+                                0% (Isento)
+                              </SelectItem>
+                              <SelectItem value="0.96" className="text-xs font-mono">
+                                0,96%
+                              </SelectItem>
+                              <SelectItem value="1.5" className="text-xs font-mono">
+                                1,5% (Padrão)
+                              </SelectItem>
+                              <SelectItem value="2" className="text-xs font-mono">
+                                2,0%
+                              </SelectItem>
+                              {![0, 0.96, 1.5, 2.0].includes(irDiffRate) && (
+                                <SelectItem
+                                  value="custom"
+                                  className="text-xs font-mono text-muted-foreground"
+                                >
+                                  {irDiffRate}% (Outro)
+                                </SelectItem>
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     </div>
                   </div>
