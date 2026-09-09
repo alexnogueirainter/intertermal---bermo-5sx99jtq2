@@ -39,6 +39,10 @@ import {
   ArrowLeftRight,
   Car,
   Mail,
+  MoreVertical,
+  Eye,
+  CheckCheck,
+  XCircle,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
@@ -61,6 +65,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
 import {
@@ -94,7 +106,6 @@ export interface QuotesManagerProps {
   onOpenCatalog?: () => void
 }
 
-// QuotesManager principal
 export function QuotesManager({
   quotes,
   clients,
@@ -109,16 +120,17 @@ export function QuotesManager({
 }: QuotesManagerProps) {
   const { toast } = useToast()
 
-  // State de busca e filtros
+  // State de busca, status e ordenação
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
 
-  // Proposta em edição / ativa
+  // Controle do modal de criação / edição de proposta
+  const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [activeQuoteId, setActiveQuoteId] = useState<string | null>(null)
-  const [isEditing, setIsEditing] = useState(true)
   const [activeTabSection, setActiveTabSection] = useState('escopo')
+  const [isSaving, setIsSaving] = useState(false)
 
-  // PDF Preview Dialog (com suporte a visão interna e cliente)
+  // PDF Preview Dialog (visão cliente e interna)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [quoteForPreview, setQuoteForPreview] = useState<QuoteRecord | null>(null)
   const [previewViewMode, setPreviewViewMode] = useState<'client' | 'internal'>('client')
@@ -220,7 +232,7 @@ export function QuotesManager({
   const [technicalNotes, setTechnicalNotes] = useState('')
   const [commercialNotes, setCommercialNotes] = useState('')
 
-  // Auto-save debounce timer ref
+  // Auto-save debounce timer ref (apenas quando o modal de edição está aberto)
   const autoSaveTimerRef = useRef<any>(null)
   const isInitialMount = useRef(true)
 
@@ -436,10 +448,10 @@ export function QuotesManager({
     }
   }
 
-  // Reset Form
+  // Reset Form para Nova Proposta
   const resetForm = () => {
     setActiveQuoteId(null)
-    setIsEditing(false)
+    setActiveTabSection('escopo')
     setClientId('')
     setClientName('')
     setDealId('')
@@ -447,7 +459,7 @@ export function QuotesManager({
     setAssignedTo('Alex Nogueira')
     setApprovalToken('')
     setQuoteTitle('')
-    setQuoteNumber('')
+    setQuoteNumber(`INT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`)
     setStatus('draft')
     setEquipmentModel('')
     setEquipmentBrand('BERMO')
@@ -523,10 +535,9 @@ export function QuotesManager({
     setCommercialNotes('')
   }
 
-  // Carregar e Restaurar Proposta Selecionada
+  // Carregar Proposta Existente no Formulário
   const loadQuoteIntoForm = (quote: QuoteRecord) => {
     setActiveQuoteId(quote.id)
-    setIsEditing(true)
     setClientId(quote.client_id || '')
     setClientName(quote.client_name || '')
     setDealId(quote.deal_id || '')
@@ -628,24 +639,34 @@ export function QuotesManager({
     setCommercialNotes(quote.commercial_notes || '')
   }
 
-  // Atualizar quando selectedQuote mudar por props externas (ex: do KanBan ou navegação)
+  // Abrir editor para nova proposta
+  const handleOpenCreateModal = () => {
+    resetForm()
+    setIsEditorOpen(true)
+  }
+
+  // Abrir editor para editar proposta existente
+  const handleOpenEditModal = (quote: QuoteRecord) => {
+    loadQuoteIntoForm(quote)
+    setIsEditorOpen(true)
+  }
+
+  // Se receber selectedQuote das props externas (ex: do Kanban ou Pipeline), carrega e abre
   useEffect(() => {
     if (selectedQuote) {
       loadQuoteIntoForm(selectedQuote)
-    } else if (!activeQuoteId && quotes && quotes.length > 0) {
-      // Abre a primeira proposta automaticamente para nunca exibir formulário vazio desconectado
-      loadQuoteIntoForm(quotes[0])
+      setIsEditorOpen(true)
     }
-  }, [selectedQuote, quotes])
+  }, [selectedQuote])
 
-  // AUTO-SAVE DE 2 SEGUNDOS: debounced quando alterado em proposta existente
+  // AUTO-SAVE DE 2 SEGUNDOS: apenas se o modal estiver aberto e activeQuoteId existir
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
       return
     }
 
-    if (!activeQuoteId || !isEditing) return
+    if (!isEditorOpen || !activeQuoteId) return
 
     if (autoSaveTimerRef.current) {
       clearTimeout(autoSaveTimerRef.current)
@@ -666,8 +687,8 @@ export function QuotesManager({
       }
     }
   }, [
+    isEditorOpen,
     activeQuoteId,
-    isEditing,
     clientId,
     clientName,
     quoteTitle,
@@ -768,13 +789,13 @@ export function QuotesManager({
         return
       }
 
-      // Cálculo de distância por coordenadas geográficas
-      const lat1 = origCoords.lat
-      const lon1 = origCoords.lng ?? 0
-      const lat2 = destCoords.lat
-      const lon2 = destCoords.lng ?? 0
-
-      const straightKm = haversineDistance(lat1, lon1, lat2, lon2, 1.0)
+      const straightKm = haversineDistance(
+        origCoords.lat,
+        origCoords.lng ?? 0,
+        destCoords.lat,
+        destCoords.lng ?? 0,
+        1.0,
+      )
       const roadKm = Math.max(10, Math.round(straightKm * 1.25))
 
       setDistanceKm(roadKm)
@@ -797,12 +818,13 @@ export function QuotesManager({
         geocodeCity(destCity),
       ])
       if (origCoords && destCoords) {
-        const lat1 = origCoords.lat
-        const lon1 = origCoords.lng ?? 0
-        const lat2 = destCoords.lat
-        const lon2 = destCoords.lng ?? 0
-
-        const straightKm = haversineDistance(lat1, lon1, lat2, lon2, 1.0)
+        const straightKm = haversineDistance(
+          origCoords.lat,
+          origCoords.lng ?? 0,
+          destCoords.lat,
+          destCoords.lng ?? 0,
+          1.0,
+        )
         const roadKm = Math.max(10, Math.round(straightKm * 1.25))
 
         setDistanceKm(roadKm)
@@ -817,16 +839,16 @@ export function QuotesManager({
         })
       }
     } catch {
-      // Ignora erro de geocodificação
+      // Ignora erro
     } finally {
       setIsCalculatingRoute(false)
     }
   }
 
-  // Salvar Proposta (Manual)
+  // Salvar Proposta (Manual) dentro do editor
   const handleSaveQuote = async () => {
     const payload = getFormDataObject()
-
+    setIsSaving(true)
     try {
       if (activeQuoteId) {
         await onUpdateQuote(activeQuoteId, payload)
@@ -835,49 +857,35 @@ export function QuotesManager({
         await onCreateQuote(payload)
         toast({ title: 'Nova proposta técnica criada!' })
       }
+      setIsEditorOpen(false)
     } catch (err: any) {
       toast({
         title: 'Erro ao salvar proposta',
         description: err.message || 'Verifique os dados preenchidos.',
         variant: 'destructive',
       })
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  // Ações de Mudança de Status (Aprovar / Recusar / Reabrir)
-  const handleSetStatus = async (newStatus: QuoteStatus) => {
-    if (!activeQuoteId) {
-      setStatus(newStatus)
+  // Ações de Mudança de Status
+  const handleSetStatus = async (quoteId: string, newStatus: QuoteStatus) => {
+    try {
+      if (onUpdateQuoteStatus) {
+        await onUpdateQuoteStatus(quoteId, newStatus)
+      } else {
+        await onUpdateQuote(quoteId, { status: newStatus })
+      }
+      if (activeQuoteId === quoteId) {
+        setStatus(newStatus)
+      }
       toast({
         title:
           newStatus === 'approved'
-            ? 'Proposta marcada como aprovada'
+            ? '🎉 Proposta Aprovada! Ordem de Serviço (OS) gerada no fluxo técnico.'
             : newStatus === 'rejected'
               ? 'Proposta marcada como recusada'
-              : `Status alterado para ${newStatus}`,
-        description: 'Salve a proposta para persistir o novo status.',
-      })
-      return
-    }
-
-    try {
-      // Salva dados atuais do formulário e atualiza o status de forma consistente
-      const payload = getFormDataObject()
-      payload.status = newStatus
-
-      if (onUpdateQuoteStatus) {
-        await onUpdateQuote(activeQuoteId, payload)
-        await onUpdateQuoteStatus(activeQuoteId, newStatus)
-      } else {
-        await onUpdateQuote(activeQuoteId, payload)
-      }
-      setStatus(newStatus)
-      toast({
-        title:
-          newStatus === 'approved'
-            ? '🎉 Proposta Aprovada! OS gerada e funil atualizado.'
-            : newStatus === 'rejected'
-              ? 'Proposta Recusada'
               : `Status alterado para ${newStatus}`,
       })
     } catch (err: any) {
@@ -896,29 +904,94 @@ export function QuotesManager({
     setIsPreviewOpen(true)
   }
 
+  // Excluir proposta com confirmação
+  const handleDelete = async (quote: QuoteRecord) => {
+    if (
+      confirm(
+        `Deseja realmente excluir a proposta ${quote.quote_number || ''} do cliente ${quote.client_name || ''}?`,
+      )
+    ) {
+      try {
+        await onDeleteQuote(quote.id)
+        if (activeQuoteId === quote.id) {
+          setIsEditorOpen(false)
+          resetForm()
+        }
+        toast({ title: 'Proposta excluída com sucesso.' })
+      } catch (err: any) {
+        toast({
+          title: 'Erro ao excluir proposta',
+          description: err.message,
+          variant: 'destructive',
+        })
+      }
+    }
+  }
+
   // Filtragem de Lista de Propostas
   const filteredQuotes = quotes.filter((q) => {
+    const term = searchTerm.toLowerCase()
     const matchesSearch =
-      (q.quote_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (q.client_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (q.equipment_model || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (q.title || '').toLowerCase().includes(searchTerm.toLowerCase())
+      (q.quote_number || '').toLowerCase().includes(term) ||
+      (q.client_name || '').toLowerCase().includes(term) ||
+      (q.equipment_model || '').toLowerCase().includes(term) ||
+      (q.title || '').toLowerCase().includes(term) ||
+      (q.assigned_to || '').toLowerCase().includes(term)
 
     const matchesStatus = statusFilter === 'all' || q.status === statusFilter
     return matchesSearch && matchesStatus
   })
 
+  // Métricas para a barra superior de resumo
+  const totalValue = quotes.reduce((acc, q) => acc + (q.total || q.final_price || 0), 0)
+  const approvedQuotes = quotes.filter((q) => q.status === 'approved')
+  const approvedValue = approvedQuotes.reduce((acc, q) => acc + (q.total || q.final_price || 0), 0)
+  const pendingQuotes = quotes.filter((q) => q.status === 'sent' || q.status === 'draft')
+
+  const getStatusBadge = (st: QuoteStatus) => {
+    switch (st) {
+      case 'approved':
+        return (
+          <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 font-semibold text-[11px] gap-1">
+            <CheckCheck className="h-3 w-3" /> Aprovada
+          </Badge>
+        )
+      case 'rejected':
+        return (
+          <Badge className="bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 border-rose-300 font-semibold text-[11px] gap-1">
+            <XCircle className="h-3 w-3" /> Rejeitada
+          </Badge>
+        )
+      case 'sent':
+        return (
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-300 font-semibold text-[11px] gap-1">
+            <Send className="h-3 w-3" /> Enviada
+          </Badge>
+        )
+      default:
+        return (
+          <Badge
+            variant="outline"
+            className="text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 border-slate-300 font-semibold text-[11px] gap-1"
+          >
+            <Clock className="h-3 w-3" /> Rascunho
+          </Badge>
+        )
+    }
+  }
+
   return (
     <div className="space-y-6">
-      {/* Barra de Cabeçalho da Gestão de Propostas */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
+      {/* 1. Barra de Cabeçalho da Gestão de Propostas (Layout de Coluna Única) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Calculator className="h-6 w-6 text-teal-600" />
-            Engenharia de Propostas & Orçamentos Técnicos BERMO
+            Orçamentos de Serviços Intertermal
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Composição detalhada de custos industriais, rotas e margens de serviço
+          <p className="text-xs text-muted-foreground mt-1">
+            Gestão unificada de propostas comerciais e técnicas: visualize, edite, gere PDF e aprove
+            diretamente.
           </p>
         </div>
 
@@ -940,1428 +1013,1611 @@ export function QuotesManager({
             type="button"
             variant="default"
             size="sm"
-            onClick={() => {
-              resetForm()
-              setIsEditing(true)
-            }}
+            onClick={handleOpenCreateModal}
             className="text-xs font-bold bg-teal-700 hover:bg-teal-600 text-white shadow-xs"
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="h-4 w-4 mr-1.5" />
             Nova Proposta
           </Button>
         </div>
       </div>
 
-      {/* Grid: Lista de Propostas (Esquerda) vs Formulário de Edição (Direita) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Painel Esquerdo: Lista de Propostas Existentes */}
-        <div className="lg:col-span-4 space-y-3">
-          <Card className="border-slate-200 dark:border-slate-800">
-            <CardHeader className="p-3.5 pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <FolderOpen className="h-4 w-4 text-teal-600" />
-                  Propostas ({filteredQuotes.length})
-                </CardTitle>
-                <Badge variant="outline" className="text-[10px] font-mono">
-                  Total: {quotes.length}
-                </Badge>
-              </div>
+      {/* 2. Resumo de Métricas (Cards em linha) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="border-slate-200 dark:border-slate-800">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Total de Propostas
+              </span>
+              <FolderOpen className="h-4 w-4 text-teal-600" />
+            </div>
+            <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-slate-100">
+              {quotes.length}
+            </div>
+            <span className="text-[11px] text-muted-foreground mt-0.5 block">
+              Volume total emitido
+            </span>
+          </CardContent>
+        </Card>
 
-              {/* Filtro e Pesquisa */}
-              <div className="space-y-2 pt-2">
-                <div className="relative">
-                  <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar cliente, número, modelo..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="text-xs h-8 pl-8"
-                  />
-                </div>
+        <Card className="border-slate-200 dark:border-slate-800">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Valor em Carteira
+              </span>
+              <DollarSign className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div className="mt-2 text-2xl font-bold font-mono text-emerald-700 dark:text-emerald-400">
+              {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
+            <span className="text-[11px] text-muted-foreground mt-0.5 block">
+              Soma de todas as propostas
+            </span>
+          </CardContent>
+        </Card>
 
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="text-xs h-7">
-                    <SelectValue placeholder="Todos os Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os Status</SelectItem>
-                    <SelectItem value="draft">Rascunho</SelectItem>
-                    <SelectItem value="sent">Enviada</SelectItem>
-                    <SelectItem value="approved">Aprovada</SelectItem>
-                    <SelectItem value="rejected">Rejeitada</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardHeader>
+        <Card className="border-slate-200 dark:border-slate-800">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Aprovadas / OS
+              </span>
+              <CheckCircle className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div className="mt-2 text-2xl font-bold font-mono text-slate-900 dark:text-slate-100">
+              {approvedQuotes.length}
+              <span className="text-xs text-muted-foreground font-normal ml-1.5">
+                ({approvedValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+              </span>
+            </div>
+            <span className="text-[11px] text-emerald-600 font-semibold mt-0.5 block">
+              Convertidas para execução
+            </span>
+          </CardContent>
+        </Card>
 
-            <CardContent className="p-2 space-y-2 max-h-[750px] overflow-y-auto">
-              {filteredQuotes.length === 0 ? (
-                <div className="p-6 text-center text-xs text-muted-foreground">
-                  Nenhuma proposta encontrada.
-                </div>
-              ) : (
-                filteredQuotes.map((q) => {
-                  const isSelected = activeQuoteId === q.id
-                  return (
-                    <div
-                      key={q.id}
-                      onClick={() => loadQuoteIntoForm(q)}
-                      className={`p-3 rounded-lg border text-xs cursor-pointer transition-all ${
-                        isSelected
-                          ? 'border-teal-500 bg-teal-50/70 dark:bg-teal-950/40 shadow-xs'
-                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <span className="font-mono font-bold text-[11px] text-teal-700 dark:text-teal-400">
-                          {q.quote_number || 'INT-S/N'}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={`text-[9.5px] px-1.5 py-0 uppercase ${
-                            q.status === 'approved'
-                              ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                              : q.status === 'rejected'
-                                ? 'bg-rose-50 text-rose-700 border-rose-300'
-                                : q.status === 'sent'
-                                  ? 'bg-blue-50 text-blue-700 border-blue-300'
-                                  : 'bg-slate-100 text-slate-700 border-slate-300'
-                          }`}
-                        >
-                          {q.status === 'approved'
-                            ? 'Aprovada'
-                            : q.status === 'rejected'
-                              ? 'Rejeitada'
-                              : q.status === 'sent'
-                                ? 'Enviada'
-                                : 'Rascunho'}
-                        </Badge>
-                      </div>
+        <Card className="border-slate-200 dark:border-slate-800">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Em Negociação
+              </span>
+              <Clock className="h-4 w-4 text-amber-500" />
+            </div>
+            <div className="mt-2 text-2xl font-bold font-mono text-amber-600">
+              {pendingQuotes.length}
+            </div>
+            <span className="text-[11px] text-muted-foreground mt-0.5 block">
+              Rascunhos ou enviadas
+            </span>
+          </CardContent>
+        </Card>
+      </div>
 
-                      <div className="font-bold text-slate-900 dark:text-slate-100 line-clamp-1">
-                        {q.client_name || 'Cliente Sem Nome'}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground line-clamp-1">
-                        {q.equipment_model ? `Trocador ${q.equipment_model}` : q.title || 'Serviço'}
-                      </div>
+      {/* 3. Filtros e Pesquisa da Lista de Propostas */}
+      <Card className="border-slate-200 dark:border-slate-800">
+        <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="h-4 w-4 absolute left-3 top-2.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por cliente, número, modelo ou título..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="text-xs h-9 pl-9"
+              />
+            </div>
 
-                      <div className="flex items-center justify-between pt-2 mt-2 border-t border-slate-100 dark:border-slate-800 text-[11px]">
-                        <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                          {(q.total || q.final_price || 0).toLocaleString('pt-BR', {
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="text-xs h-9 w-44">
+                  <SelectValue placeholder="Filtrar por Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Status ({quotes.length})</SelectItem>
+                  <SelectItem value="draft">
+                    Rascunho ({quotes.filter((q) => q.status === 'draft').length})
+                  </SelectItem>
+                  <SelectItem value="sent">
+                    Enviada ({quotes.filter((q) => q.status === 'sent').length})
+                  </SelectItem>
+                  <SelectItem value="approved">
+                    Aprovada ({quotes.filter((q) => q.status === 'approved').length})
+                  </SelectItem>
+                  <SelectItem value="rejected">
+                    Rejeitada ({quotes.filter((q) => q.status === 'rejected').length})
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              {searchTerm && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSearchTerm('')}
+                  className="text-xs h-9 text-muted-foreground hover:text-slate-900"
+                >
+                  Limpar busca
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+
+        {/* 4. Tabela / Lista de Propostas em Coluna Única com Ações Diretas */}
+        <CardContent className="p-0">
+          {filteredQuotes.length === 0 ? (
+            <div className="p-12 text-center space-y-3">
+              <FolderOpen className="h-10 w-10 text-muted-foreground/50 mx-auto" />
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Nenhuma proposta encontrada
+              </p>
+              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                {searchTerm || statusFilter !== 'all'
+                  ? 'Tente ajustar os filtros ou o termo de busca.'
+                  : 'Crie sua primeira proposta técnica e comercial clicando no botão acima.'}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleOpenCreateModal}
+                className="text-xs mt-2 border-teal-300 text-teal-700 hover:bg-teal-50"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Criar Nova Proposta
+              </Button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    <th className="py-3 px-4">Proposta</th>
+                    <th className="py-3 px-4">Cliente</th>
+                    <th className="py-3 px-4">Equipamento / Modelo</th>
+                    <th className="py-3 px-4">Responsável</th>
+                    <th className="py-3 px-4 text-right">Valor Total</th>
+                    <th className="py-3 px-4 text-center">Status</th>
+                    <th className="py-3 px-4 text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredQuotes.map((quote) => {
+                    const price = quote.total || quote.final_price || 0
+                    return (
+                      <tr
+                        key={quote.id}
+                        className="hover:bg-slate-50/80 dark:hover:bg-slate-900/60 transition-colors"
+                      >
+                        {/* Identificação / Número */}
+                        <td className="py-3 px-4 font-mono font-bold text-teal-700 dark:text-teal-400 whitespace-nowrap">
+                          <div>
+                            <span className="font-semibold">{quote.quote_number || 'INT-S/N'}</span>
+                            {quote.created && (
+                              <span className="block text-[10px] text-muted-foreground font-normal font-sans">
+                                {new Date(quote.created).toLocaleDateString('pt-BR')}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Cliente & Oportunidade */}
+                        <td className="py-3 px-4 font-medium text-slate-900 dark:text-slate-100">
+                          <div
+                            className="max-w-[200px] truncate"
+                            title={quote.client_name || 'Cliente Sem Nome'}
+                          >
+                            <span className="font-semibold block">
+                              {quote.client_name || 'Cliente Sem Nome'}
+                            </span>
+                            {quote.deal_title && (
+                              <span className="text-[10px] text-teal-600 truncate block">
+                                Funil: {quote.deal_title}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Equipamento */}
+                        <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
+                          <div className="max-w-[220px] truncate">
+                            <span className="font-medium block truncate">
+                              {quote.equipment_model
+                                ? `${quote.equipment_brand || 'BERMO'} ${quote.equipment_model}`
+                                : quote.title || 'Manutenção Geral'}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground truncate block">
+                              {quote.plate_count ? `${quote.plate_count} placas` : ''}{' '}
+                              {quote.gasket_material ? `• ${quote.gasket_material}` : ''}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Responsável */}
+                        <td className="py-3 px-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                          {quote.assigned_to || 'Alex Nogueira'}
+                        </td>
+
+                        {/* Valor Total */}
+                        <td className="py-3 px-4 font-mono font-bold text-slate-900 dark:text-slate-100 text-right whitespace-nowrap">
+                          {price.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
                           })}
-                        </span>
-                        <div
-                          className="flex items-center gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-teal-600 hover:bg-teal-50"
-                            onClick={() => handleOpenPdfPreview(q, 'client')}
-                            title="Visão Cliente (PDF)"
-                          >
-                            <FileText className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-amber-600 hover:bg-amber-50"
-                            onClick={() => handleOpenPdfPreview(q, 'internal')}
-                            title="Visão Interna (Composição)"
-                          >
-                            <SlidersHorizontal className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-slate-400 hover:text-rose-600"
-                            onClick={() => {
-                              if (confirm('Deseja excluir esta proposta?')) {
-                                onDeleteQuote(q.id)
-                                if (activeQuoteId === q.id) resetForm()
-                              }
-                            }}
-                            title="Excluir Proposta"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                        </td>
 
-        {/* Painel Direito: Editor Completo de Composição da Proposta */}
-        <div className="lg:col-span-8 space-y-4">
-          <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
-            <CardHeader className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-900/50">
+                        {/* Status */}
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          {getStatusBadge(quote.status || 'draft')}
+                        </td>
+
+                        {/* Ações Diretas por Proposta */}
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1">
+                            {/* Editar */}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100"
+                              onClick={() => handleOpenEditModal(quote)}
+                              title="Editar Proposta"
+                            >
+                              <Edit className="h-3.5 w-3.5 mr-1 text-slate-600 dark:text-slate-300" />
+                              Editar
+                            </Button>
+
+                            {/* Visualizar PDF - Visão Cliente */}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2.5 text-xs text-teal-700 dark:text-teal-400 border-teal-300 hover:bg-teal-50"
+                              onClick={() => handleOpenPdfPreview(quote, 'client')}
+                              title="Visualizar Proposta em PDF (Visão Cliente)"
+                            >
+                              <FileText className="h-3.5 w-3.5 mr-1 text-teal-600" />
+                              PDF
+                            </Button>
+
+                            {/* Menu de Ações Secundárias */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                                >
+                                  <MoreVertical className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-52">
+                                <DropdownMenuLabel className="text-xs">
+                                  Opções da Proposta
+                                </DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => handleOpenEditModal(quote)}>
+                                  <Edit className="h-3.5 w-3.5 mr-2" />
+                                  Editar Parâmetros & Custos
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenPdfPreview(quote, 'client')}
+                                >
+                                  <FileText className="h-3.5 w-3.5 mr-2 text-teal-600" />
+                                  Visualizar PDF (Visão Cliente)
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleOpenPdfPreview(quote, 'internal')}
+                                >
+                                  <SlidersHorizontal className="h-3.5 w-3.5 mr-2 text-amber-600" />
+                                  Memória de Cálculo (Visão Interna)
+                                </DropdownMenuItem>
+
+                                {(quote.approval_token || quote.id) && (
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      const token = quote.approval_token || quote.id
+                                      window.open(`/proposta/${token}`, '_blank')
+                                    }}
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5 mr-2 text-blue-600" />
+                                    Abrir Link de Aceite do Cliente
+                                  </DropdownMenuItem>
+                                )}
+
+                                <DropdownMenuSeparator />
+
+                                {quote.status !== 'approved' && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleSetStatus(quote.id, 'approved')}
+                                    className="text-emerald-700 dark:text-emerald-400 font-semibold"
+                                  >
+                                    <CheckCircle className="h-3.5 w-3.5 mr-2 text-emerald-600" />
+                                    Aprovar Proposta & Gerar OS
+                                  </DropdownMenuItem>
+                                )}
+
+                                {quote.status !== 'rejected' && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleSetStatus(quote.id, 'rejected')}
+                                    className="text-rose-700 dark:text-rose-400"
+                                  >
+                                    <Ban className="h-3.5 w-3.5 mr-2 text-rose-600" />
+                                    Marcar como Rejeitada
+                                  </DropdownMenuItem>
+                                )}
+
+                                {quote.status !== 'draft' && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleSetStatus(quote.id, 'draft')}
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5 mr-2 text-slate-500" />
+                                    Voltar para Rascunho
+                                  </DropdownMenuItem>
+                                )}
+
+                                <DropdownMenuSeparator />
+
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(quote)}
+                                  className="text-rose-600 focus:text-rose-600 font-semibold"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                  Excluir Proposta
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 5. DIALOG / MODAL DE EDIÇÃO E COMPOSIÇÃO DE PROPOSTA */}
+      <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+          <DialogHeader className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 sticky top-0 z-10 backdrop-blur-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-6">
               <div>
-                <CardTitle className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  <span>
-                    {activeQuoteId
-                      ? `Editando Proposta #${quoteNumber}`
-                      : 'Nova Proposta Comercial'}
-                  </span>
-                  {activeQuoteId && (
-                    <Badge
-                      variant="outline"
-                      className="text-[10px] font-mono text-emerald-700 bg-emerald-50"
-                    >
-                      Auto-save 2s ativo
-                    </Badge>
-                  )}
-                </CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  Altere os parâmetros e o cálculo consolidará custos diretos e indiretos
-                  automaticamente.
+                <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Calculator className="h-5 w-5 text-teal-600" />
+                  {activeQuoteId
+                    ? `Editar Proposta #${quoteNumber}`
+                    : 'Nova Proposta Comercial & Técnica'}
+                </DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Composição de custos diretos, deslocamento Mapeia, hospedagem e markup industrial.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Botões Diretos de Visão Cliente vs Visão Interna */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const currentObj = getFormDataObject() as QuoteRecord
-                    handleOpenPdfPreview({ ...currentObj, id: activeQuoteId || 'draft' }, 'client')
-                  }}
-                  className="text-xs h-8 font-semibold border-teal-300 text-teal-700 hover:bg-teal-50"
-                  title="Visualizar PDF na visão do cliente"
-                >
-                  <FileText className="h-3.5 w-3.5 mr-1 text-teal-600" />
-                  Visão Cliente
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const currentObj = getFormDataObject() as QuoteRecord
-                    handleOpenPdfPreview(
-                      { ...currentObj, id: activeQuoteId || 'draft' },
-                      'internal',
-                    )
-                  }}
-                  className="text-xs h-8 font-semibold border-amber-300 text-amber-800 hover:bg-amber-50"
-                  title="Visualizar memória de cálculo e custos internos"
-                >
-                  <SlidersHorizontal className="h-3.5 w-3.5 mr-1 text-amber-600" />
-                  Visão Interna
-                </Button>
-
-                {/* Botões de Aprovação e Recusa Direta */}
-                {status !== 'approved' && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => handleSetStatus('approved')}
-                    className="text-xs h-8 font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
-                    title="Aprovar proposta comercial e gerar OS"
-                  >
-                    <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                    Aprovar
-                  </Button>
-                )}
-
-                {status !== 'rejected' && (
-                  <Button
-                    type="button"
+              {activeQuoteId && (
+                <div className="flex items-center gap-2">
+                  <Badge
                     variant="outline"
-                    size="sm"
-                    onClick={() => handleSetStatus('rejected')}
-                    className="text-xs h-8 font-semibold border-rose-300 text-rose-700 hover:bg-rose-50"
-                    title="Marcar como recusada"
+                    className="text-[10px] font-mono text-emerald-700 bg-emerald-50"
                   >
-                    <Ban className="h-3.5 w-3.5 mr-1 text-rose-600" />
-                    Recusar
-                  </Button>
-                )}
-
-                {/* Link Público para Aceite do Cliente se houver token ou proposta salva */}
-                {activeQuoteId && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      const token = approvalToken || activeQuoteId
-                      window.open(`/proposta/${token}`, '_blank')
-                    }}
-                    className="text-xs h-8 text-slate-600 hover:text-teal-700"
-                    title="Abrir página pública de aprovação do cliente"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                    Link Aceite
-                  </Button>
-                )}
-
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={handleSaveQuote}
-                  className="text-xs h-8 font-bold bg-teal-700 hover:bg-teal-600 text-white shadow-xs"
-                >
-                  <Save className="h-3.5 w-3.5 mr-1" />
-                  Salvar
-                </Button>
-              </div>
-            </CardHeader>
-
-            <CardContent className="p-4 space-y-5">
-              {/* Resumo Financeiro no Topo do Editor */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
-                <div className="space-y-0.5">
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                    Custos Diretos Totais
-                  </span>
-                  <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">
-                    {directCostsTotal.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </div>
-                  <span className="text-[9.5px] text-muted-foreground block">
-                    Mão Obra + Desloc. + Hotel + Peças
-                  </span>
+                    Auto-save 2s ativo
+                  </Badge>
+                  {getStatusBadge(status)}
                 </div>
+              )}
+            </div>
+          </DialogHeader>
 
-                <div className="space-y-0.5">
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                    Logística & Rotas
-                  </span>
-                  <div className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-sm">
-                    {travelTotalCost.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </div>
-                  <span className="text-[9.5px] text-muted-foreground block">
-                    Combustível + Pedágios
-                  </span>
+          <div className="p-4 sm:p-6 space-y-5">
+            {/* Resumo Financeiro Consolidado */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                  Custos Diretos Totais
+                </span>
+                <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">
+                  {directCostsTotal.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
                 </div>
-
-                <div className="space-y-0.5">
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold">
-                    Margem / Markup
-                  </span>
-                  <div className="font-mono font-bold text-blue-700 dark:text-blue-400 text-sm">
-                    {serviceMargin}% Margem ({adminRate}% Adm)
-                  </div>
-                  <span className="text-[9.5px] text-muted-foreground block">
-                    Divisor: {(divisor * 100).toFixed(1)}%
-                  </span>
-                </div>
-
-                <div className="space-y-0.5 bg-teal-50 dark:bg-teal-950/60 p-2 rounded-lg border border-teal-200 dark:border-teal-800">
-                  <span className="text-[10px] text-teal-800 dark:text-teal-300 uppercase font-bold">
-                    Preço Final de Venda
-                  </span>
-                  <div className="font-mono font-extrabold text-teal-800 dark:text-teal-300 text-base">
-                    {calculatedSalePrice.toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL',
-                    })}
-                  </div>
-                  <span className="text-[9.5px] text-teal-700 dark:text-teal-400 block font-semibold">
-                    Valor total homologado
-                  </span>
-                </div>
+                <span className="text-[9.5px] text-muted-foreground block">
+                  Mão Obra + Desloc. + Hotel + Peças
+                </span>
               </div>
 
-              {/* Seções por Abas */}
-              <Tabs value={activeTabSection} onValueChange={setActiveTabSection} className="w-full">
-                <TabsList className="grid grid-cols-5 w-full h-9">
-                  <TabsTrigger value="escopo" className="text-xs">
-                    1. Escopo & CRM
-                  </TabsTrigger>
-                  <TabsTrigger value="labor" className="text-xs">
-                    2. Mão de Obra
-                  </TabsTrigger>
-                  <TabsTrigger value="travel" className="text-xs">
-                    3. Deslocamento
-                  </TabsTrigger>
-                  <TabsTrigger value="lodging" className="text-xs">
-                    4. Hospedagem & Alimentação
-                  </TabsTrigger>
-                  <TabsTrigger value="pricing" className="text-xs">
-                    5. Margens & Fechamento
-                  </TabsTrigger>
-                </TabsList>
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                  Logística & Rotas
+                </span>
+                <div className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-sm">
+                  {travelTotalCost.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+                </div>
+                <span className="text-[9.5px] text-muted-foreground block">
+                  Combustível + Pedágios
+                </span>
+              </div>
 
-                {/* ABA 1: Cliente & Escopo */}
-                <TabsContent value="escopo" className="space-y-4 pt-3">
+              <div className="space-y-0.5">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold">
+                  Margem / Markup
+                </span>
+                <div className="font-mono font-bold text-blue-700 dark:text-blue-400 text-sm">
+                  {serviceMargin}% Margem ({adminRate}% Adm)
+                </div>
+                <span className="text-[9.5px] text-muted-foreground block">
+                  Divisor: {(divisor * 100).toFixed(1)}%
+                </span>
+              </div>
+
+              <div className="space-y-0.5 bg-teal-50 dark:bg-teal-950/60 p-2 rounded-lg border border-teal-200 dark:border-teal-800">
+                <span className="text-[10px] text-teal-800 dark:text-teal-300 uppercase font-bold">
+                  Preço Final de Venda
+                </span>
+                <div className="font-mono font-extrabold text-teal-800 dark:text-teal-300 text-base">
+                  {calculatedSalePrice.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+                </div>
+                <span className="text-[9.5px] text-teal-700 dark:text-teal-400 block font-semibold">
+                  Valor total consolidado
+                </span>
+              </div>
+            </div>
+
+            {/* Abas do Editor */}
+            <Tabs value={activeTabSection} onValueChange={setActiveTabSection} className="w-full">
+              <TabsList className="grid grid-cols-5 w-full h-9">
+                <TabsTrigger value="escopo" className="text-xs">
+                  1. Escopo & CRM
+                </TabsTrigger>
+                <TabsTrigger value="labor" className="text-xs">
+                  2. Mão de Obra
+                </TabsTrigger>
+                <TabsTrigger value="travel" className="text-xs">
+                  3. Deslocamento
+                </TabsTrigger>
+                <TabsTrigger value="lodging" className="text-xs">
+                  4. Hospedagem & Alimentação
+                </TabsTrigger>
+                <TabsTrigger value="pricing" className="text-xs">
+                  5. Margens & Fechamento
+                </TabsTrigger>
+              </TabsList>
+
+              {/* ABA 1: Cliente & Escopo */}
+              <TabsContent value="escopo" className="space-y-4 pt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Cliente</Label>
+                    <Select
+                      value={clientId}
+                      onValueChange={(val) => {
+                        setClientId(val)
+                        const found = clients.find((c) => c.id === val)
+                        if (found) {
+                          setClientName(found.name || found.company_name || '')
+                          if (found.address) setDestinationAddress(found.address)
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="text-xs h-8">
+                        <SelectValue placeholder="Selecione o cliente..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {clients.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name || c.company_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Título da Proposta</Label>
+                    <Input
+                      value={quoteTitle}
+                      onChange={(e) => setQuoteTitle(e.target.value)}
+                      placeholder="Ex: Manutenção Preventiva Trocador BP30"
+                      className="text-xs h-8"
+                    />
+                  </div>
+                </div>
+
+                {/* Vínculo com Oportunidade do Pipeline Comercial & Responsável */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5 text-teal-600" />
+                      Vínculo Oportunidade (CRM)
+                    </Label>
+                    <Select
+                      value={dealId || 'none'}
+                      onValueChange={(val) => {
+                        if (val === 'none') {
+                          setDealId('')
+                          return
+                        }
+                        setDealId(val)
+                        const found = deals.find((d) => d.id === val)
+                        if (found) {
+                          setDealTitle(found.title)
+                          if (!clientId && found.client_id) {
+                            setClientId(found.client_id)
+                            setClientName(found.client_name || '')
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="text-xs h-8">
+                        <SelectValue placeholder="Selecione a oportunidade..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum negócio vinculado</SelectItem>
+                        {deals.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.title} ({d.client_name || 'Sem cliente'} -{' '}
+                            {(d.value || 0).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                            )
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Título Oportunidade / Negócio (Livre)
+                    </Label>
+                    <Input
+                      value={dealTitle}
+                      onChange={(e) => setDealTitle(e.target.value)}
+                      placeholder="Ex: Reforma Trocador Placas Linha 2"
+                      className="text-xs h-8"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Responsável Técnico
+                    </Label>
+                    <Input
+                      value={assignedTo}
+                      onChange={(e) => setAssignedTo(e.target.value)}
+                      placeholder="Ex: Alex Nogueira"
+                      className="text-xs h-8"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Modelo do Equipamento</Label>
+                    <Input
+                      value={equipmentModel}
+                      onChange={(e) => setEquipmentModel(e.target.value)}
+                      placeholder="Ex: BP30 / TL10-BFG"
+                      className="text-xs h-8 font-semibold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Marca</Label>
+                    <Input
+                      value={equipmentBrand}
+                      onChange={(e) => setEquipmentBrand(e.target.value)}
+                      placeholder="Ex: BERMO / Alfa Laval"
+                      className="text-xs h-8"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Quantidade de Equipamentos</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={equipmentQuantity}
+                      onChange={(e) => setEquipmentQuantity(Math.max(1, Number(e.target.value)))}
+                      className="text-xs h-8 font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Especificações Técnicas de Placas / Gaxetas */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Qtd. de Placas</Label>
+                    <Input
+                      type="number"
+                      value={plateCount}
+                      onChange={(e) => setPlateCount(Number(e.target.value))}
+                      className="text-xs h-7 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Material da Placa</Label>
+                    <Input
+                      value={plateMaterial}
+                      onChange={(e) => setPlateMaterial(e.target.value)}
+                      placeholder="AISI 316L"
+                      className="text-xs h-7"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Espessura (mm)</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      value={plateThickness}
+                      onChange={(e) => setPlateThickness(Number(e.target.value))}
+                      className="text-xs h-7 font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] text-muted-foreground">Gaxeta</Label>
+                    <Input
+                      value={gasketMaterial}
+                      onChange={(e) => setGasketMaterial(e.target.value)}
+                      placeholder="EPDM Clip-on"
+                      className="text-xs h-7"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold">Escopo Detalhado do Fornecimento</Label>
+                  <Textarea
+                    rows={3}
+                    value={scopeOfWork}
+                    onChange={(e) => setScopeOfWork(e.target.value)}
+                    className="text-xs leading-relaxed"
+                  />
+                </div>
+
+                {/* Mensagem ao Cliente e Observações Técnicas */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">
+                      Mensagem ao Cliente (Aparece na Proposta / PDF)
+                    </Label>
+                    <Textarea
+                      rows={2}
+                      value={commercialNotes}
+                      onChange={(e) => setCommercialNotes(e.target.value)}
+                      placeholder="Ex: Prezado cliente, apresentamos nossa proposta técnica e comercial..."
+                      className="text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">
+                      Observações Técnicas / Restrições de Campo
+                    </Label>
+                    <Textarea
+                      rows={2}
+                      value={technicalNotes}
+                      onChange={(e) => setTechnicalNotes(e.target.value)}
+                      placeholder="Ex: Ponto de água e energia 220V fornecidos pelo contratante..."
+                      className="text-xs"
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* ABA 2: Mão de Obra */}
+              <TabsContent value="labor" className="space-y-4 pt-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      Técnico Mecânico
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={techCount}
+                          onChange={(e) => setTechCount(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={techHours}
+                          onChange={(e) => setTechHours(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={techRate}
+                          onChange={(e) => setTechRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                      Subtotal:{' '}
+                      {techTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      Ajudante / Auxiliar
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={helperCount}
+                          onChange={(e) => setHelperCount(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={helperHours}
+                          onChange={(e) => setHelperHours(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={helperRate}
+                          onChange={(e) => setHelperRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                      Subtotal:{' '}
+                      {helperTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      Inspetor END / Qualidade
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={inspectorCount}
+                          onChange={(e) => setInspectorCount(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={inspectorHours}
+                          onChange={(e) => setInspectorHours(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={inspectorRate}
+                          onChange={(e) => setInspectorRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                      Subtotal:{' '}
+                      {inspectorTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Linha 2 de Funções */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      Soldador Especializado (TIG / Eletrodo)
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={welderCount}
+                          onChange={(e) => setWelderCount(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={welderHours}
+                          onChange={(e) => setWelderHours(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={welderRate}
+                          onChange={(e) => setWelderRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                      Subtotal:{' '}
+                      {welderTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      Encanador Industrial / Tubulações
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={plumberCount}
+                          onChange={(e) => setPlumberCount(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={plumberHours}
+                          onChange={(e) => setPlumberHours(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={plumberRate}
+                          onChange={(e) => setPlumberRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                      Subtotal:{' '}
+                      {plumberTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
+                      Encarregado de Equipe / Supervisão
+                    </span>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Qtd</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={foremanCount}
+                          onChange={(e) => setForemanCount(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">Horas</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={foremanHours}
+                          onChange={(e) => setForemanHours(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                      <div className="space-y-0.5">
+                        <Label className="text-[10px] text-muted-foreground">R$/h</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={foremanRate}
+                          onChange={(e) => setForemanRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                      Subtotal:{' '}
+                      {foremanTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-teal-50 dark:bg-teal-950/40 rounded-lg border border-teal-200 dark:border-teal-800">
+                  <span className="text-xs font-bold text-teal-900 dark:text-teal-200">
+                    Total da Mão de Obra ({totalLaborHours} horas homem)
+                  </span>
+                  <span className="font-mono font-bold text-sm text-teal-900 dark:text-teal-200">
+                    {totalLaborCost.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </span>
+                </div>
+              </TabsContent>
+
+              {/* ABA 3: Deslocamento & Rotas */}
+              <TabsContent value="travel" className="space-y-4 pt-3">
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4 text-emerald-600" />
+                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                        Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                        <ArrowLeftRight
+                          className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
+                        />
+                        <Label
+                          htmlFor="toggle-round-trip-modal"
+                          className="text-xs font-semibold cursor-pointer select-none"
+                        >
+                          {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
+                        </Label>
+                        <Switch
+                          id="toggle-round-trip-modal"
+                          checked={isRoundTrip}
+                          onCheckedChange={setIsRoundTrip}
+                        />
+                      </div>
+
+                      <span className="text-xs font-bold text-emerald-600 font-mono">
+                        Subtotal:{' '}
+                        {travelTotalCost.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* CEPs */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Cliente</Label>
-                      <Select
-                        value={clientId}
-                        onValueChange={(val) => {
-                          setClientId(val)
-                          const found = clients.find((c) => c.id === val)
-                          if (found) {
-                            setClientName(found.name || found.company_name || '')
-                            if (found.address) setDestinationAddress(found.address)
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="Selecione o cliente..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name || c.company_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Título da Proposta</Label>
-                      <Input
-                        value={quoteTitle}
-                        onChange={(e) => setQuoteTitle(e.target.value)}
-                        placeholder="Ex: Manutenção Preventiva Trocador BP30"
-                        className="text-xs h-8"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Vínculo com Oportunidade do Pipeline Comercial & Responsável */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                        <TrendingUp className="h-3.5 w-3.5 text-teal-600" />
-                        Vínculo Oportunidade (CRM)
+                      <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                        Origem (CEP e Endereço da Base)
                       </Label>
-                      <Select
-                        value={dealId || 'none'}
-                        onValueChange={(val) => {
-                          if (val === 'none') {
-                            setDealId('')
-                            return
-                          }
-                          setDealId(val)
-                          const found = deals.find((d) => d.id === val)
-                          if (found) {
-                            setDealTitle(found.title)
-                            if (!clientId && found.client_id) {
-                              setClientId(found.client_id)
-                              setClientName(found.client_name || '')
+                      <div className="flex gap-2">
+                        <Input
+                          value={originCep}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setOriginCep(val)
+                            const clean = val.replace(/\D/g, '')
+                            if (clean.length === 8) {
+                              handleRecalculateRouteByCep(destinationCep, val)
                             }
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="Selecione a oportunidade..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Nenhum negócio vinculado</SelectItem>
-                          {deals.map((d) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              {d.title} ({d.client_name || 'Sem cliente'} -{' '}
-                              {(d.value || 0).toLocaleString('pt-BR', {
-                                style: 'currency',
-                                currency: 'BRL',
-                              })}
-                              )
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                          }}
+                          placeholder="89066-000"
+                          className="text-xs h-8 w-32 font-mono font-bold"
+                        />
+                        <Input
+                          value={originAddress}
+                          onChange={(e) => setOriginAddress(e.target.value)}
+                          placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
+                          className="text-xs h-8 flex-1"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Título Oportunidade / Negócio (Livre)
+                      <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
+                        Destino da Fábrica / Cliente (CEP e Cidade)
                       </Label>
-                      <Input
-                        value={dealTitle}
-                        onChange={(e) => setDealTitle(e.target.value)}
-                        placeholder="Ex: Reforma Trocador Placas Linha 2"
-                        className="text-xs h-8"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Responsável Técnico
-                      </Label>
-                      <Input
-                        value={assignedTo}
-                        onChange={(e) => setAssignedTo(e.target.value)}
-                        placeholder="Ex: Alex Nogueira"
-                        className="text-xs h-8"
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          value={destinationCep}
+                          onChange={(e) => {
+                            const val = e.target.value
+                            setDestinationCep(val)
+                            const clean = val.replace(/\D/g, '')
+                            if (clean.length === 8) {
+                              handleRecalculateRouteByCep(val, originCep)
+                            }
+                          }}
+                          placeholder="Ex: 89801-000"
+                          className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
+                        />
+                        <Input
+                          value={destinationAddress}
+                          onChange={(e) => setDestinationAddress(e.target.value)}
+                          placeholder="Cidade/UF do Cliente"
+                          className="text-xs h-8 flex-1"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Parâmetros do percurso */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
                     <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Modelo do Equipamento</Label>
-                      <Input
-                        value={equipmentModel}
-                        onChange={(e) => setEquipmentModel(e.target.value)}
-                        placeholder="Ex: BP30 / TL10-BFG"
-                        className="text-xs h-8 font-semibold"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Marca</Label>
-                      <Input
-                        value={equipmentBrand}
-                        onChange={(e) => setEquipmentBrand(e.target.value)}
-                        placeholder="Ex: BERMO / Alfa Laval"
-                        className="text-xs h-8"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Quantidade de Equipamentos</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] text-muted-foreground">
+                          Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
+                        </Label>
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] px-1 py-0 ${
+                            isRoundTrip
+                              ? 'text-emerald-700 bg-emerald-50'
+                              : 'text-slate-600 bg-slate-50'
+                          }`}
+                        >
+                          {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
+                        </Badge>
+                      </div>
                       <Input
                         type="number"
-                        min="1"
-                        value={equipmentQuantity}
-                        onChange={(e) => setEquipmentQuantity(Math.max(1, Number(e.target.value)))}
+                        value={distanceKm}
+                        onChange={(e) => setDistanceKm(Number(e.target.value))}
+                        className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">
+                        Consumo Veículo (km/L)
+                      </Label>
+                      <Input
+                        type="number"
+                        value={consumptionKmL}
+                        onChange={(e) => setConsumptionKmL(Number(e.target.value))}
+                        className="text-xs h-8"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">
+                        Preço Litro Combustível (R$)
+                      </Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={fuelPrice}
+                        onChange={(e) => setFuelPrice(Number(e.target.value))}
+                        className="text-xs h-8"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-muted-foreground">
+                        % Rodovias c/ Pedágio
+                      </Label>
+                      <Input
+                        type="number"
+                        value={tollRoadPercent}
+                        onChange={(e) => setTollRoadPercent(Number(e.target.value))}
+                        className="text-xs h-8"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ajustes Manuais */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                        Ajuste Manual Combustível (+/- R$)
+                      </Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={manualFuelAdj}
+                        onChange={(e) => setManualFuelAdj(Number(e.target.value))}
+                        placeholder="0.00"
+                        className="text-xs h-8 font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] text-slate-600 dark:text-slate-400">
+                        Ajuste Manual Pedágio (+/- R$)
+                      </Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={manualTollAdj}
+                        onChange={(e) => setManualTollAdj(Number(e.target.value))}
+                        placeholder="0.00"
                         className="text-xs h-8 font-mono"
                       />
                     </div>
                   </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">
-                      Escopo Detalhado do Fornecimento
-                    </Label>
-                    <Textarea
-                      rows={3}
-                      value={scopeOfWork}
-                      onChange={(e) => setScopeOfWork(e.target.value)}
-                      className="text-xs leading-relaxed"
-                    />
-                  </div>
-
-                  {/* Mensagem ao Cliente e Observações Técnicas */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">
-                        Mensagem ao Cliente (Aparece na Proposta / PDF)
-                      </Label>
-                      <Textarea
-                        rows={2}
-                        value={commercialNotes}
-                        onChange={(e) => setCommercialNotes(e.target.value)}
-                        placeholder="Ex: Prezado cliente, apresentamos nossa proposta técnica e comercial..."
-                        className="text-xs"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">
-                        Observações Técnicas / Restrições de Campo
-                      </Label>
-                      <Textarea
-                        rows={2}
-                        value={technicalNotes}
-                        onChange={(e) => setTechnicalNotes(e.target.value)}
-                        placeholder="Ex: Ponto de água e energia 220V fornecidos pelo contratante..."
-                        className="text-xs"
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* ABA 2: Mão de Obra */}
-                <TabsContent value="labor" className="space-y-4 pt-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Técnico Mecânico
-                      </span>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={techCount}
-                            onChange={(e) => setTechCount(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={techHours}
-                            onChange={(e) => setTechHours(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={techRate}
-                            onChange={(e) => setTechRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                        Subtotal:{' '}
-                        {techTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Ajudante / Auxiliar
-                      </span>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={helperCount}
-                            onChange={(e) => setHelperCount(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={helperHours}
-                            onChange={(e) => setHelperHours(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={helperRate}
-                            onChange={(e) => setHelperRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                        Subtotal:{' '}
-                        {helperTotal.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Inspetor END / Qualidade
-                      </span>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={inspectorCount}
-                            onChange={(e) => setInspectorCount(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={inspectorHours}
-                            onChange={(e) => setInspectorHours(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={inspectorRate}
-                            onChange={(e) => setInspectorRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                        Subtotal:{' '}
-                        {inspectorTotal.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Segunda Linha de Funções: Soldador, Encanador e Encarregado */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Soldador Especializado (TIG / Eletrodo)
-                      </span>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={welderCount}
-                            onChange={(e) => setWelderCount(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={welderHours}
-                            onChange={(e) => setWelderHours(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={welderRate}
-                            onChange={(e) => setWelderRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                        Subtotal:{' '}
-                        {welderTotal.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Encanador Industrial / Tubulações
-                      </span>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={plumberCount}
-                            onChange={(e) => setPlumberCount(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={plumberHours}
-                            onChange={(e) => setPlumberHours(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={plumberRate}
-                            onChange={(e) => setPlumberRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                        Subtotal:{' '}
-                        {plumberTotal.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                      <span className="text-xs font-bold text-slate-800 dark:text-slate-200 block">
-                        Encarregado de Equipe / Supervisão
-                      </span>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Qtd</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={foremanCount}
-                            onChange={(e) => setForemanCount(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">Horas</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={foremanHours}
-                            onChange={(e) => setForemanHours(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          <Label className="text-[10px] text-muted-foreground">R$/h</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={foremanRate}
-                            onChange={(e) => setForemanRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono"
-                          />
-                        </div>
-                      </div>
-                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                        Subtotal:{' '}
-                        {foremanTotal.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-teal-50 dark:bg-teal-950/40 rounded-lg border border-teal-200 dark:border-teal-800">
-                    <span className="text-xs font-bold text-teal-900 dark:text-teal-200">
-                      Total da Mão de Obra ({totalLaborHours} horas homem)
-                    </span>
-                    <span className="font-mono font-bold text-sm text-teal-900 dark:text-teal-200">
-                      {totalLaborCost.toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      })}
-                    </span>
-                  </div>
-                </TabsContent>
-
-                {/* ABA 3: Deslocamento & Rotas */}
-                <TabsContent value="travel" className="space-y-4 pt-3">
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <Truck className="h-4 w-4 text-emerald-600" />
-                        <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                          3c. Deslocamento & Rotas (Ref. Mapeia / ViaCEP / Haversine)
-                        </span>
-                      </div>
-
-                      {/* TOGGLE VISUAL IDA E VOLTA (x2) COM ÍCONE ArrowLeftRight E SWITCH */}
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 bg-white dark:bg-slate-950 px-3 py-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                          <ArrowLeftRight
-                            className={`h-3.5 w-3.5 ${isRoundTrip ? 'text-emerald-600' : 'text-slate-400'}`}
-                          />
-                          <Label
-                            htmlFor="toggle-round-trip"
-                            className="text-xs font-semibold cursor-pointer select-none"
-                          >
-                            {isRoundTrip ? 'Ida e Volta (×2)' : 'Apenas Ida (×1)'}
-                          </Label>
-                          <Switch
-                            id="toggle-round-trip"
-                            checked={isRoundTrip}
-                            onCheckedChange={setIsRoundTrip}
-                          />
-                        </div>
-
-                        <span className="text-xs font-bold text-emerald-600 font-mono">
-                          Subtotal:{' '}
-                          {travelTotalCost.toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* CEPS COM DISPARO AUTOMÁTICO AOS 8 DÍGITOS */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Origem (CEP e Endereço da Base)
+                  {/* Aluguel de Carro */}
+                  <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Car className="h-4 w-4 text-emerald-600" />
+                        <Label className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                          Aluguel de Veículo / Carro
                         </Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={originCep}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setOriginCep(val)
-                              const clean = val.replace(/\D/g, '')
-                              if (clean.length === 8) {
-                                handleRecalculateRouteByCep(destinationCep, val)
-                              }
-                            }}
-                            placeholder="89066-000"
-                            className="text-xs h-8 w-32 font-mono font-bold"
-                          />
-                          <Input
-                            value={originAddress}
-                            onChange={(e) => setOriginAddress(e.target.value)}
-                            placeholder="Rua Bernardo Reiter, 500 - Blumenau/SC"
-                            className="text-xs h-8 flex-1"
-                          />
-                        </div>
                       </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-700 dark:text-slate-300">
-                          Destino da Fábrica / Cliente (CEP e Cidade)
-                        </Label>
-                        <div className="flex gap-2">
-                          <Input
-                            value={destinationCep}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setDestinationCep(val)
-                              const clean = val.replace(/\D/g, '')
-                              if (clean.length === 8) {
-                                handleRecalculateRouteByCep(val, originCep)
-                              }
-                            }}
-                            placeholder="Ex: 89801-000"
-                            className="text-xs h-8 w-32 font-mono font-bold text-teal-700 dark:text-teal-300"
-                          />
-                          <Input
-                            value={destinationAddress}
-                            onChange={(e) => setDestinationAddress(e.target.value)}
-                            placeholder="Cidade/UF do Cliente"
-                            className="text-xs h-8 flex-1"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* PARÂMETROS DO MAPEIA / LOGÍSTICA */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[10px] text-muted-foreground">
-                            Distância ({isRoundTrip ? 'Ida + Volta km' : 'Apenas Ida km'})
-                          </Label>
-                          <Badge
-                            variant="outline"
-                            className={`text-[9px] px-1 py-0 ${
-                              isRoundTrip
-                                ? 'text-emerald-700 bg-emerald-50'
-                                : 'text-slate-600 bg-slate-50'
-                            }`}
-                          >
-                            {isRoundTrip ? '×2 Ida/Volta' : '×1 Só Ida'}
-                          </Badge>
-                        </div>
-                        <Input
-                          type="number"
-                          value={distanceKm}
-                          onChange={(e) => setDistanceKm(Number(e.target.value))}
-                          className="text-xs h-8 font-bold font-mono text-emerald-800 dark:text-emerald-300"
-                        />
-                        <span className="text-[9px] text-muted-foreground block">
-                          {isRoundTrip
-                            ? `(Ida: ~${Math.round(distanceKm / 2)} km | Volta: ~${Math.round(distanceKm / 2)} km)`
-                            : `(Percurso unidirecional: ${distanceKm} km)`}
-                        </span>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">
-                          Consumo Veículo (km/L)
-                        </Label>
-                        <Input
-                          type="number"
-                          value={consumptionKmL}
-                          onChange={(e) => setConsumptionKmL(Number(e.target.value))}
-                          className="text-xs h-8"
-                        />
-                        <span className="text-[9px] text-muted-foreground block">
-                          Litros: ~{(distanceKm / (consumptionKmL || 9.5)).toFixed(1)} L (
-                          {isRoundTrip ? 'ida+volta' : 'só ida'})
-                        </span>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">
-                          Preço Litro Combustível (R$)
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={fuelPrice}
-                          onChange={(e) => setFuelPrice(Number(e.target.value))}
-                          className="text-xs h-8"
-                        />
-                        <span className="text-[9px] text-muted-foreground block">
-                          Combustível:{' '}
-                          {baseFuelCost.toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </span>
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label className="text-[10px] text-muted-foreground">
-                          % Rodovias c/ Pedágio
-                        </Label>
-                        <Input
-                          type="number"
-                          value={tollRoadPercent}
-                          onChange={(e) => setTollRoadPercent(Number(e.target.value))}
-                          className="text-xs h-8"
-                        />
-                        <span className="text-[9px] text-muted-foreground block">
-                          Pedágios ({estimatedTolls} praças):{' '}
-                          {baseTollCost.toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Ajustes Manuais */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                      <div className="space-y-1">
-                        <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                          Ajuste Manual Combustível (+/- R$)
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={manualFuelAdj}
-                          onChange={(e) => setManualFuelAdj(Number(e.target.value))}
-                          placeholder="0.00"
-                          className="text-xs h-8 font-mono"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] text-slate-600 dark:text-slate-400">
-                          Ajuste Manual Pedágio (+/- R$)
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={manualTollAdj}
-                          onChange={(e) => setManualTollAdj(Number(e.target.value))}
-                          placeholder="0.00"
-                          className="text-xs h-8 font-mono"
-                        />
-                      </div>
-                    </div>
-
-                    {/* CAMPO DE ALUGUEL DE CARRO */}
-                    <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <Car className="h-4 w-4 text-emerald-600" />
-                          <Label className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                            Aluguel de Veículo / Carro
-                          </Label>
-                        </div>
-                        {carRentalType !== 'none' && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] font-mono border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40"
-                          >
-                            Subtotal Carro:{' '}
-                            {carRentalSubtotal.toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </Badge>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-[10px] text-muted-foreground font-medium">
-                            Categoria do Veículo
-                          </Label>
-                          <Select value={carRentalType} onValueChange={setCarRentalType}>
-                            <SelectTrigger className="text-xs h-8">
-                              <SelectValue placeholder="Selecione..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Sem aluguel</SelectItem>
-                              <SelectItem value="simple">Carro Simples (R$ 230,00/dia)</SelectItem>
-                              <SelectItem value="complete">
-                                Carro Completo (R$ 350,00/dia)
-                              </SelectItem>
-                              <SelectItem value="custom">Personalizado</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {carRentalType !== 'none' && (
-                          <>
-                            <div className="space-y-1">
-                              <Label className="text-[10px] text-muted-foreground font-medium">
-                                Valor Diária (R$) {carRentalType !== 'custom' && '(Editável)'}
-                              </Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={carRentalDailyRate}
-                                onChange={(e) => setCarRentalDailyRate(Number(e.target.value))}
-                                className="text-xs h-8 font-mono font-semibold"
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <Label className="text-[10px] text-muted-foreground font-medium">
-                                Quantidade de Dias
-                              </Label>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={carRentalDays}
-                                onChange={(e) =>
-                                  setCarRentalDays(Math.max(1, Number(e.target.value)))
-                                }
-                                className="text-xs h-8 font-mono font-semibold"
-                              />
-                            </div>
-                          </>
-                        )}
-                      </div>
-
                       {carRentalType !== 'none' && (
-                        <div className="text-[10.5px] text-slate-500 flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
-                          <span>
-                            Cálculo: {carRentalDays} diária(s) ×{' '}
-                            {carRentalDailyRate.toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </span>
-                          <span className="font-bold text-slate-900 dark:text-slate-100 font-mono">
-                            ={' '}
-                            {carRentalSubtotal.toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </span>
-                        </div>
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-mono border-emerald-300 text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40"
+                        >
+                          Subtotal Carro:{' '}
+                          {carRentalSubtotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </Badge>
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between pt-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-muted-foreground">
-                          * Digite as cidades (ou CEPs) para rota automática via Nominatim/Mapeia.
-                        </span>
-                        {isCalculatingRoute && (
-                          <Badge
-                            variant="outline"
-                            className="text-[9px] px-1.5 py-0 text-teal-700 bg-teal-50 border-teal-300 flex items-center gap-1 animate-pulse"
-                          >
-                            <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                            Automático
-                          </Badge>
-                        )}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={isCalculatingRoute}
-                        onClick={() => {
-                          const orig = originAddress.trim()
-                          const dest = destinationAddress.trim()
-                          if (orig.length >= 3 && dest.length >= 3) {
-                            handleRecalculateRouteByCities(orig, dest)
-                          } else {
-                            handleRecalculateRouteByCep()
-                          }
-                        }}
-                        className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                      >
-                        {isCalculatingRoute ? (
-                          <>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Calculando Rota...
-                          </>
-                        ) : (
-                          'Recalcular Rota Mapeia'
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* ABA 4: Hospedagem & Alimentação */}
-                <TabsContent value="lodging" className="space-y-4 pt-3">
-                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                        Composição de Hospedagem & Alimentação em Campo
-                      </span>
-                      <span className="text-xs font-bold text-emerald-600 font-mono">
-                        Subtotal:{' '}
-                        {lodgingMealsTotalCost.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Diárias de Hotel */}
-                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                        <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                          Diárias de Hotel
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] text-muted-foreground font-medium">
+                          Categoria do Veículo
                         </Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-0.5">
-                            <Label className="text-[10px] text-muted-foreground">
-                              Quantidade de Diárias
-                            </Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={hotelDays}
-                              onChange={(e) => setHotelDays(Number(e.target.value))}
-                              className="text-xs h-8 font-mono"
-                            />
-                          </div>
-                          <div className="space-y-0.5">
-                            <Label className="text-[10px] text-muted-foreground">
+                        <Select value={carRentalType} onValueChange={setCarRentalType}>
+                          <SelectTrigger className="text-xs h-8">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sem aluguel</SelectItem>
+                            <SelectItem value="simple">Carro Simples (R$ 230,00/dia)</SelectItem>
+                            <SelectItem value="complete">Carro Completo (R$ 350,00/dia)</SelectItem>
+                            <SelectItem value="custom">Personalizado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {carRentalType !== 'none' && (
+                        <>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground font-medium">
                               Valor Diária (R$)
                             </Label>
                             <Input
                               type="number"
                               min="0"
-                              value={hotelRate}
-                              onChange={(e) => setHotelRate(Number(e.target.value))}
-                              className="text-xs h-8 font-mono"
+                              step="0.01"
+                              value={carRentalDailyRate}
+                              onChange={(e) => setCarRentalDailyRate(Number(e.target.value))}
+                              className="text-xs h-8 font-mono font-semibold"
                             />
                           </div>
-                        </div>
-                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                          Subtotal Hotel:{' '}
-                          {hotelTotal.toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </div>
-                      </div>
 
-                      {/* Refeições */}
-                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                        <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                          Refeições / Alimentação Diária
-                        </Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-0.5">
-                            <Label className="text-[10px] text-muted-foreground">
-                              Quantidade de Refeições
+                          <div className="space-y-1">
+                            <Label className="text-[10px] text-muted-foreground font-medium">
+                              Quantidade de Dias
                             </Label>
                             <Input
                               type="number"
-                              min="0"
-                              value={mealsDays}
-                              onChange={(e) => setMealsDays(Number(e.target.value))}
-                              className="text-xs h-8 font-mono"
+                              min="1"
+                              value={carRentalDays}
+                              onChange={(e) =>
+                                setCarRentalDays(Math.max(1, Number(e.target.value)))
+                              }
+                              className="text-xs h-8 font-mono font-semibold"
                             />
                           </div>
-                          <div className="space-y-0.5">
-                            <Label className="text-[10px] text-muted-foreground">
-                              Valor Refeição (R$)
-                            </Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={mealsRate}
-                              onChange={(e) => setMealsRate(Number(e.target.value))}
-                              className="text-xs h-8 font-mono"
-                            />
-                          </div>
-                        </div>
-                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                          Subtotal Refeições:{' '}
-                          {mealsTotal.toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Vale Refeição Funcionários (Alojado e Não Alojado) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                        <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                          Vale Refeição Alojado (Equipe Hospedada)
-                        </Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-0.5">
-                            <Label className="text-[10px] text-muted-foreground">Quantidade</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={mealVoucherHousedQty}
-                              onChange={(e) => setMealVoucherHousedQty(Number(e.target.value))}
-                              className="text-xs h-8 font-mono"
-                            />
-                          </div>
-                          <div className="space-y-0.5">
-                            <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={mealVoucherHousedRate}
-                              onChange={(e) => setMealVoucherHousedRate(Number(e.target.value))}
-                              className="text-xs h-8 font-mono"
-                            />
-                          </div>
-                        </div>
-                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                          Subtotal:{' '}
-                          {voucherHousedTotal.toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
-                        <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                          Vale Refeição Não Alojado (Equipe Local)
-                        </Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-0.5">
-                            <Label className="text-[10px] text-muted-foreground">Quantidade</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={mealVoucherUnhousedQty}
-                              onChange={(e) => setMealVoucherUnhousedQty(Number(e.target.value))}
-                              className="text-xs h-8 font-mono"
-                            />
-                          </div>
-                          <div className="space-y-0.5">
-                            <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={mealVoucherUnhousedRate}
-                              onChange={(e) => setMealVoucherUnhousedRate(Number(e.target.value))}
-                              className="text-xs h-8 font-mono"
-                            />
-                          </div>
-                        </div>
-                        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
-                          Subtotal:{' '}
-                          {voucherUnhousedTotal.toLocaleString('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* ABA 5: Margens & Fechamento */}
-                <TabsContent value="pricing" className="space-y-4 pt-3">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Margem de Serviço (%)</Label>
-                      <Input
-                        type="number"
-                        value={serviceMargin}
-                        onChange={(e) => setServiceMargin(Number(e.target.value))}
-                        className="text-xs h-8 font-mono font-bold text-emerald-700"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Comissão de Vendas (%)</Label>
-                      <Input
-                        type="number"
-                        value={salesCommission}
-                        onChange={(e) => setSalesCommission(Number(e.target.value))}
-                        className="text-xs h-8 font-mono font-bold text-blue-700"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Overhead Adm (%)</Label>
-                      <Input
-                        type="number"
-                        value={adminRate}
-                        onChange={(e) => setAdminRate(Number(e.target.value))}
-                        className="text-xs h-8 font-mono"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Validade da Proposta (Dias)</Label>
-                      <Input
-                        type="number"
-                        value={validityDays}
-                        onChange={(e) => setValidityDays(Number(e.target.value))}
-                        className="text-xs h-8 font-mono"
-                      />
+                        </>
+                      )}
                     </div>
                   </div>
 
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[10px] text-muted-foreground">
+                      * Digite as cidades (ou CEPs) para rota automática via Nominatim/Mapeia.
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={isCalculatingRoute}
+                      onClick={() => {
+                        const orig = originAddress.trim()
+                        const dest = destinationAddress.trim()
+                        if (orig.length >= 3 && dest.length >= 3) {
+                          handleRecalculateRouteByCities(orig, dest)
+                        } else {
+                          handleRecalculateRouteByCep()
+                        }
+                      }}
+                      className="text-[11px] h-7 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                    >
+                      {isCalculatingRoute ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Calculando Rota...
+                        </>
+                      ) : (
+                        'Recalcular Rota Mapeia'
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* ABA 4: Hospedagem & Alimentação */}
+              <TabsContent value="lodging" className="space-y-4 pt-3">
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                      Composição de Hospedagem & Alimentação em Campo
+                    </span>
+                    <span className="text-xs font-bold text-emerald-600 font-mono">
+                      Subtotal:{' '}
+                      {lodgingMealsTotalCost.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Diárias de Hotel */}
+                    <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        Diárias de Hotel
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">
+                            Quantidade de Diárias
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={hotelDays}
+                            onChange={(e) => setHotelDays(Number(e.target.value))}
+                            className="text-xs h-8 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">
+                            Valor Diária (R$)
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={hotelRate}
+                            onChange={(e) => setHotelRate(Number(e.target.value))}
+                            className="text-xs h-8 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal Hotel:{' '}
+                        {hotelTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Refeições */}
+                    <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                        Refeições / Alimentação Diária
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">
+                            Quantidade de Refeições
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={mealsDays}
+                            onChange={(e) => setMealsDays(Number(e.target.value))}
+                            className="text-xs h-8 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">
+                            Valor Refeição (R$)
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={mealsRate}
+                            onChange={(e) => setMealsRate(Number(e.target.value))}
+                            className="text-xs h-8 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal Refeições:{' '}
+                        {mealsTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Vale Refeição Funcionários (Alojado e Não Alojado) */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                    <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        Vale Refeição Alojado (Equipe Hospedada)
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Quantidade</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={mealVoucherHousedQty}
+                            onChange={(e) => setMealVoucherHousedQty(Number(e.target.value))}
+                            className="text-xs h-8 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={mealVoucherHousedRate}
+                            onChange={(e) => setMealVoucherHousedRate(Number(e.target.value))}
+                            className="text-xs h-8 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal:{' '}
+                        {voucherHousedTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                      <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        Vale Refeição Não Alojado (Equipe Local)
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Quantidade</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={mealVoucherUnhousedQty}
+                            onChange={(e) => setMealVoucherUnhousedQty(Number(e.target.value))}
+                            className="text-xs h-8 font-mono"
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          <Label className="text-[10px] text-muted-foreground">Valor (R$)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={mealVoucherUnhousedRate}
+                            onChange={(e) => setMealVoucherUnhousedRate(Number(e.target.value))}
+                            className="text-xs h-8 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 font-mono text-right pt-1">
+                        Subtotal:{' '}
+                        {voucherUnhousedTotal.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              {/* ABA 5: Margens & Fechamento */}
+              <TabsContent value="pricing" className="space-y-4 pt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Margem de Serviço (%)</Label>
+                    <Input
+                      type="number"
+                      value={serviceMargin}
+                      onChange={(e) => setServiceMargin(Number(e.target.value))}
+                      className="text-xs h-8 font-mono font-bold text-emerald-700"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Comissão de Vendas (%)</Label>
+                    <Input
+                      type="number"
+                      value={salesCommission}
+                      onChange={(e) => setSalesCommission(Number(e.target.value))}
+                      className="text-xs h-8 font-mono font-bold text-blue-700"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Overhead Adm (%)</Label>
+                    <Input
+                      type="number"
+                      value={adminRate}
+                      onChange={(e) => setAdminRate(Number(e.target.value))}
+                      className="text-xs h-8 font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Validade da Proposta (Dias)</Label>
+                    <Input
+                      type="number"
+                      value={validityDays}
+                      onChange={(e) => setValidityDays(Number(e.target.value))}
+                      className="text-xs h-8 font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Condições de Pagamento</Label>
                     <Input
                       value={paymentTerms}
                       onChange={(e) => setPaymentTerms(e.target.value)}
-                      placeholder="Ex: 28 DDL faturado"
+                      placeholder="Ex: 28 DDL faturado após entrega técnica"
                       className="text-xs h-8"
                     />
                   </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
 
-      {/* Modal de Impressão e PDF (com suporte explícito a visão cliente e interna + aprovação) */}
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Status Inicial</Label>
+                    <Select value={status} onValueChange={(val) => setStatus(val as QuoteStatus)}>
+                      <SelectTrigger className="text-xs h-8">
+                        <SelectValue placeholder="Selecione o status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="draft">Rascunho</SelectItem>
+                        <SelectItem value="sent">Enviada ao Cliente</SelectItem>
+                        <SelectItem value="approved">Aprovada</SelectItem>
+                        <SelectItem value="rejected">Rejeitada</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          <DialogFooter className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const currentObj = getFormDataObject() as QuoteRecord
+                  handleOpenPdfPreview({ ...currentObj, id: activeQuoteId || 'draft' }, 'client')
+                }}
+                className="text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
+              >
+                <FileText className="h-3.5 w-3.5 mr-1" />
+                Pré-visualizar PDF
+              </Button>
+
+              {activeQuoteId && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const token = approvalToken || activeQuoteId
+                    window.open(`/proposta/${token}`, '_blank')
+                  }}
+                  className="text-xs text-slate-600 hover:text-teal-700"
+                >
+                  <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                  Link Aceite
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditorOpen(false)}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSaveQuote}
+                disabled={isSaving}
+                className="text-xs font-bold bg-teal-700 hover:bg-teal-600 text-white shadow-xs"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3.5 w-3.5 mr-1" />
+                    Salvar Proposta
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 6. Modal de Impressão e PDF (com suporte explícito a visão cliente e interna + aprovação) */}
       {quoteForPreview && (
         <QuotePdfPreviewDialog
           quote={
@@ -2398,4 +2654,5 @@ export function QuotesManager({
     </div>
   )
 }
+
 export default QuotesManager
