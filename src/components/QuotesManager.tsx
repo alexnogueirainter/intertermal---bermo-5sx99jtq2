@@ -2865,48 +2865,325 @@ export function QuotesManager({
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Margem de Serviço (%)</Label>
-                      <Input
-                        type="number"
-                        value={serviceMargin}
-                        onChange={(e) => setServiceMargin(Number(e.target.value))}
-                        className="text-xs h-8 font-mono font-bold text-emerald-700"
-                      />
-                    </div>
+                  {/* Bloco 1: Margens Comerciais & Operacionais */}
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
+                      Margens e Custos Indiretos
+                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold">Margem de Serviço (%)</Label>
+                          <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                            {(calculatedSalePrice * (serviceMargin / 100)).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={serviceMargin}
+                          onChange={(e) => setServiceMargin(Number(e.target.value))}
+                          className="text-xs h-8 font-mono font-bold text-emerald-700 dark:text-emerald-400"
+                        />
+                      </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Comissão de Vendas (%)</Label>
-                      <Input
-                        type="number"
-                        value={salesCommission}
-                        onChange={(e) => setSalesCommission(Number(e.target.value))}
-                        className="text-xs h-8 font-mono font-bold text-blue-700"
-                      />
-                    </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold">Comissão de Vendas (%)</Label>
+                          <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 font-semibold">
+                            {(calculatedSalePrice * (salesCommission / 100)).toLocaleString(
+                              'pt-BR',
+                              {
+                                style: 'currency',
+                                currency: 'BRL',
+                              },
+                            )}
+                          </span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={salesCommission}
+                          onChange={(e) => setSalesCommission(Number(e.target.value))}
+                          className="text-xs h-8 font-mono font-bold text-blue-700 dark:text-blue-400"
+                        />
+                      </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Overhead Adm (%)</Label>
-                      <Input
-                        type="number"
-                        value={adminRate}
-                        onChange={(e) => setAdminRate(Number(e.target.value))}
-                        className="text-xs h-8 font-mono"
-                      />
-                    </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-semibold">Overhead Adm (%)</Label>
+                          <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 font-semibold">
+                            {adminAmount.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={adminRate}
+                          onChange={(e) => setAdminRate(Number(e.target.value))}
+                          className="text-xs h-8 font-mono font-bold text-purple-700 dark:text-purple-400"
+                        />
+                      </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Validade da Proposta (Dias)</Label>
-                      <Input
-                        type="number"
-                        value={validityDays}
-                        onChange={(e) => setValidityDays(Number(e.target.value))}
-                        className="text-xs h-8 font-mono"
-                      />
+                      <div className="space-y-1">
+                        <Label className="text-xs font-semibold">Validade da Proposta (Dias)</Label>
+                        <Input
+                          type="number"
+                          value={validityDays}
+                          onChange={(e) => setValidityDays(Number(e.target.value))}
+                          className="text-xs h-8 font-mono"
+                        />
+                      </div>
                     </div>
                   </div>
 
+                  {/* Bloco 2: Abertura Tributária Individual (6 Alíquotas) */}
+                  <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Percent className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                          Opções Tributárias & Impostos Incidentes
+                        </span>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className="text-[10.5px] font-mono font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-900"
+                      >
+                        Total Alíquotas: {totalTaxesPercent.toFixed(2)}% (
+                        {(calculatedSalePrice * (totalTaxesPercent / 100)).toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                        )
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                      {/* PIS */}
+                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                            PIS (%)
+                          </Label>
+                          <span className="text-[9.5px] font-mono text-slate-500">
+                            {(calculatedSalePrice * (pisRate / 100)).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={pisRate}
+                          onChange={(e) => setPisRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                      </div>
+
+                      {/* COFINS */}
+                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                            COFINS (%)
+                          </Label>
+                          <span className="text-[9.5px] font-mono text-slate-500">
+                            {(calculatedSalePrice * (cofinsRate / 100)).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={cofinsRate}
+                          onChange={(e) => setCofinsRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                      </div>
+
+                      {/* ISS */}
+                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                            ISS (%)
+                          </Label>
+                          <span className="text-[9.5px] font-mono text-slate-500">
+                            {(calculatedSalePrice * (issRate / 100)).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={issRate}
+                          onChange={(e) => setIssRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                      </div>
+
+                      {/* CSLL */}
+                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                            CSLL (%)
+                          </Label>
+                          <span className="text-[9.5px] font-mono text-slate-500">
+                            {(calculatedSalePrice * (csllRate / 100)).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={csllRate}
+                          onChange={(e) => setCsllRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                      </div>
+
+                      {/* IRPJ */}
+                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                            IRPJ (%)
+                          </Label>
+                          <span className="text-[9.5px] font-mono text-slate-500">
+                            {(calculatedSalePrice * (irpjRate / 100)).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={irpjRate}
+                          onChange={(e) => setIrpjRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                      </div>
+
+                      {/* Dif. IR */}
+                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                            Dif. IR (%)
+                          </Label>
+                          <span className="text-[9.5px] font-mono text-slate-500">
+                            {(calculatedSalePrice * (irDiffRate / 100)).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={irDiffRate}
+                          onChange={(e) => setIrDiffRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bloco 3: Formação de Preço & Fechamento Gerencial */}
+                  <div className="p-3.5 rounded-lg border-2 border-amber-300 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/20 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-950 dark:text-amber-200 flex items-center gap-1.5">
+                        <Calculator className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
+                        Formação de Preço (Soma Custos Diretos + Indiretos + Tributos)
+                      </span>
+                      <Badge className="bg-amber-700 dark:bg-amber-800 text-white font-mono text-[10px]">
+                        DIVISOR {(divisor * 100).toFixed(1)}%
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                      {/* Custos Diretos */}
+                      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-md border border-amber-200 dark:border-amber-900/50 space-y-0.5">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">
+                          Custos Diretos Totais
+                        </span>
+                        <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">
+                          {directCostsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[9.5px] text-slate-500 dark:text-slate-400">
+                          Mão de obra + Viagem + Hotel
+                        </div>
+                      </div>
+
+                      {/* Overhead Adm */}
+                      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-md border border-amber-200 dark:border-amber-900/50 space-y-0.5">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">
+                          Overhead Adm ({adminRate}%)
+                        </span>
+                        <div className="font-mono font-bold text-purple-700 dark:text-purple-400 text-sm">
+                          {adminAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[9.5px] text-slate-500 dark:text-slate-400">
+                          Custo Indireto Operacional
+                        </div>
+                      </div>
+
+                      {/* Margem + Comis + Impostos */}
+                      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-md border border-amber-200 dark:border-amber-900/50 space-y-0.5">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">
+                          Margem + Comis + Impostos
+                        </span>
+                        <div className="font-mono font-bold text-amber-800 dark:text-amber-300 text-sm">
+                          {(
+                            calculatedSalePrice * (serviceMargin / 100) +
+                            calculatedSalePrice * (salesCommission / 100) +
+                            calculatedSalePrice * (totalTaxesPercent / 100) +
+                            adminAmount
+                          ).toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[9.5px] text-slate-500 dark:text-slate-400">
+                          {(serviceMargin + salesCommission + totalTaxesPercent).toFixed(2)}% sobre
+                          receita
+                        </div>
+                      </div>
+
+                      {/* Preço Final */}
+                      <div className="bg-amber-900 text-white p-2.5 rounded-md space-y-0.5">
+                        <span className="text-[10px] text-amber-200 uppercase font-bold block">
+                          Preço Final Homologado
+                        </span>
+                        <div className="font-mono font-black text-white text-base">
+                          {calculatedSalePrice.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[9.5px] text-amber-300">Valor de Venda ao Cliente</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bloco 4: Condições de Pagamento e Status */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     <div className="space-y-1">
                       <Label className="text-xs font-semibold">Condições de Pagamento</Label>

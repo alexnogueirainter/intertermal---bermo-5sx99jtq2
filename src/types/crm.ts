@@ -177,26 +177,42 @@ export interface QuoteLodgingMealsConfig {
 export interface QuoteCustomMaterial {
   id: string
   description: string
-  qty: number
-  unitPrice: number
+  qty?: number
+  unitPrice?: number
+  quantity?: number
+  unit_cost?: number
+  unitCost?: number
+  subtotal?: number
 }
 
 export interface QuoteEquipmentItem {
   id: string
-  model: string
-  brand: string
+  model?: string
+  brand?: string
   series?: string
-  plateCount: number
-  plateMaterial: string
-  plateThickness: number
-  gasketMaterial: string
-  connectionSize: string
+  plateCount?: number
+  plate_count?: number
+  plateMaterial?: string
+  plate_material?: string
+  plateThickness?: number
+  plate_thickness?: number
+  gasketMaterial?: string
+  gasket_material?: string
+  connectionSize?: string
+  connection_size?: string
   connectionType?: string
-  pressureTestBar: number
-  workingPressureBar: number
-  dimensions: string
-  weightKg: number
-  quantity: number
+  connection_type?: string
+  pressureTestBar?: number
+  pressure_test_bar?: number
+  workingPressureBar?: number
+  working_pressure_bar?: number
+  dimensions?: string
+  dimensions_w_h_d?: string
+  weightKg?: number
+  weight_kg?: number
+  quantity?: number
+  tag?: string
+  serial_number?: string
   modelSource?: 'local' | 'manual'
   isExpanded?: boolean
 }
@@ -341,6 +357,8 @@ export interface QuoteRecord {
   // Novos campos Seção 3A
   integration_needed?: boolean
   integration_day?: string
+  integration_weekday?: string
+  integration_timing?: string
   integration_type?: 'day_of_work' | 'early' | string
   integration_when?: 'same_day' | 'early' | string
   integration_cost?: number
