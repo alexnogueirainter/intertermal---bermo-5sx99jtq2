@@ -462,11 +462,51 @@
 
   #quote-printable-document thead {
     display: table-header-group !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  #quote-printable-document tbody {
+    display: table-row-group !important;
+  }
+
+  #quote-printable-document tfoot {
+    display: table-footer-group !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   #quote-printable-document tr {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+  }
+
+  #quote-printable-document td,
+  #quote-printable-document th {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Títulos de seção nunca ficam órfãos no fim da página */
+  #quote-printable-document h1,
+  #quote-printable-document h2,
+  #quote-printable-document h3,
+  #quote-printable-document h4,
+  #quote-printable-document .quote-section-header {
+    break-after: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  /* Parágrafos e listas evitam linhas órfãs e quebras no meio da linha */
+  #quote-printable-document p,
+  #quote-printable-document li,
+  #quote-printable-document dl,
+  #quote-printable-document dt,
+  #quote-printable-document dd {
+    orphans: 3 !important;
+    widows: 3 !important;
   }
 
   /* Rodapé do documento */
@@ -484,4 +524,80 @@
     margin: 0 !important;
     padding: 0 !important;
   }
+}
+
+/* ========================================================================= */
+/* Regras de Quebra de Página Gerais (Valem tanto na tela quanto para html2pdf) */
+/* ========================================================================= */
+#quote-printable-document .quote-print-header {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+#quote-printable-document .quote-print-client-info {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+#quote-printable-document .quote-print-keep-together,
+#quote-printable-document .quote-print-card,
+#quote-printable-document .quote-print-signatures,
+#quote-printable-document .quote-print-terms {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+#quote-printable-document table {
+  border-collapse: collapse;
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+#quote-printable-document thead {
+  display: table-header-group;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+#quote-printable-document tbody {
+  display: table-row-group;
+}
+
+#quote-printable-document tfoot {
+  display: table-footer-group;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+#quote-printable-document tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+#quote-printable-document td,
+#quote-printable-document th {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+#quote-printable-document h1,
+#quote-printable-document h2,
+#quote-printable-document h3,
+#quote-printable-document h4,
+#quote-printable-document .quote-section-header {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+#quote-printable-document p,
+#quote-printable-document li {
+  orphans: 3;
+  widows: 3;
+}
+
+#quote-printable-document .quote-print-footer {
+  break-inside: avoid;
+  page-break-inside: avoid;
 }

@@ -753,7 +753,7 @@ export function QuotePdfPreviewDialog({
             <div className="space-y-6 print:space-y-2">
               {/* Seção Interna A: Mão de Obra Especializada */}
               <div className="quote-print-card space-y-2 print:space-y-1">
-                <div className="flex items-center justify-between border-b border-amber-300 pb-1">
+                <div className="quote-section-header flex items-center justify-between border-b border-amber-300 pb-1">
                   <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5 text-amber-700" />
                     Composição de Mão de Obra Especializada
@@ -940,7 +940,7 @@ export function QuotePdfPreviewDialog({
 
               {/* Seção Interna B: Deslocamento & Rotas */}
               <div className="quote-print-card space-y-2 print:space-y-1">
-                <div className="flex items-center justify-between border-b border-amber-300 pb-1">
+                <div className="quote-section-header flex items-center justify-between border-b border-amber-300 pb-1">
                   <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <Truck className="h-3.5 w-3.5 text-amber-700" />
                     Composição de Deslocamento & Logística (ViaCEP / Mapeia)
@@ -1038,7 +1038,7 @@ export function QuotePdfPreviewDialog({
 
               {/* Seção Interna C: Hospedagem & Alimentação */}
               <div className="quote-print-card space-y-2 print:space-y-1">
-                <div className="flex items-center justify-between border-b border-amber-300 pb-1">
+                <div className="quote-section-header flex items-center justify-between border-b border-amber-300 pb-1">
                   <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <Hotel className="h-3.5 w-3.5 text-amber-700" />
                     Composição de Hospedagem & Alimentação
@@ -1156,7 +1156,7 @@ export function QuotePdfPreviewDialog({
 
               {/* Seção Interna D: Custos Indiretos, Margem & Tributos */}
               <div className="quote-print-card space-y-2 print:space-y-1">
-                <div className="flex items-center justify-between border-b border-amber-300 pb-1">
+                <div className="quote-section-header flex items-center justify-between border-b border-amber-300 pb-1">
                   <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
                     <Percent className="h-3.5 w-3.5 text-amber-700" />
                     Custos Indiretos, Margens e Tributos Fiscais
@@ -1293,7 +1293,7 @@ export function QuotePdfPreviewDialog({
 
               {/* Seção Interna E: Consolidação Geral dos Custos Diretos vs Indiretos vs Preço Final */}
               <div className="quote-print-card p-4 print:p-2 rounded-xl bg-amber-50/80 border-2 border-amber-300 space-y-3 print:space-y-1.5">
-                <div className="flex items-center justify-between">
+                <div className="quote-section-header flex items-center justify-between">
                   <span className="font-bold uppercase tracking-wider text-xs print:text-[10px] text-amber-950 flex items-center gap-1.5">
                     <Calculator className="h-4 w-4 text-amber-700" />
                     Consolidação Financeira da Proposta (Formação de Preço Divisor)
@@ -1375,7 +1375,7 @@ export function QuotePdfPreviewDialog({
           {/* Seção: Escopo de Fornecimento & Serviços BERMO */}
           <div className="space-y-3.5 print:space-y-3">
             <div
-              className={`flex items-center justify-between border-b pb-1.5 ${
+              className={`quote-section-header flex items-center justify-between border-b pb-1.5 ${
                 isInternal ? 'border-amber-300' : 'border-slate-200'
               }`}
             >
@@ -1396,7 +1396,7 @@ export function QuotePdfPreviewDialog({
 
             {/* LISTAGEM DE ESPECIFICAÇÕES TÉCNICAS DE CADA EQUIPAMENTO */}
             <div className="space-y-2.5 print:space-y-2">
-              <span className="text-[10px] print:text-[10pt] font-bold uppercase tracking-wider text-slate-500 block">
+              <span className="quote-section-header text-[10px] print:text-[10pt] font-bold uppercase tracking-wider text-slate-500 block">
                 Equipamentos Contemplados na Proposta Técnica (Especificações):
               </span>
               <div className="grid grid-cols-1 gap-3 print:gap-2.5">
@@ -1409,6 +1409,7 @@ export function QuotePdfPreviewDialog({
                         : 'bg-teal-50/50 border-teal-100'
                     }`}
                   >
+                    {' '}
                     <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-1.5 print:pb-1">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900 text-[11.5px] print:text-[11.5pt]">
@@ -1427,7 +1428,6 @@ export function QuotePdfPreviewDialog({
                         {eq.series || 'Placas Desmontáveis'}
                       </span>
                     </div>
-
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 print:gap-x-4 print:gap-y-1.5 text-[10.5px] print:text-[10.5pt] font-mono">
                       <div>
                         <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">

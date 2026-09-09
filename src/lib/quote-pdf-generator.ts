@@ -96,7 +96,23 @@ export async function generateQuotePdfBlob(
       format: 'a4',
       orientation: 'portrait',
     },
-    pagebreak: { mode: ['css', 'legacy'], avoid: ['.quote-print-keep-together', 'tr'] },
+    pagebreak: {
+      mode: ['avoid-all', 'css', 'legacy'],
+      avoid: [
+        'tr',
+        '.quote-print-card',
+        '.quote-print-keep-together',
+        '.quote-print-header',
+        '.quote-print-client-info',
+        '.quote-print-signatures',
+        '.quote-print-terms',
+        '.quote-print-footer',
+        'h1',
+        'h2',
+        'h3',
+        'h4',
+      ],
+    },
   }
 
   const pdfWorker = html2pdf().set(opt).from(element)
