@@ -347,6 +347,8 @@ export interface QuoteRecord {
   work_permit_needed?: boolean
   work_permit_cost?: number
   work_permit_time?: 'first_hour' | string
+  homologated_procedure?: string
+  last_saved_at?: string
   overnight_needed?: boolean
   overnight_cost?: number
   notes?: string

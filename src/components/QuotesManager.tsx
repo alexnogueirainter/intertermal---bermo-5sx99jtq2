@@ -83,6 +83,7 @@ import {
   QuoteTravelConfig,
   QuoteLodgingMealsConfig,
   QuoteLaborConfig,
+  QuoteEquipmentItem,
 } from '@/types/crm'
 import { QuotePdfPreviewDialog } from './QuotePdfPreviewDialog'
 import {
@@ -151,6 +152,23 @@ export function QuotesManager({
   const [connectionSize, setConnectionSize] = useState('DN50 (2")')
   const [pressureTestBar, setPressureTestBar] = useState(16)
   const [workingPressureBar, setWorkingPressureBar] = useState(10)
+  const [equipments, setEquipments] = useState<QuoteEquipmentItem[]>([
+    {
+      id: 'eq-1',
+      model: '',
+      brand: 'BERMO',
+      quantity: 1,
+      tag: '',
+      serial_number: '',
+      plate_count: 40,
+      plate_material: 'AISI 316L',
+      plate_thickness: 0.5,
+      gasket_material: 'EPDM Clip-on',
+      connection_size: 'DN50 (2")',
+      pressure_test_bar: 16,
+      working_pressure_bar: 10,
+    },
+  ])
   const [scopeOfWork, setScopeOfWork] = useState(
     'Desmontagem completa, limpeza química/mecânica por imersão, teste de líquido penetrante, substituição das gaxetas e teste hidrostático conforme norma ASME.',
   )
@@ -343,9 +361,23 @@ export function QuotesManager({
       foremanRate,
     }
 
+    const primaryEq = equipments[0] || {
+      model: equipmentModel || '',
+      brand: equipmentBrand || 'BERMO',
+      quantity: equipmentQuantity || 1,
+      plate_count: plateCount || 40,
+      plate_material: plateMaterial || 'AISI 316L',
+      plate_thickness: plateThickness || 0.5,
+      gasket_material: gasketMaterial || 'EPDM Clip-on',
+      connection_size: connectionSize || 'DN50 (2")',
+      pressure_test_bar: pressureTestBar || 16,
+      working_pressure_bar: workingPressureBar || 10,
+    }
+
     return {
       title:
-        quoteTitle || `Proposta Técnica ${equipmentModel || 'BERMO'} - ${clientName || 'Cliente'}`,
+        quoteTitle ||
+        `Proposta Técnica ${primaryEq.model || equipmentModel || 'BERMO'} - ${clientName || 'Cliente'}`,
       quote_number:
         quoteNumber || `INT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
       client_id: clientId,
@@ -355,16 +387,17 @@ export function QuotesManager({
       assigned_to: assignedTo || 'Alex Nogueira',
       approval_token: approvalToken || undefined,
       status,
-      equipment_brand: equipmentBrand,
-      equipment_model: equipmentModel,
-      equipment_quantity: equipmentQuantity,
-      plate_count: plateCount,
-      plate_material: plateMaterial,
-      plate_thickness: plateThickness,
-      gasket_material: gasketMaterial,
-      connection_size: connectionSize,
-      pressure_test_bar: pressureTestBar,
-      working_pressure_bar: workingPressureBar,
+      equipments: equipments && equipments.length > 0 ? equipments : undefined,
+      equipment_brand: primaryEq.brand || equipmentBrand || 'BERMO',
+      equipment_model: primaryEq.model || equipmentModel || '',
+      equipment_quantity: primaryEq.quantity || equipmentQuantity || 1,
+      plate_count: primaryEq.plate_count ?? plateCount ?? 40,
+      plate_material: primaryEq.plate_material || plateMaterial || 'AISI 316L',
+      plate_thickness: primaryEq.plate_thickness ?? plateThickness ?? 0.5,
+      gasket_material: primaryEq.gasket_material || gasketMaterial || 'EPDM Clip-on',
+      connection_size: primaryEq.connection_size || connectionSize || 'DN50 (2")',
+      pressure_test_bar: primaryEq.pressure_test_bar ?? pressureTestBar ?? 16,
+      working_pressure_bar: primaryEq.working_pressure_bar ?? workingPressureBar ?? 10,
       scope_of_work: scopeOfWork,
 
       // Custos diretos - Mão de Obra (6 funções)
@@ -471,6 +504,23 @@ export function QuotesManager({
     setConnectionSize('DN50 (2")')
     setPressureTestBar(16)
     setWorkingPressureBar(10)
+    setEquipments([
+      {
+        id: `eq-${Date.now()}-1`,
+        model: '',
+        brand: 'BERMO',
+        quantity: 1,
+        tag: '',
+        serial_number: '',
+        plate_count: 40,
+        plate_material: 'AISI 316L',
+        plate_thickness: 0.5,
+        gasket_material: 'EPDM Clip-on',
+        connection_size: 'DN50 (2")',
+        pressure_test_bar: 16,
+        working_pressure_bar: 10,
+      },
+    ])
     setScopeOfWork(
       'Desmontagem completa, limpeza química/mecânica por imersão, teste de líquido penetrante, substituição das gaxetas e teste hidrostático conforme norma ASME.',
     )
@@ -535,6 +585,72 @@ export function QuotesManager({
     setCommercialNotes('')
   }
 
+  // Adicionar equipamento dinâmico
+  const handleAddEquipment = () => {
+    setEquipments((prev) => [
+      ...prev,
+      {
+        id: `eq-${Date.now()}-${prev.length + 1}`,
+        model: '',
+        brand: 'BERMO',
+        quantity: 1,
+        tag: '',
+        serial_number: '',
+        plate_count: 40,
+        plate_material: 'AISI 316L',
+        plate_thickness: 0.5,
+        gasket_material: 'EPDM Clip-on',
+        connection_size: 'DN50 (2")',
+        pressure_test_bar: 16,
+        working_pressure_bar: 10,
+      },
+    ])
+  }
+
+  // Remover equipamento dinâmico
+  const handleRemoveEquipment = (index: number) => {
+    setEquipments((prev) => {
+      if (prev.length <= 1) return prev
+      const next = prev.filter((_, idx) => idx !== index)
+      if (index === 0 && next[0]) {
+        setEquipmentModel(next[0].model || '')
+        setEquipmentBrand(next[0].brand || 'BERMO')
+        setEquipmentQuantity(next[0].quantity || 1)
+        setPlateCount(next[0].plate_count ?? 40)
+        setPlateMaterial(next[0].plate_material || 'AISI 316L')
+        setPlateThickness(next[0].plate_thickness ?? 0.5)
+        setGasketMaterial(next[0].gasket_material || 'EPDM Clip-on')
+        setConnectionSize(next[0].connection_size || 'DN50 (2")')
+        setPressureTestBar(next[0].pressure_test_bar ?? 16)
+        setWorkingPressureBar(next[0].working_pressure_bar ?? 10)
+      }
+      return next
+    })
+  }
+
+  // Atualizar campo de equipamento dinâmico
+  const handleUpdateEquipment = (index: number, patch: Partial<QuoteEquipmentItem>) => {
+    setEquipments((prev) => {
+      const next = [...prev]
+      const curr = next[index] || { id: `eq-${index}` }
+      next[index] = { ...curr, ...patch }
+      if (index === 0) {
+        if (patch.model !== undefined) setEquipmentModel(patch.model)
+        if (patch.brand !== undefined) setEquipmentBrand(patch.brand)
+        if (patch.quantity !== undefined) setEquipmentQuantity(patch.quantity)
+        if (patch.plate_count !== undefined) setPlateCount(patch.plate_count)
+        if (patch.plate_material !== undefined) setPlateMaterial(patch.plate_material)
+        if (patch.plate_thickness !== undefined) setPlateThickness(patch.plate_thickness)
+        if (patch.gasket_material !== undefined) setGasketMaterial(patch.gasket_material)
+        if (patch.connection_size !== undefined) setConnectionSize(patch.connection_size)
+        if (patch.pressure_test_bar !== undefined) setPressureTestBar(patch.pressure_test_bar)
+        if (patch.working_pressure_bar !== undefined)
+          setWorkingPressureBar(patch.working_pressure_bar)
+      }
+      return next
+    })
+  }
+
   // Carregar Proposta Existente no Formulário
   const loadQuoteIntoForm = (quote: QuoteRecord) => {
     setActiveQuoteId(quote.id)
@@ -557,6 +673,29 @@ export function QuotesManager({
     setConnectionSize(quote.connection_size || 'DN50 (2")')
     setPressureTestBar(quote.pressure_test_bar || 16)
     setWorkingPressureBar(quote.working_pressure_bar || 10)
+
+    if (quote.equipments && Array.isArray(quote.equipments) && quote.equipments.length > 0) {
+      setEquipments(quote.equipments)
+    } else {
+      setEquipments([
+        {
+          id: `eq-${quote.id || 'item'}-1`,
+          model: quote.equipment_model || '',
+          brand: quote.equipment_brand || 'BERMO',
+          quantity: quote.equipment_quantity || 1,
+          tag: '',
+          serial_number: '',
+          plate_count: quote.plate_count || 40,
+          plate_material: quote.plate_material || 'AISI 316L',
+          plate_thickness: quote.plate_thickness || 0.5,
+          gasket_material: quote.gasket_material || 'EPDM Clip-on',
+          connection_size: quote.connection_size || 'DN50 (2")',
+          pressure_test_bar: quote.pressure_test_bar || 16,
+          working_pressure_bar: quote.working_pressure_bar || 10,
+        },
+      ])
+    }
+
     setScopeOfWork(quote.scope_of_work || '')
 
     setTechCount(quote.tech_count ?? quote.labor_config?.techCount ?? 2)
@@ -702,6 +841,7 @@ export function QuotesManager({
     connectionSize,
     pressureTestBar,
     workingPressureBar,
+    equipments,
     scopeOfWork,
     techCount,
     techHours,
