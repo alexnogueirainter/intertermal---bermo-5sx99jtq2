@@ -38,6 +38,7 @@ import {
   Truck,
   ArrowLeftRight,
   Car,
+  Mail,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
