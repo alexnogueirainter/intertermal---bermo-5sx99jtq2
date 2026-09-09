@@ -161,6 +161,9 @@ export interface QuoteTravelConfig {
   car_rental_daily_rate?: number
   car_rental_days?: number
   car_rental_total?: number
+  transit_voucher_qty?: number
+  transit_voucher_rate?: number
+  transit_voucher_total?: number
 }
 
 export interface QuoteLodgingMealsConfig {
@@ -285,6 +288,9 @@ export interface QuoteRecord {
   car_rental_daily_rate?: number
   car_rental_days?: number
   car_rental_total?: number
+  transit_voucher_qty?: number
+  transit_voucher_rate?: number
+  transit_voucher_total?: number
   travel_config?: QuoteTravelConfig
 
   // Hospedagem & Alimentação
