@@ -16,9 +16,7 @@ import {
   Building2,
   ArrowRight,
   ShieldAlert,
-  Mail,
 } from 'lucide-react'
-import { inboundQuoteEmailsService } from '@/services/inbound-quote-emails'
 import type {
   ClientRecord,
   DealRecord,
@@ -70,26 +68,6 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const [customStartDate, setCustomStartDate] = React.useState<string>('')
   const [customEndDate, setCustomEndDate] = React.useState<string>('')
   const [reportClientFilter, setReportClientFilter] = React.useState<string>('all')
-  const [pendingEmailQuotesCount, setPendingEmailQuotesCount] = React.useState<number>(0)
-
-  React.useEffect(() => {
-    let isMounted = true
-    inboundQuoteEmailsService
-      .getInboundEmails()
-      .then((list) => {
-        if (isMounted) {
-          const pending = list.filter(
-            (e) => e.status === 'rascunho_criado' || e.status === 'recebido',
-          ).length
-          setPendingEmailQuotesCount(pending)
-        }
-      })
-      .catch(() => {})
-
-    return () => {
-      isMounted = false
-    }
-  }, [quotes])
 
   // Filtro de propostas por período baseado no campo created (ou updated)
   const filteredQuotesByPeriod = React.useMemo(() => {
@@ -1103,19 +1081,6 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   Novo Orçamento de Serviço
                 </Button>
 
-                {pendingEmailQuotesCount > 0 && (
-                  <Button
-                    size="sm"
-                    onClick={() => onNavigate('quotes')}
-                    className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-md flex items-center gap-1.5 animate-pulse"
-                  >
-                    <Mail className="h-4 w-4" />
-                    <span>Cotações por E-mail</span>
-                    <Badge className="bg-slate-950 text-white text-[10px] px-1.5 py-0 h-4">
-                      {pendingEmailQuotesCount} pendente{pendingEmailQuotesCount > 1 ? 's' : ''}
-                    </Badge>
-                  </Button>
-                )}
                 <Button
                   size="sm"
                   variant="outline"
