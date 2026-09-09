@@ -8,10 +8,13 @@
 routerAdd('POST', '/backend/v1/quotes/inbound-email', (c) => {
   // 1. Validação de segurança com token simples
   const reqInfo =
-    typeof $apis !== 'undefined' && $apis.requestInfo ? $apis.requestInfo(c) : c.requestInfo()
+    typeof c.requestInfo === 'function'
+      ? c.requestInfo()
+      : typeof $apis !== 'undefined' && $apis.requestInfo
+        ? $apis.requestInfo(c)
+        : {}
   const headers = reqInfo.headers || {}
   const query = reqInfo.query || {}
-
   const configuredToken = 'intertermal-inbound-secret-2026'
   const providedToken =
     headers['x-inbound-token'] ||
@@ -42,8 +45,7 @@ routerAdd('POST', '/backend/v1/quotes/inbound-email', (c) => {
   let rawBody = ''
 
   const contentType = String(headers['content-type'] || headers['Content-Type'] || '')
-  const reqData = reqInfo.data || reqInfo.body
-
+  const reqData = (reqInfo && (reqInfo.data || reqInfo.body)) || {}
   if (contentType.includes('application/json') && reqData && typeof reqData === 'object') {
     sender = String(reqData.sender || reqData.from || '').trim()
     originalSender = String(reqData.original_sender || reqData.originalSender || sender).trim()

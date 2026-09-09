@@ -3,7 +3,13 @@
 
 routerAdd('POST', '/send_service_order_status_email', (c) => {
   try {
-    const data = $apis.requestInfo(c).data || {}
+    const reqInfo =
+      typeof c.requestInfo === 'function'
+        ? c.requestInfo()
+        : typeof $apis !== 'undefined' && $apis.requestInfo
+          ? $apis.requestInfo(c)
+          : {}
+    const data = reqInfo.data || reqInfo.body || {}
     const orderId = (data.orderId || data.order_id || '').toString().trim()
     const previousStatus = (data.previousStatus || data.previous_status || data.from_status || '')
       .toString()

@@ -7,7 +7,11 @@
 
 routerAdd('POST', '/send_proposal_email', (c) => {
   const reqInfo =
-    typeof $apis !== 'undefined' && $apis.requestInfo ? $apis.requestInfo(c) : c.requestInfo()
+    typeof c.requestInfo === 'function'
+      ? c.requestInfo()
+      : typeof $apis !== 'undefined' && $apis.requestInfo
+        ? $apis.requestInfo(c)
+        : {}
   const body = reqInfo.data || reqInfo.body || {}
   const quoteId = String(body.quoteId || body.quote_id || '').trim()
 
@@ -691,7 +695,11 @@ routerAdd('POST', '/send_proposal_email', (c) => {
 
 routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
   const reqInfo =
-    typeof $apis !== 'undefined' && $apis.requestInfo ? $apis.requestInfo(c) : c.requestInfo()
+    typeof c.requestInfo === 'function'
+      ? c.requestInfo()
+      : typeof $apis !== 'undefined' && $apis.requestInfo
+        ? $apis.requestInfo(c)
+        : {}
   const body = reqInfo.data || reqInfo.body || {}
   const quoteId = String(body.quoteId || body.quote_id || '').trim()
 

@@ -19,3 +19,5 @@ export function MailIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   )
 }
+
+export const Mail = MailIcon
