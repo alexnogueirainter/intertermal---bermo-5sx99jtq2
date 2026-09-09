@@ -1020,6 +1020,7 @@ export default function IndexPage() {
             <QuotesManager
               quotes={quotes}
               clients={clients}
+              deals={deals}
               selectedQuote={selectedQuote}
               onCreateQuote={handleCreateQuote}
               onUpdateQuote={handleUpdateQuote}

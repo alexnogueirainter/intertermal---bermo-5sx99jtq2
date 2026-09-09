@@ -65,9 +65,11 @@ import { useToast } from '@/hooks/use-toast'
 import {
   QuoteRecord,
   ClientRecord,
+  DealRecord,
   QuoteStatus,
   QuoteTravelConfig,
   QuoteLodgingMealsConfig,
+  QuoteLaborConfig,
 } from '@/types/crm'
 import { QuotePdfPreviewDialog } from './QuotePdfPreviewDialog'
 import {
@@ -81,6 +83,7 @@ import { quotesService } from '@/services/quotes'
 export interface QuotesManagerProps {
   quotes: QuoteRecord[]
   clients: ClientRecord[]
+  deals?: DealRecord[]
   selectedQuote?: QuoteRecord | null
   onCreateQuote: (data: Partial<QuoteRecord>) => Promise<void>
   onUpdateQuote: (id: string, data: Partial<QuoteRecord>) => Promise<void>
@@ -94,6 +97,7 @@ export interface QuotesManagerProps {
 export function QuotesManager({
   quotes,
   clients,
+  deals = [],
   selectedQuote,
   onCreateQuote,
   onUpdateQuote,
