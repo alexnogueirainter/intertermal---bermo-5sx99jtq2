@@ -1686,6 +1686,20 @@ export function QuotePdfPreviewDialog({
             <span>Documento oficial gerado pelo Sistema Intertermal CRM</span>
           </div>
 
+          {/* Rodapé Fixo Repetido em Cada Página na Impressão via Navegador */}
+          <div
+            className="quote-print-page-footer hidden print:flex items-center justify-between text-[8pt] text-slate-500 pt-1 border-t border-slate-300"
+            aria-hidden="true"
+          >
+            <div className="flex items-center gap-2">
+              <strong className="text-slate-800">INTERTERMAL</strong>
+              <span>• Soluções Térmicas Industriais • alex.nogueira@intertermal.com.br</span>
+            </div>
+            <div className="text-right font-mono text-slate-600">
+              {quote.quote_number || quote.code}
+            </div>
+          </div>
+
           {/* Rodapé Interno quando for Composição Interna */}
           {isInternal && (
             <div className="quote-print-keep-together pt-3 print:pt-2 border-t-2 border-dashed border-amber-300 text-center text-[10px] print:text-[10pt] font-bold text-amber-900 tracking-wider uppercase">

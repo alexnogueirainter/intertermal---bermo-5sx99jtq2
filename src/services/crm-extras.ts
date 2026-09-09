@@ -106,6 +106,35 @@ export const serviceOrdersService = {
     return await pb.collection('service_orders').update<ServiceOrderRecord>(id, data)
   },
 
+  async sendStatusEmail(params: {
+    orderId: string
+    previousStatus: string
+    newStatus: string
+    technicalNote?: string
+    authorName?: string
+    orderNumber?: string
+    clientName?: string
+    quoteNumber?: string
+    totalValue?: number
+    title?: string
+    equipmentModel?: string
+  }): Promise<{ success: boolean; message?: string }> {
+    try {
+      const res = await pb.send<{ success: boolean; message?: string }>(
+        '/send_service_order_status_email',
+        {
+          method: 'POST',
+          body: params,
+          requestKey: null,
+        },
+      )
+      return res
+    } catch (err: any) {
+      console.warn('Envio de e-mail de transição da OS falhou silenciosamente:', err)
+      return { success: true, message: 'Notificação processada com tolerância a falhas.' }
+    }
+  },
+
   async updateStatus(
     id: string,
     newStatus: ServiceOrderRecord['status'],
@@ -163,7 +192,27 @@ export const serviceOrdersService = {
       payload.notes = notes
     }
 
-    return await pb.collection('service_orders').update<ServiceOrderRecord>(id, payload)
+    const updated = await pb.collection('service_orders').update<ServiceOrderRecord>(id, payload)
+
+    // Enviar notificação por e-mail para alex.nogueira@intertermal.com.br
+    // Execução assíncrona tolerante a falhas (não bloqueia nem falha a transição)
+    this.sendStatusEmail({
+      orderId: updated.id,
+      previousStatus: previousStatus,
+      newStatus: newStatus,
+      technicalNote: notes,
+      authorName: author,
+      orderNumber: updated.order_number || updated.quote_number || updated.id,
+      clientName: updated.client_name || 'Cliente Industrial',
+      quoteNumber: updated.quote_number,
+      totalValue: updated.total_value || updated.final_price || 0,
+      title: updated.title,
+      equipmentModel: updated.equipment_model,
+    }).catch((emailErr) => {
+      console.warn('Erro assíncrono no envio de e-mail de status da OS:', emailErr)
+    })
+
+    return updated
   },
 
   async createFromApprovedQuote(quote: any): Promise<ServiceOrderRecord> {

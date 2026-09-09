@@ -42,7 +42,9 @@ import {
   Trash2,
   Ban,
   Loader2,
+  BarChart3,
 } from 'lucide-react'
+import { ServiceOrdersReport } from './ServiceOrdersReport'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -88,7 +90,7 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
   onDeleteServiceOrder,
   onCancelServiceOrder,
 }) => {
-  const [activeTab, setActiveTab] = useState<'orders' | 'services'>('orders')
+  const [activeTab, setActiveTab] = useState<'orders' | 'services' | 'report'>('orders')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -237,6 +239,18 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
             </button>
             <button
               type="button"
+              onClick={() => setActiveTab('report')}
+              className={`px-3 py-1.5 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'report'
+                  ? 'bg-white dark:bg-slate-900 text-teal-700 dark:text-teal-400 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
+              }`}
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              Relatório de OS
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveTab('services')}
               className={`px-3 py-1.5 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
                 activeTab === 'services'
@@ -258,36 +272,40 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar ordem de serviço ou cliente..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 text-xs"
-          />
+      {/* Filtros apenas para as abas de cards 'orders' e 'services' (a aba report tem filtros dedicados) */}
+      {activeTab !== 'report' && (
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar ordem de serviço ou cliente..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 text-xs"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-48 text-xs">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os Status</SelectItem>
+              <SelectItem value="pending_approval">Aguardando Aprovação</SelectItem>
+              <SelectItem value="approved">Aprovada</SelectItem>
+              <SelectItem value="in_execution">Em Execução</SelectItem>
+              <SelectItem value="in_progress">Em Andamento</SelectItem>
+              <SelectItem value="completed">Concluída</SelectItem>
+              <SelectItem value="rejected">Rejeitada</SelectItem>
+              <SelectItem value="cancelled">Cancelada</SelectItem>
+            </SelectContent>{' '}
+          </Select>{' '}
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-48 text-xs">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os Status</SelectItem>
-            <SelectItem value="pending_approval">Aguardando Aprovação</SelectItem>
-            <SelectItem value="approved">Aprovada</SelectItem>
-            <SelectItem value="in_execution">Em Execução</SelectItem>
-            <SelectItem value="in_progress">Em Andamento</SelectItem>
-            <SelectItem value="completed">Concluída</SelectItem>
-            <SelectItem value="rejected">Rejeitada</SelectItem>
-            <SelectItem value="cancelled">Cancelada</SelectItem>
-          </SelectContent>{' '}
-        </Select>{' '}
-      </div>
+      )}
 
-      {/* ABA 1: ORDENS DE SERVIÇO (GERADAS AUTOMATICAMENTE DAS PROPOSTAS APROVADAS) */}
-      {activeTab === 'orders' ? (
+      {/* ABA RELATÓRIO DE OS */}
+      {activeTab === 'report' ? (
+        <ServiceOrdersReport serviceOrders={serviceOrders} clients={clients} />
+      ) : activeTab === 'orders' ? (
         <div className="space-y-4">
           {filteredOrders.length === 0 ? (
             <Card className="p-10 text-center text-muted-foreground">

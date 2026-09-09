@@ -115,8 +115,60 @@ export async function generateQuotePdfBlob(
     },
   }
 
-  const pdfWorker = html2pdf().set(opt).from(element)
-  const pdfBlob: Blob = await pdfWorker.outputPdf('blob')
+  const worker = html2pdf()
+    .set(opt)
+    .from(element)
+    .toPdf()
+    .get('pdf')
+    .then((pdf: any) => {
+      try {
+        const totalPages =
+          (pdf.internal && typeof pdf.internal.getNumberOfPages === 'function'
+            ? pdf.internal.getNumberOfPages()
+            : null) || (typeof pdf.getNumberOfPages === 'function' ? pdf.getNumberOfPages() : 1)
+
+        for (let i = 1; i <= totalPages; i++) {
+          pdf.setPage(i)
+
+          const pageWidth =
+            (pdf.internal && pdf.internal.pageSize && pdf.internal.pageSize.getWidth
+              ? pdf.internal.pageSize.getWidth()
+              : pdf.internal?.pageSize?.width) || 210
+          const pageHeight =
+            (pdf.internal && pdf.internal.pageSize && pdf.internal.pageSize.getHeight
+              ? pdf.internal.pageSize.getHeight()
+              : pdf.internal?.pageSize?.height) || 297
+
+          // Rodapé institucional e paginação "Página X de Y"
+          pdf.setFontSize(8)
+          pdf.setTextColor(100, 116, 139) // Slate-500
+
+          const footerTextLeft =
+            'INTERTERMAL - Soluções Térmicas Industriais • alex.nogueira@intertermal.com.br'
+          const pageStr = `Página ${i} de ${totalPages}`
+
+          // Margem inferior de 5mm
+          const yPos = pageHeight - 4
+
+          // Texto institucional à esquerda (margem 8mm)
+          pdf.text(footerTextLeft, 8, yPos)
+
+          // Paginação à direita (margem 8mm da direita)
+          if (typeof pdf.text === 'function') {
+            // Se jsPDF suportar alinhamento right
+            try {
+              pdf.text(pageStr, pageWidth - 8, yPos, { align: 'right' })
+            } catch {
+              pdf.text(pageStr, pageWidth - 32, yPos)
+            }
+          }
+        }
+      } catch (pageErr) {
+        console.warn('Não foi possível adicionar rodapé com numeração ao PDF:', pageErr)
+      }
+    })
+
+  const pdfBlob: Blob = await worker.outputPdf('blob')
 
   // Retorna como File para upload no FormData
   const file = new File([pdfBlob], fileName, { type: 'application/pdf' })
