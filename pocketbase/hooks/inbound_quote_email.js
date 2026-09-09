@@ -37,7 +37,7 @@ routerAdd('POST', '/backend/v1/quotes/inbound-email', (c) => {
     })
   }
 
-  // 2. Extração de campos do corpo da requisição
+  // 2. Extração de campos do corpo da requisição (JSON, multipart/form-data ou text/plain)
   let sender = ''
   let originalSender = ''
   let recipient = ''
@@ -45,12 +45,22 @@ routerAdd('POST', '/backend/v1/quotes/inbound-email', (c) => {
   let rawBody = ''
 
   const contentType = String(headers['content-type'] || headers['Content-Type'] || '')
-  const reqData = (reqInfo && (reqInfo.data || reqInfo.body)) || {}
+  const reqData = (reqInfo && (reqInfo.body || reqInfo.data)) || {}
+
   if (contentType.includes('application/json') && reqData && typeof reqData === 'object') {
     sender = String(reqData.sender || reqData.from || '').trim()
     originalSender = String(reqData.original_sender || reqData.originalSender || sender).trim()
     recipient = String(reqData.recipient || reqData.to || '').trim()
     subject = String(reqData.subject || reqData.assunto || '').trim()
+    rawBody = String(
+      reqData.body || reqData.text || reqData.raw_body || reqData.content || '',
+    ).trim()
+  } else if (contentType.includes('multipart/form-data')) {
+    // Multipart/form-data enviado via formulário com anexos
+    sender = String(reqData.sender || reqData.from || query.sender || '').trim()
+    originalSender = String(reqData.original_sender || reqData.originalSender || sender).trim()
+    recipient = String(reqData.recipient || reqData.to || '').trim()
+    subject = String(reqData.subject || reqData.assunto || query.subject || '').trim()
     rawBody = String(
       reqData.body || reqData.text || reqData.raw_body || reqData.content || '',
     ).trim()
@@ -488,6 +498,53 @@ Status: Rascunho para Revisão Humana (ajuste valores de mão de obra e deslocam
     }
   }
 
+  // 7.1 Processar e salvar eventuais arquivos anexos enviados via multipart/form-data
+  let savedAttachmentsCount = 0
+  const attachmentFiles = (reqInfo && (reqInfo.files || reqInfo.attachments)) || {}
+  try {
+    const colAtts = $app.findCollectionByNameOrId('inbound_quote_attachments')
+    const filesList = []
+
+    if (Array.isArray(attachmentFiles)) {
+      filesList.push(...attachmentFiles)
+    } else if (typeof attachmentFiles === 'object' && attachmentFiles !== null) {
+      Object.keys(attachmentFiles).forEach((k) => {
+        const item = attachmentFiles[k]
+        if (Array.isArray(item)) {
+          filesList.push(...item)
+        } else if (item) {
+          filesList.push(item)
+        }
+      })
+    }
+
+    if (filesList.length > 0 && inboundRecord) {
+      for (let i = 0; i < filesList.length; i++) {
+        const f = filesList[i]
+        try {
+          const attRec = new Record(colAtts)
+          attRec.set('inbound_email_id', inboundRecord.id)
+          if (createdQuote) {
+            attRec.set('quote_id', createdQuote.id)
+          }
+          if (f.name) attRec.set('file_name', f.name)
+          if (f.type || f.mimeType) attRec.set('file_type', f.type || f.mimeType)
+          if (f.size) attRec.set('file_size', f.size)
+          attRec.set('file', f)
+          $app.save(attRec)
+          savedAttachmentsCount++
+        } catch (errSaveFile) {
+          console.warn('Aviso: falha ao salvar anexo de e-mail no backend:', errSaveFile.message)
+          warningsList.push(
+            `Aviso de anexo: arquivo não pôde ser gravado automaticamente (${errSaveFile.message})`,
+          )
+        }
+      }
+    }
+  } catch (errAtts) {
+    console.warn('Aviso: erro geral ao processar lista de anexos no backend:', errAtts.message)
+  }
+
   // 8. Retorno JSON completo com o resultado
   return c.json(200, {
     success: true,
@@ -505,5 +562,6 @@ Status: Rascunho para Revisão Humana (ajuste valores de mão de obra e deslocam
     extracted_data: extracted,
     warnings: warningsList,
     extraction_method: extractionMethod,
+    attachments_count: savedAttachmentsCount,
   })
 })

@@ -514,6 +514,21 @@ export interface ExtractedQuoteData {
   missing_fields?: string[]
 }
 
+// Exportar Mail para compatibilidade onde for importado de crm.ts ou reexportado
+export { Mail } from 'lucide-react'
+
+export interface InboundQuoteAttachmentRecord {
+  id: string
+  inbound_email_id: string
+  file: string
+  file_name?: string
+  file_type?: string
+  file_size?: number
+  quote_id?: string
+  created?: string
+  updated?: string
+}
+
 export interface InboundQuoteEmailRecord {
   id: string
   sender?: string
@@ -528,6 +543,8 @@ export interface InboundQuoteEmailRecord {
   warnings?: string[]
   created?: string
   updated?: string
+  attachments?: InboundQuoteAttachmentRecord[]
+  attachments_count?: number
   expand?: {
     quote_id?: QuoteRecord
     client_id?: ClientRecord
@@ -540,6 +557,7 @@ export interface ProcessInboundEmailPayload {
   sender?: string
   original_sender?: string
   recipient?: string
+  files?: File[]
 }
 
 export interface ProcessInboundEmailResponse {
@@ -556,5 +574,6 @@ export interface ProcessInboundEmailResponse {
   extracted_data?: ExtractedQuoteData
   warnings?: string[]
   extraction_method?: string
+  attachments_count?: number
   error?: string
 }

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-09T16:50:38.523Z",
+  "generatedAt": "2026-09-09T17:07:49.163Z",
   "collections": [
     {
       "name": "users",
@@ -1642,6 +1642,76 @@
       "indexes": [
         "CREATE INDEX idx_inbound_emails_status ON inbound_quote_emails (status)",
         "CREATE INDEX idx_inbound_emails_created ON inbound_quote_emails (created DESC)"
+      ]
+    },
+    {
+      "name": "inbound_quote_attachments",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "inbound_email_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "inbound_quote_emails"
+        },
+        {
+          "name": "file",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "file_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "file_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "file_size",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quote_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "quotes"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_inbound_att_email ON inbound_quote_attachments (inbound_email_id)",
+        "CREATE INDEX idx_inbound_att_quote ON inbound_quote_attachments (quote_id)",
+        "CREATE INDEX idx_inbound_att_created ON inbound_quote_attachments (created DESC)"
       ]
     }
   ]

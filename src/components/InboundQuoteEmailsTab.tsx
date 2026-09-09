@@ -16,6 +16,14 @@ import {
   Info,
   Calendar,
   AlertCircle,
+  Paperclip,
+  FileText,
+  FileSpreadsheet,
+  FileImage,
+  File,
+  X,
+  Download,
+  UploadCloud,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -31,9 +39,15 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { InboundQuoteEmailRecord, QuoteRecord, ClientRecord } from '@/types/crm'
+import {
+  InboundQuoteEmailRecord,
+  InboundQuoteAttachmentRecord,
+  QuoteRecord,
+  ClientRecord,
+} from '@/types/crm'
 import {
   inboundQuoteEmailsService,
+  getInboundAttachmentUrl,
   INBOUND_QUOTE_DEFAULT_SECRET,
 } from '@/services/inbound-quote-emails'
 import { useToast } from '@/hooks/use-toast'
@@ -67,6 +81,47 @@ export function InboundQuoteEmailsTab({
   const [senderInput, setSenderInput] = useState('')
   const [subjectInput, setSubjectInput] = useState('')
   const [bodyInput, setBodyInput] = useState('')
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  // Função utilitária para formatar bytes em tamanho legível
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes || bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+  }
+
+  // Ícone representativo por tipo de arquivo
+  const renderFileIcon = (fileName?: string, fileType?: string) => {
+    const name = (fileName || '').toLowerCase()
+    const type = (fileType || '').toLowerCase()
+    if (type.includes('image') || name.match(/\.(png|jpe?g|webp|gif|svg)$/)) {
+      return <FileImage className="h-4 w-4 text-purple-500 shrink-0" />
+    }
+    if (type.includes('pdf') || name.endsWith('.pdf')) {
+      return <FileText className="h-4 w-4 text-rose-500 shrink-0" />
+    }
+    if (type.includes('sheet') || type.includes('excel') || name.match(/\.(xlsx?|csv)$/)) {
+      return <FileSpreadsheet className="h-4 w-4 text-emerald-500 shrink-0" />
+    }
+    return <File className="h-4 w-4 text-teal-600 shrink-0" />
+  }
+
+  const handleFilesAdded = (files: FileList | File[]) => {
+    const newFiles = Array.from(files)
+    // Evitar duplicados por nome e tamanho
+    setSelectedFiles((prev) => {
+      const existingKeys = new Set(prev.map((f) => `${f.name}-${f.size}`))
+      const filtered = newFiles.filter((f) => !existingKeys.has(`${f.name}-${f.size}`))
+      return [...prev, ...filtered]
+    })
+  }
+
+  const handleRemoveFile = (indexToRemove: number) => {
+    setSelectedFiles((prev) => prev.filter((_, idx) => idx !== indexToRemove))
+  }
 
   // Exemplo de preenchimento rápido para demonstração / testes
   const handleLoadSample = () => {
@@ -110,18 +165,22 @@ Gerente de Manutenção Industrial`)
         sender: senderInput.trim() || 'usuario@intertermal.com.br',
         original_sender: senderInput.trim(),
         recipient: 'orcamentos@intertermal.com.br',
+        files: selectedFiles,
       })
 
       if (res.success && res.quote_id) {
+        const attMsg =
+          selectedFiles.length > 0 ? ` (${selectedFiles.length} anexo(s) salvo(s))` : ''
         toast({
           title: 'Rascunho gerado com sucesso!',
-          description: `Proposta ${res.quote_number || ''} criada e vinculada a ${res.client?.name || 'Cliente'}. Pronto para revisão humana.`,
+          description: `Proposta ${res.quote_number || ''} criada e vinculada a ${res.client?.name || 'Cliente'}${attMsg}. Pronto para revisão humana.`,
         })
 
         // Limpa formulário
         setSenderInput('')
         setSubjectInput('')
         setBodyInput('')
+        setSelectedFiles([])
         setIsManualModalOpen(false)
 
         // Atualiza a listagem
@@ -292,13 +351,14 @@ Gerente de Manutenção Industrial`)
                   <th className="p-3">Equipamento</th>
                   <th className="p-3">Status</th>
                   <th className="p-3">Rascunho Gerado</th>
+                  <th className="p-3">Anexos</th>
                   <th className="p-3 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {inboundEmails.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="p-8 text-center text-muted-foreground">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <Mail className="h-8 w-8 text-slate-400" />
                         <p className="font-medium text-slate-700 dark:text-slate-300">
@@ -444,6 +504,45 @@ Gerente de Manutenção Industrial`)
                                 Status:{' '}
                                 {linkedQuote.status === 'draft' ? 'Rascunho' : linkedQuote.status}
                               </div>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-[11px]">—</span>
+                          )}
+                        </td>
+
+                        <td className="p-3">
+                          {item.attachments && item.attachments.length > 0 ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <Badge
+                                variant="outline"
+                                className="bg-teal-50 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border-teal-200 dark:border-teal-800 text-[11px] font-semibold flex items-center gap-1 px-2 py-0.5"
+                                title={`${item.attachments.length} anexo(s) disponível(is)`}
+                              >
+                                <Paperclip className="h-3 w-3" />
+                                <span>
+                                  {item.attachments.length} anexo
+                                  {item.attachments.length > 1 ? 's' : ''}
+                                </span>
+                              </Badge>
+
+                              {/* Mini links rápidos para baixar o 1º anexo */}
+                              {item.attachments.slice(0, 1).map((att) => {
+                                const url = getInboundAttachmentUrl(att)
+                                return (
+                                  <a
+                                    key={att.id}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    download={att.file_name || 'anexo'}
+                                    className="text-[10px] text-teal-700 hover:text-teal-900 dark:text-teal-400 underline truncate max-w-[90px] inline-flex items-center gap-0.5"
+                                    title={`Baixar: ${att.file_name || 'anexo'}`}
+                                  >
+                                    <Download className="h-2.5 w-2.5" />
+                                    <span className="truncate">{att.file_name || 'Baixar'}</span>
+                                  </a>
+                                )
+                              })}
                             </div>
                           ) : (
                             <span className="text-muted-foreground text-[11px]">—</span>
@@ -610,13 +709,116 @@ Gerente de Manutenção Industrial`)
                 Corpo / Conteúdo do E-mail Encaminhado *
               </Label>
               <Textarea
-                rows={9}
+                rows={7}
                 placeholder="Cole aqui o texto completo do e-mail recebido..."
                 value={bodyInput}
                 onChange={(e) => setBodyInput(e.target.value)}
                 required
                 className="text-xs font-mono"
               />
+            </div>
+
+            {/* CAMPO DE ANEXOS MÚLTIPLOS E DRAG-AND-DROP */}
+            <div className="space-y-2 pt-1 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold flex items-center gap-1.5 text-slate-900 dark:text-slate-100">
+                  <Paperclip className="h-3.5 w-3.5 text-teal-600" />
+                  Anexos da Cotação (PDF, Imagens, Planilhas, Documentos)
+                </Label>
+                <span className="text-[10px] text-muted-foreground">
+                  {selectedFiles.length} selecionado{selectedFiles.length === 1 ? '' : 's'}{' '}
+                  (opcional)
+                </span>
+              </div>
+
+              {/* Zona de Drop / Seleção */}
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  setIsDragOver(true)
+                }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setIsDragOver(false)
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    handleFilesAdded(e.dataTransfer.files)
+                  }
+                }}
+                className={`border-2 border-dashed rounded-xl p-4 text-center transition-colors cursor-pointer ${
+                  isDragOver
+                    ? 'border-teal-500 bg-teal-50/60 dark:bg-teal-950/30'
+                    : 'border-slate-300 dark:border-slate-700 hover:border-teal-400 bg-slate-50/50 dark:bg-slate-900/50'
+                }`}
+                onClick={() => {
+                  const inputEl = document.getElementById('inbound-file-input')
+                  if (inputEl) inputEl.click()
+                }}
+              >
+                <input
+                  id="inbound-file-input"
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      handleFilesAdded(e.target.files)
+                    }
+                  }}
+                />
+                <div className="flex flex-col items-center justify-center gap-1.5">
+                  <UploadCloud className="h-6 w-6 text-teal-600" />
+                  <p className="text-xs font-medium text-slate-800 dark:text-slate-200">
+                    Clique para selecionar arquivos ou arraste e solte aqui
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Suporta PDF, JPG, PNG, planilhas Excel (XLSX, CSV) e laudos até 25MB
+                  </p>
+                </div>
+              </div>
+
+              {/* Preview dos arquivos selecionados */}
+              {selectedFiles.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                    Arquivos que serão vinculados à proposta:
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-36 overflow-y-auto p-1 bg-slate-100/60 dark:bg-slate-900/60 rounded-lg">
+                    {selectedFiles.map((file, idx) => (
+                      <div
+                        key={`${file.name}-${idx}`}
+                        className="flex items-center justify-between gap-2 p-1.5 bg-white dark:bg-slate-950 rounded border border-slate-200 dark:border-slate-800 text-xs shadow-2xs"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {renderFileIcon(file.name, file.type)}
+                          <div className="min-w-0">
+                            <p className="font-medium truncate max-w-[170px] text-[11px] text-slate-800 dark:text-slate-200">
+                              {file.name}
+                            </p>
+                            <p className="text-[9px] text-muted-foreground font-mono">
+                              {formatFileSize(file.size)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRemoveFile(idx)
+                          }}
+                          className="h-6 w-6 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          title="Remover arquivo"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0 pt-2">
@@ -759,6 +961,55 @@ Gerente de Manutenção Industrial`)
                           <li key={idx}>{w}</li>
                         ))}
                       </ul>
+                    </div>
+                  )}
+
+                {/* Lista de Anexos do E-mail */}
+                {selectedEmailForDetails.attachments &&
+                  selectedEmailForDetails.attachments.length > 0 && (
+                    <div>
+                      <h4 className="font-semibold text-slate-800 dark:text-slate-200 mb-1.5 flex items-center gap-1.5 text-xs">
+                        <Paperclip className="h-3.5 w-3.5 text-teal-600" />
+                        Anexos Vinculados ({selectedEmailForDetails.attachments.length})
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {selectedEmailForDetails.attachments.map((att) => {
+                          const fileUrl = getInboundAttachmentUrl(att)
+                          return (
+                            <div
+                              key={att.id}
+                              className="p-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between gap-2"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                {renderFileIcon(att.file_name, att.file_type)}
+                                <div className="min-w-0">
+                                  <p
+                                    className="font-medium text-[11px] text-slate-800 dark:text-slate-200 truncate max-w-[170px]"
+                                    title={att.file_name}
+                                  >
+                                    {att.file_name || 'anexo'}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground font-mono">
+                                    {formatFileSize(att.file_size)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <a
+                                href={fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                download={att.file_name || 'anexo'}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded bg-teal-600 hover:bg-teal-700 text-white text-[10px] font-semibold shrink-0 shadow-2xs"
+                                title="Baixar arquivo"
+                              >
+                                <Download className="h-3 w-3" />
+                                <span>Baixar</span>
+                              </a>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
 
