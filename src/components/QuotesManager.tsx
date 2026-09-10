@@ -1794,11 +1794,13 @@ export function QuotesManager({
               <div>
                 <DialogTitle className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                   <Calculator className="h-5 w-5 text-teal-600" />
-                  Editar Proposta {quoteNumber ? `#${quoteNumber}` : ''}
+                  Editar Proposta
                 </DialogTitle>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Layout integral unificado: escopo, mão de obra, deslocamento, hospedagem e
-                  fechamento comercial.
+                  {quoteNumber
+                    ? `Orçamento nº #${quoteNumber}`
+                    : 'Orçamento de Serviços e Equipamentos'}{' '}
+                  — Layout integral unificado (5 seções).
                 </p>
               </div>
 
@@ -1857,7 +1859,13 @@ export function QuotesManager({
                     ? `✓ Salvo em ${new Date(lastSavedAt).toLocaleDateString('pt-BR')} às ${new Date(
                         lastSavedAt,
                       ).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
-                    : '✓ Salvo automaticamente'}
+                    : '✓ Salvo em ' +
+                      new Date().toLocaleDateString('pt-BR') +
+                      ' às ' +
+                      new Date().toLocaleTimeString('pt-BR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
                 </Badge>
 
                 {activeQuoteId && getStatusBadge(status)}
@@ -1936,7 +1944,7 @@ export function QuotesManager({
                       <span className="flex items-center justify-center w-7 h-5 rounded bg-teal-600 text-white text-[11px] font-bold">
                         3A
                       </span>
-                      3A. Escopo / Identificação Técnica
+                      3A Escopo / Identificação Técnica
                     </CardTitle>
                     <span className="text-[11px] text-muted-foreground">
                       Dados do cliente, oportunidade, equipamentos, materiais e escopo técnico
@@ -2323,7 +2331,7 @@ export function QuotesManager({
                       <span className="flex items-center justify-center w-7 h-5 rounded bg-teal-600 text-white text-[11px] font-bold">
                         3B
                       </span>
-                      3B. Mão de Obra
+                      3B Mão de Obra
                     </CardTitle>
                     <span className="text-xs font-mono font-bold text-teal-700 dark:text-teal-400">
                       Subtotal:{' '}
@@ -2629,7 +2637,7 @@ export function QuotesManager({
                       <span className="flex items-center justify-center w-7 h-5 rounded bg-teal-600 text-white text-[11px] font-bold">
                         3C
                       </span>
-                      3C. Deslocamento & Rotas
+                      3C Deslocamento & Rotas
                     </CardTitle>
                     <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">
                       Subtotal:{' '}
@@ -2949,7 +2957,7 @@ export function QuotesManager({
                       <span className="flex items-center justify-center w-7 h-5 rounded bg-teal-600 text-white text-[11px] font-bold">
                         3D
                       </span>
-                      3D. Hospedagem & Alimentação
+                      3D Hospedagem & Alimentação
                     </CardTitle>
                     <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">
                       Subtotal:{' '}
@@ -3141,7 +3149,7 @@ export function QuotesManager({
                       <span className="flex items-center justify-center w-7 h-5 rounded bg-teal-600 text-white text-[11px] font-bold">
                         3E
                       </span>
-                      3E. Margens & Fechamento
+                      3E Margens & Fechamento
                     </CardTitle>
                     <span className="text-xs font-mono font-extrabold text-teal-800 dark:text-teal-300">
                       Total:{' '}
