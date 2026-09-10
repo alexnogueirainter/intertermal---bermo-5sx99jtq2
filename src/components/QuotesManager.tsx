@@ -1230,7 +1230,7 @@ export function QuotesManager({
     try {
       if (activeQuoteId) {
         await onUpdateQuote(activeQuoteId, payload)
-        toast({ title: 'Proposta atualizada com sucesso!' })
+        toast({ title: 'Alterações salvas com sucesso!' })
       } else {
         await onCreateQuote(payload)
         toast({ title: 'Nova proposta técnica criada!' })
@@ -1239,6 +1239,32 @@ export function QuotesManager({
     } catch (err: any) {
       toast({
         title: 'Erro ao salvar proposta',
+        description: err.message || 'Verifique os dados preenchidos.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Salvar como Rascunho explicitamente
+  const handleSaveDraft = async () => {
+    const payload = getFormDataObject()
+    payload.status = 'draft'
+    setStatus('draft')
+    setIsSaving(true)
+    try {
+      if (activeQuoteId) {
+        await onUpdateQuote(activeQuoteId, payload)
+        toast({ title: 'Rascunho salvo com sucesso!' })
+      } else {
+        await onCreateQuote(payload)
+        toast({ title: 'Proposta salva como rascunho!' })
+      }
+      setIsEditorOpen(false)
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao salvar rascunho',
         description: err.message || 'Verifique os dados preenchidos.',
         variant: 'destructive',
       })
@@ -1640,11 +1666,11 @@ export function QuotesManager({
                               type="button"
                               variant="outline"
                               size="sm"
-                              className="h-8 px-2.5 text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100"
+                              className="h-8 px-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 border-slate-300 dark:border-slate-700 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-700 dark:hover:text-teal-300"
                               onClick={() => handleOpenEditModal(quote)}
                               title="Editar Proposta"
                             >
-                              <Pencil className="h-3.5 w-3.5 mr-1 text-slate-600 dark:text-slate-300" />
+                              <Pencil className="h-3.5 w-3.5 mr-1.5 text-teal-600 dark:text-teal-400" />
                               Editar
                             </Button>
 
@@ -1902,15 +1928,15 @@ export function QuotesManager({
 
             {/* SEÇÕES EMPILHADAS (Layout Unificado Versão 0.0.66) */}
             <div className="space-y-6">
-              {/* SEÇÃO 1: Escopo & CRM */}
+              {/* SEÇÃO 3A: Escopo / Identificação Técnica */}
               <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
                 <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-bold">
-                        1
+                      <span className="flex items-center justify-center w-7 h-5 rounded bg-teal-600 text-white text-[11px] font-bold">
+                        3A
                       </span>
-                      1. Escopo & CRM
+                      3A. Escopo / Identificação Técnica
                     </CardTitle>
                     <span className="text-[11px] text-muted-foreground">
                       Dados do cliente, oportunidade, equipamentos, materiais e escopo técnico
@@ -2289,15 +2315,15 @@ export function QuotesManager({
                 </CardContent>
               </Card>
 
-              {/* SEÇÃO 2: Mão de Obra */}
+              {/* SEÇÃO 3B: Mão de Obra */}
               <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
                 <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-bold">
-                        2
+                      <span className="flex items-center justify-center w-7 h-5 rounded bg-teal-600 text-white text-[11px] font-bold">
+                        3B
                       </span>
-                      2. Mão de Obra
+                      3B. Mão de Obra
                     </CardTitle>
                     <span className="text-xs font-mono font-bold text-teal-700 dark:text-teal-400">
                       Subtotal:{' '}
@@ -2595,15 +2621,15 @@ export function QuotesManager({
                 </CardContent>
               </Card>
 
-              {/* SEÇÃO 3: Deslocamento & Rotas */}
+              {/* SEÇÃO 3C: Deslocamento & Rotas */}
               <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
                 <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-bold">
-                        3
+                      <span className="flex items-center justify-center w-7 h-5 rounded bg-teal-600 text-white text-[11px] font-bold">
+                        3C
                       </span>
-                      3. Deslocamento & Rotas
+                      3C. Deslocamento & Rotas
                     </CardTitle>
                     <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">
                       Subtotal:{' '}
@@ -2915,15 +2941,15 @@ export function QuotesManager({
                 </CardContent>
               </Card>
 
-              {/* SEÇÃO 4: Hospedagem & Alimentação */}
+              {/* SEÇÃO 3D: Hospedagem & Alimentação */}
               <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
                 <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-bold">
-                        4
+                      <span className="flex items-center justify-center w-7 h-5 rounded bg-teal-600 text-white text-[11px] font-bold">
+                        3D
                       </span>
-                      4. Hospedagem & Alimentação
+                      3D. Hospedagem & Alimentação
                     </CardTitle>
                     <span className="text-xs font-mono font-bold text-emerald-700 dark:text-emerald-400">
                       Subtotal:{' '}
@@ -3107,15 +3133,15 @@ export function QuotesManager({
                 </CardContent>
               </Card>
 
-              {/* SEÇÃO 5: Margens & Fechamento */}
+              {/* SEÇÃO 3E: Margens & Fechamento */}
               <Card className="border-slate-200 dark:border-slate-800 shadow-xs">
                 <CardHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      <span className="flex items-center justify-center w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] font-bold">
-                        5
+                      <span className="flex items-center justify-center w-7 h-5 rounded bg-teal-600 text-white text-[11px] font-bold">
+                        3E
                       </span>
-                      5. Margens & Fechamento
+                      3E. Margens & Fechamento
                     </CardTitle>
                     <span className="text-xs font-mono font-extrabold text-teal-800 dark:text-teal-300">
                       Total:{' '}
@@ -3525,8 +3551,18 @@ export function QuotesManager({
             </div>
           </div>
 
-          <DialogFooter className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <DialogFooter className="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-900/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sticky bottom-0 z-10 backdrop-blur-sm">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditorOpen(false)}
+                className="text-xs text-slate-700 dark:text-slate-300 hover:bg-slate-100"
+              >
+                Cancelar
+              </Button>
+
               <Button
                 type="button"
                 variant="outline"
@@ -3535,10 +3571,10 @@ export function QuotesManager({
                   const currentObj = getFormDataObject() as QuoteRecord
                   handleOpenPdfPreview({ ...currentObj, id: activeQuoteId || 'draft' }, 'client')
                 }}
-                className="text-xs border-teal-300 text-teal-700 hover:bg-teal-50"
+                className="text-xs border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300"
               >
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                Pré-visualizar PDF
+                <Eye className="h-3.5 w-3.5 mr-1 text-teal-600" />
+                Visualizar PDF
               </Button>
 
               {activeQuoteId && (
@@ -3550,7 +3586,7 @@ export function QuotesManager({
                     const token = approvalToken || activeQuoteId
                     window.open(`/proposta/${token}`, '_blank')
                   }}
-                  className="text-xs text-slate-600 hover:text-teal-700"
+                  className="text-xs text-slate-600 hover:text-teal-700 hidden sm:inline-flex"
                 >
                   <ExternalLink className="h-3.5 w-3.5 mr-1" />
                   Link Aceite
@@ -3558,16 +3594,19 @@ export function QuotesManager({
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setIsEditorOpen(false)}
-                className="text-xs"
+                onClick={handleSaveDraft}
+                disabled={isSaving}
+                className="text-xs border-slate-300 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300"
               >
-                Cancelar
+                <Clock className="h-3.5 w-3.5 mr-1 text-slate-500" />
+                Salvar Rascunho
               </Button>
+
               <Button
                 type="button"
                 size="sm"
@@ -3583,7 +3622,7 @@ export function QuotesManager({
                 ) : (
                   <>
                     <Save className="h-3.5 w-3.5 mr-1" />
-                    Salvar Proposta
+                    Salvar Alterações
                   </>
                 )}
               </Button>
