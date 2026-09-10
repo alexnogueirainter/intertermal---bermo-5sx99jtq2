@@ -297,10 +297,12 @@ export interface EquipmentSpecsSearchResult {
     material?: string
     gasketMaterial?: string
     platesRange?: string
+    platesCount?: string | number
     plateDimensions?: string
     gasketsCount?: string
     maxFlowRate?: string
     applications?: string
+    [key: string]: any
   } | null
   source?: string
   message?: string

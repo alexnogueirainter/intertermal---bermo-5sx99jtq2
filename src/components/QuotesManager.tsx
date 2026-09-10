@@ -3,7 +3,7 @@ import {
   FileText,
   Plus,
   Trash2,
-  Edit,
+  Pencil,
   Save,
   Search,
   CheckCircle,
@@ -43,6 +43,7 @@ import {
   Eye,
   CheckCheck,
   XCircle,
+  Globe,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
@@ -93,7 +94,8 @@ import {
   fetchCepCoordinates,
   haversineDistance,
 } from '@/lib/mapeia-calculator'
-import { quotesService } from '@/services/quotes'
+import { quotesService, searchEquipmentSpecsOnline } from '@/services/quotes'
+import { getStandardServiceMethodology } from '@/data/bermo-catalog'
 
 export interface QuotesManagerProps {
   quotes: QuoteRecord[]
@@ -191,9 +193,8 @@ export function QuotesManager({
       working_pressure_bar: 10,
     },
   ])
-  const [scopeOfWork, setScopeOfWork] = useState(
-    'Desmontagem completa, limpeza química/mecânica por imersão, teste de líquido penetrante, substituição das gaxetas e teste hidrostático conforme norma ASME.',
-  )
+  const [searchingSpecsIndex, setSearchingSpecsIndex] = useState<number | null>(null)
+  const [scopeOfWork, setScopeOfWork] = useState(() => getStandardServiceMethodology(['BERMO']))
 
   // Vínculo com Oportunidade CRM e Responsável
   const [dealId, setDealId] = useState('')
@@ -572,9 +573,7 @@ export function QuotesManager({
         working_pressure_bar: 10,
       },
     ])
-    setScopeOfWork(
-      'Desmontagem completa, limpeza química/mecânica por imersão, teste de líquido penetrante, substituição das gaxetas e teste hidrostático conforme norma ASME.',
-    )
+    setScopeOfWork(getStandardServiceMethodology(['BERMO']))
     setTechCount(2)
     setTechHours(16)
     setTechRate(85)
@@ -699,6 +698,104 @@ export function QuotesManager({
           setWorkingPressureBar(patch.working_pressure_bar)
       }
       return next
+    })
+  }
+
+  // Busca na internet de especificações técnicas do equipamento com fallback para Google
+  const handleSearchSpecsOnline = async (index: number) => {
+    const item = equipments[index]
+    const model = (item?.model || equipmentModel || '').trim()
+    const brand = (item?.brand || equipmentBrand || '').trim()
+
+    if (!model) {
+      toast({
+        title: 'Modelo não informado',
+        description: 'Digite o modelo do equipamento antes de buscar especificações.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setSearchingSpecsIndex(index)
+    try {
+      const result = await searchEquipmentSpecsOnline(model, brand)
+      if (result && result.found && result.specs) {
+        const specs = result.specs
+        const patch: Partial<QuoteEquipmentItem> = {}
+
+        if (result.brand) {
+          patch.brand = result.brand
+        }
+        if (result.model) {
+          patch.model = result.model
+        }
+        if (specs.platesCount) {
+          const parsed = parseInt(String(specs.platesCount), 10)
+          if (!isNaN(parsed) && parsed > 0) {
+            patch.plate_count = parsed
+          }
+        }
+        if (specs.material) {
+          patch.plate_material = specs.material
+        }
+        if (specs.gasketMaterial) {
+          patch.gasket_material = specs.gasketMaterial
+        }
+        if (specs.connection) {
+          patch.connection_size = specs.connection
+        }
+        if (specs.pressure) {
+          const match = String(specs.pressure).match(/(\d+)/)
+          if (match && match[1]) {
+            const p = parseInt(match[1], 10)
+            if (!isNaN(p) && p > 0) {
+              patch.working_pressure_bar = p
+              patch.pressure_test_bar = Math.round(p * 1.5)
+            }
+          }
+        }
+
+        handleUpdateEquipment(index, patch)
+        toast({
+          title: 'Especificações encontradas!',
+          description:
+            result.message ||
+            `Dados carregados para ${result.model || model} (${result.brand || brand}).`,
+        })
+      } else {
+        // Fallback: abrir busca no Google em nova aba
+        const queryTerm = `${brand ? `${brand} ` : ''}${model} trocador de calor especificações técnicas datasheet`
+        window.open(`https://www.google.com/search?q=${encodeURIComponent(queryTerm)}`, '_blank')
+        toast({
+          title: 'Não encontrado no catálogo',
+          description: 'Abrindo busca no Google em nova aba com o termo digitado.',
+        })
+      }
+    } catch (err) {
+      console.warn('Erro na busca online de specs:', err)
+      const queryTerm = `${brand ? `${brand} ` : ''}${model} trocador de calor especificações técnicas datasheet`
+      window.open(`https://www.google.com/search?q=${encodeURIComponent(queryTerm)}`, '_blank')
+      toast({
+        title: 'Busca online falhou',
+        description: 'Abrindo busca no Google em nova aba com o termo digitado.',
+      })
+    } finally {
+      setSearchingSpecsIndex(null)
+    }
+  }
+
+  // Preencher descrição padrão dos serviços
+  const handleInsertStandardScope = () => {
+    const brandsList = equipments
+      .map((e) => e.brand)
+      .filter((b): b is string => !!b && b.trim() !== '')
+    const standardText = getStandardServiceMethodology(
+      brandsList.length > 0 ? brandsList : [equipmentBrand || 'BERMO'],
+    )
+    setScopeOfWork(standardText)
+    toast({
+      title: 'Descrição padrão inserida',
+      description: 'O escopo técnico foi preenchido com a metodologia de manutenção.',
     })
   }
 
@@ -1547,7 +1644,7 @@ export function QuotesManager({
                               onClick={() => handleOpenEditModal(quote)}
                               title="Editar Proposta"
                             >
-                              <Edit className="h-3.5 w-3.5 mr-1 text-slate-600 dark:text-slate-300" />
+                              <Pencil className="h-3.5 w-3.5 mr-1 text-slate-600 dark:text-slate-300" />
                               Editar
                             </Button>
 
@@ -1581,7 +1678,7 @@ export function QuotesManager({
                                   Opções da Proposta
                                 </DropdownMenuLabel>
                                 <DropdownMenuItem onClick={() => handleOpenEditModal(quote)}>
-                                  <Edit className="h-3.5 w-3.5 mr-2" />
+                                  <Pencil className="h-3.5 w-3.5 mr-2" />
                                   Editar Parâmetros & Custos
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
@@ -1928,88 +2025,235 @@ export function QuotesManager({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Modelo do Equipamento</Label>
-                      <Input
-                        value={equipmentModel}
-                        onChange={(e) => setEquipmentModel(e.target.value)}
-                        placeholder="Ex: BP30 / TL10-BFG"
-                        className="text-xs h-8 font-semibold"
-                      />
+                  {/* Bloco Dinâmico de Equipamentos / Itens do Orçamento */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                          Itens / Equipamentos ({equipments.length})
+                        </Label>
+                        <span className="text-[11px] text-muted-foreground">
+                          Cada equipamento com especificações técnicas próprias
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAddEquipment}
+                        className="h-7 text-xs border-dashed border-teal-500 text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/40"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Adicionar item
+                      </Button>
                     </div>
 
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Marca</Label>
-                      <Input
-                        value={equipmentBrand}
-                        onChange={(e) => setEquipmentBrand(e.target.value)}
-                        placeholder="Ex: BERMO / Alfa Laval"
-                        className="text-xs h-8"
-                      />
-                    </div>
+                    <div className="space-y-3">
+                      {equipments.map((eq, eqIdx) => {
+                        const isPrimary = eqIdx === 0
+                        const currentModel = eq.model ?? (isPrimary ? equipmentModel : '')
+                        const currentBrand = eq.brand ?? (isPrimary ? equipmentBrand : 'BERMO')
+                        const currentQty = eq.quantity ?? (isPrimary ? equipmentQuantity : 1)
+                        const currentPlateCount = eq.plate_count ?? (isPrimary ? plateCount : 40)
+                        const currentPlateMat =
+                          eq.plate_material ?? (isPrimary ? plateMaterial : 'AISI 316L')
+                        const currentPlateThick =
+                          eq.plate_thickness ?? (isPrimary ? plateThickness : 0.5)
+                        const currentGasketMat =
+                          eq.gasket_material ?? (isPrimary ? gasketMaterial : 'EPDM Clip-on')
+                        const isSearchingThis = searchingSpecsIndex === eqIdx
 
-                    <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Quantidade de Equipamentos</Label>
-                      <Input
-                        type="number"
-                        min="1"
-                        value={equipmentQuantity}
-                        onChange={(e) => setEquipmentQuantity(Math.max(1, Number(e.target.value)))}
-                        className="text-xs h-8 font-mono"
-                      />
-                    </div>
-                  </div>
+                        return (
+                          <div
+                            key={eq.id || `eq-${eqIdx}`}
+                            className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3 relative"
+                          >
+                            <div className="flex items-center justify-between gap-2 border-b border-slate-200/70 dark:border-slate-800 pb-2">
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px] font-mono font-bold bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
+                                >
+                                  Item #{eqIdx + 1}
+                                  {isPrimary && ' (Principal)'}
+                                </Badge>
+                                {eq.tag && (
+                                  <span className="text-[11px] text-muted-foreground font-mono">
+                                    TAG: {eq.tag}
+                                  </span>
+                                )}
+                              </div>
 
-                  {/* Especificações Técnicas de Placas / Gaxetas */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">Qtd. de Placas</Label>
-                      <Input
-                        type="number"
-                        value={plateCount}
-                        onChange={(e) => setPlateCount(Number(e.target.value))}
-                        className="text-xs h-7 font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">Material da Placa</Label>
-                      <Input
-                        value={plateMaterial}
-                        onChange={(e) => setPlateMaterial(e.target.value)}
-                        placeholder="AISI 316L"
-                        className="text-xs h-7"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">Espessura (mm)</Label>
-                      <Input
-                        type="number"
-                        step="0.1"
-                        value={plateThickness}
-                        onChange={(e) => setPlateThickness(Number(e.target.value))}
-                        className="text-xs h-7 font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] text-muted-foreground">Gaxeta</Label>
-                      <Input
-                        value={gasketMaterial}
-                        onChange={(e) => setGasketMaterial(e.target.value)}
-                        placeholder="EPDM Clip-on"
-                        className="text-xs h-7"
-                      />
+                              <div className="flex items-center gap-1.5">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isSearchingThis}
+                                  onClick={() => handleSearchSpecsOnline(eqIdx)}
+                                  className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300"
+                                  title="Buscar especificações técnicas online nos catálogos ou Google"
+                                >
+                                  {isSearchingThis ? (
+                                    <>
+                                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                      Buscando...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Globe className="h-3 w-3 mr-1 text-teal-600" />
+                                      Buscar especificações na internet
+                                    </>
+                                  )}
+                                </Button>
+
+                                {equipments.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleRemoveEquipment(eqIdx)}
+                                    className="h-7 px-2 text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                    title="Remover este item"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                              <div className="space-y-1 sm:col-span-2">
+                                <Label className="text-xs font-semibold">
+                                  Modelo do Equipamento
+                                </Label>
+                                <Input
+                                  value={currentModel}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eqIdx, { model: e.target.value })
+                                  }
+                                  placeholder="Ex: BP30 / TL10-BFG / M10-B"
+                                  className="text-xs h-8 font-semibold"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <Label className="text-xs font-semibold">Marca</Label>
+                                <Input
+                                  value={currentBrand}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eqIdx, { brand: e.target.value })
+                                  }
+                                  placeholder="Ex: BERMO / Alfa Laval"
+                                  className="text-xs h-8"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <Label className="text-xs font-semibold">Quantidade</Label>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  value={currentQty}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eqIdx, {
+                                      quantity: Math.max(1, Number(e.target.value)),
+                                    })
+                                  }
+                                  className="text-xs h-8 font-mono"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Detalhes Técnicos de Placas / Gaxetas */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">
+                                  Qtd. de Placas
+                                </Label>
+                                <Input
+                                  type="number"
+                                  value={currentPlateCount}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eqIdx, {
+                                      plate_count: Number(e.target.value),
+                                    })
+                                  }
+                                  className="text-xs h-7 font-mono bg-white dark:bg-slate-950"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">
+                                  Material da Placa
+                                </Label>
+                                <Input
+                                  value={currentPlateMat}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eqIdx, {
+                                      plate_material: e.target.value,
+                                    })
+                                  }
+                                  placeholder="AISI 316L"
+                                  className="text-xs h-7 bg-white dark:bg-slate-950"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">
+                                  Espessura (mm)
+                                </Label>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  value={currentPlateThick}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eqIdx, {
+                                      plate_thickness: Number(e.target.value),
+                                    })
+                                  }
+                                  className="text-xs h-7 font-mono bg-white dark:bg-slate-950"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-[10px] text-muted-foreground">Gaxeta</Label>
+                                <Input
+                                  value={currentGasketMat}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eqIdx, {
+                                      gasket_material: e.target.value,
+                                    })
+                                  }
+                                  placeholder="EPDM Clip-on"
+                                  className="text-xs h-7 bg-white dark:bg-slate-950"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold">
-                      Escopo Detalhado do Fornecimento
-                    </Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">
+                        Escopo Detalhado do Fornecimento
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleInsertStandardScope}
+                        className="h-6 px-2 text-[11px] text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40"
+                      >
+                        <Sparkles className="h-3 w-3 mr-1 text-teal-600" />
+                        Inserir descrição padrão
+                      </Button>
+                    </div>
                     <Textarea
-                      rows={3}
+                      rows={4}
                       value={scopeOfWork}
                       onChange={(e) => setScopeOfWork(e.target.value)}
+                      placeholder="Descreva detalhadamente a metodologia técnica e escopo do serviço..."
                       className="text-xs leading-relaxed"
                     />
                   </div>
