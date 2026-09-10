@@ -88,6 +88,7 @@ if (typeof window !== 'undefined' && !(window as any).Mail) {
 if (typeof globalThis !== 'undefined' && !(globalThis as any).Mail) {
   ;(globalThis as any).Mail = Mail
 }
+// Versão do Layout fixada: v0.0.66
 
 export default function IndexPage() {
   const { toast } = useToast()

@@ -50,7 +50,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
 import {
   Dialog,
   DialogContent,
@@ -129,7 +129,6 @@ export function QuotesManager({
   // Controle do modal de criação / edição de proposta
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [activeQuoteId, setActiveQuoteId] = useState<string | null>(null)
-  const [activeTabSection, setActiveTabSection] = useState('escopo')
   const [isSaving, setIsSaving] = useState(false)
 
   // PDF Preview Dialog (visão cliente e interna)
@@ -527,7 +526,6 @@ export function QuotesManager({
   // Reset Form para Nova Proposta
   const resetForm = () => {
     setActiveQuoteId(null)
-    setActiveTabSection('escopo')
     setClientId('')
     setClientName('')
     setDealId('')
