@@ -62,7 +62,6 @@ import { PipelineKanban } from '@/components/PipelineKanban'
 import { QuotesManager } from '@/components/QuotesManager'
 import { ServicesManager } from '@/components/ServicesManager'
 import { ServiceOrdersKanban } from '@/components/ServiceOrdersKanban'
-import { ServiceOrdersReport } from '@/components/ServiceOrdersReport'
 import { EquipmentServiceHistory } from '@/components/EquipmentServiceHistory'
 import { TicketsSupport } from '@/components/TicketsSupport'
 import { ActivitiesManager } from '@/components/ActivitiesManager'
@@ -77,7 +76,6 @@ type ActiveTab =
   | 'clients'
   | 'services'
   | 'service_kanban'
-  | 'service_report'
   | 'equipment_history'
   | 'tickets'
   | 'activities'
@@ -780,21 +778,6 @@ export default function IndexPage() {
             </button>
 
             <button
-              onClick={() => setActiveTab('service_report')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'service_report'
-                  ? 'bg-teal-700 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <BarChart3 className="h-4 w-4 text-teal-400" />
-                Relatório de OS
-              </div>
-              <span className="text-[11px] text-muted-foreground">{serviceOrders.length}</span>
-            </button>
-
-            <button
               onClick={() => setActiveTab('services')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                 activeTab === 'services'
@@ -932,7 +915,6 @@ export default function IndexPage() {
                 {activeTab === 'deals' && 'Pipeline Comercial (Funil)'}
                 {activeTab === 'clients' && 'Gestão de Clientes Industriais'}
                 {activeTab === 'service_kanban' && 'Pipeline de Serviços Técnicos (Kanban)'}
-                {activeTab === 'service_report' && 'Relatório Analítico de Ordens de Serviço (OS)'}
                 {activeTab === 'equipment_history' &&
                   'Histórico de Manutenções por Cliente & Equipamento'}
                 {activeTab === 'services' && 'Ordens de Serviço & Contratos'}
@@ -1029,9 +1011,6 @@ export default function IndexPage() {
               onDeleteServiceOrder={handleDeleteServiceOrder}
               onCancelServiceOrder={handleCancelServiceOrder}
             />
-          )}
-          {activeTab === 'service_report' && (
-            <ServiceOrdersReport serviceOrders={serviceOrders} clients={clients} quotes={quotes} />
           )}
           {activeTab === 'equipment_history' && (
             <EquipmentServiceHistory

@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { QuoteRecord } from '@/types/crm'
 import { generateAndUploadQuotePdf } from '@/lib/quote-pdf-generator'
-import { QuoteAttachmentsPanel } from '@/components/QuoteAttachmentsPanel'
 import {
   Printer,
   FileDown,
@@ -595,13 +594,6 @@ export function QuotePdfPreviewDialog({
             )}
           </div>
         </DialogHeader>
-
-        {/* Painel de Anexos do Pedido de Cotação Original (se houver) */}
-        {quote?.id && (
-          <div className="p-4 bg-slate-50 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 print:hidden">
-            <QuoteAttachmentsPanel quoteId={quote.id} />
-          </div>
-        )}
 
         {/* ÁREA DO DOCUMENTO FORMATADO (A4 STYLE) */}
         <div

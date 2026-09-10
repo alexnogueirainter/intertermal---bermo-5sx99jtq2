@@ -260,6 +260,7 @@ export function QuotesManager({
   const [serviceMargin, setServiceMargin] = useState(25)
   const [salesCommission, setSalesCommission] = useState(6)
   const [adminRate, setAdminRate] = useState(3)
+  const [taxRate, setTaxRate] = useState(14.83)
   const [pisRate, setPisRate] = useState(0.65)
   const [cofinsRate, setCofinsRate] = useState(3.0)
   const [issRate, setIssRate] = useState(5.0)
@@ -322,8 +323,8 @@ export function QuotesManager({
     thirdPartyCost +
     otherCosts
 
-  // Total Tributos
-  const totalTaxesPercent = pisRate + cofinsRate + issRate + csllRate + irpjRate + irDiffRate
+  // Total Tributos (Taxa Fiscal Consolidada - modelo v0.0.66)
+  const totalTaxesPercent = taxRate
 
   // Divisor de formação de preço (Markup)
   const totalDeductionsPercent = (serviceMargin + salesCommission + totalTaxesPercent) / 100
@@ -625,6 +626,7 @@ export function QuotesManager({
     setServiceMargin(25)
     setSalesCommission(6)
     setAdminRate(3)
+    setTaxRate(14.83)
     setPisRate(0.65)
     setCofinsRate(3.0)
     setIssRate(5.0)
@@ -874,6 +876,23 @@ export function QuotesManager({
     setServiceMargin(quote.service_margin ?? 25)
     setSalesCommission(quote.sales_commission ?? 6)
     setAdminRate(quote.admin_rate ?? 3)
+    // Se a proposta já tiver total_taxes salvo ou alíquotas individuais somadas, preserva; padrão 14.83%
+    const existingTaxSum =
+      (quote.pis_rate ?? 0) +
+      (quote.cofins_rate ?? 0) +
+      (quote.iss_rate ?? 0) +
+      (quote.csll_rate ?? 0) +
+      (quote.irpj_rate ?? 0) +
+      (quote.ir_diff_rate ?? 0)
+    const initialTaxRate =
+      (quote as any).tax_rate ??
+      (quote as any).taxes_rate ??
+      (quote.service_details?.indirect_costs?.taxes?.totalTaxes != null
+        ? Number(quote.service_details.indirect_costs.taxes.totalTaxes)
+        : existingTaxSum > 0
+          ? Number(existingTaxSum.toFixed(2))
+          : 14.83)
+    setTaxRate(initialTaxRate)
     setPisRate(quote.pis_rate ?? 0.65)
     setCofinsRate(quote.cofins_rate ?? 3.0)
     setIssRate(quote.iss_rate ?? 5.0)
@@ -1000,6 +1019,7 @@ export function QuotesManager({
     serviceMargin,
     salesCommission,
     adminRate,
+    taxRate,
     paymentTerms,
     validityDays,
     technicalNotes,
@@ -3087,20 +3107,20 @@ export function QuotesManager({
                     </div>
                   </div>
 
-                  {/* Bloco 2: Abertura Tributária Individual (6 Alíquotas) */}
+                  {/* Bloco 2: Taxa Fiscal Consolidada */}
                   <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
                         <Percent className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
                         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                          Opções Tributárias & Impostos Incidentes
+                          Tributos & Encargos Fiscais
                         </span>
                       </div>
                       <Badge
                         variant="outline"
                         className="text-[10.5px] font-mono font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-900"
                       >
-                        Total Alíquotas: {totalTaxesPercent.toFixed(2)}% (
+                        Total Tributos: {totalTaxesPercent.toFixed(2)}% (
                         {(calculatedSalePrice * (totalTaxesPercent / 100)).toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
@@ -3109,363 +3129,41 @@ export function QuotesManager({
                       </Badge>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-                      {/* PIS */}
-                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-2.5 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                            PIS (%)
+                          <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            Taxa Fiscal Consolidada (%)
                           </Label>
-                          <span className="text-[9.5px] font-mono text-slate-500">
-                            {(calculatedSalePrice * (pisRate / 100)).toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
+                          <span className="text-[10.5px] font-mono font-bold text-rose-600 dark:text-rose-400">
+                            {(calculatedSalePrice * (totalTaxesPercent / 100)).toLocaleString(
+                              'pt-BR',
+                              {
+                                style: 'currency',
+                                currency: 'BRL',
+                              },
+                            )}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                           <Input
                             type="number"
                             step="0.01"
-                            value={pisRate}
-                            onChange={(e) => setPisRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
+                            value={taxRate}
+                            onChange={(e) => setTaxRate(Number(e.target.value))}
+                            className="text-xs h-8 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1"
                           />
-                          <Select
-                            value={[0, 0.65, 1.65].includes(pisRate) ? String(pisRate) : 'custom'}
-                            onValueChange={(val) => {
-                              if (val !== 'custom') setPisRate(Number(val))
-                            }}
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] font-mono text-muted-foreground shrink-0"
                           >
-                            <SelectTrigger
-                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-                              title="Opções de PIS"
-                            >
-                              <SelectValue placeholder="%" />
-                            </SelectTrigger>
-                            <SelectContent align="end">
-                              <SelectItem value="0" className="text-xs font-mono">
-                                0% (Isento)
-                              </SelectItem>
-                              <SelectItem value="0.65" className="text-xs font-mono">
-                                0,65% (Cumulativo)
-                              </SelectItem>
-                              <SelectItem value="1.65" className="text-xs font-mono">
-                                1,65% (Não-cumulativo)
-                              </SelectItem>
-                              {![0, 0.65, 1.65].includes(pisRate) && (
-                                <SelectItem
-                                  value="custom"
-                                  className="text-xs font-mono text-muted-foreground"
-                                >
-                                  {pisRate}% (Outro)
-                                </SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
+                            Padrão: 14,83%
+                          </Badge>
                         </div>
-                      </div>
-
-                      {/* COFINS */}
-                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                            COFINS (%)
-                          </Label>
-                          <span className="text-[9.5px] font-mono text-slate-500">
-                            {(calculatedSalePrice * (cofinsRate / 100)).toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={cofinsRate}
-                            onChange={(e) => setCofinsRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
-                          />
-                          <Select
-                            value={
-                              [0, 3.0, 7.6].includes(cofinsRate) ? String(cofinsRate) : 'custom'
-                            }
-                            onValueChange={(val) => {
-                              if (val !== 'custom') setCofinsRate(Number(val))
-                            }}
-                          >
-                            <SelectTrigger
-                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-                              title="Opções de COFINS"
-                            >
-                              <SelectValue placeholder="%" />
-                            </SelectTrigger>
-                            <SelectContent align="end">
-                              <SelectItem value="0" className="text-xs font-mono">
-                                0% (Isento)
-                              </SelectItem>
-                              <SelectItem value="3" className="text-xs font-mono">
-                                3,0% (Cumulativo)
-                              </SelectItem>
-                              <SelectItem value="7.6" className="text-xs font-mono">
-                                7,6% (Não-cumulativo)
-                              </SelectItem>
-                              {![0, 3.0, 7.6].includes(cofinsRate) && (
-                                <SelectItem
-                                  value="custom"
-                                  className="text-xs font-mono text-muted-foreground"
-                                >
-                                  {cofinsRate}% (Outro)
-                                </SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {/* ISS */}
-                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                            ISS (%)
-                          </Label>
-                          <span className="text-[9.5px] font-mono text-slate-500">
-                            {(calculatedSalePrice * (issRate / 100)).toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={issRate}
-                            onChange={(e) => setIssRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
-                          />
-                          <Select
-                            value={
-                              [0, 2.0, 2.5, 3.0, 4.0, 5.0].includes(issRate)
-                                ? String(issRate)
-                                : 'custom'
-                            }
-                            onValueChange={(val) => {
-                              if (val !== 'custom') setIssRate(Number(val))
-                            }}
-                          >
-                            <SelectTrigger
-                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-                              title="Opções de ISS"
-                            >
-                              <SelectValue placeholder="%" />
-                            </SelectTrigger>
-                            <SelectContent align="end">
-                              <SelectItem value="0" className="text-xs font-mono">
-                                0% (Isento)
-                              </SelectItem>
-                              <SelectItem value="2" className="text-xs font-mono">
-                                2,0% (Mínimo)
-                              </SelectItem>
-                              <SelectItem value="2.5" className="text-xs font-mono">
-                                2,5%
-                              </SelectItem>
-                              <SelectItem value="3" className="text-xs font-mono">
-                                3,0%
-                              </SelectItem>
-                              <SelectItem value="4" className="text-xs font-mono">
-                                4,0%
-                              </SelectItem>
-                              <SelectItem value="5" className="text-xs font-mono">
-                                5,0% (Padrão)
-                              </SelectItem>
-                              {![0, 2.0, 2.5, 3.0, 4.0, 5.0].includes(issRate) && (
-                                <SelectItem
-                                  value="custom"
-                                  className="text-xs font-mono text-muted-foreground"
-                                >
-                                  {issRate}% (Outro)
-                                </SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {/* CSLL */}
-                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                            CSLL (%)
-                          </Label>
-                          <span className="text-[9.5px] font-mono text-slate-500">
-                            {(calculatedSalePrice * (csllRate / 100)).toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={csllRate}
-                            onChange={(e) => setCsllRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
-                          />
-                          <Select
-                            value={[0, 1.08, 2.88].includes(csllRate) ? String(csllRate) : 'custom'}
-                            onValueChange={(val) => {
-                              if (val !== 'custom') setCsllRate(Number(val))
-                            }}
-                          >
-                            <SelectTrigger
-                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-                              title="Opções de CSLL"
-                            >
-                              <SelectValue placeholder="%" />
-                            </SelectTrigger>
-                            <SelectContent align="end">
-                              <SelectItem value="0" className="text-xs font-mono">
-                                0% (Isento)
-                              </SelectItem>
-                              <SelectItem value="1.08" className="text-xs font-mono">
-                                1,08%
-                              </SelectItem>
-                              <SelectItem value="2.88" className="text-xs font-mono">
-                                2,88% (Padrão)
-                              </SelectItem>
-                              {![0, 1.08, 2.88].includes(csllRate) && (
-                                <SelectItem
-                                  value="custom"
-                                  className="text-xs font-mono text-muted-foreground"
-                                >
-                                  {csllRate}% (Outro)
-                                </SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {/* IRPJ */}
-                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                            IRPJ (%)
-                          </Label>
-                          <span className="text-[9.5px] font-mono text-slate-500">
-                            {(calculatedSalePrice * (irpjRate / 100)).toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={irpjRate}
-                            onChange={(e) => setIrpjRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
-                          />
-                          <Select
-                            value={[0, 1.2, 4.8].includes(irpjRate) ? String(irpjRate) : 'custom'}
-                            onValueChange={(val) => {
-                              if (val !== 'custom') setIrpjRate(Number(val))
-                            }}
-                          >
-                            <SelectTrigger
-                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-                              title="Opções de IRPJ"
-                            >
-                              <SelectValue placeholder="%" />
-                            </SelectTrigger>
-                            <SelectContent align="end">
-                              <SelectItem value="0" className="text-xs font-mono">
-                                0% (Isento)
-                              </SelectItem>
-                              <SelectItem value="1.2" className="text-xs font-mono">
-                                1,2%
-                              </SelectItem>
-                              <SelectItem value="4.8" className="text-xs font-mono">
-                                4,8% (Padrão)
-                              </SelectItem>
-                              {![0, 1.2, 4.8].includes(irpjRate) && (
-                                <SelectItem
-                                  value="custom"
-                                  className="text-xs font-mono text-muted-foreground"
-                                >
-                                  {irpjRate}% (Outro)
-                                </SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {/* Dif. IR */}
-                      <div className="p-2 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                            Dif. IR (%)
-                          </Label>
-                          <span className="text-[9.5px] font-mono text-slate-500">
-                            {(calculatedSalePrice * (irDiffRate / 100)).toLocaleString('pt-BR', {
-                              style: 'currency',
-                              currency: 'BRL',
-                            })}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={irDiffRate}
-                            onChange={(e) => setIrDiffRate(Number(e.target.value))}
-                            className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1 min-w-0"
-                          />
-                          <Select
-                            value={
-                              [0, 0.96, 1.5, 2.0].includes(irDiffRate)
-                                ? String(irDiffRate)
-                                : 'custom'
-                            }
-                            onValueChange={(val) => {
-                              if (val !== 'custom') setIrDiffRate(Number(val))
-                            }}
-                          >
-                            <SelectTrigger
-                              className="w-14 h-7 text-[10.5px] font-mono px-1 shrink-0 bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-                              title="Opções de Dif. IR"
-                            >
-                              <SelectValue placeholder="%" />
-                            </SelectTrigger>
-                            <SelectContent align="end">
-                              <SelectItem value="0" className="text-xs font-mono">
-                                0% (Isento)
-                              </SelectItem>
-                              <SelectItem value="0.96" className="text-xs font-mono">
-                                0,96%
-                              </SelectItem>
-                              <SelectItem value="1.5" className="text-xs font-mono">
-                                1,5% (Padrão)
-                              </SelectItem>
-                              <SelectItem value="2" className="text-xs font-mono">
-                                2,0%
-                              </SelectItem>
-                              {![0, 0.96, 1.5, 2.0].includes(irDiffRate) && (
-                                <SelectItem
-                                  value="custom"
-                                  className="text-xs font-mono text-muted-foreground"
-                                >
-                                  {irDiffRate}% (Outro)
-                                </SelectItem>
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                          Alíquota consolidada incidente sobre a receita bruta (PIS, COFINS, ISS,
+                          CSLL e IRPJ).
+                        </p>
                       </div>
                     </div>
                   </div>
