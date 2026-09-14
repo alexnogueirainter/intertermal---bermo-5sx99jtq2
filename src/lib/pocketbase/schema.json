@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T19:48:42.824Z",
+  "generatedAt": "2026-09-14T20:06:24.622Z",
   "collections": [
     {
       "name": "users",
@@ -1046,6 +1046,12 @@
         {
           "name": "admin_rate",
           "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipments",
+          "type": "json",
           "required": false,
           "system": false
         }
