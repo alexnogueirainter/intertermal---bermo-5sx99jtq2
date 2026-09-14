@@ -104,6 +104,7 @@ import {
 } from '@/services/quotes'
 import { getStandardServiceMethodology } from '@/data/bermo-catalog'
 import { equipmentCatalogService, EquipmentCatalogItem } from '@/services/equipment-catalog'
+import { clientsService } from '@/services/clients'
 
 export interface QuotesManagerProps {
   quotes: QuoteRecord[]
@@ -150,6 +151,17 @@ export function QuotesManager({
   const [newMaterialDescription, setNewMaterialDescription] = useState('')
   const [newMaterialQty, setNewMaterialQty] = useState(1)
   const [newMaterialUnitCost, setNewMaterialUnitCost] = useState(0)
+
+  // Modal de cadastro manual de novo cliente (Seção 3A)
+  const [isNewClientDialogOpen, setIsNewClientDialogOpen] = useState(false)
+  const [isSavingNewClient, setIsSavingNewClient] = useState(false)
+  const [newClientName, setNewClientName] = useState('')
+  const [newClientDocument, setNewClientDocument] = useState('')
+  const [newClientContact, setNewClientContact] = useState('')
+  const [newClientEmail, setNewClientEmail] = useState('')
+  const [newClientPhone, setNewClientPhone] = useState('')
+  const [newClientCity, setNewClientCity] = useState('')
+  const [newClientState, setNewClientState] = useState('')
 
   // Form Fields - Identificação Geral
   const [clientId, setClientId] = useState('')
@@ -644,8 +656,8 @@ export function QuotesManager({
     setQuoteNumber(`INT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`)
     setStatus('draft')
     setEquipmentModel('')
-    setEquipmentBrand('BERMO')
-    setEquipmentQuantity(1)
+    setEquipmentBrand('')
+    setEquipmentQuantity(0)
     setPlateCount(undefined)
     setPlateMaterial('')
     setPlateThickness(undefined)
@@ -659,16 +671,16 @@ export function QuotesManager({
     setLastSavedAt(null)
     setIntegrationRequired(false)
     setIntegrationTiming('same_day')
-    setIntegrationWeekday('Segunda-feira')
-    setIntegrationCost(532.0)
+    setIntegrationWeekday('')
+    setIntegrationCost(0)
     setWorkPermitRequired(false)
     setCustomMaterials([])
     setEquipments([
       {
         id: `eq-${Date.now()}-1`,
         model: '',
-        brand: 'BERMO',
-        quantity: 1,
+        brand: '',
+        quantity: 0,
         tag: '',
         serial_number: '',
         plate_count: undefined,
@@ -680,56 +692,56 @@ export function QuotesManager({
         working_pressure_bar: undefined,
       },
     ])
-    setScopeOfWork(getStandardServiceMethodology(['BERMO']))
-    setTechCount(2)
-    setTechHours(16)
-    setTechRate(85)
-    setHelperCount(1)
-    setHelperHours(16)
-    setHelperRate(55)
+    setScopeOfWork('')
+    setTechCount(0)
+    setTechHours(0)
+    setTechRate(0)
+    setHelperCount(0)
+    setHelperHours(0)
+    setHelperRate(0)
     setInspectorCount(0)
     setInspectorHours(0)
-    setInspectorRate(120)
+    setInspectorRate(0)
     setWelderCount(0)
     setWelderHours(0)
-    setWelderRate(160)
+    setWelderRate(0)
     setPlumberCount(0)
     setPlumberHours(0)
-    setPlumberRate(120)
+    setPlumberRate(0)
     setForemanCount(0)
     setForemanHours(0)
-    setForemanRate(180)
+    setForemanRate(0)
 
-    setOriginCep('89066-000')
-    setOriginAddress('Rua Bernardo Reiter, 500 - Blumenau/SC')
+    setOriginCep('')
+    setOriginAddress('')
     setDestinationCep('')
     setDestinationAddress('')
-    setDistanceKm(120)
-    setIsRoundTrip(true)
-    setConsumptionKmL(9.5)
-    setFuelPrice(5.89)
-    setTollRoadPercent(60)
+    setDistanceKm(0)
+    setIsRoundTrip(false)
+    setConsumptionKmL(0)
+    setFuelPrice(0)
+    setTollRoadPercent(0)
     setManualFuelAdj(0)
     setManualTollAdj(0)
     setCarRentalType('none')
-    setCarRentalDailyRate(230)
-    setCarRentalDays(1)
+    setCarRentalDailyRate(0)
+    setCarRentalDays(0)
 
     setHotelDays(0)
-    setHotelRate(220)
+    setHotelRate(0)
     setMealsDays(0)
-    setMealsRate(95)
+    setMealsRate(0)
     setMealVoucherHousedQty(0)
-    setMealVoucherHousedRate(45)
+    setMealVoucherHousedRate(0)
     setMealVoucherUnhousedQty(0)
-    setMealVoucherUnhousedRate(40)
+    setMealVoucherUnhousedRate(0)
 
     setMaterialsCost(0)
     setThirdPartyCost(0)
     setOtherCosts(0)
-    setServiceMargin(25)
-    setSalesCommission(6)
-    setAdminRate(3)
+    setServiceMargin(0)
+    setSalesCommission(0)
+    setAdminRate(0)
     setPisRate(0.65)
     setCofinsRate(3.0)
     setIssRate(5.0)
@@ -737,8 +749,8 @@ export function QuotesManager({
     setIrpjRate(4.8)
     setIrDiffRate(1.5)
     setTaxRate(17.83)
-    setPaymentTerms('28 DDL faturado após entrega técnica')
-    setValidityDays(15)
+    setPaymentTerms('')
+    setValidityDays(0)
     setTechnicalNotes('')
     setCommercialNotes('')
   }
@@ -1376,6 +1388,87 @@ export function QuotesManager({
     setValidityDays(quote.validity_days || 15)
     setTechnicalNotes(quote.technical_notes || '')
     setCommercialNotes(quote.commercial_notes || '')
+  }
+
+  // Salvar novo cliente manualmente a partir da Seção 3A
+  const handleSaveNewClientQuick = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const trimmedName = newClientName.trim()
+    if (!trimmedName) {
+      toast({
+        title: 'Nome obrigatório',
+        description: 'Informe a razão social ou nome do cliente.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsSavingNewClient(true)
+    try {
+      const clientData: Partial<ClientRecord> = {
+        name: trimmedName,
+        company_name: trimmedName,
+        document: newClientDocument.trim() || undefined,
+        email: newClientEmail.trim() || undefined,
+        phone: newClientPhone.trim() || undefined,
+        whatsapp: newClientPhone.trim() || undefined,
+        city: newClientCity.trim() || undefined,
+        state: newClientState.trim().toUpperCase() || undefined,
+        status: 'prospect',
+      }
+
+      if (newClientContact.trim()) {
+        clientData.contacts = [
+          {
+            id: `c-${Date.now()}`,
+            name: newClientContact.trim(),
+            email: newClientEmail.trim() || undefined,
+            phone: newClientPhone.trim() || undefined,
+            role: 'Contato Comercial / Manutenção',
+          },
+        ]
+      }
+
+      let created: ClientRecord
+      if (onCreateClient) {
+        created = await onCreateClient(clientData)
+      } else {
+        created = await clientsService.create(clientData)
+      }
+
+      // Seleciona automaticamente o novo cliente na proposta
+      setClientId(created.id)
+      setClientName(created.name || created.company_name || trimmedName)
+      if (created.address) {
+        setDestinationAddress(created.address)
+      } else if (created.city || created.state) {
+        setDestinationAddress([created.city, created.state].filter(Boolean).join(' - '))
+      }
+
+      toast({
+        title: 'Cliente cadastrado com sucesso!',
+        description: `${created.name} foi adicionado e selecionado na proposta.`,
+      })
+
+      // Limpar formulário e fechar modal
+      setNewClientName('')
+      setNewClientDocument('')
+      setNewClientContact('')
+      setNewClientEmail('')
+      setNewClientPhone('')
+      setNewClientCity('')
+      setNewClientState('')
+      setIsNewClientDialogOpen(false)
+    } catch (err: any) {
+      console.error('Erro ao cadastrar novo cliente:', err)
+      toast({
+        title: 'Erro ao cadastrar cliente',
+        description: err.message || 'Não foi possível cadastrar o cliente no sistema.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSavingNewClient(false)
+    }
   }
 
   // Abrir editor para nova proposta
@@ -2357,29 +2450,73 @@ export function QuotesManager({
                 <CardContent className="p-4 space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <Label className="text-xs font-semibold">Cliente</Label>
-                      <Select
-                        value={clientId}
-                        onValueChange={(val) => {
-                          setClientId(val)
-                          const found = clients.find((c) => c.id === val)
-                          if (found) {
-                            setClientName(found.name || found.company_name || '')
-                            if (found.address) setDestinationAddress(found.address)
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="text-xs h-8">
-                          <SelectValue placeholder="Selecione o cliente..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name || c.company_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold">Cliente</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setNewClientName('')
+                            setNewClientDocument('')
+                            setNewClientContact('')
+                            setNewClientEmail('')
+                            setNewClientPhone('')
+                            setNewClientCity('')
+                            setNewClientState('')
+                            setIsNewClientDialogOpen(true)
+                          }}
+                          className="h-6 px-1.5 text-[11px] font-semibold text-teal-700 hover:text-teal-800 hover:bg-teal-50 dark:text-teal-300 dark:hover:bg-teal-950/50 flex items-center gap-1"
+                          title="Inserir novo cliente manualmente"
+                        >
+                          <UserPlus className="h-3.5 w-3.5" />
+                          <span>Novo cliente</span>
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Select
+                          value={clientId}
+                          onValueChange={(val) => {
+                            setClientId(val)
+                            const found = clients.find((c) => c.id === val)
+                            if (found) {
+                              setClientName(found.name || found.company_name || '')
+                              if (found.address) setDestinationAddress(found.address)
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="text-xs h-8 flex-1">
+                            <SelectValue placeholder="Selecione o cliente..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {clients.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name || c.company_name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setNewClientName('')
+                            setNewClientDocument('')
+                            setNewClientContact('')
+                            setNewClientEmail('')
+                            setNewClientPhone('')
+                            setNewClientCity('')
+                            setNewClientState('')
+                            setIsNewClientDialogOpen(true)
+                          }}
+                          className="h-8 px-2 text-teal-700 border-teal-300 hover:bg-teal-50 dark:border-teal-700 dark:text-teal-300 dark:hover:bg-teal-950/50 shrink-0"
+                          title="Cadastrar novo cliente manualmente"
+                        >
+                          <UserPlus className="h-3.5 w-3.5" />
+                          <span className="sr-only">Cadastrar novo cliente</span>
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="space-y-1">
@@ -4447,6 +4584,152 @@ export function QuotesManager({
               </Button>
             </div>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para Cadastro Manual de Novo Cliente (Seção 3A) */}
+      <Dialog open={isNewClientDialogOpen} onOpenChange={setIsNewClientDialogOpen}>
+        <DialogContent className="sm:max-w-[540px] p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-3 border-b border-slate-100 dark:border-slate-800 bg-teal-50/60 dark:bg-teal-950/30">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0">
+                <UserPlus className="h-4 w-4" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100">
+                  Cadastrar Novo Cliente
+                </DialogTitle>
+                <DialogDescription className="text-xs text-muted-foreground mt-0.5">
+                  Preencha os dados abaixo. O novo cliente será salvo e selecionado na proposta.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveNewClientQuick} className="p-4 space-y-3.5">
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                Nome do Cliente / Razão Social <span className="text-rose-500">*</span>
+              </Label>
+              <Input
+                required
+                autoFocus
+                placeholder="Ex: Cervejaria Catarinense Ltda"
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+                className="text-xs h-8"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  CNPJ / CPF (opcional)
+                </Label>
+                <Input
+                  placeholder="00.000.000/0001-00"
+                  value={newClientDocument}
+                  onChange={(e) => setNewClientDocument(e.target.value)}
+                  className="text-xs h-8"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Contato / Responsável
+                </Label>
+                <Input
+                  placeholder="Ex: Eng. Roberto Silveira"
+                  value={newClientContact}
+                  onChange={(e) => setNewClientContact(e.target.value)}
+                  className="text-xs h-8"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  E-mail
+                </Label>
+                <Input
+                  type="email"
+                  placeholder="contato@empresa.com.br"
+                  value={newClientEmail}
+                  onChange={(e) => setNewClientEmail(e.target.value)}
+                  className="text-xs h-8"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Telefone / Celular
+                </Label>
+                <Input
+                  placeholder="(47) 99999-8888"
+                  value={newClientPhone}
+                  onChange={(e) => setNewClientPhone(e.target.value)}
+                  className="text-xs h-8"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1 col-span-2">
+                <Label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                  Cidade
+                </Label>
+                <Input
+                  placeholder="Ex: Blumenau"
+                  value={newClientCity}
+                  onChange={(e) => setNewClientCity(e.target.value)}
+                  className="text-xs h-8"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-700 dark:text-slate-300">UF</Label>
+                <Input
+                  placeholder="SC"
+                  maxLength={2}
+                  value={newClientState}
+                  onChange={(e) => setNewClientState(e.target.value.toUpperCase())}
+                  className="text-xs h-8"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsNewClientDialogOpen(false)}
+                className="h-8 text-xs"
+                disabled={isSavingNewClient}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isSavingNewClient || !newClientName.trim()}
+                className="h-8 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+              >
+                {isSavingNewClient ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-3.5 w-3.5 mr-1" />
+                    Cadastrar e Selecionar
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 
