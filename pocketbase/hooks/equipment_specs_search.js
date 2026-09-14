@@ -349,7 +349,68 @@ routerAdd('POST', '/backend/v1/equipment/search-specs', (c) => {
     }
   }
 
-  // 1. Busca na base rica catalogada
+  // 0. Prioridade máxima: Buscar na coleção equipment_catalog do banco de dados (BERMO e outras marcas cadastradas)
+  try {
+    const cleanLower = model.trim().toLowerCase()
+    const cleanNoHyphen = cleanLower.replace(/[\s\-_]/g, '')
+    const records = $app.findRecordsByFilter(
+      'equipment_catalog',
+      `model ~ '${cleanLower}' || name ~ '${cleanLower}'`,
+      '-created',
+      10,
+    )
+
+    if (records && records.length > 0) {
+      // Priorizar match exato no modelo
+      let bestMatch = records.find(
+        (r) =>
+          r
+            .getString('model')
+            .toLowerCase()
+            .replace(/[\s\-_]/g, '') === cleanNoHyphen,
+      )
+      if (!bestMatch) {
+        bestMatch = records[0]
+      }
+
+      const plateCount = bestMatch.getInt('plate_count')
+      const plateMat = bestMatch.getString('plate_material') || 'AISI 316L'
+      const plateThick = bestMatch.getFloat('plate_thickness')
+      const gasketMat = bestMatch.getString('gasket_material') || 'NBR / EPDM'
+      const conn = bestMatch.getString('connection_size') || 'DN50 (2 pol)'
+      const pWork = bestMatch.getInt('working_pressure_bar') || 10
+      const dims = bestMatch.getString('dimensions_w_h_d')
+      const wKg = bestMatch.getFloat('weight_kg')
+      const maxTemp = bestMatch.getString('max_temperature') || '160°C'
+
+      return c.json(200, {
+        found: true,
+        brand: bestMatch.getString('brand') || 'BERMO',
+        model: bestMatch.getString('model'),
+        name: bestMatch.getString('name'),
+        specs: {
+          platesRange: plateCount
+            ? `${Math.max(10, plateCount - 20)} a ${plateCount + 50} placas`
+            : 'Sob consulta',
+          platesCount: plateCount > 0 ? String(plateCount) : '',
+          plateDimensions: dims || '',
+          gasketMaterial: gasketMat,
+          gasketsCount: plateCount > 0 ? String(plateCount) : '',
+          connection: conn,
+          material: plateThick ? `${plateMat} (${plateThick}mm)` : plateMat,
+          pressure: `${pWork} bar`,
+          maxTemperature: maxTemp,
+          weightKg: wKg > 0 ? `${wKg} kg` : '',
+        },
+        source: bestMatch.getString('source_url') || 'https://bermo.com.br',
+        message: `Especificações técnicas localizadas na base oficial de equipamentos BERMO (${bestMatch.getString('model')}).`,
+      })
+    }
+  } catch (_) {
+    // Falha silenciosa no banco, segue para catálogo estático e web
+  }
+
+  // 1. Busca na base rica catalogada em memória
   const exactMatch = CATALOG_DATABASE.find((item) => {
     const itemModelClean = item.model.toUpperCase().replace(/[\s\-_]/g, '')
     return itemModelClean === cleanQuery

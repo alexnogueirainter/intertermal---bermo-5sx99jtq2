@@ -97,6 +97,7 @@ import {
 } from '@/lib/mapeia-calculator'
 import { quotesService, searchEquipmentSpecsOnline } from '@/services/quotes'
 import { getStandardServiceMethodology } from '@/data/bermo-catalog'
+import { equipmentCatalogService, EquipmentCatalogItem } from '@/services/equipment-catalog'
 
 export interface QuotesManagerProps {
   quotes: QuoteRecord[]
@@ -195,6 +196,11 @@ export function QuotesManager({
     },
   ])
   const [searchingSpecsIndex, setSearchingSpecsIndex] = useState<number | null>(null)
+  const [activeCatalogSuggestionsIndex, setActiveCatalogSuggestionsIndex] = useState<number | null>(
+    null,
+  )
+  const [catalogSuggestions, setCatalogSuggestions] = useState<EquipmentCatalogItem[]>([])
+  const [allCatalogEquipments, setAllCatalogEquipments] = useState<EquipmentCatalogItem[]>([])
   const [scopeOfWork, setScopeOfWork] = useState(() => getStandardServiceMethodology(['BERMO']))
 
   // Vínculo com Oportunidade CRM e Responsável
@@ -856,6 +862,92 @@ export function QuotesManager({
     setCustomMaterials(updated)
     const sumMat = updated.reduce((acc, m) => acc + (m.subtotal || 0), 0)
     setMaterialsCost(sumMat)
+  }
+
+  // Carregar lista completa do catálogo de equipamentos BERMO do banco ao abrir o editor
+  useEffect(() => {
+    let isMounted = true
+    equipmentCatalogService
+      .getAll()
+      .then((items) => {
+        if (isMounted && items && items.length > 0) {
+          setAllCatalogEquipments(items)
+        }
+      })
+      .catch((err) => {
+        console.warn('Erro ao carregar catálogo de equipamentos inicial:', err)
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  // Buscar sugestões de equipamentos do catálogo conforme o usuário digita
+  const handleModelInputChange = (index: number, val: string) => {
+    handleUpdateEquipment(index, { model: val })
+    const trimmed = val.trim().toLowerCase()
+    if (!trimmed) {
+      setActiveCatalogSuggestionsIndex(null)
+      setCatalogSuggestions([])
+      return
+    }
+
+    const cleanNoHyphen = trimmed.replace(/[\s\-_]/g, '')
+    const matches = allCatalogEquipments.filter((item) => {
+      const m = (item.model || '').toLowerCase()
+      const mClean = m.replace(/[\s\-_]/g, '')
+      const n = (item.name || '').toLowerCase()
+      const s = (item.series || '').toLowerCase()
+      const b = (item.brand || '').toLowerCase()
+      return (
+        m.includes(trimmed) ||
+        mClean.includes(cleanNoHyphen) ||
+        n.includes(trimmed) ||
+        s.includes(trimmed) ||
+        b.includes(trimmed)
+      )
+    })
+
+    setCatalogSuggestions(matches.slice(0, 8))
+    setActiveCatalogSuggestionsIndex(index)
+  }
+
+  // Ao selecionar um equipamento do catálogo da BERMO no autocomplete
+  const handleSelectCatalogItem = (index: number, item: EquipmentCatalogItem) => {
+    const patch: Partial<QuoteEquipmentItem> = {
+      model: item.model,
+      brand: item.brand || 'BERMO',
+    }
+
+    if (item.plate_count && item.plate_count > 0) {
+      patch.plate_count = item.plate_count
+    }
+    if (item.plate_material) {
+      patch.plate_material = item.plate_material
+    }
+    if (item.plate_thickness) {
+      patch.plate_thickness = item.plate_thickness
+    }
+    if (item.gasket_material) {
+      patch.gasket_material = item.gasket_material
+    }
+    if (item.connection_size) {
+      patch.connection_size = item.connection_size
+    }
+    if (item.working_pressure_bar) {
+      patch.working_pressure_bar = item.working_pressure_bar
+      patch.pressure_test_bar =
+        item.pressure_test_bar || Math.round(item.working_pressure_bar * 1.5)
+    }
+
+    handleUpdateEquipment(index, patch)
+    setActiveCatalogSuggestionsIndex(null)
+    setCatalogSuggestions([])
+
+    toast({
+      title: 'Equipamento BERMO selecionado!',
+      description: `${item.name} (${item.model}) preenchido automaticamente com dados da base.`,
+    })
   }
 
   // Carregar Proposta Existente no Formulário
@@ -2178,18 +2270,141 @@ export function QuotesManager({
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                              <div className="space-y-1 sm:col-span-2">
-                                <Label className="text-xs font-semibold">
-                                  Modelo do Equipamento
-                                </Label>
+                              <div className="space-y-1 sm:col-span-2 relative">
+                                <div className="flex items-center justify-between">
+                                  <Label className="text-xs font-semibold flex items-center gap-1.5">
+                                    <span>Modelo do Equipamento</span>
+                                    <span className="text-[10px] text-teal-700 dark:text-teal-400 font-normal">
+                                      (Catálogo BERMO integrado)
+                                    </span>
+                                  </Label>
+                                  {currentModel && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        // Abre sugestões mesmo se já digitado
+                                        handleModelInputChange(eqIdx, currentModel || 'B')
+                                      }}
+                                      className="text-[10px] text-teal-600 hover:underline"
+                                    >
+                                      Ver na base
+                                    </button>
+                                  )}
+                                </div>
                                 <Input
                                   value={currentModel}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(eqIdx, { model: e.target.value })
-                                  }
-                                  placeholder="Ex: BP30 / TL10-BFG / M10-B"
+                                  onChange={(e) => handleModelInputChange(eqIdx, e.target.value)}
+                                  onFocus={() => {
+                                    if (currentModel && currentModel.trim().length > 0) {
+                                      handleModelInputChange(eqIdx, currentModel)
+                                    } else {
+                                      // Mostra os primeiros itens mais populares da BERMO
+                                      setCatalogSuggestions(allCatalogEquipments.slice(0, 8))
+                                      setActiveCatalogSuggestionsIndex(eqIdx)
+                                    }
+                                  }}
+                                  placeholder="Ex: BP30, BP6, GP10, BL14, BLN20, ARI-ZESA..."
                                   className="text-xs h-8 font-semibold"
+                                  autoComplete="off"
                                 />
+
+                                {/* Dropdown de sugestões do catálogo local BERMO */}
+                                {activeCatalogSuggestionsIndex === eqIdx && (
+                                  <>
+                                    <div
+                                      className="fixed inset-0 z-40"
+                                      onClick={() => setActiveCatalogSuggestionsIndex(null)}
+                                    />
+                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-slate-900 border border-teal-500/40 dark:border-teal-500/30 rounded-lg shadow-xl z-50 overflow-hidden max-h-64 overflow-y-auto">
+                                      <div className="p-2 bg-teal-50/80 dark:bg-teal-950/60 border-b border-teal-100 dark:border-teal-900/60 flex items-center justify-between text-[11px]">
+                                        <span className="font-semibold text-teal-900 dark:text-teal-200 flex items-center gap-1">
+                                          <Sparkles className="h-3 w-3 text-teal-600" />
+                                          Base de dados BERMO ({catalogSuggestions.length}{' '}
+                                          encontrado{catalogSuggestions.length !== 1 ? 's' : ''})
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground">
+                                          Clique para autocompletar
+                                        </span>
+                                      </div>
+
+                                      {catalogSuggestions.length > 0 ? (
+                                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                          {catalogSuggestions.map((catItem) => (
+                                            <button
+                                              key={catItem.id}
+                                              type="button"
+                                              onClick={() =>
+                                                handleSelectCatalogItem(eqIdx, catItem)
+                                              }
+                                              className="w-full text-left p-2.5 hover:bg-teal-50/60 dark:hover:bg-teal-950/40 transition-colors flex items-start justify-between gap-2"
+                                            >
+                                              <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                  <span className="text-xs font-bold text-teal-700 dark:text-teal-300">
+                                                    {catItem.model}
+                                                  </span>
+                                                  <Badge
+                                                    variant="secondary"
+                                                    className="text-[9px] px-1 py-0 h-4 bg-slate-100 dark:bg-slate-800"
+                                                  >
+                                                    {catItem.brand}
+                                                  </Badge>
+                                                  {catItem.series && (
+                                                    <span className="text-[10px] text-muted-foreground truncate">
+                                                      • {catItem.series}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <p className="text-[11px] text-slate-600 dark:text-slate-300 truncate mt-0.5">
+                                                  {catItem.name}
+                                                </p>
+                                                <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2 flex-wrap">
+                                                  {catItem.plate_count ? (
+                                                    <span>{catItem.plate_count} placas</span>
+                                                  ) : null}
+                                                  {catItem.connection_size && (
+                                                    <span>Conexão: {catItem.connection_size}</span>
+                                                  )}
+                                                  {catItem.working_pressure_bar && (
+                                                    <span>{catItem.working_pressure_bar} bar</span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <div className="shrink-0 pt-0.5">
+                                                <Badge
+                                                  variant="outline"
+                                                  className="text-[9px] border-teal-300 text-teal-700 dark:border-teal-700 dark:text-teal-300"
+                                                >
+                                                  Usar specs
+                                                </Badge>
+                                              </div>
+                                            </button>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="p-3 text-center space-y-2">
+                                          <p className="text-xs text-muted-foreground">
+                                            Nenhum equipamento com &ldquo;{currentModel}&rdquo;
+                                            encontrado na base local BERMO.
+                                          </p>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => {
+                                              setActiveCatalogSuggestionsIndex(null)
+                                              handleSearchSpecsOnline(eqIdx)
+                                            }}
+                                            className="h-7 text-xs border-teal-400 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300"
+                                          >
+                                            <Globe className="h-3 w-3 mr-1 text-teal-600" />
+                                            Buscar na internet / Google
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </>
+                                )}
                               </div>
 
                               <div className="space-y-1">

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T18:21:39.994Z",
+  "generatedAt": "2026-09-14T18:54:23.724Z",
   "collections": [
     {
       "name": "users",
@@ -1730,6 +1730,157 @@
         "CREATE INDEX idx_inbound_att_email ON inbound_quote_attachments (inbound_email_id)",
         "CREATE INDEX idx_inbound_att_quote ON inbound_quote_attachments (quote_id)",
         "CREATE INDEX idx_inbound_att_created ON inbound_quote_attachments (created DESC)"
+      ]
+    },
+    {
+      "name": "equipment_catalog",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "@request.auth.id != \"\"",
+        "update": "@request.auth.id != \"\"",
+        "delete": "@request.auth.id != \"\""
+      },
+      "fields": [
+        {
+          "name": "model",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "brand",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "series",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plate_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plate_material",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "plate_thickness",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "gasket_material",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "connection_size",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "working_pressure_bar",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pressure_test_bar",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dimensions_w_h_d",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "weight_kg",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "max_temperature",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "max_flow_rate",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "heat_exchange_area",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "specs",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_equip_catalog_model ON equipment_catalog (model)",
+        "CREATE INDEX idx_equip_catalog_brand ON equipment_catalog (brand)"
       ]
     }
   ]
