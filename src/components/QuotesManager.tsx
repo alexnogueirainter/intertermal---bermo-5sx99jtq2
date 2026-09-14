@@ -533,9 +533,9 @@ export function QuotesManager({
       total_cost: directCostsTotal,
 
       // Margens e Tributos
-      service_margin: serviceMargin,
-      sales_commission: salesCommission,
-      admin_rate: adminRate,
+      service_margin: Math.round(serviceMargin),
+      sales_commission: Math.round(salesCommission),
+      admin_rate: Math.round(adminRate),
       admin_cost: adminAmount,
       pis_rate: pisRate,
       cofins_rate: cofinsRate,
@@ -544,9 +544,9 @@ export function QuotesManager({
       irpj_rate: irpjRate,
       ir_diff_rate: irDiffRate,
       pricing_config: {
-        serviceMargin,
-        salesCommission,
-        adminRate,
+        serviceMargin: Math.round(serviceMargin),
+        salesCommission: Math.round(salesCommission),
+        adminRate: Math.round(adminRate),
         pisRate,
         cofinsRate,
         issRate,
@@ -1210,9 +1210,16 @@ export function QuotesManager({
     setMaterialsCost(quote.materials_cost ?? 0)
     setThirdPartyCost(quote.third_party_cost ?? 0)
     setOtherCosts(quote.other_costs ?? 0)
-    setServiceMargin(quote.service_margin ?? 25)
-    setSalesCommission(quote.sales_commission ?? 6)
-    setAdminRate(quote.admin_rate ?? 3)
+    setServiceMargin(Math.round(quote.service_margin ?? 25))
+    setSalesCommission(Math.round(quote.sales_commission ?? 6))
+    setAdminRate(
+      Math.round(
+        quote.admin_rate ??
+          quote.pricing_config?.adminRate ??
+          quote.service_details?.indirect_costs?.adminRate ??
+          3,
+      ),
+    )
     // Se a proposta já tiver total_taxes salvo ou alíquotas individuais somadas, preserva; padrão 14.83%
     const existingTaxSum =
       (quote.pis_rate ?? quote.pricing_config?.pisRate ?? 0) +
@@ -3600,12 +3607,12 @@ export function QuotesManager({
                             value={[Math.min(50, Math.max(0, serviceMargin))]}
                             min={0}
                             max={50}
-                            step={0.1}
-                            onValueChange={(val) => setServiceMargin(Number(val[0].toFixed(2)))}
+                            step={1}
+                            onValueChange={(val) => setServiceMargin(Math.round(val[0]))}
                             className="flex-1 cursor-pointer"
                           />
                           <span className="text-[11px] font-mono font-bold w-12 text-right text-emerald-800 dark:text-emerald-300">
-                            {serviceMargin.toFixed(1)}%
+                            {serviceMargin}%
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 pt-0.5">
@@ -3613,10 +3620,13 @@ export function QuotesManager({
                             type="number"
                             min="0"
                             max="50"
-                            step="0.01"
+                            step="1"
                             value={serviceMargin}
                             onChange={(e) => {
-                              const val = Math.min(50, Math.max(0, Number(e.target.value)))
+                              const val = Math.min(
+                                50,
+                                Math.max(0, Math.round(parseFloat(e.target.value) || 0)),
+                              )
                               setServiceMargin(val)
                             }}
                             className="text-xs h-7 font-mono font-bold text-emerald-700 dark:text-emerald-400 flex-1 min-w-0"
@@ -3687,12 +3697,12 @@ export function QuotesManager({
                             value={[Math.min(50, Math.max(0, salesCommission))]}
                             min={0}
                             max={50}
-                            step={0.1}
-                            onValueChange={(val) => setSalesCommission(Number(val[0].toFixed(2)))}
+                            step={1}
+                            onValueChange={(val) => setSalesCommission(Math.round(val[0]))}
                             className="flex-1 cursor-pointer"
                           />
                           <span className="text-[11px] font-mono font-bold w-12 text-right text-blue-800 dark:text-blue-300">
-                            {salesCommission.toFixed(1)}%
+                            {salesCommission}%
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 pt-0.5">
@@ -3700,10 +3710,13 @@ export function QuotesManager({
                             type="number"
                             min="0"
                             max="50"
-                            step="0.01"
+                            step="1"
                             value={salesCommission}
                             onChange={(e) => {
-                              const val = Math.min(50, Math.max(0, Number(e.target.value)))
+                              const val = Math.min(
+                                50,
+                                Math.max(0, Math.round(parseFloat(e.target.value) || 0)),
+                              )
                               setSalesCommission(val)
                             }}
                             className="text-xs h-7 font-mono font-bold text-blue-700 dark:text-blue-400 flex-1 min-w-0"
@@ -3777,12 +3790,12 @@ export function QuotesManager({
                             value={[Math.min(50, Math.max(0, adminRate))]}
                             min={0}
                             max={50}
-                            step={0.1}
-                            onValueChange={(val) => setAdminRate(Number(val[0].toFixed(2)))}
+                            step={1}
+                            onValueChange={(val) => setAdminRate(Math.round(val[0]))}
                             className="flex-1 cursor-pointer"
                           />
                           <span className="text-[11px] font-mono font-bold w-12 text-right text-purple-800 dark:text-purple-300">
-                            {adminRate.toFixed(1)}%
+                            {adminRate}%
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5 pt-0.5">
@@ -3790,10 +3803,13 @@ export function QuotesManager({
                             type="number"
                             min="0"
                             max="50"
-                            step="0.01"
+                            step="1"
                             value={adminRate}
                             onChange={(e) => {
-                              const val = Math.min(50, Math.max(0, Number(e.target.value)))
+                              const val = Math.min(
+                                50,
+                                Math.max(0, Math.round(parseFloat(e.target.value) || 0)),
+                              )
                               setAdminRate(val)
                             }}
                             className="text-xs h-7 font-mono font-bold text-purple-700 dark:text-purple-400 flex-1 min-w-0"

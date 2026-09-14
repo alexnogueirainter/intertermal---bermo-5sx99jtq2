@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T19:20:04.429Z",
+  "generatedAt": "2026-09-14T19:48:42.824Z",
   "collections": [
     {
       "name": "users",
@@ -1039,6 +1039,12 @@
         },
         {
           "name": "transit_voucher_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "admin_rate",
           "type": "number",
           "required": false,
           "system": false
