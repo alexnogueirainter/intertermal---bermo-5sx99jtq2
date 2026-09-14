@@ -428,44 +428,9 @@ Retorne EXCLUSIVAMENTE o bloco JSON válido, sem texto introdutório ou explica�
     console.log('Falha na consulta AI de specs server-side:', aiErr)
   }
 
-  // 4. Se ainda não há specs estruturadas, monta estimativa paramétrica segura
-  if (!bestSpecs) {
-    const isLarge = /15|20|100|150|200/.test(cleanQuery)
-    const isSmall = /2|3|5|30/.test(cleanQuery)
-    const estPlates = isLarge ? 80 : isSmall ? 30 : 45
-    const estConn = isLarge
-      ? 'DN100 / DN150 (4 a 6 pol)'
-      : isSmall
-        ? 'DN32 / DN50 (1.1/4 a 2 pol)'
-        : 'DN50 / DN80 (2 a 3 pol)'
-    const estDims = isLarge ? '1450 x 480 mm' : isSmall ? '480 x 180 mm' : '850 x 300 mm'
-    const estPress = isLarge ? 20 : 16
-
-    bestSpecs = {
-      platesRange: isLarge ? '40 a 250 placas' : isSmall ? '10 a 60 placas' : '20 a 140 placas',
-      platesCount: String(estPlates),
-      plateDimensions: estDims,
-      gasketMaterial: 'EPDM Clip-on / NBR',
-      gasketsCount: String(estPlates),
-      connection: estConn,
-      material: 'AISI 316L (0.5mm)',
-      pressure: `${estPress} bar`,
-      maxTemperature: '160°C',
-      weightKg: isLarge ? '450 kg' : isSmall ? '65 kg' : '180 kg',
-    }
-
-    results.push({
-      id: `param-${Date.now()}`,
-      sourceType: 'parametric_estimate',
-      title: `${targetBrand || 'Fabricante'} ${model} — Estimativa Técnica Paramétrica`,
-      url: targetBrand === 'BERMO' ? 'https://bermo.com.br' : 'https://intertermal.com.br',
-      snippet: `Dimensionamento preliminar baseado na classe do modelo "${model}". Conexão ${estConn}, ${estPlates} placas estimadas, pressão de trabalho ${estPress} bar.`,
-      brand: targetBrand || 'Fabricante Industrial',
-      model: model,
-      specs: bestSpecs,
-      badge: 'Estimativa Paramétrica',
-    })
-  }
+  // 4. Estimativa paramétrica desativada como preenchimento automático:
+  // Se não houver dados confirmados do catálogo ou de busca técnica/IA, não inventa specs sintéticas
+  // mantendo os campos vazios para preenchimento manual pelo usuário.
 
   // Deduplicar resultados por título/modelo
   const uniqueResults = []
@@ -481,16 +446,16 @@ Retorne EXCLUSIVAMENTE o bloco JSON válido, sem texto introdutório ou explica�
 
   return c.json(200, {
     success: true,
-    found: uniqueResults.length > 0,
+    found: uniqueResults.length > 0 && !!bestSpecs,
     model: model || customQuery,
     brand: targetBrand || 'BERMO',
     totalResults: uniqueResults.length,
     results: uniqueResults,
-    recommendedSpecs: bestSpecs,
+    recommendedSpecs: bestSpecs || null,
     message:
-      uniqueResults.length > 0
-        ? `Localizados ${uniqueResults.length} resultado(s) para "${model || customQuery}". Selecione um resultado ou aplique diretamente os dados técnicos.`
-        : `Nenhum registro encontrado para "${model || customQuery}". Você pode preencher manualmente os campos.`,
+      uniqueResults.length > 0 && bestSpecs
+        ? `Localizados ${uniqueResults.length} resultado(s) para "${model || customQuery}". Selecione um resultado para aplicar os dados técnicos.`
+        : `Nenhum registro com especificações técnicas confirmadas para "${model || customQuery}". Preencha os campos técnicos manualmente.`,
   })
 })
 
@@ -570,61 +535,14 @@ routerAdd('POST', '/backend/v1/equipment/search-specs', (c) => {
     }
   } catch (_) {}
 
-  // 2. Fallback de síntese server-side
-  let targetBrand = rawBrand
-  if (!targetBrand || targetBrand === 'Outro') {
-    if (
-      cleanQuery.startsWith('BP') ||
-      cleanQuery.startsWith('BL') ||
-      cleanQuery.startsWith('BM') ||
-      cleanQuery.startsWith('BTL')
-    ) {
-      targetBrand = 'BERMO'
-    } else if (
-      cleanQuery.startsWith('M') ||
-      cleanQuery.startsWith('T') ||
-      cleanQuery.startsWith('TL') ||
-      cleanQuery.startsWith('CLIP')
-    ) {
-      targetBrand = 'Alfa Laval'
-    } else {
-      targetBrand = 'BERMO'
-    }
-  }
-
-  const isLarge = /15|20|100|150|200/.test(cleanQuery)
-  const isSmall = /2|3|5|30/.test(cleanQuery)
-  const conn = isLarge
-    ? 'DN100 / DN150 (4 a 6 pol)'
-    : isSmall
-      ? 'DN32 / DN50 (1.1/4 a 2 pol)'
-      : 'DN50 / DN80 (2 a 3 pol)'
-  const dim = isLarge ? '1450 x 480 mm' : isSmall ? '480 x 180 mm' : '850 x 300 mm'
-  const plCount = isLarge ? '80' : isSmall ? '30' : '45'
-  const press = isLarge ? '20 bar' : '16 bar'
-
+  // 2. Não injetar especificações estimadas automaticamente quando não encontrado no catálogo
   return c.json(200, {
-    found: true,
-    brand: targetBrand,
+    found: false,
+    brand: rawBrand || 'BERMO',
     model: model,
-    name: `Trocador de Calor ${targetBrand} ${model}`,
-    specs: {
-      platesRange: isLarge ? '40 a 250 placas' : isSmall ? '10 a 60 placas' : '20 a 140 placas',
-      platesCount: plCount,
-      plateDimensions: dim,
-      gasketMaterial: 'EPDM Clip-on / NBR',
-      gasketsCount: plCount,
-      connection: conn,
-      material: 'AISI 316L (0.5mm)',
-      pressure: press,
-      maxTemperature: '160°C',
-      weightKg: isLarge ? '450 kg' : isSmall ? '65 kg' : '180 kg',
-    },
-    source:
-      targetBrand === 'BERMO'
-        ? 'https://bermo.com.br/produtos/trocadores-de-calor/'
-        : 'https://alfalaval.com.br',
-    message: `Especificações técnicas obtidas no catálogo técnico (${targetBrand}). Dados editáveis.`,
+    name: `Equipamento ${rawBrand || 'BERMO'} ${model}`,
+    specs: null,
+    message: `Modelo "${model}" não encontrado no catálogo oficial. Insira os dados técnicos manualmente.`,
   })
 })
 
@@ -668,34 +586,13 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-specs', (c) => {
     }
   }
 
-  const isLarge = /15|20|100|150|200/.test(cleanQuery)
-  const isSmall = /2|3|5|30/.test(cleanQuery)
-
+  // Não injetar estimativas paramétricas sintéticas
   return c.json(200, {
-    found: true,
+    found: false,
     brand: targetBrand,
     model: model,
     name: `Trocador de Calor ${targetBrand} ${model}`,
-    specs: {
-      platesRange: isLarge ? '40 a 250 placas' : isSmall ? '10 a 60 placas' : '20 a 140 placas',
-      platesCount: isLarge ? '80' : isSmall ? '30' : '45',
-      plateDimensions: isLarge ? '1450 x 480 mm' : isSmall ? '480 x 180 mm' : '850 x 300 mm',
-      gasketMaterial: 'EPDM Clip-on / NBR',
-      gasketsCount: isLarge ? '80' : isSmall ? '30' : '45',
-      connection: isLarge
-        ? 'DN100 / DN150 (4 a 6 pol)'
-        : isSmall
-          ? 'DN32 / DN50 (1.1/4 a 2 pol)'
-          : 'DN50 / DN80 (2 a 3 pol)',
-      material: 'AISI 316L (0.5mm)',
-      pressure: isLarge ? '20 bar' : '16 bar',
-      maxTemperature: '160°C',
-      weightKg: isLarge ? '450 kg' : isSmall ? '65 kg' : '180 kg',
-    },
-    source:
-      targetBrand === 'BERMO'
-        ? 'https://bermo.com.br/produtos/trocadores-de-calor/'
-        : 'https://alfalaval.com.br',
-    message: `Especificações técnicas obtidas com sucesso para ${targetBrand} ${model}.`,
+    specs: null,
+    message: `Modelo "${model}" sem dados técnicos confirmados. Preencha manualmente.`,
   })
 })

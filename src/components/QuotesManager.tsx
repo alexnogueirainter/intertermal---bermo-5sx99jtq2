@@ -160,13 +160,13 @@ export function QuotesManager({
   const [equipmentModel, setEquipmentModel] = useState('')
   const [equipmentBrand, setEquipmentBrand] = useState('BERMO')
   const [equipmentQuantity, setEquipmentQuantity] = useState(1)
-  const [plateCount, setPlateCount] = useState(40)
-  const [plateMaterial, setPlateMaterial] = useState('AISI 316L')
-  const [plateThickness, setPlateThickness] = useState(0.5)
-  const [gasketMaterial, setGasketMaterial] = useState('EPDM Clip-on')
-  const [connectionSize, setConnectionSize] = useState('DN50 (2")')
-  const [pressureTestBar, setPressureTestBar] = useState(16)
-  const [workingPressureBar, setWorkingPressureBar] = useState(10)
+  const [plateCount, setPlateCount] = useState<number | undefined>(undefined)
+  const [plateMaterial, setPlateMaterial] = useState('')
+  const [plateThickness, setPlateThickness] = useState<number | undefined>(undefined)
+  const [gasketMaterial, setGasketMaterial] = useState('')
+  const [connectionSize, setConnectionSize] = useState('')
+  const [pressureTestBar, setPressureTestBar] = useState<number | undefined>(undefined)
+  const [workingPressureBar, setWorkingPressureBar] = useState<number | undefined>(undefined)
   const [dimensionsWHd, setDimensionsWHd] = useState('')
   const [workFluid, setWorkFluid] = useState('')
   const [homologatedProcedure, setHomologatedProcedure] = useState('')
@@ -192,13 +192,13 @@ export function QuotesManager({
       quantity: 1,
       tag: '',
       serial_number: '',
-      plate_count: 40,
-      plate_material: 'AISI 316L',
-      plate_thickness: 0.5,
-      gasket_material: 'EPDM Clip-on',
-      connection_size: 'DN50 (2")',
-      pressure_test_bar: 16,
-      working_pressure_bar: 10,
+      plate_count: undefined,
+      plate_material: '',
+      plate_thickness: undefined,
+      gasket_material: '',
+      connection_size: '',
+      pressure_test_bar: undefined,
+      working_pressure_bar: undefined,
     },
   ])
   const [searchingSpecsIndex, setSearchingSpecsIndex] = useState<number | null>(null)
@@ -419,13 +419,13 @@ export function QuotesManager({
       model: equipmentModel || '',
       brand: equipmentBrand || 'BERMO',
       quantity: equipmentQuantity || 1,
-      plate_count: plateCount || 40,
-      plate_material: plateMaterial || 'AISI 316L',
-      plate_thickness: plateThickness || 0.5,
-      gasket_material: gasketMaterial || 'EPDM Clip-on',
-      connection_size: connectionSize || 'DN50 (2")',
-      pressure_test_bar: pressureTestBar || 16,
-      working_pressure_bar: workingPressureBar || 10,
+      plate_count: plateCount,
+      plate_material: plateMaterial || '',
+      plate_thickness: plateThickness,
+      gasket_material: gasketMaterial || '',
+      connection_size: connectionSize || '',
+      pressure_test_bar: pressureTestBar,
+      working_pressure_bar: workingPressureBar,
     }
 
     const currentSavedTime = new Date().toISOString()
@@ -447,13 +447,13 @@ export function QuotesManager({
       equipment_brand: primaryEq.brand || equipmentBrand || 'BERMO',
       equipment_model: primaryEq.model || equipmentModel || '',
       equipment_quantity: primaryEq.quantity || equipmentQuantity || 1,
-      plate_count: primaryEq.plate_count ?? plateCount ?? 40,
-      plate_material: primaryEq.plate_material || plateMaterial || 'AISI 316L',
-      plate_thickness: primaryEq.plate_thickness ?? plateThickness ?? 0.5,
-      gasket_material: primaryEq.gasket_material || gasketMaterial || 'EPDM Clip-on',
-      connection_size: primaryEq.connection_size || connectionSize || 'DN50 (2")',
-      pressure_test_bar: primaryEq.pressure_test_bar ?? pressureTestBar ?? 16,
-      working_pressure_bar: primaryEq.working_pressure_bar ?? workingPressureBar ?? 10,
+      plate_count: primaryEq.plate_count ?? plateCount,
+      plate_material: primaryEq.plate_material || plateMaterial || undefined,
+      plate_thickness: primaryEq.plate_thickness ?? plateThickness,
+      gasket_material: primaryEq.gasket_material || gasketMaterial || undefined,
+      connection_size: primaryEq.connection_size || connectionSize || undefined,
+      pressure_test_bar: primaryEq.pressure_test_bar ?? pressureTestBar,
+      working_pressure_bar: primaryEq.working_pressure_bar ?? workingPressureBar,
       dimensions_w_h_d: dimensionsWHd,
       work_fluid: workFluid,
       homologated_procedure: homologatedProcedure,
@@ -580,13 +580,13 @@ export function QuotesManager({
     setEquipmentModel('')
     setEquipmentBrand('BERMO')
     setEquipmentQuantity(1)
-    setPlateCount(40)
-    setPlateMaterial('AISI 316L')
-    setPlateThickness(0.5)
-    setGasketMaterial('EPDM Clip-on')
-    setConnectionSize('DN50 (2")')
-    setPressureTestBar(16)
-    setWorkingPressureBar(10)
+    setPlateCount(undefined)
+    setPlateMaterial('')
+    setPlateThickness(undefined)
+    setGasketMaterial('')
+    setConnectionSize('')
+    setPressureTestBar(undefined)
+    setWorkingPressureBar(undefined)
     setDimensionsWHd('')
     setWorkFluid('')
     setHomologatedProcedure('')
@@ -605,13 +605,13 @@ export function QuotesManager({
         quantity: 1,
         tag: '',
         serial_number: '',
-        plate_count: 40,
-        plate_material: 'AISI 316L',
-        plate_thickness: 0.5,
-        gasket_material: 'EPDM Clip-on',
-        connection_size: 'DN50 (2")',
-        pressure_test_bar: 16,
-        working_pressure_bar: 10,
+        plate_count: undefined,
+        plate_material: '',
+        plate_thickness: undefined,
+        gasket_material: '',
+        connection_size: '',
+        pressure_test_bar: undefined,
+        working_pressure_bar: undefined,
       },
     ])
     setScopeOfWork(getStandardServiceMethodology(['BERMO']))
@@ -687,13 +687,13 @@ export function QuotesManager({
         quantity: 1,
         tag: '',
         serial_number: '',
-        plate_count: 40,
-        plate_material: 'AISI 316L',
-        plate_thickness: 0.5,
-        gasket_material: 'EPDM Clip-on',
-        connection_size: 'DN50 (2")',
-        pressure_test_bar: 16,
-        working_pressure_bar: 10,
+        plate_count: undefined,
+        plate_material: '',
+        plate_thickness: undefined,
+        gasket_material: '',
+        connection_size: '',
+        pressure_test_bar: undefined,
+        working_pressure_bar: undefined,
       },
     ])
   }
@@ -707,13 +707,13 @@ export function QuotesManager({
         setEquipmentModel(next[0].model || '')
         setEquipmentBrand(next[0].brand || 'BERMO')
         setEquipmentQuantity(next[0].quantity || 1)
-        setPlateCount(next[0].plate_count ?? 40)
-        setPlateMaterial(next[0].plate_material || 'AISI 316L')
-        setPlateThickness(next[0].plate_thickness ?? 0.5)
-        setGasketMaterial(next[0].gasket_material || 'EPDM Clip-on')
-        setConnectionSize(next[0].connection_size || 'DN50 (2")')
-        setPressureTestBar(next[0].pressure_test_bar ?? 16)
-        setWorkingPressureBar(next[0].working_pressure_bar ?? 10)
+        setPlateCount(next[0].plate_count)
+        setPlateMaterial(next[0].plate_material || '')
+        setPlateThickness(next[0].plate_thickness)
+        setGasketMaterial(next[0].gasket_material || '')
+        setConnectionSize(next[0].connection_size || '')
+        setPressureTestBar(next[0].pressure_test_bar)
+        setWorkingPressureBar(next[0].working_pressure_bar)
       }
       return next
     })
@@ -743,41 +743,66 @@ export function QuotesManager({
   }
 
   // Aplica conjunto de especificações técnicas recebido no equipamento especificado
+  // Retorna booleano indicando se alguma especificação válida foi aplicada
   const applySpecsToEquipment = (
     index: number,
     specs: any,
     suggestedBrand?: string,
     suggestedModel?: string,
-  ) => {
-    if (!specs) return
-    const patch: Partial<QuoteEquipmentItem> = {}
-
-    if (suggestedBrand) {
-      patch.brand = suggestedBrand
+  ): boolean => {
+    if (!specs || typeof specs !== 'object') {
+      toast({
+        title: 'Nenhuma especificação encontrada',
+        description:
+          'Não foram localizados dados técnicos confirmados para este modelo. Preencha os campos manualmente.',
+        variant: 'destructive',
+      })
+      return false
     }
-    if (suggestedModel) {
-      patch.model = suggestedModel
+
+    const patch: Partial<QuoteEquipmentItem> = {}
+    let hasAppliedFields = false
+
+    if (suggestedBrand && suggestedBrand.trim()) {
+      patch.brand = suggestedBrand.trim()
+    }
+    if (suggestedModel && suggestedModel.trim()) {
+      patch.model = suggestedModel.trim()
     }
     if (specs.platesCount) {
       const parsed = parseInt(String(specs.platesCount), 10)
       if (!isNaN(parsed) && parsed > 0) {
         patch.plate_count = parsed
+        hasAppliedFields = true
       }
     }
     if (specs.material || specs.plateMaterial) {
-      patch.plate_material = specs.material || specs.plateMaterial
+      const mat = (specs.material || specs.plateMaterial || '').trim()
+      if (mat) {
+        patch.plate_material = mat
+        hasAppliedFields = true
+      }
     }
     if (specs.plateThickness) {
       const parsedThick = parseFloat(String(specs.plateThickness))
       if (!isNaN(parsedThick) && parsedThick > 0) {
         patch.plate_thickness = parsedThick
+        hasAppliedFields = true
       }
     }
     if (specs.gasketMaterial) {
-      patch.gasket_material = specs.gasketMaterial
+      const gMat = (specs.gasketMaterial || '').trim()
+      if (gMat) {
+        patch.gasket_material = gMat
+        hasAppliedFields = true
+      }
     }
     if (specs.connection || specs.connectionSize) {
-      patch.connection_size = specs.connection || specs.connectionSize
+      const conn = (specs.connection || specs.connectionSize || '').trim()
+      if (conn) {
+        patch.connection_size = conn
+        hasAppliedFields = true
+      }
     }
     if (specs.pressure || specs.workingPressureBar) {
       const rawPress = specs.pressure || specs.workingPressureBar
@@ -787,11 +812,23 @@ export function QuotesManager({
         if (!isNaN(p) && p > 0) {
           patch.working_pressure_bar = p
           patch.pressure_test_bar = Math.round(p * 1.5)
+          hasAppliedFields = true
         }
       }
     }
 
+    if (!hasAppliedFields) {
+      toast({
+        title: 'Nenhuma especificação encontrada',
+        description:
+          'Os dados retornados não contêm especificações técnicas confirmadas. O equipamento permaneceu inalterado para inserção manual.',
+        variant: 'destructive',
+      })
+      return false
+    }
+
     handleUpdateEquipment(index, patch)
+    return true
   }
 
   // Executa busca server-side (web/técnica/AI) sem abrir abas externas no navegador
@@ -829,14 +866,16 @@ export function QuotesManager({
           webResult.message || `Localizados ${webResult.results.length} resultados no servidor.`,
         )
 
-        // Se houver apenas 1 resultado exato com specs completas, já auto-aplica
+        // Se houver apenas 1 resultado exato com specs confirmadas, aplica
         if (webResult.results.length === 1 && webResult.results[0].specs) {
           const first = webResult.results[0]
-          applySpecsToEquipment(index, first.specs, first.brand, first.model)
-          toast({
-            title: 'Especificações aplicadas automaticamente!',
-            description: `Ficha técnica de ${first.title} carregada nos campos.`,
-          })
+          const ok = applySpecsToEquipment(index, first.specs, first.brand, first.model)
+          if (ok) {
+            toast({
+              title: 'Especificações aplicadas automaticamente!',
+              description: `Ficha técnica de ${first.title} carregada nos campos.`,
+            })
+          }
         }
       } else {
         // Fallback para endpoint de specs se webResult vier vazio
@@ -860,7 +899,7 @@ export function QuotesManager({
         } else {
           setWebSearchResults([])
           setWebSearchMessage(
-            `Nenhum dado encontrado no servidor para "${model}". Você pode copiar o termo abaixo para busca manual se desejar.`,
+            `Nenhum dado encontrado no servidor para "${model}". Você pode preencher manualmente ou copiar o termo abaixo para pesquisa manual.`,
           )
         }
       }
@@ -1055,13 +1094,13 @@ export function QuotesManager({
     setEquipmentModel(quote.equipment_model || '')
     setEquipmentBrand(quote.equipment_brand || 'BERMO')
     setEquipmentQuantity(quote.equipment_quantity || 1)
-    setPlateCount(quote.plate_count || 40)
-    setPlateMaterial(quote.plate_material || 'AISI 316L')
-    setPlateThickness(quote.plate_thickness || 0.5)
-    setGasketMaterial(quote.gasket_material || 'EPDM Clip-on')
-    setConnectionSize(quote.connection_size || 'DN50 (2")')
-    setPressureTestBar(quote.pressure_test_bar || 16)
-    setWorkingPressureBar(quote.working_pressure_bar || 10)
+    setPlateCount(quote.plate_count ?? undefined)
+    setPlateMaterial(quote.plate_material || '')
+    setPlateThickness(quote.plate_thickness ?? undefined)
+    setGasketMaterial(quote.gasket_material || '')
+    setConnectionSize(quote.connection_size || '')
+    setPressureTestBar(quote.pressure_test_bar ?? undefined)
+    setWorkingPressureBar(quote.working_pressure_bar ?? undefined)
 
     if (quote.equipments && Array.isArray(quote.equipments) && quote.equipments.length > 0) {
       setEquipments(quote.equipments)
@@ -1074,13 +1113,13 @@ export function QuotesManager({
           quantity: quote.equipment_quantity || 1,
           tag: '',
           serial_number: '',
-          plate_count: quote.plate_count || 40,
-          plate_material: quote.plate_material || 'AISI 316L',
-          plate_thickness: quote.plate_thickness || 0.5,
-          gasket_material: quote.gasket_material || 'EPDM Clip-on',
-          connection_size: quote.connection_size || 'DN50 (2")',
-          pressure_test_bar: quote.pressure_test_bar || 16,
-          working_pressure_bar: quote.working_pressure_bar || 10,
+          plate_count: quote.plate_count ?? undefined,
+          plate_material: quote.plate_material || '',
+          plate_thickness: quote.plate_thickness ?? undefined,
+          gasket_material: quote.gasket_material || '',
+          connection_size: quote.connection_size || '',
+          pressure_test_bar: quote.pressure_test_bar ?? undefined,
+          working_pressure_bar: quote.working_pressure_bar ?? undefined,
         },
       ])
     }
@@ -2295,13 +2334,14 @@ export function QuotesManager({
                         const currentModel = eq.model ?? (isPrimary ? equipmentModel : '')
                         const currentBrand = eq.brand ?? (isPrimary ? equipmentBrand : 'BERMO')
                         const currentQty = eq.quantity ?? (isPrimary ? equipmentQuantity : 1)
-                        const currentPlateCount = eq.plate_count ?? (isPrimary ? plateCount : 40)
+                        const currentPlateCount =
+                          eq.plate_count ?? (isPrimary ? plateCount : undefined)
                         const currentPlateMat =
-                          eq.plate_material ?? (isPrimary ? plateMaterial : 'AISI 316L')
+                          eq.plate_material ?? (isPrimary ? plateMaterial : '')
                         const currentPlateThick =
-                          eq.plate_thickness ?? (isPrimary ? plateThickness : 0.5)
+                          eq.plate_thickness ?? (isPrimary ? plateThickness : undefined)
                         const currentGasketMat =
-                          eq.gasket_material ?? (isPrimary ? gasketMaterial : 'EPDM Clip-on')
+                          eq.gasket_material ?? (isPrimary ? gasketMaterial : '')
                         const isSearchingThis = searchingSpecsIndex === eqIdx
 
                         return (
@@ -2388,6 +2428,13 @@ export function QuotesManager({
                                 <Input
                                   value={currentModel}
                                   onChange={(e) => handleModelInputChange(eqIdx, e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault()
+                                      // Fecha o autocomplete mantendo o modelo digitado sem alterar campos técnicos
+                                      setActiveCatalogSuggestionsIndex(null)
+                                    }
+                                  }}
                                   onFocus={() => {
                                     if (currentModel && currentModel.trim().length > 0) {
                                       handleModelInputChange(eqIdx, currentModel)
@@ -2409,7 +2456,7 @@ export function QuotesManager({
                                       className="fixed inset-0 z-40"
                                       onClick={() => setActiveCatalogSuggestionsIndex(null)}
                                     />
-                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-slate-900 border border-teal-500/40 dark:border-teal-500/30 rounded-lg shadow-xl z-50 overflow-hidden max-h-64 overflow-y-auto">
+                                    <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-slate-900 border border-teal-500/40 dark:border-teal-500/30 rounded-lg shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto">
                                       <div className="p-2 bg-teal-50/80 dark:bg-teal-950/60 border-b border-teal-100 dark:border-teal-900/60 flex items-center justify-between text-[11px]">
                                         <span className="font-semibold text-teal-900 dark:text-teal-200 flex items-center gap-1">
                                           <Sparkles className="h-3 w-3 text-teal-600" />
@@ -2420,6 +2467,40 @@ export function QuotesManager({
                                           Clique para autocompletar
                                         </span>
                                       </div>
+
+                                      {/* Opção em destaque para manter o modelo digitado manualmente sem preencher dados técnicos */}
+                                      {currentModel && currentModel.trim() && (
+                                        <div className="p-2 bg-amber-50/60 dark:bg-amber-950/30 border-b border-amber-200/60 dark:border-amber-900/40">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setActiveCatalogSuggestionsIndex(null)
+                                              toast({
+                                                title: 'Modelo definido manualmente',
+                                                description: `Modelo "${currentModel.trim()}" mantido sem dados automáticos. Preencha os campos técnicos se desejar.`,
+                                              })
+                                            }}
+                                            className="w-full text-left p-2 rounded-md bg-white dark:bg-slate-900 hover:bg-amber-100/70 dark:hover:bg-amber-950/50 border border-amber-300 dark:border-amber-800 transition-colors flex items-center justify-between gap-2"
+                                          >
+                                            <div className="min-w-0 flex-1">
+                                              <p className="text-xs font-bold text-amber-900 dark:text-amber-200 truncate">
+                                                Usar &ldquo;{currentModel.trim()}&rdquo; (inserir
+                                                manualmente, sem dados automáticos)
+                                              </p>
+                                              <p className="text-[10px] text-muted-foreground mt-0.5">
+                                                Mantém os campos técnicos vazios para digitação
+                                                livre.
+                                              </p>
+                                            </div>
+                                            <Badge
+                                              variant="secondary"
+                                              className="text-[9px] px-1.5 py-0.5 h-auto bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700 shrink-0 font-medium"
+                                            >
+                                              Manual
+                                            </Badge>
+                                          </button>
+                                        </div>
+                                      )}
 
                                       {catalogSuggestions.length > 0 ? (
                                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -2537,12 +2618,14 @@ export function QuotesManager({
                                 </Label>
                                 <Input
                                   type="number"
-                                  value={currentPlateCount}
+                                  value={currentPlateCount ?? ''}
                                   onChange={(e) =>
                                     handleUpdateEquipment(eqIdx, {
-                                      plate_count: Number(e.target.value),
+                                      plate_count:
+                                        e.target.value === '' ? undefined : Number(e.target.value),
                                     })
                                   }
+                                  placeholder="Ex: 40"
                                   className="text-xs h-7 font-mono bg-white dark:bg-slate-950"
                                 />
                               </div>
@@ -2551,13 +2634,13 @@ export function QuotesManager({
                                   Material da Placa
                                 </Label>
                                 <Input
-                                  value={currentPlateMat}
+                                  value={currentPlateMat ?? ''}
                                   onChange={(e) =>
                                     handleUpdateEquipment(eqIdx, {
                                       plate_material: e.target.value,
                                     })
                                   }
-                                  placeholder="AISI 316L"
+                                  placeholder="Ex: AISI 316L"
                                   className="text-xs h-7 bg-white dark:bg-slate-950"
                                 />
                               </div>
@@ -2568,25 +2651,27 @@ export function QuotesManager({
                                 <Input
                                   type="number"
                                   step="0.1"
-                                  value={currentPlateThick}
+                                  value={currentPlateThick ?? ''}
                                   onChange={(e) =>
                                     handleUpdateEquipment(eqIdx, {
-                                      plate_thickness: Number(e.target.value),
+                                      plate_thickness:
+                                        e.target.value === '' ? undefined : Number(e.target.value),
                                     })
                                   }
+                                  placeholder="Ex: 0.5"
                                   className="text-xs h-7 font-mono bg-white dark:bg-slate-950"
                                 />
                               </div>
                               <div className="space-y-1">
                                 <Label className="text-[10px] text-muted-foreground">Gaxeta</Label>
                                 <Input
-                                  value={currentGasketMat}
+                                  value={currentGasketMat ?? ''}
                                   onChange={(e) =>
                                     handleUpdateEquipment(eqIdx, {
                                       gasket_material: e.target.value,
                                     })
                                   }
-                                  placeholder="EPDM Clip-on"
+                                  placeholder="Ex: EPDM Clip-on"
                                   className="text-xs h-7 bg-white dark:bg-slate-950"
                                 />
                               </div>
@@ -4301,17 +4386,19 @@ export function QuotesManager({
                           type="button"
                           size="sm"
                           onClick={() => {
-                            applySpecsToEquipment(
+                            const applied = applySpecsToEquipment(
                               webSearchActiveIndex,
                               resItem.specs,
                               resItem.brand,
                               resItem.model,
                             )
-                            setIsWebSearchModalOpen(false)
-                            toast({
-                              title: 'Especificações aplicadas!',
-                              description: `Dados de ${resItem.title} preenchidos com sucesso no Item #${webSearchActiveIndex + 1}.`,
-                            })
+                            if (applied) {
+                              setIsWebSearchModalOpen(false)
+                              toast({
+                                title: 'Especificações aplicadas!',
+                                description: `Dados de ${resItem.title} preenchidos com sucesso no Item #${webSearchActiveIndex + 1}.`,
+                              })
+                            }
                           }}
                           className="h-7 px-3 text-xs bg-teal-600 hover:bg-teal-700 text-white shrink-0"
                         >
