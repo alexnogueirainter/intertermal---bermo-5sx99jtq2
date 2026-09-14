@@ -284,6 +284,41 @@ export async function deleteQuote(id: string): Promise<boolean> {
   }
 }
 
+export interface EquipmentWebSearchResultItem {
+  id: string
+  sourceType: string
+  title: string
+  url?: string
+  snippet?: string
+  brand?: string
+  model?: string
+  badge?: string
+  specs?: {
+    platesRange?: string
+    platesCount?: string | number
+    plateDimensions?: string
+    gasketMaterial?: string
+    gasketsCount?: string | number
+    connection?: string
+    material?: string
+    pressure?: string
+    maxTemperature?: string
+    weightKg?: string
+    [key: string]: any
+  } | null
+}
+
+export interface EquipmentWebSearchResponse {
+  success: boolean
+  found: boolean
+  model: string
+  brand: string
+  totalResults: number
+  results: EquipmentWebSearchResultItem[]
+  recommendedSpecs?: EquipmentWebSearchResultItem['specs']
+  message?: string
+}
+
 export interface EquipmentSpecsSearchResult {
   found: boolean
   brand: string
@@ -306,6 +341,78 @@ export interface EquipmentSpecsSearchResult {
   } | null
   source?: string
   message?: string
+}
+
+/**
+ * Busca de especificações na internet e base técnica via BACKEND (server-side).
+ * Retorna múltiplos resultados para o usuário escolher dentro do próprio sistema,
+ * eliminando problemas de CORS / iframe / ERR_BLOCKED_BY_RESPONSE no navegador.
+ */
+export async function searchEquipmentWeb(
+  model: string,
+  brand?: string,
+  query?: string,
+): Promise<EquipmentWebSearchResponse> {
+  const cleanModel = (model || '').trim()
+  const cleanBrand = (brand || '').trim()
+  const cleanQuery = (query || '').trim()
+
+  try {
+    const res = await pb.send<EquipmentWebSearchResponse>(
+      '/backend/v1/intertermal/equipment-web-search',
+      {
+        method: 'POST',
+        body: { model: cleanModel, brand: cleanBrand, query: cleanQuery },
+        requestKey: null,
+      },
+    )
+    return res
+  } catch (err) {
+    console.warn('Erro ao consultar /backend/v1/intertermal/equipment-web-search:', err)
+    // Tenta fallback com a rota básica de specs
+    try {
+      const fallbackSpecs = await searchEquipmentSpecsOnline(cleanModel, cleanBrand)
+      if (fallbackSpecs && fallbackSpecs.found) {
+        return {
+          success: true,
+          found: true,
+          model: cleanModel,
+          brand: fallbackSpecs.brand || cleanBrand || 'BERMO',
+          totalResults: 1,
+          results: [
+            {
+              id: 'fallback-1',
+              sourceType: 'backend_fallback',
+              title:
+                fallbackSpecs.name ||
+                `${fallbackSpecs.brand || 'BERMO'} ${fallbackSpecs.model || cleanModel}`,
+              url: fallbackSpecs.source || 'https://bermo.com.br',
+              snippet: fallbackSpecs.message || 'Especificações recuperadas via servidor.',
+              brand: fallbackSpecs.brand,
+              model: fallbackSpecs.model,
+              specs: fallbackSpecs.specs,
+              badge: 'Servidor Intertermal',
+            },
+          ],
+          recommendedSpecs: fallbackSpecs.specs,
+          message: fallbackSpecs.message,
+        }
+      }
+    } catch {
+      /* intentionally ignored */
+    }
+
+    return {
+      success: false,
+      found: false,
+      model: cleanModel,
+      brand: cleanBrand,
+      totalResults: 0,
+      results: [],
+      message:
+        'Não foi possível conectar ao serviço de busca no momento. Preencha manualmente os dados técnicos.',
+    }
+  }
 }
 
 export async function searchEquipmentSpecsOnline(
@@ -425,6 +532,7 @@ export const quotesService = {
   },
   delete: deleteQuote,
   searchSpecsOnline: searchEquipmentSpecsOnline,
+  searchEquipmentWeb,
   sendProposalApprovalEmail,
   async getPublicProposal(
     token: string,

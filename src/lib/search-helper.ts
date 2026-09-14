@@ -60,47 +60,22 @@ export function openTechnicalSearchInNewTab(options: OpenInternetSearchOptions):
   const queryTerm = parts.join(' ').trim() || `${model} trocador de calor especificações`
   const targetUrl = buildSearchUrl(queryTerm, enginePreference)
 
+  // NOTA DE SEGURANÇA: no ambiente de preview (iframe com COOP/COEP),
+  // window.open para google.com pode disparar ERR_BLOCKED_BY_RESPONSE.
+  // A busca principal deve ser sempre SERVER-SIDE. Esta função é apenas utilitária secundária.
   try {
-    // Tenta abrir em nova aba com flags de segurança completas
     const newWindow = window.open(targetUrl, '_blank', 'noopener,noreferrer')
-
-    // Se window.open foi bloqueado pelo popup blocker do navegador, tentamos um fallback via âncora temporária
-    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-      try {
-        const link = document.createElement('a')
-        link.href = targetUrl
-        link.target = '_blank'
-        link.rel = 'noopener noreferrer'
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-      } catch (domErr) {
-        console.warn('Fallback de abertura via âncora falhou:', domErr)
-      }
-    }
-
     return {
-      success: true,
+      success: !!newWindow,
       engine: enginePreference,
       url: targetUrl,
     }
   } catch (err) {
-    console.warn(`Erro ao abrir ${enginePreference}, tentando fallback DuckDuckGo:`, err)
-    const fallbackUrl = buildSearchUrl(queryTerm, 'duckduckgo')
-    try {
-      window.open(fallbackUrl, '_blank', 'noopener,noreferrer')
-      return {
-        success: true,
-        engine: 'duckduckgo',
-        url: fallbackUrl,
-      }
-    } catch (finalErr) {
-      console.error('Falha geral ao abrir busca na internet:', finalErr)
-      return {
-        success: false,
-        engine: 'failed',
-        url: targetUrl,
-      }
+    console.warn(`Tentativa de abertura secundária:`, err)
+    return {
+      success: false,
+      engine: 'failed',
+      url: targetUrl,
     }
   }
 }

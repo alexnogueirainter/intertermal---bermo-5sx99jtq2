@@ -58,6 +58,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
@@ -95,10 +96,14 @@ import {
   fetchCepCoordinates,
   haversineDistance,
 } from '@/lib/mapeia-calculator'
-import { quotesService, searchEquipmentSpecsOnline } from '@/services/quotes'
+import {
+  quotesService,
+  searchEquipmentSpecsOnline,
+  searchEquipmentWeb,
+  EquipmentWebSearchResultItem,
+} from '@/services/quotes'
 import { getStandardServiceMethodology } from '@/data/bermo-catalog'
 import { equipmentCatalogService, EquipmentCatalogItem } from '@/services/equipment-catalog'
-import { openTechnicalSearchInNewTab } from '@/lib/search-helper'
 
 export interface QuotesManagerProps {
   quotes: QuoteRecord[]
@@ -203,6 +208,14 @@ export function QuotesManager({
   const [catalogSuggestions, setCatalogSuggestions] = useState<EquipmentCatalogItem[]>([])
   const [allCatalogEquipments, setAllCatalogEquipments] = useState<EquipmentCatalogItem[]>([])
   const [scopeOfWork, setScopeOfWork] = useState(() => getStandardServiceMethodology(['BERMO']))
+
+  // Painel / Modal interno de resultados de pesquisa server-side (sem abrir abas no navegador)
+  const [isWebSearchModalOpen, setIsWebSearchModalOpen] = useState(false)
+  const [webSearchActiveIndex, setWebSearchActiveIndex] = useState<number>(0)
+  const [webSearchQuery, setWebSearchQuery] = useState('')
+  const [webSearchResults, setWebSearchResults] = useState<EquipmentWebSearchResultItem[]>([])
+  const [isWebSearching, setIsWebSearching] = useState(false)
+  const [webSearchMessage, setWebSearchMessage] = useState('')
 
   // Vínculo com Oportunidade CRM e Responsável
   const [dealId, setDealId] = useState('')
@@ -729,7 +742,59 @@ export function QuotesManager({
     })
   }
 
-  // Busca na internet de especificações técnicas do equipamento com fallback seguro para Google / DuckDuckGo em nova aba
+  // Aplica conjunto de especificações técnicas recebido no equipamento especificado
+  const applySpecsToEquipment = (
+    index: number,
+    specs: any,
+    suggestedBrand?: string,
+    suggestedModel?: string,
+  ) => {
+    if (!specs) return
+    const patch: Partial<QuoteEquipmentItem> = {}
+
+    if (suggestedBrand) {
+      patch.brand = suggestedBrand
+    }
+    if (suggestedModel) {
+      patch.model = suggestedModel
+    }
+    if (specs.platesCount) {
+      const parsed = parseInt(String(specs.platesCount), 10)
+      if (!isNaN(parsed) && parsed > 0) {
+        patch.plate_count = parsed
+      }
+    }
+    if (specs.material || specs.plateMaterial) {
+      patch.plate_material = specs.material || specs.plateMaterial
+    }
+    if (specs.plateThickness) {
+      const parsedThick = parseFloat(String(specs.plateThickness))
+      if (!isNaN(parsedThick) && parsedThick > 0) {
+        patch.plate_thickness = parsedThick
+      }
+    }
+    if (specs.gasketMaterial) {
+      patch.gasket_material = specs.gasketMaterial
+    }
+    if (specs.connection || specs.connectionSize) {
+      patch.connection_size = specs.connection || specs.connectionSize
+    }
+    if (specs.pressure || specs.workingPressureBar) {
+      const rawPress = specs.pressure || specs.workingPressureBar
+      const match = String(rawPress).match(/(\d+)/)
+      if (match && match[1]) {
+        const p = parseInt(match[1], 10)
+        if (!isNaN(p) && p > 0) {
+          patch.working_pressure_bar = p
+          patch.pressure_test_bar = Math.round(p * 1.5)
+        }
+      }
+    }
+
+    handleUpdateEquipment(index, patch)
+  }
+
+  // Executa busca server-side (web/técnica/AI) sem abrir abas externas no navegador
   const handleSearchSpecsOnline = async (index: number) => {
     const item = equipments[index]
     const model = (item?.model || equipmentModel || '').trim()
@@ -745,82 +810,94 @@ export function QuotesManager({
     }
 
     setSearchingSpecsIndex(index)
+    setWebSearchActiveIndex(index)
+    setWebSearchQuery(model)
+    setIsWebSearching(true)
+    setWebSearchResults([])
+    setWebSearchMessage('')
+
+    // Abre o modal interno imediatamente para feedback visual do usuário
+    setIsWebSearchModalOpen(true)
+
     try {
-      const result = await searchEquipmentSpecsOnline(model, brand)
-      if (result && result.found && result.specs) {
-        const specs = result.specs
-        const patch: Partial<QuoteEquipmentItem> = {}
+      // 1. Linha primária: consulta o endpoint rico server-side
+      const webResult = await searchEquipmentWeb(model, brand)
 
-        if (result.brand) {
-          patch.brand = result.brand
-        }
-        if (result.model) {
-          patch.model = result.model
-        }
-        if (specs.platesCount) {
-          const parsed = parseInt(String(specs.platesCount), 10)
-          if (!isNaN(parsed) && parsed > 0) {
-            patch.plate_count = parsed
-          }
-        }
-        if (specs.material) {
-          patch.plate_material = specs.material
-        }
-        if (specs.gasketMaterial) {
-          patch.gasket_material = specs.gasketMaterial
-        }
-        if (specs.connection) {
-          patch.connection_size = specs.connection
-        }
-        if (specs.pressure) {
-          const match = String(specs.pressure).match(/(\d+)/)
-          if (match && match[1]) {
-            const p = parseInt(match[1], 10)
-            if (!isNaN(p) && p > 0) {
-              patch.working_pressure_bar = p
-              patch.pressure_test_bar = Math.round(p * 1.5)
-            }
-          }
-        }
+      if (webResult && webResult.success && webResult.results && webResult.results.length > 0) {
+        setWebSearchResults(webResult.results)
+        setWebSearchMessage(
+          webResult.message || `Localizados ${webResult.results.length} resultados no servidor.`,
+        )
 
-        handleUpdateEquipment(index, patch)
-        toast({
-          title: 'Especificações encontradas!',
-          description:
-            result.message ||
-            `Dados carregados para ${result.model || model} (${result.brand || brand}).`,
-        })
+        // Se houver apenas 1 resultado exato com specs completas, já auto-aplica
+        if (webResult.results.length === 1 && webResult.results[0].specs) {
+          const first = webResult.results[0]
+          applySpecsToEquipment(index, first.specs, first.brand, first.model)
+          toast({
+            title: 'Especificações aplicadas automaticamente!',
+            description: `Ficha técnica de ${first.title} carregada nos campos.`,
+          })
+        }
       } else {
-        // Fallback: abrir busca segura em nova aba com noopener
-        const searchRes = openTechnicalSearchInNewTab({
-          model,
-          brand,
-          extraTerms: 'trocador de calor especificações técnicas datasheet',
-          enginePreference: 'google',
-        })
-        toast({
-          title: 'Não encontrado no catálogo BERMO',
-          description: searchRes.success
-            ? 'Abrindo busca técnica em nova aba do navegador com termo codificado.'
-            : 'Preencha manualmente os dados técnicos do equipamento.',
-        })
+        // Fallback para endpoint de specs se webResult vier vazio
+        const singleResult = await searchEquipmentSpecsOnline(model, brand)
+        if (singleResult && singleResult.found && singleResult.specs) {
+          const fallbackItem: EquipmentWebSearchResultItem = {
+            id: 'fb-specs-1',
+            sourceType: 'specs_catalog',
+            title:
+              singleResult.name || `${singleResult.brand || brand} ${singleResult.model || model}`,
+            url: singleResult.source || 'https://bermo.com.br',
+            snippet: singleResult.message || 'Dados técnicos oficiais obtidos pelo servidor.',
+            brand: singleResult.brand,
+            model: singleResult.model,
+            specs: singleResult.specs,
+            badge: 'Base Técnica BERMO',
+          }
+          setWebSearchResults([fallbackItem])
+          setWebSearchMessage('Especificações localizadas no catálogo técnico interno.')
+          applySpecsToEquipment(index, singleResult.specs, singleResult.brand, singleResult.model)
+        } else {
+          setWebSearchResults([])
+          setWebSearchMessage(
+            `Nenhum dado encontrado no servidor para "${model}". Você pode copiar o termo abaixo para busca manual se desejar.`,
+          )
+        }
       }
     } catch (err) {
-      console.warn('Erro na busca online de specs:', err)
-      const searchRes = openTechnicalSearchInNewTab({
-        model,
-        brand,
-        extraTerms: 'trocador de calor especificações técnicas datasheet',
-        enginePreference: 'google',
-      })
-      toast({
-        title: 'Busca técnica online',
-        description: searchRes.success
-          ? 'Abrindo busca em nova aba com parâmetros de pesquisa.'
-          : 'Não foi possível abrir a busca externa.',
-      })
+      console.warn('Erro na busca server-side de especificações:', err)
+      setWebSearchMessage(
+        'O serviço de busca online pelo servidor está momentaneamente indisponível. Utilize a cópia de termos abaixo ou informe os dados manualmente.',
+      )
     } finally {
+      setIsWebSearching(false)
       setSearchingSpecsIndex(null)
+    }
+  }
+
+  // Realizar nova busca com texto customizado dentro do modal interno
+  const handlePerformInternalQuery = async (customQueryText: string) => {
+    const cleanQuery = customQueryText.trim()
+    if (!cleanQuery) return
+
+    setIsWebSearching(true)
+    setWebSearchMessage('')
+    try {
+      const activeEq = equipments[webSearchActiveIndex]
+      const brand = activeEq?.brand || equipmentBrand || ''
+      const res = await searchEquipmentWeb(cleanQuery, brand, cleanQuery)
+      if (res && res.results && res.results.length > 0) {
+        setWebSearchResults(res.results)
+        setWebSearchMessage(res.message || `Localizados ${res.results.length} resultados.`)
+      } else {
+        setWebSearchResults([])
+        setWebSearchMessage(`Nenhum resultado retornado para "${cleanQuery}".`)
+      }
+    } catch (err) {
+      console.warn('Erro ao refinar pesquisa:', err)
+      setWebSearchMessage('Falha ao processar pesquisa no servidor.')
+    } finally {
+      setIsWebSearching(false)
     }
   }
 
@@ -4105,6 +4182,263 @@ export function QuotesManager({
                 )}
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 5.5 Modal interno de Pesquisa Técnica Server-Side (Sem abrir abas externas / Iframe Safe) */}
+      <Dialog open={isWebSearchModalOpen} onOpenChange={setIsWebSearchModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-2 border-b border-slate-100 dark:border-slate-800 bg-teal-50/50 dark:bg-teal-950/20">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-sm font-bold flex items-center gap-2 text-teal-900 dark:text-teal-200">
+                <Globe className="h-4 w-4 text-teal-600" />
+                Busca de Especificações Técnicas (Server-Side)
+              </DialogTitle>
+              <Badge
+                variant="outline"
+                className="text-[10px] border-teal-300 text-teal-700 dark:border-teal-700 dark:text-teal-300"
+              >
+                Item #{webSearchActiveIndex + 1}
+              </Badge>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              Pesquisa realizada no servidor com catálogo BERMO, fichas técnicas de trocadores e IA
+              integrada. Selecione um resultado para aplicar os dados técnicos diretamente no
+              orçamento.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Barra de busca refinada */}
+          <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={webSearchQuery}
+                onChange={(e) => setWebSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handlePerformInternalQuery(webSearchQuery)
+                  }
+                }}
+                placeholder="Ex: BP30, BP6, M10-B, BL50..."
+                className="pl-8 h-8 text-xs font-medium"
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              disabled={isWebSearching || !webSearchQuery.trim()}
+              onClick={() => handlePerformInternalQuery(webSearchQuery)}
+              className="h-8 px-3 text-xs bg-teal-600 hover:bg-teal-700 text-white"
+            >
+              {isWebSearching ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Pesquisando...
+                </>
+              ) : (
+                <>
+                  <Search className="h-3 w-3 mr-1" />
+                  Pesquisar
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Área de Resultados */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {webSearchMessage && (
+              <p className="text-xs text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-md border border-slate-200 dark:border-slate-800">
+                {webSearchMessage}
+              </p>
+            )}
+
+            {isWebSearching ? (
+              <div className="py-12 flex flex-col items-center justify-center space-y-3 text-center">
+                <Loader2 className="h-8 w-8 text-teal-600 animate-spin" />
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    Consultando especificações técnicas no servidor...
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Verificando base BERMO, fabricantes homologados e parâmetros térmicos
+                  </p>
+                </div>
+              </div>
+            ) : webSearchResults.length > 0 ? (
+              <div className="space-y-2.5">
+                {webSearchResults.map((resItem) => {
+                  const specs = resItem.specs
+                  return (
+                    <div
+                      key={resItem.id}
+                      className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-teal-500/50 hover:shadow-xs transition-all space-y-2.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                              {resItem.title}
+                            </span>
+                            {resItem.badge && (
+                              <Badge
+                                variant="secondary"
+                                className="text-[10px] px-1.5 py-0 h-4 bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800"
+                              >
+                                {resItem.badge}
+                              </Badge>
+                            )}
+                          </div>
+                          {resItem.snippet && (
+                            <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                              {resItem.snippet}
+                            </p>
+                          )}
+                        </div>
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            applySpecsToEquipment(
+                              webSearchActiveIndex,
+                              resItem.specs,
+                              resItem.brand,
+                              resItem.model,
+                            )
+                            setIsWebSearchModalOpen(false)
+                            toast({
+                              title: 'Especificações aplicadas!',
+                              description: `Dados de ${resItem.title} preenchidos com sucesso no Item #${webSearchActiveIndex + 1}.`,
+                            })
+                          }}
+                          className="h-7 px-3 text-xs bg-teal-600 hover:bg-teal-700 text-white shrink-0"
+                        >
+                          <Check className="h-3 w-3 mr-1" />
+                          Aplicar Specs
+                        </Button>
+                      </div>
+
+                      {/* Grade de Especificações Extraídas */}
+                      {specs && (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 bg-slate-50 dark:bg-slate-950/60 rounded border border-slate-100 dark:border-slate-800/80 text-[11px]">
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">
+                              Qtd Placas:
+                            </span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                              {specs.platesCount || specs.platesRange || 'N/A'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">
+                              Material:
+                            </span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                              {specs.material || specs.plateMaterial || 'AISI 316L'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">
+                              Gaxeta / Vedação:
+                            </span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                              {specs.gasketMaterial || 'EPDM Clip-on'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground block text-[10px]">
+                              Conexão / Pressão:
+                            </span>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                              {specs.connection || 'DN50'} • {specs.pressure || '16 bar'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Link de referência com proteção noopener */}
+                      {resItem.url && (
+                        <div className="flex items-center justify-between pt-0.5 text-[10px] text-muted-foreground">
+                          <span className="truncate max-w-[80%]">Fonte: {resItem.url}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(resItem.url || '')
+                              toast({
+                                title: 'URL copiada',
+                                description:
+                                  'Endereço da fonte copiado para a área de transferência.',
+                              })
+                            }}
+                            className="text-teal-600 hover:underline flex items-center gap-1"
+                          >
+                            <Copy className="h-2.5 w-2.5" />
+                            Copiar URL
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Nenhuma ficha técnica automática encontrada para &ldquo;{webSearchQuery}&rdquo;.
+                </p>
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md text-left text-xs space-y-2">
+                  <p className="font-semibold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                    Busca manual assistida (segura contra bloqueios do navegador):
+                  </p>
+                  <p className="text-muted-foreground text-[11px]">
+                    Copie o termo técnico abaixo e faça a pesquisa diretamente em seu navegador em
+                    nova janela, evitando bloqueios de iframe da prévia:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={`${webSearchQuery || equipmentModel || 'trocador de calor'} trocador de calor especificações técnicas datasheet`}
+                      className="h-7 text-xs bg-white dark:bg-slate-900 font-mono"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const term = `${webSearchQuery || equipmentModel || 'trocador de calor'} trocador de calor especificações técnicas datasheet`
+                        navigator.clipboard.writeText(term)
+                        toast({
+                          title: 'Termo copiado!',
+                          description: 'Termo técnico copiado para a área de transferência.',
+                        })
+                      }}
+                      className="h-7 px-2.5 text-xs border-amber-300 text-amber-800 hover:bg-amber-100"
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copiar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="p-3 bg-slate-50 dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">
+              Total de resultados: {webSearchResults.length}
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsWebSearchModalOpen(false)}
+              className="h-7 text-xs"
+            >
+              Fechar
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
