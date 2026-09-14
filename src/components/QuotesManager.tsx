@@ -51,6 +51,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Slider } from '@/components/ui/slider'
 
 import {
   Dialog,
@@ -323,8 +324,17 @@ export function QuotesManager({
     thirdPartyCost +
     otherCosts
 
-  // Total Tributos (Taxa Fiscal Consolidada - modelo v0.0.66)
-  const totalTaxesPercent = taxRate
+  // Total Tributos (Soma das alíquotas individuais de impostos)
+  const totalTaxesPercent =
+    Math.round(
+      (Number(pisRate || 0) +
+        Number(cofinsRate || 0) +
+        Number(issRate || 0) +
+        Number(csllRate || 0) +
+        Number(irpjRate || 0) +
+        Number(irDiffRate || 0)) *
+        10000,
+    ) / 10000
 
   // Divisor de formação de preço (Markup)
   const totalDeductionsPercent = (serviceMargin + salesCommission + totalTaxesPercent) / 100
@@ -513,6 +523,17 @@ export function QuotesManager({
       csll_rate: csllRate,
       irpj_rate: irpjRate,
       ir_diff_rate: irDiffRate,
+      pricing_config: {
+        serviceMargin,
+        salesCommission,
+        adminRate,
+        pisRate,
+        cofinsRate,
+        issRate,
+        csllRate,
+        irpjRate,
+        irDiffRate,
+      },
 
       final_price: calculatedSalePrice,
       total: calculatedSalePrice,
@@ -623,13 +644,13 @@ export function QuotesManager({
     setServiceMargin(25)
     setSalesCommission(6)
     setAdminRate(3)
-    setTaxRate(14.83)
     setPisRate(0.65)
     setCofinsRate(3.0)
     setIssRate(5.0)
     setCsllRate(2.88)
     setIrpjRate(4.8)
     setIrDiffRate(1.5)
+    setTaxRate(17.83)
     setPaymentTerms('28 DDL faturado após entrega técnica')
     setValidityDays(15)
     setTechnicalNotes('')
@@ -973,12 +994,12 @@ export function QuotesManager({
     setAdminRate(quote.admin_rate ?? 3)
     // Se a proposta já tiver total_taxes salvo ou alíquotas individuais somadas, preserva; padrão 14.83%
     const existingTaxSum =
-      (quote.pis_rate ?? 0) +
-      (quote.cofins_rate ?? 0) +
-      (quote.iss_rate ?? 0) +
-      (quote.csll_rate ?? 0) +
-      (quote.irpj_rate ?? 0) +
-      (quote.ir_diff_rate ?? 0)
+      (quote.pis_rate ?? quote.pricing_config?.pisRate ?? 0) +
+      (quote.cofins_rate ?? quote.pricing_config?.cofinsRate ?? 0) +
+      (quote.iss_rate ?? quote.pricing_config?.issRate ?? 0) +
+      (quote.csll_rate ?? quote.pricing_config?.csllRate ?? 0) +
+      (quote.irpj_rate ?? quote.pricing_config?.irpjRate ?? 0) +
+      (quote.ir_diff_rate ?? quote.pricing_config?.irDiffRate ?? 0)
     const initialTaxRate =
       (quote as any).tax_rate ??
       (quote as any).taxes_rate ??
@@ -988,12 +1009,12 @@ export function QuotesManager({
           ? Number(existingTaxSum.toFixed(2))
           : 14.83)
     setTaxRate(initialTaxRate)
-    setPisRate(quote.pis_rate ?? 0.65)
-    setCofinsRate(quote.cofins_rate ?? 3.0)
-    setIssRate(quote.iss_rate ?? 5.0)
-    setCsllRate(quote.csll_rate ?? 2.88)
-    setIrpjRate(quote.irpj_rate ?? 4.8)
-    setIrDiffRate(quote.ir_diff_rate ?? 1.5)
+    setPisRate(quote.pis_rate ?? quote.pricing_config?.pisRate ?? 0.65)
+    setCofinsRate(quote.cofins_rate ?? quote.pricing_config?.cofinsRate ?? 3.0)
+    setIssRate(quote.iss_rate ?? quote.pricing_config?.issRate ?? 5.0)
+    setCsllRate(quote.csll_rate ?? quote.pricing_config?.csllRate ?? 2.88)
+    setIrpjRate(quote.irpj_rate ?? quote.pricing_config?.irpjRate ?? 4.8)
+    setIrDiffRate(quote.ir_diff_rate ?? quote.pricing_config?.irDiffRate ?? 1.5)
     setPaymentTerms(quote.payment_terms || '28 DDL faturado após entrega técnica')
     setValidityDays(quote.validity_days || 15)
     setTechnicalNotes(quote.technical_notes || '')
@@ -3161,29 +3182,50 @@ export function QuotesManager({
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 space-y-4">
-                  {/* Bloco 1: Margens Comerciais & Operacionais */}
-                  <div className="space-y-1.5">
+                  {/* Bloco 1: Margens Comerciais & Operacionais com Sliders 0-50% */}
+                  <div className="space-y-3">
                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 block">
-                      Margens e Custos Indiretos
+                      Margens e Custos Indiretos (Barras 0 a 50%)
                     </span>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="space-y-1">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {/* Margem de Serviço */}
+                      <div className="p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/20 space-y-2">
                         <div className="flex items-center justify-between">
-                          <Label className="text-xs font-semibold">Margem de Serviço (%)</Label>
-                          <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
+                          <Label className="text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                            Margem de Serviço (%)
+                          </Label>
+                          <span className="text-[11px] font-mono text-emerald-700 dark:text-emerald-300 font-bold">
                             {(calculatedSalePrice * (serviceMargin / 100)).toLocaleString('pt-BR', {
                               style: 'currency',
                               currency: 'BRL',
                             })}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
+                          <Slider
+                            value={[Math.min(50, Math.max(0, serviceMargin))]}
+                            min={0}
+                            max={50}
+                            step={0.1}
+                            onValueChange={(val) => setServiceMargin(Number(val[0].toFixed(2)))}
+                            className="flex-1 cursor-pointer"
+                          />
+                          <span className="text-[11px] font-mono font-bold w-12 text-right text-emerald-800 dark:text-emerald-300">
+                            {serviceMargin.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 pt-0.5">
                           <Input
                             type="number"
+                            min="0"
+                            max="50"
                             step="0.01"
                             value={serviceMargin}
-                            onChange={(e) => setServiceMargin(Number(e.target.value))}
-                            className="text-xs h-8 font-mono font-bold text-emerald-700 dark:text-emerald-400 flex-1 min-w-0"
+                            onChange={(e) => {
+                              const val = Math.min(50, Math.max(0, Number(e.target.value)))
+                              setServiceMargin(val)
+                            }}
+                            className="text-xs h-7 font-mono font-bold text-emerald-700 dark:text-emerald-400 flex-1 min-w-0"
                           />
                           <Select
                             value={
@@ -3196,7 +3238,7 @@ export function QuotesManager({
                             }}
                           >
                             <SelectTrigger
-                              className="w-16 h-8 text-[11px] font-mono px-1.5 shrink-0 bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800"
+                              className="w-16 h-7 text-[11px] font-mono px-1.5 shrink-0 bg-emerald-50/50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800"
                               title="Escolher percentual pré-definido"
                             >
                               <SelectValue placeholder="Opção" />
@@ -3230,10 +3272,13 @@ export function QuotesManager({
                         </div>
                       </div>
 
-                      <div className="space-y-1">
+                      {/* Comissão de Vendas */}
+                      <div className="p-3 rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50/30 dark:bg-blue-950/20 space-y-2">
                         <div className="flex items-center justify-between">
-                          <Label className="text-xs font-semibold">Comissão de Vendas (%)</Label>
-                          <span className="text-[10px] font-mono text-blue-600 dark:text-blue-400 font-semibold">
+                          <Label className="text-xs font-bold text-blue-900 dark:text-blue-300">
+                            Comissão de Vendas (%)
+                          </Label>
+                          <span className="text-[11px] font-mono text-blue-700 dark:text-blue-300 font-bold">
                             {(calculatedSalePrice * (salesCommission / 100)).toLocaleString(
                               'pt-BR',
                               {
@@ -3243,13 +3288,31 @@ export function QuotesManager({
                             )}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
+                          <Slider
+                            value={[Math.min(50, Math.max(0, salesCommission))]}
+                            min={0}
+                            max={50}
+                            step={0.1}
+                            onValueChange={(val) => setSalesCommission(Number(val[0].toFixed(2)))}
+                            className="flex-1 cursor-pointer"
+                          />
+                          <span className="text-[11px] font-mono font-bold w-12 text-right text-blue-800 dark:text-blue-300">
+                            {salesCommission.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 pt-0.5">
                           <Input
                             type="number"
+                            min="0"
+                            max="50"
                             step="0.01"
                             value={salesCommission}
-                            onChange={(e) => setSalesCommission(Number(e.target.value))}
-                            className="text-xs h-8 font-mono font-bold text-blue-700 dark:text-blue-400 flex-1 min-w-0"
+                            onChange={(e) => {
+                              const val = Math.min(50, Math.max(0, Number(e.target.value)))
+                              setSalesCommission(val)
+                            }}
+                            className="text-xs h-7 font-mono font-bold text-blue-700 dark:text-blue-400 flex-1 min-w-0"
                           />
                           <Select
                             value={
@@ -3262,7 +3325,7 @@ export function QuotesManager({
                             }}
                           >
                             <SelectTrigger
-                              className="w-16 h-8 text-[11px] font-mono px-1.5 shrink-0 bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
+                              className="w-16 h-7 text-[11px] font-mono px-1.5 shrink-0 bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
                               title="Escolher percentual pré-definido"
                             >
                               <SelectValue placeholder="Opção" />
@@ -3302,23 +3365,44 @@ export function QuotesManager({
                         </div>
                       </div>
 
-                      <div className="space-y-1">
+                      {/* Overhead Administrativo */}
+                      <div className="p-3 rounded-lg border border-purple-200 dark:border-purple-900/50 bg-purple-50/30 dark:bg-purple-950/20 space-y-2">
                         <div className="flex items-center justify-between">
-                          <Label className="text-xs font-semibold">Overhead Adm (%)</Label>
-                          <span className="text-[10px] font-mono text-purple-600 dark:text-purple-400 font-semibold">
+                          <Label className="text-xs font-bold text-purple-900 dark:text-purple-300">
+                            Overhead Adm (%)
+                          </Label>
+                          <span className="text-[11px] font-mono text-purple-700 dark:text-purple-300 font-bold">
                             {adminAmount.toLocaleString('pt-BR', {
                               style: 'currency',
                               currency: 'BRL',
                             })}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
+                          <Slider
+                            value={[Math.min(50, Math.max(0, adminRate))]}
+                            min={0}
+                            max={50}
+                            step={0.1}
+                            onValueChange={(val) => setAdminRate(Number(val[0].toFixed(2)))}
+                            className="flex-1 cursor-pointer"
+                          />
+                          <span className="text-[11px] font-mono font-bold w-12 text-right text-purple-800 dark:text-purple-300">
+                            {adminRate.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 pt-0.5">
                           <Input
                             type="number"
+                            min="0"
+                            max="50"
                             step="0.01"
                             value={adminRate}
-                            onChange={(e) => setAdminRate(Number(e.target.value))}
-                            className="text-xs h-8 font-mono font-bold text-purple-700 dark:text-purple-400 flex-1 min-w-0"
+                            onChange={(e) => {
+                              const val = Math.min(50, Math.max(0, Number(e.target.value)))
+                              setAdminRate(val)
+                            }}
+                            className="text-xs h-7 font-mono font-bold text-purple-700 dark:text-purple-400 flex-1 min-w-0"
                           />
                           <Select
                             value={
@@ -3331,7 +3415,7 @@ export function QuotesManager({
                             }}
                           >
                             <SelectTrigger
-                              className="w-16 h-8 text-[11px] font-mono px-1.5 shrink-0 bg-purple-50/50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800"
+                              className="w-16 h-7 text-[11px] font-mono px-1.5 shrink-0 bg-purple-50/50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800"
                               title="Escolher percentual pré-definido"
                             >
                               <SelectValue placeholder="Opção" />
@@ -3370,77 +3454,231 @@ export function QuotesManager({
                           </Select>
                         </div>
                       </div>
+                    </div>
 
-                      <div className="space-y-1">
-                        <Label className="text-xs font-semibold">Validade da Proposta (Dias)</Label>
+                    <div className="flex items-center justify-between pt-1">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                          Validade da Proposta (Dias):
+                        </Label>
                         <Input
                           type="number"
                           value={validityDays}
                           onChange={(e) => setValidityDays(Number(e.target.value))}
-                          className="text-xs h-8 font-mono"
+                          className="text-xs h-7 w-24 font-mono font-bold"
                         />
                       </div>
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        Margem ({serviceMargin}%) + Comissão ({salesCommission}%) + Overhead (
+                        {adminRate}%) = {(serviceMargin + salesCommission + adminRate).toFixed(2)}%
+                      </span>
                     </div>
                   </div>
 
-                  {/* Bloco 2: Taxa Fiscal Consolidada */}
-                  <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 space-y-2.5">
-                    <div className="flex items-center justify-between">
+                  {/* Bloco 2: Impostos Individuais com Alíquotas e Valores em R$ */}
+                  <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-1.5">
                         <Percent className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
                         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                          Tributos & Encargos Fiscais
+                          Tributos & Encargos Fiscais Individuais
                         </span>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className="text-[10.5px] font-mono font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-900"
-                      >
-                        Total Tributos: {totalTaxesPercent.toFixed(2)}% (
-                        {(calculatedSalePrice * (totalTaxesPercent / 100)).toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                        )
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className="text-[11px] font-mono font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800 shadow-xs"
+                        >
+                          Carga Tributária Total: {totalTaxesPercent.toFixed(2)}% •{' '}
+                          {(calculatedSalePrice * (totalTaxesPercent / 100)).toLocaleString(
+                            'pt-BR',
+                            {
+                              style: 'currency',
+                              currency: 'BRL',
+                            },
+                          )}
+                        </Badge>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div className="p-2.5 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                      {/* PIS */}
+                      <div className="p-2.5 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
                         <div className="flex items-center justify-between">
                           <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                            Taxa Fiscal Consolidada (%)
+                            PIS (%)
                           </Label>
-                          <span className="text-[10.5px] font-mono font-bold text-rose-600 dark:text-rose-400">
-                            {(calculatedSalePrice * (totalTaxesPercent / 100)).toLocaleString(
-                              'pt-BR',
-                              {
-                                style: 'currency',
-                                currency: 'BRL',
-                              },
-                            )}
-                          </span>
+                          <span className="text-[9px] text-muted-foreground font-mono">0,65%</span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={taxRate}
-                            onChange={(e) => setTaxRate(Number(e.target.value))}
-                            className="text-xs h-8 font-mono font-bold text-slate-900 dark:text-slate-100 flex-1"
-                          />
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] font-mono text-muted-foreground shrink-0"
-                          >
-                            Padrão: 14,83%
-                          </Badge>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={pisRate}
+                          onChange={(e) => setPisRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                        <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
+                          {(calculatedSalePrice * (Number(pisRate || 0) / 100)).toLocaleString(
+                            'pt-BR',
+                            {
+                              style: 'currency',
+                              currency: 'BRL',
+                            },
+                          )}
                         </div>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                          Alíquota consolidada incidente sobre a receita bruta (PIS, COFINS, ISS,
-                          CSLL e IRPJ).
-                        </p>
                       </div>
+
+                      {/* COFINS */}
+                      <div className="p-2.5 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            COFINS (%)
+                          </Label>
+                          <span className="text-[9px] text-muted-foreground font-mono">3,00%</span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={cofinsRate}
+                          onChange={(e) => setCofinsRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                        <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
+                          {(calculatedSalePrice * (Number(cofinsRate || 0) / 100)).toLocaleString(
+                            'pt-BR',
+                            {
+                              style: 'currency',
+                              currency: 'BRL',
+                            },
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ISS */}
+                      <div className="p-2.5 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            ISS (%)
+                          </Label>
+                          <span className="text-[9px] text-muted-foreground font-mono">5,00%</span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={issRate}
+                          onChange={(e) => setIssRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                        <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
+                          {(calculatedSalePrice * (Number(issRate || 0) / 100)).toLocaleString(
+                            'pt-BR',
+                            {
+                              style: 'currency',
+                              currency: 'BRL',
+                            },
+                          )}
+                        </div>
+                      </div>
+
+                      {/* CSLL */}
+                      <div className="p-2.5 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            CSLL (%)
+                          </Label>
+                          <span className="text-[9px] text-muted-foreground font-mono">2,88%</span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={csllRate}
+                          onChange={(e) => setCsllRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                        <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
+                          {(calculatedSalePrice * (Number(csllRate || 0) / 100)).toLocaleString(
+                            'pt-BR',
+                            {
+                              style: 'currency',
+                              currency: 'BRL',
+                            },
+                          )}
+                        </div>
+                      </div>
+
+                      {/* IRPJ */}
+                      <div className="p-2.5 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            IRPJ (%)
+                          </Label>
+                          <span className="text-[9px] text-muted-foreground font-mono">4,80%</span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={irpjRate}
+                          onChange={(e) => setIrpjRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                        <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
+                          {(calculatedSalePrice * (Number(irpjRate || 0) / 100)).toLocaleString(
+                            'pt-BR',
+                            {
+                              style: 'currency',
+                              currency: 'BRL',
+                            },
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Dif. IR */}
+                      <div className="p-2.5 rounded-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            Dif. IR (%)
+                          </Label>
+                          <span className="text-[9px] text-muted-foreground font-mono">1,50%</span>
+                        </div>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={irDiffRate}
+                          onChange={(e) => setIrDiffRate(Number(e.target.value))}
+                          className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
+                        />
+                        <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
+                          {(calculatedSalePrice * (Number(irDiffRate || 0) / 100)).toLocaleString(
+                            'pt-BR',
+                            {
+                              style: 'currency',
+                              currency: 'BRL',
+                            },
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+                      <span>
+                        Alíquotas incidentes sobre o faturamento bruto homologado da proposta.
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setPisRate(0.65)
+                          setCofinsRate(3.0)
+                          setIssRate(5.0)
+                          setCsllRate(2.88)
+                          setIrpjRate(4.8)
+                          setIrDiffRate(1.5)
+                        }}
+                        className="h-6 text-[10px] font-medium text-slate-500 hover:text-rose-600 px-2"
+                      >
+                        Restaurar Alíquotas Padrão (17,83%)
+                      </Button>
                     </div>
                   </div>
 
