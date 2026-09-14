@@ -415,7 +415,73 @@ export function QuotesManager({
       foremanRate,
     }
 
-    const primaryEq = equipments[0] || {
+    const sanitizedEquipments: QuoteEquipmentItem[] = (
+      equipments && equipments.length > 0
+        ? equipments
+        : [
+            {
+              id: `eq-${Date.now()}-1`,
+              model: equipmentModel || '',
+              brand: equipmentBrand || 'BERMO',
+              quantity: equipmentQuantity || 1,
+              tag: '',
+              serial_number: '',
+              plate_count: plateCount,
+              plate_material: plateMaterial || '',
+              plate_thickness: plateThickness,
+              gasket_material: gasketMaterial || '',
+              connection_size: connectionSize || '',
+              pressure_test_bar: pressureTestBar,
+              working_pressure_bar: workingPressureBar,
+            },
+          ]
+    ).map((eq, idx) => ({
+      id: eq.id || `eq-${idx + 1}`,
+      model: eq.model != null ? String(eq.model).trim() : '',
+      brand: eq.brand != null && String(eq.brand).trim() ? String(eq.brand).trim() : 'BERMO',
+      series: eq.series || undefined,
+      quantity: Math.max(1, Number(eq.quantity) || 1),
+      tag: eq.tag || undefined,
+      serial_number: eq.serial_number || undefined,
+      plate_count:
+        eq.plate_count != null && !isNaN(Number(eq.plate_count))
+          ? Number(eq.plate_count)
+          : undefined,
+      plate_material:
+        eq.plate_material != null && String(eq.plate_material).trim()
+          ? String(eq.plate_material).trim()
+          : undefined,
+      plate_thickness:
+        eq.plate_thickness != null && !isNaN(Number(eq.plate_thickness))
+          ? Number(eq.plate_thickness)
+          : undefined,
+      gasket_material:
+        eq.gasket_material != null && String(eq.gasket_material).trim()
+          ? String(eq.gasket_material).trim()
+          : undefined,
+      connection_size:
+        eq.connection_size != null && String(eq.connection_size).trim()
+          ? String(eq.connection_size).trim()
+          : undefined,
+      connection_type: eq.connection_type || undefined,
+      pressure_test_bar:
+        eq.pressure_test_bar != null && !isNaN(Number(eq.pressure_test_bar))
+          ? Number(eq.pressure_test_bar)
+          : undefined,
+      working_pressure_bar:
+        eq.working_pressure_bar != null && !isNaN(Number(eq.working_pressure_bar))
+          ? Number(eq.working_pressure_bar)
+          : undefined,
+      dimensions: eq.dimensions || undefined,
+      dimensions_w_h_d: eq.dimensions_w_h_d || undefined,
+      weight_kg:
+        eq.weight_kg != null && !isNaN(Number(eq.weight_kg)) ? Number(eq.weight_kg) : undefined,
+      weightKg:
+        eq.weightKg != null && !isNaN(Number(eq.weightKg)) ? Number(eq.weightKg) : undefined,
+    }))
+
+    const primaryEq = sanitizedEquipments[0] || {
+      id: 'eq-1',
       model: equipmentModel || '',
       brand: equipmentBrand || 'BERMO',
       quantity: equipmentQuantity || 1,
@@ -443,7 +509,7 @@ export function QuotesManager({
       assigned_to: assignedTo || 'Alex Nogueira',
       approval_token: approvalToken || undefined,
       status,
-      equipments: equipments && equipments.length > 0 ? equipments : undefined,
+      equipments: sanitizedEquipments,
       equipment_brand: primaryEq.brand || equipmentBrand || 'BERMO',
       equipment_model: primaryEq.model || equipmentModel || '',
       equipment_quantity: primaryEq.quantity || equipmentQuantity || 1,
@@ -1103,7 +1169,70 @@ export function QuotesManager({
     setWorkingPressureBar(quote.working_pressure_bar ?? undefined)
 
     if (quote.equipments && Array.isArray(quote.equipments) && quote.equipments.length > 0) {
-      setEquipments(quote.equipments)
+      const restored = quote.equipments.map((eq: any, idx: number) => ({
+        id: eq.id || `eq-${quote.id || 'item'}-${idx + 1}`,
+        model: eq.model != null ? String(eq.model) : '',
+        brand: eq.brand != null && String(eq.brand).trim() ? String(eq.brand) : 'BERMO',
+        series: eq.series || '',
+        quantity: Math.max(1, Number(eq.quantity) || 1),
+        tag: eq.tag || '',
+        serial_number: eq.serial_number || '',
+        plate_count:
+          eq.plate_count != null && !isNaN(Number(eq.plate_count))
+            ? Number(eq.plate_count)
+            : eq.plateCount != null && !isNaN(Number(eq.plateCount))
+              ? Number(eq.plateCount)
+              : undefined,
+        plate_material: eq.plate_material || eq.plateMaterial || '',
+        plate_thickness:
+          eq.plate_thickness != null && !isNaN(Number(eq.plate_thickness))
+            ? Number(eq.plate_thickness)
+            : eq.plateThickness != null && !isNaN(Number(eq.plateThickness))
+              ? Number(eq.plateThickness)
+              : undefined,
+        gasket_material: eq.gasket_material || eq.gasketMaterial || '',
+        connection_size: eq.connection_size || eq.connectionSize || '',
+        connection_type: eq.connection_type || eq.connectionType || '',
+        pressure_test_bar:
+          eq.pressure_test_bar != null && !isNaN(Number(eq.pressure_test_bar))
+            ? Number(eq.pressure_test_bar)
+            : eq.pressureTestBar != null && !isNaN(Number(eq.pressureTestBar))
+              ? Number(eq.pressureTestBar)
+              : undefined,
+        working_pressure_bar:
+          eq.working_pressure_bar != null && !isNaN(Number(eq.working_pressure_bar))
+            ? Number(eq.working_pressure_bar)
+            : eq.workingPressureBar != null && !isNaN(Number(eq.workingPressureBar))
+              ? Number(eq.workingPressureBar)
+              : undefined,
+        dimensions: eq.dimensions || eq.dimensions_w_h_d || '',
+        dimensions_w_h_d: eq.dimensions_w_h_d || eq.dimensions || '',
+        weight_kg:
+          eq.weight_kg != null && !isNaN(Number(eq.weight_kg))
+            ? Number(eq.weight_kg)
+            : eq.weightKg != null && !isNaN(Number(eq.weightKg))
+              ? Number(eq.weightKg)
+              : undefined,
+        weightKg:
+          eq.weightKg != null && !isNaN(Number(eq.weightKg))
+            ? Number(eq.weightKg)
+            : eq.weight_kg != null && !isNaN(Number(eq.weight_kg))
+              ? Number(eq.weight_kg)
+              : undefined,
+      }))
+      setEquipments(restored)
+      if (restored[0]) {
+        setEquipmentModel(restored[0].model || '')
+        setEquipmentBrand(restored[0].brand || 'BERMO')
+        setEquipmentQuantity(restored[0].quantity || 1)
+        setPlateCount(restored[0].plate_count)
+        setPlateMaterial(restored[0].plate_material || '')
+        setPlateThickness(restored[0].plate_thickness)
+        setGasketMaterial(restored[0].gasket_material || '')
+        setConnectionSize(restored[0].connection_size || '')
+        setPressureTestBar(restored[0].pressure_test_bar)
+        setWorkingPressureBar(restored[0].working_pressure_bar)
+      }
     } else {
       setEquipments([
         {
@@ -1876,16 +2005,37 @@ export function QuotesManager({
 
                         {/* Equipamento */}
                         <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
-                          <div className="max-w-[220px] truncate">
-                            <span className="font-medium block truncate">
-                              {quote.equipment_model
-                                ? `${quote.equipment_brand || 'BERMO'} ${quote.equipment_model}`
-                                : quote.title || 'Manutenção Geral'}
-                            </span>
-                            <span className="text-[10px] text-muted-foreground truncate block">
-                              {quote.plate_count ? `${quote.plate_count} placas` : ''}{' '}
-                              {quote.gasket_material ? `• ${quote.gasket_material}` : ''}
-                            </span>
+                          <div className="max-w-[240px] truncate">
+                            {quote.equipments &&
+                            Array.isArray(quote.equipments) &&
+                            quote.equipments.length > 1 ? (
+                              <>
+                                <span className="font-medium block truncate">
+                                  {quote.equipments
+                                    .map((e) => `${e.model || 'Item'} (${e.quantity || 1})`)
+                                    .join(' + ')}
+                                </span>
+                                <span className="text-[10px] text-teal-600 dark:text-teal-400 truncate block font-medium">
+                                  {quote.equipments.reduce(
+                                    (sum, e) => sum + (Number(e.quantity) || 1),
+                                    0,
+                                  )}{' '}
+                                  unidades em {quote.equipments.length} modelos
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="font-medium block truncate">
+                                  {quote.equipment_model
+                                    ? `${quote.equipment_brand || 'BERMO'} ${quote.equipment_model}${quote.equipment_quantity && quote.equipment_quantity > 1 ? ` (${quote.equipment_quantity} peças)` : ''}`
+                                    : quote.title || 'Manutenção Geral'}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground truncate block">
+                                  {quote.plate_count ? `${quote.plate_count} placas` : ''}{' '}
+                                  {quote.gasket_material ? `• ${quote.gasket_material}` : ''}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </td>
 
@@ -2338,33 +2488,46 @@ export function QuotesManager({
                     <div className="space-y-3">
                       {equipments.map((eq, eqIdx) => {
                         const isPrimary = eqIdx === 0
-                        const currentModel = eq.model ?? (isPrimary ? equipmentModel : '')
-                        const currentBrand = eq.brand ?? (isPrimary ? equipmentBrand : 'BERMO')
-                        const currentQty = eq.quantity ?? (isPrimary ? equipmentQuantity : 1)
-                        const currentPlateCount =
-                          eq.plate_count ?? (isPrimary ? plateCount : undefined)
-                        const currentPlateMat =
-                          eq.plate_material ?? (isPrimary ? plateMaterial : '')
-                        const currentPlateThick =
-                          eq.plate_thickness ?? (isPrimary ? plateThickness : undefined)
-                        const currentGasketMat =
-                          eq.gasket_material ?? (isPrimary ? gasketMaterial : '')
+                        const currentModel =
+                          eq.model != null ? eq.model : isPrimary ? equipmentModel : ''
+                        const currentBrand =
+                          eq.brand != null && eq.brand !== ''
+                            ? eq.brand
+                            : isPrimary
+                              ? equipmentBrand || 'BERMO'
+                              : 'BERMO'
+                        const currentQty =
+                          eq.quantity != null ? eq.quantity : isPrimary ? equipmentQuantity || 1 : 1
+                        const currentPlateCount = eq.plate_count
+                        const currentPlateMat = eq.plate_material ?? ''
+                        const currentPlateThick = eq.plate_thickness
+                        const currentGasketMat = eq.gasket_material ?? ''
+                        const currentConnSize = eq.connection_size ?? ''
+                        const currentWorkingPress = eq.working_pressure_bar
                         const isSearchingThis = searchingSpecsIndex === eqIdx
 
                         return (
                           <div
                             key={eq.id || `eq-${eqIdx}`}
-                            className="p-3 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3 relative"
+                            className="p-3.5 bg-slate-50 dark:bg-slate-900/90 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3 relative shadow-xs"
                           >
-                            <div className="flex items-center justify-between gap-2 border-b border-slate-200/70 dark:border-slate-800 pb-2">
+                            <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 dark:border-slate-800 pb-2">
                               <div className="flex items-center gap-2">
                                 <Badge
                                   variant="secondary"
-                                  className="text-[10px] font-mono font-bold bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
+                                  className="text-[11px] font-mono font-bold bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300"
                                 >
                                   Item #{eqIdx + 1}
                                   {isPrimary && ' (Principal)'}
                                 </Badge>
+                                {currentModel && (
+                                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                    {currentModel}
+                                  </span>
+                                )}
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  • {currentQty} {currentQty === 1 ? 'peça/unid.' : 'peças/unid.'}
+                                </span>
                                 {eq.tag && (
                                   <span className="text-[11px] text-muted-foreground font-mono">
                                     TAG: {eq.tag}

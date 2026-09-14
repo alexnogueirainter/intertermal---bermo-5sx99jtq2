@@ -366,49 +366,126 @@ export function QuotePdfPreviewDialog({
     taxes.totalTaxes ??
     pisPercent + cofinsPercent + issPercent + csllPercent + irpjPercent + irDiffPercent
 
-  // Lista unificada de equipamentos da proposta (suporta array q.equipments, service_details ou fallback)
+  // Lista unificada de equipamentos da proposta (prioriza quote.equipments individualizado)
   let quoteEquipmentsList: any[] = []
   if (quote.equipments && Array.isArray(quote.equipments) && quote.equipments.length > 0) {
-    quoteEquipmentsList = quote.equipments
+    quoteEquipmentsList = quote.equipments.map((eq, idx) => ({
+      id: eq.id || `eq-${idx + 1}`,
+      model: eq.model != null ? String(eq.model).trim() : '',
+      brand:
+        eq.brand != null && String(eq.brand).trim()
+          ? String(eq.brand).trim()
+          : quote.equipment_brand || 'BERMO',
+      series: eq.series || '',
+      quantity: Math.max(1, Number(eq.quantity) || 1),
+      tag: eq.tag || '',
+      serial_number: eq.serial_number || '',
+      plateCount:
+        eq.plate_count != null && !isNaN(Number(eq.plate_count))
+          ? Number(eq.plate_count)
+          : eq.plateCount != null && !isNaN(Number(eq.plateCount))
+            ? Number(eq.plateCount)
+            : undefined,
+      plateMaterial: eq.plate_material || eq.plateMaterial || '',
+      plateThickness:
+        eq.plate_thickness != null && !isNaN(Number(eq.plate_thickness))
+          ? Number(eq.plate_thickness)
+          : eq.plateThickness != null && !isNaN(Number(eq.plateThickness))
+            ? Number(eq.plateThickness)
+            : undefined,
+      gasketMaterial: eq.gasket_material || eq.gasketMaterial || '',
+      connectionSize: eq.connection_size || eq.connectionSize || '',
+      connectionType: eq.connection_type || eq.connectionType || '',
+      pressureTestBar:
+        eq.pressure_test_bar != null && !isNaN(Number(eq.pressure_test_bar))
+          ? Number(eq.pressure_test_bar)
+          : eq.pressureTestBar != null && !isNaN(Number(eq.pressureTestBar))
+            ? Number(eq.pressureTestBar)
+            : undefined,
+      workingPressureBar:
+        eq.working_pressure_bar != null && !isNaN(Number(eq.working_pressure_bar))
+          ? Number(eq.working_pressure_bar)
+          : eq.workingPressureBar != null && !isNaN(Number(eq.workingPressureBar))
+            ? Number(eq.workingPressureBar)
+            : undefined,
+      dimensions: eq.dimensions || eq.dimensions_w_h_d || '',
+      weightKg:
+        eq.weight_kg != null && !isNaN(Number(eq.weight_kg))
+          ? Number(eq.weight_kg)
+          : eq.weightKg != null && !isNaN(Number(eq.weightKg))
+            ? Number(eq.weightKg)
+            : undefined,
+    }))
   } else if (
     specs?.equipments_list &&
     Array.isArray(specs.equipments_list) &&
     specs.equipments_list.length > 0
   ) {
-    quoteEquipmentsList = specs.equipments_list
+    quoteEquipmentsList = specs.equipments_list.map((eq: any, idx: number) => ({
+      id: eq.id || `eq-${idx + 1}`,
+      model: eq.model || eq.productModel || '',
+      brand: eq.brand || eq.productBrand || quote.equipment_brand || 'BERMO',
+      series: eq.series || '',
+      quantity: Math.max(1, Number(eq.quantity) || 1),
+      tag: eq.tag || '',
+      plateCount: eq.plateCount ?? eq.plate_count ?? eq.platesCount,
+      plateMaterial: eq.plateMaterial || eq.plate_material || '',
+      plateThickness: eq.plateThickness ?? eq.plate_thickness,
+      gasketMaterial: eq.gasketMaterial || eq.gasket_material || '',
+      connectionSize: eq.connectionSize || eq.connection_size || '',
+      pressureTestBar: eq.pressureTestBar ?? eq.pressure_test_bar,
+      workingPressureBar: eq.workingPressureBar ?? eq.working_pressure_bar,
+      dimensions: eq.dimensions || eq.dimensions_w_h_d || '',
+      weightKg: eq.weightKg ?? eq.weight_kg,
+    }))
   } else if (quote.items && quote.items.length > 0) {
     const itemsWithSpecs = quote.items.filter((it) => it.bermo_specs && it.bermo_specs.productModel)
     if (itemsWithSpecs.length > 0) {
       quoteEquipmentsList = itemsWithSpecs.map((it, idx) => ({
-        id: it.id || `eq-${idx}`,
+        id: it.id || `eq-${idx + 1}`,
         model: it.bermo_specs?.productModel || it.bermo_specs?.productCode || '',
-        brand: it.bermo_specs?.productBrand || quote.equipment_brand || 'Alfa Laval / BERMO',
+        brand: it.bermo_specs?.productBrand || quote.equipment_brand || 'BERMO',
         series: it.bermo_specs?.productSeries || quote.equipment_series || '',
-        quantity: Number(it.quantity) || 1,
+        quantity: Math.max(1, Number(it.quantity) || 1),
         plateCount:
-          Number(it.bermo_specs?.platesCount) ||
-          (quote.plate_count != null ? Number(quote.plate_count) : 45),
-        plateMaterial: it.bermo_specs?.plateMaterial || quote.plate_material || 'AISI 316L',
+          it.bermo_specs?.platesCount != null && !isNaN(Number(it.bermo_specs?.platesCount))
+            ? Number(it.bermo_specs?.platesCount)
+            : quote.plate_count != null
+              ? Number(quote.plate_count)
+              : undefined,
+        plateMaterial: it.bermo_specs?.plateMaterial || quote.plate_material || '',
         plateThickness:
-          Number(it.bermo_specs?.plateThickness) ||
-          (quote.plate_thickness != null ? Number(quote.plate_thickness) : 0.5),
-        gasketMaterial: it.bermo_specs?.gasketType || quote.gasket_material || 'EPDM Clip-on',
+          it.bermo_specs?.plateThickness != null && !isNaN(Number(it.bermo_specs?.plateThickness))
+            ? Number(it.bermo_specs?.plateThickness)
+            : quote.plate_thickness != null
+              ? Number(quote.plate_thickness)
+              : undefined,
+        gasketMaterial: it.bermo_specs?.gasketType || quote.gasket_material || '',
         connectionSize:
           it.bermo_specs?.pipeMeasurement ||
           it.bermo_specs?.equipmentSize ||
           quote.connection_size ||
-          'DN100 (4")',
+          '',
         pressureTestBar:
-          Number(it.bermo_specs?.testPressure) ||
-          (quote.pressure_test_bar != null ? Number(quote.pressure_test_bar) : 16),
+          it.bermo_specs?.testPressure != null && !isNaN(Number(it.bermo_specs?.testPressure))
+            ? Number(it.bermo_specs?.testPressure)
+            : quote.pressure_test_bar != null
+              ? Number(quote.pressure_test_bar)
+              : undefined,
         workingPressureBar:
-          Number(it.bermo_specs?.operatingPressure) ||
-          (quote.working_pressure_bar != null ? Number(quote.working_pressure_bar) : 10),
-        dimensions:
-          it.bermo_specs?.plateDimensions || quote.dimensions_w_h_d || '1450 x 480 x 1120 mm',
+          it.bermo_specs?.operatingPressure != null &&
+          !isNaN(Number(it.bermo_specs?.operatingPressure))
+            ? Number(it.bermo_specs?.operatingPressure)
+            : quote.working_pressure_bar != null
+              ? Number(quote.working_pressure_bar)
+              : undefined,
+        dimensions: it.bermo_specs?.plateDimensions || quote.dimensions_w_h_d || '',
         weightKg:
-          Number(it.bermo_specs?.weightKg) ||
-          (quote.weight_kg != null ? Number(quote.weight_kg) : 480),
+          it.bermo_specs?.weightKg != null && !isNaN(Number(it.bermo_specs?.weightKg))
+            ? Number(it.bermo_specs?.weightKg)
+            : quote.weight_kg != null
+              ? Number(quote.weight_kg)
+              : undefined,
       }))
     }
   }
@@ -418,26 +495,44 @@ export function QuotePdfPreviewDialog({
       {
         id: 'eq-default',
         model: quote.equipment_model || specs?.productModel || specs?.productCode || '',
-        brand: quote.equipment_brand || specs?.productBrand || 'Alfa Laval / BERMO',
+        brand: quote.equipment_brand || specs?.productBrand || 'BERMO',
         series: quote.equipment_series || specs?.productSeries || '',
-        quantity: quote.equipment_quantity ?? 1,
+        quantity: Math.max(1, Number(quote.equipment_quantity) || 1),
         plateCount:
-          quote.plate_count ?? (specs?.platesCount != null ? Number(specs.platesCount) : 45),
-        plateMaterial: quote.plate_material || specs?.plateMaterial || 'AISI 316L',
+          quote.plate_count != null && !isNaN(Number(quote.plate_count))
+            ? Number(quote.plate_count)
+            : specs?.platesCount != null && !isNaN(Number(specs.platesCount))
+              ? Number(specs.platesCount)
+              : undefined,
+        plateMaterial: quote.plate_material || specs?.plateMaterial || '',
         plateThickness:
-          quote.plate_thickness ??
-          (specs?.plateThickness != null ? Number(specs.plateThickness) : 0.5),
-        gasketMaterial: quote.gasket_material || specs?.gasketType || 'EPDM Clip-on',
+          quote.plate_thickness != null && !isNaN(Number(quote.plate_thickness))
+            ? Number(quote.plate_thickness)
+            : specs?.plateThickness != null && !isNaN(Number(specs.plateThickness))
+              ? Number(specs.plateThickness)
+              : undefined,
+        gasketMaterial: quote.gasket_material || specs?.gasketType || '',
         connectionSize:
-          quote.connection_size || specs?.equipmentSize || specs?.pipeMeasurement || 'DN100 (4")',
+          quote.connection_size || specs?.equipmentSize || specs?.pipeMeasurement || '',
         pressureTestBar:
-          quote.pressure_test_bar ??
-          (specs?.testPressure != null ? Number(specs.testPressure) : 16),
+          quote.pressure_test_bar != null && !isNaN(Number(quote.pressure_test_bar))
+            ? Number(quote.pressure_test_bar)
+            : specs?.testPressure != null && !isNaN(Number(specs.testPressure))
+              ? Number(specs.testPressure)
+              : undefined,
         workingPressureBar:
-          quote.working_pressure_bar ??
-          (specs?.operatingPressure != null ? Number(specs.operatingPressure) : 10),
-        dimensions: quote.dimensions_w_h_d || specs?.dimensions || '1450 x 480 x 1120 mm',
-        weightKg: quote.weight_kg ?? (specs?.weightKg != null ? Number(specs.weightKg) : 480),
+          quote.working_pressure_bar != null && !isNaN(Number(quote.working_pressure_bar))
+            ? Number(quote.working_pressure_bar)
+            : specs?.operatingPressure != null && !isNaN(Number(specs.operatingPressure))
+              ? Number(specs.operatingPressure)
+              : undefined,
+        dimensions: quote.dimensions_w_h_d || specs?.dimensions || '',
+        weightKg:
+          quote.weight_kg != null && !isNaN(Number(quote.weight_kg))
+            ? Number(quote.weight_kg)
+            : specs?.weightKg != null && !isNaN(Number(specs.weightKg))
+              ? Number(specs.weightKg)
+              : undefined,
       },
     ]
   }
@@ -1402,96 +1497,142 @@ export function QuotePdfPreviewDialog({
                 Equipamentos Contemplados na Proposta Técnica (Especificações):
               </span>
               <div className="grid grid-cols-1 gap-3 print:gap-2.5">
-                {quoteEquipmentsList.map((eq, idx) => (
-                  <div
-                    key={eq.id || idx}
-                    className={`quote-print-card p-3.5 print:p-3 rounded-lg border text-xs print:text-[10.5pt] space-y-2.5 print:space-y-2 ${
-                      isInternal
-                        ? 'bg-amber-50/50 border-amber-200'
-                        : 'bg-teal-50/50 border-teal-100'
-                    }`}
-                  >
-                    {' '}
-                    <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-1.5 print:pb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-[11.5px] print:text-[11.5pt]">
-                          Item {idx + 1}: {eq.brand || 'BERMO'} {eq.model || 'Trocador de Calor'}
-                        </span>
-                        {Number(eq.quantity) > 1 && (
-                          <Badge
-                            variant="secondary"
-                            className="text-[9px] print:text-[9.5pt] px-1.5 py-0 bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300 font-mono"
-                          >
-                            {eq.quantity} unidades
-                          </Badge>
+                {quoteEquipmentsList.map((eq, idx) => {
+                  const hasSpecs =
+                    eq.plateCount != null ||
+                    (eq.plateMaterial && eq.plateMaterial.trim() !== '') ||
+                    eq.plateThickness != null ||
+                    (eq.gasketMaterial && eq.gasketMaterial.trim() !== '') ||
+                    (eq.connectionSize && eq.connectionSize.trim() !== '') ||
+                    eq.workingPressureBar != null ||
+                    eq.pressureTestBar != null ||
+                    (eq.dimensions && eq.dimensions.trim() !== '') ||
+                    eq.weightKg != null
+
+                  return (
+                    <div
+                      key={eq.id || idx}
+                      className={`quote-print-card p-3.5 print:p-3 rounded-lg border text-xs print:text-[10.5pt] space-y-2.5 print:space-y-2 ${
+                        isInternal
+                          ? 'bg-amber-50/50 border-amber-200'
+                          : 'bg-teal-50/50 border-teal-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800/60 pb-1.5 print:pb-1 flex-wrap gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 text-[11.5px] print:text-[11.5pt]">
+                            Item {idx + 1}: {eq.model ? `${eq.model}` : 'Equipamento'} —{' '}
+                            {Number(eq.quantity) || 1}{' '}
+                            {Number(eq.quantity) === 1 ? 'unidade' : 'unidades'}
+                          </span>
+                          {eq.brand && (
+                            <Badge
+                              variant="outline"
+                              className="text-[9.5px] print:text-[9pt] px-1.5 py-0 border-slate-300 text-slate-700 bg-white"
+                            >
+                              {eq.brand}
+                            </Badge>
+                          )}
+                          {eq.tag && (
+                            <span className="text-[10px] print:text-[9.5pt] text-muted-foreground font-mono">
+                              TAG: {eq.tag}
+                            </span>
+                          )}
+                        </div>
+                        {eq.series && (
+                          <span className="text-[10px] print:text-[10pt] text-muted-foreground font-mono">
+                            {eq.series}
+                          </span>
                         )}
                       </div>
-                      <span className="text-[10px] print:text-[10pt] text-muted-foreground font-mono">
-                        {eq.series || 'Placas Desmontáveis'}
-                      </span>
+
+                      {hasSpecs ? (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 print:gap-x-4 print:gap-y-1.5 text-[10.5px] print:text-[10.5pt] font-mono">
+                          <div>
+                            <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
+                              Modelo / Fabricante
+                            </span>
+                            <strong className="text-slate-900">{eq.model || 'N/A'}</strong> (
+                            {eq.brand || 'BERMO'})
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
+                              Nº de Placas
+                            </span>
+                            <strong className="text-slate-900">{eq.plateCount ?? 'N/A'}</strong>
+                            {eq.plateMaterial ? ` (${eq.plateMaterial})` : ''}
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
+                              Espessura Placas
+                            </span>
+                            <strong className="text-slate-900">
+                              {eq.plateThickness != null ? `${eq.plateThickness} mm` : 'N/A'}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
+                              Gaxetas
+                            </span>
+                            <strong className="text-slate-900">{eq.gasketMaterial || 'N/A'}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
+                              Conexão / Bitola
+                            </span>
+                            <strong className="text-slate-900">{eq.connectionSize || 'N/A'}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
+                              Pressão Trab. / Teste
+                            </span>
+                            <strong className="text-slate-900">
+                              {eq.workingPressureBar != null
+                                ? `${eq.workingPressureBar} bar`
+                                : 'N/A'}{' '}
+                              / {eq.pressureTestBar != null ? `${eq.pressureTestBar} bar` : 'N/A'}
+                            </strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
+                              Dimensões (L x A x P)
+                            </span>
+                            <strong className="text-slate-900">{eq.dimensions || 'N/A'}</strong>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
+                              Peso Estimado
+                            </span>
+                            <strong className="text-slate-900">
+                              {eq.weightKg != null ? `${eq.weightKg} kg` : 'N/A'}
+                            </strong>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 text-[11px] print:text-[10pt] text-slate-600 bg-white/70 dark:bg-slate-950/40 p-2 rounded border border-slate-200/60">
+                          <span>
+                            <strong>Modelo:</strong> {eq.model || 'Não especificado'}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            <strong>Quantidade:</strong> {Number(eq.quantity) || 1} peças/unidades
+                          </span>
+                          {eq.brand && (
+                            <>
+                              <span>•</span>
+                              <span>
+                                <strong>Marca:</strong> {eq.brand}
+                              </span>
+                            </>
+                          )}
+                          <span className="text-slate-400 text-[10px] ml-auto">
+                            (Item adicionado de forma individualizada)
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 print:gap-x-4 print:gap-y-1.5 text-[10.5px] print:text-[10.5pt] font-mono">
-                      <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
-                          Modelo / Fabricante
-                        </span>
-                        <strong className="text-slate-900">{eq.model || 'N/A'}</strong> (
-                        {eq.brand || 'BERMO'})
-                      </div>
-                      <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
-                          Nº de Placas
-                        </span>
-                        <strong className="text-slate-900">{eq.plateCount ?? 'N/A'}</strong> (
-                        {eq.plateMaterial || 'AISI 316L'})
-                      </div>
-                      <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
-                          Espessura Placas
-                        </span>
-                        <strong className="text-slate-900">{eq.plateThickness ?? '0.5'} mm</strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
-                          Gaxetas
-                        </span>
-                        <strong className="text-slate-900">
-                          {eq.gasketMaterial || 'EPDM Clip-on'}
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
-                          Conexão / Bitola
-                        </span>
-                        <strong className="text-slate-900">
-                          {eq.connectionSize || 'DN100 (4")'}
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
-                          Pressão Trab. / Teste
-                        </span>
-                        <strong className="text-slate-900">
-                          {eq.workingPressureBar ?? 10} bar / {eq.pressureTestBar ?? 16} bar
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
-                          Dimensões (L x A x P)
-                        </span>
-                        <strong className="text-slate-900">
-                          {eq.dimensions || '1450 x 480 x 1120 mm'}
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 font-sans text-[9.5px] print:text-[9.5pt] block">
-                          Peso Estimado
-                        </span>
-                        <strong className="text-slate-900">{eq.weightKg ?? 480} kg</strong>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
 
