@@ -98,6 +98,7 @@ import {
 import { quotesService, searchEquipmentSpecsOnline } from '@/services/quotes'
 import { getStandardServiceMethodology } from '@/data/bermo-catalog'
 import { equipmentCatalogService, EquipmentCatalogItem } from '@/services/equipment-catalog'
+import { openTechnicalSearchInNewTab } from '@/lib/search-helper'
 
 export interface QuotesManagerProps {
   quotes: QuoteRecord[]
@@ -728,7 +729,7 @@ export function QuotesManager({
     })
   }
 
-  // Busca na internet de especificações técnicas do equipamento com fallback para Google
+  // Busca na internet de especificações técnicas do equipamento com fallback seguro para Google / DuckDuckGo em nova aba
   const handleSearchSpecsOnline = async (index: number) => {
     const item = equipments[index]
     const model = (item?.model || equipmentModel || '').trim()
@@ -790,21 +791,33 @@ export function QuotesManager({
             `Dados carregados para ${result.model || model} (${result.brand || brand}).`,
         })
       } else {
-        // Fallback: abrir busca no Google em nova aba
-        const queryTerm = `${brand ? `${brand} ` : ''}${model} trocador de calor especificações técnicas datasheet`
-        window.open(`https://www.google.com/search?q=${encodeURIComponent(queryTerm)}`, '_blank')
+        // Fallback: abrir busca segura em nova aba com noopener
+        const searchRes = openTechnicalSearchInNewTab({
+          model,
+          brand,
+          extraTerms: 'trocador de calor especificações técnicas datasheet',
+          enginePreference: 'google',
+        })
         toast({
-          title: 'Não encontrado no catálogo',
-          description: 'Abrindo busca no Google em nova aba com o termo digitado.',
+          title: 'Não encontrado no catálogo BERMO',
+          description: searchRes.success
+            ? 'Abrindo busca técnica em nova aba do navegador com termo codificado.'
+            : 'Preencha manualmente os dados técnicos do equipamento.',
         })
       }
     } catch (err) {
       console.warn('Erro na busca online de specs:', err)
-      const queryTerm = `${brand ? `${brand} ` : ''}${model} trocador de calor especificações técnicas datasheet`
-      window.open(`https://www.google.com/search?q=${encodeURIComponent(queryTerm)}`, '_blank')
+      const searchRes = openTechnicalSearchInNewTab({
+        model,
+        brand,
+        extraTerms: 'trocador de calor especificações técnicas datasheet',
+        enginePreference: 'google',
+      })
       toast({
-        title: 'Busca online falhou',
-        description: 'Abrindo busca no Google em nova aba com o termo digitado.',
+        title: 'Busca técnica online',
+        description: searchRes.success
+          ? 'Abrindo busca em nova aba com parâmetros de pesquisa.'
+          : 'Não foi possível abrir a busca externa.',
       })
     } finally {
       setSearchingSpecsIndex(null)
@@ -1837,7 +1850,11 @@ export function QuotesManager({
                                   <DropdownMenuItem
                                     onClick={() => {
                                       const token = quote.approval_token || quote.id
-                                      window.open(`/proposta/${token}`, '_blank')
+                                      window.open(
+                                        `/proposta/${token}`,
+                                        '_blank',
+                                        'noopener,noreferrer',
+                                      )
                                     }}
                                   >
                                     <ExternalLink className="h-3.5 w-3.5 mr-2 text-blue-600" />
@@ -2239,7 +2256,7 @@ export function QuotesManager({
                                   disabled={isSearchingThis}
                                   onClick={() => handleSearchSpecsOnline(eqIdx)}
                                   className="h-7 text-xs border-teal-300 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300"
-                                  title="Buscar especificações técnicas online nos catálogos ou Google"
+                                  title="Buscar especificações técnicas na base técnica ou internet"
                                 >
                                   {isSearchingThis ? (
                                     <>
@@ -2398,7 +2415,7 @@ export function QuotesManager({
                                             className="h-7 text-xs border-teal-400 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300"
                                           >
                                             <Globe className="h-3 w-3 mr-1 text-teal-600" />
-                                            Buscar na internet / Google
+                                            Buscar especificações na internet
                                           </Button>
                                         </div>
                                       )}
@@ -4045,7 +4062,7 @@ export function QuotesManager({
                   size="sm"
                   onClick={() => {
                     const token = approvalToken || activeQuoteId
-                    window.open(`/proposta/${token}`, '_blank')
+                    window.open(`/proposta/${token}`, '_blank', 'noopener,noreferrer')
                   }}
                   className="text-xs text-slate-600 hover:text-teal-700 hidden sm:inline-flex"
                 >
