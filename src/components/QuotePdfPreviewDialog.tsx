@@ -345,7 +345,13 @@ export function QuotePdfPreviewDialog({
   const directCostsTotal =
     indirectCosts?.directCostsTotal ??
     quote.total_cost ??
-    totalLabor + totalTravelCost + totalLodgingMeals + materialsCost + thirdPartyCost + otherCosts
+    totalLabor +
+      totalTravelCost +
+      totalLodgingMeals +
+      materialsCost +
+      chemicalProductsTotal +
+      thirdPartyCost +
+      otherCosts
 
   // Custos Indiretos, Margens e Tributos
   const serviceMarginPercent =

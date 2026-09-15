@@ -622,7 +622,7 @@ export function QuotesManager({
 
       lodging_meals_cost: lodgingMealsTotalCost,
       travel_cost: travelTotalCost,
-      materials_cost: totalMaterialsWithChemicals,
+      materials_cost: materialsCost,
       third_party_cost: thirdPartyCost,
       other_costs: otherCosts,
       total_cost: directCostsTotal,
@@ -663,6 +663,7 @@ export function QuotesManager({
   // Reset Form para Nova Proposta
   const resetForm = () => {
     setActiveQuoteId(null)
+    loadedQuoteIdRef.current = null
     setClientId('')
     setClientName('')
     setDealId('')
@@ -1552,13 +1553,16 @@ export function QuotesManager({
 
   // Abrir editor para editar proposta existente
   const handleOpenEditModal = (quote: QuoteRecord) => {
+    loadedQuoteIdRef.current = quote.id
     loadQuoteIntoForm(quote)
     setIsEditorOpen(true)
   }
 
-  // Se receber selectedQuote das props externas (ex: do Kanban ou Pipeline), carrega e abre
+  // Se receber selectedQuote das props externas (ex: do Kanban ou Pipeline), carrega e abre apenas se mudou de ID ou ao abrir
+  const loadedQuoteIdRef = useRef<string | null>(null)
   useEffect(() => {
-    if (selectedQuote) {
+    if (selectedQuote && selectedQuote.id !== loadedQuoteIdRef.current) {
+      loadedQuoteIdRef.current = selectedQuote.id
       loadQuoteIntoForm(selectedQuote)
       setIsEditorOpen(true)
     }
