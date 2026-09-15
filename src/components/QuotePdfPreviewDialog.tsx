@@ -31,6 +31,7 @@ import {
   Calculator,
   Layers,
   AlertTriangle,
+  Sparkles,
 } from 'lucide-react'
 import { PROPOSAL_INCLUSIONS_TEXT } from '@/data/bermo-catalog'
 import {
@@ -322,6 +323,15 @@ export function QuotePdfPreviewDialog({
   const calculatedLodgingMeals = hotelTotal + mealsTotal + mealVouchersTotal
   const totalLodgingMeals =
     lodgingDetails?.totalLodgingMeals ?? quote.lodging_meals_cost ?? calculatedLodgingMeals
+
+  // Produtos químicos (Limpeza e Pintura)
+  const quoteChemicalProducts: any[] =
+    quote.chemical_products && Array.isArray(quote.chemical_products) ? quote.chemical_products : []
+  const chemicalProductsTotal = quoteChemicalProducts.reduce(
+    (acc, p) =>
+      acc + (Number(p.subtotal) || (Number(p.quantity) || 0) * (Number(p.unit_price) || 0) || 0),
+    0,
+  )
 
   // Peças e materiais
   const materialsCost =
@@ -1133,6 +1143,105 @@ export function QuotePdfPreviewDialog({
                 </div>
               </div>
 
+              {/* Seção Interna C: Produtos Químicos (Limpeza e Pintura) */}
+              {quoteChemicalProducts.length > 0 && (
+                <div className="quote-print-card space-y-2 print:space-y-1">
+                  <div className="quote-section-header flex items-center justify-between border-b border-amber-300 pb-1">
+                    <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-700" />
+                      Composição de Produtos Químicos (Limpeza e Pintura)
+                    </h3>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] print:text-[9px] font-mono border-amber-300 text-amber-800 font-bold"
+                    >
+                      Total Químicos:{' '}
+                      {chemicalProductsTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </Badge>
+                  </div>
+
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-xs print:text-[10px]">
+                      <thead className="bg-amber-50/70 text-slate-700 uppercase text-[10px] print:text-[9px] font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="p-2 print:p-1.5 w-8 text-center">#</th>
+                          <th className="p-2 print:p-1.5 w-24">Categoria</th>
+                          <th className="p-2 print:p-1.5">Descrição do Produto</th>
+                          <th className="p-2 print:p-1.5 text-center w-16">Unidade</th>
+                          <th className="p-2 print:p-1.5 text-right w-20">Qtd</th>
+                          <th className="p-2 print:p-1.5 text-right w-24">Preço Unit.</th>
+                          <th className="p-2 print:p-1.5 text-right w-24">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {quoteChemicalProducts.map((p, idx) => {
+                          const isCleaning = p.category === 'cleaning'
+                          const qty = Number(p.quantity) || 0
+                          const price = Number(p.unit_price) || 0
+                          const sub = Number(p.subtotal) || qty * price
+                          return (
+                            <tr key={p.id || idx} className="hover:bg-slate-50/50">
+                              <td className="p-2 print:p-1.5 text-center font-mono text-slate-500">
+                                {idx + 1}
+                              </td>
+                              <td className="p-2 print:p-1.5">
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-[9.5px] print:text-[8.5px] font-semibold ${
+                                    isCleaning
+                                      ? 'bg-teal-100 text-teal-800 border-teal-300'
+                                      : 'bg-blue-100 text-blue-800 border-blue-300'
+                                  }`}
+                                >
+                                  {isCleaning ? 'Limpeza' : 'Pintura'}
+                                </Badge>
+                              </td>
+                              <td className="p-2 print:p-1.5 font-medium text-slate-900">
+                                {p.description}
+                              </td>
+                              <td className="p-2 print:p-1.5 text-center font-mono text-slate-600">
+                                {p.unit}
+                              </td>
+                              <td className="p-2 print:p-1.5 text-right font-mono font-semibold">
+                                {qty}
+                              </td>
+                              <td className="p-2 print:p-1.5 text-right font-mono text-slate-700">
+                                {price.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </td>
+                              <td className="p-2 print:p-1.5 text-right font-mono font-bold text-slate-900">
+                                {sub.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                      <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
+                        <tr>
+                          <td colSpan={6} className="p-2 print:p-1.5 text-right text-slate-700">
+                            Somatório dos Produtos Químicos:
+                          </td>
+                          <td className="p-2 print:p-1.5 text-right font-mono text-amber-900 font-bold">
+                            {chemicalProductsTotal.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Seção Interna C: Hospedagem & Alimentação */}
               <div className="quote-print-card space-y-2 print:space-y-1">
                 <div className="quote-section-header flex items-center justify-between border-b border-amber-300 pb-1">
@@ -1655,6 +1764,123 @@ export function QuotePdfPreviewDialog({
                     {effectiveWorkFluid}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* SEÇÃO ESPECÍFICA DE PRODUTOS QUÍMICOS CONTEMPLADOS NA PROPOSTA DO CLIENTE */}
+            {quoteChemicalProducts.length > 0 && (
+              <div className="quote-print-card space-y-2 print:space-y-1.5">
+                <div
+                  className={`quote-section-header flex items-center justify-between border-b pb-1.5 ${
+                    isInternal ? 'border-amber-300' : 'border-teal-200'
+                  }`}
+                >
+                  <h4 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[11pt] flex items-center gap-1.5">
+                    <Sparkles
+                      className={`h-3.5 w-3.5 ${isInternal ? 'text-amber-700' : 'text-teal-700'}`}
+                    />
+                    Produtos Químicos (Limpeza e Pintura Industrial)
+                  </h4>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] print:text-[9.5pt] font-mono font-bold ${
+                      isInternal
+                        ? 'border-amber-300 text-amber-800'
+                        : 'border-teal-300 text-teal-800'
+                    }`}
+                  >
+                    Total do Grupo:{' '}
+                    {chemicalProductsTotal.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </Badge>
+                </div>
+
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-left text-xs print:text-[10.5pt]">
+                    <thead
+                      className={`uppercase text-[10px] print:text-[9.5pt] font-bold border-b border-slate-200 ${
+                        isInternal ? 'bg-amber-50/70 text-slate-800' : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <tr>
+                        <th className="p-2.5 print:p-2 w-8 text-center">#</th>
+                        <th className="p-2.5 print:p-2 w-24">Categoria</th>
+                        <th className="p-2.5 print:p-2">Descrição do Produto</th>
+                        <th className="p-2.5 print:p-2 text-center w-16">Unidade</th>
+                        <th className="p-2.5 print:p-2 text-right w-20">Qtd</th>
+                        <th className="p-2.5 print:p-2 text-right w-28">Preço Unit.</th>
+                        <th className="p-2.5 print:p-2 text-right w-28">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {quoteChemicalProducts.map((p, idx) => {
+                        const isCleaning = p.category === 'cleaning'
+                        const qty = Number(p.quantity) || 0
+                        const price = Number(p.unit_price) || 0
+                        const sub = Number(p.subtotal) || qty * price
+                        return (
+                          <tr key={p.id || idx} className="hover:bg-slate-50/50">
+                            <td className="p-2.5 print:p-2 text-center font-mono text-slate-500">
+                              {idx + 1}
+                            </td>
+                            <td className="p-2.5 print:p-2">
+                              <Badge
+                                variant="secondary"
+                                className={`text-[9.5px] print:text-[9pt] font-semibold ${
+                                  isCleaning
+                                    ? 'bg-teal-100 text-teal-800 border-teal-300'
+                                    : 'bg-blue-100 text-blue-800 border-blue-300'
+                                }`}
+                              >
+                                {isCleaning ? 'Limpeza' : 'Pintura'}
+                              </Badge>
+                            </td>
+                            <td className="p-2.5 print:p-2 font-medium text-slate-900">
+                              {p.description}
+                            </td>
+                            <td className="p-2.5 print:p-2 text-center font-mono text-slate-600">
+                              {p.unit}
+                            </td>
+                            <td className="p-2.5 print:p-2 text-right font-mono font-semibold">
+                              {qty}
+                            </td>
+                            <td className="p-2.5 print:p-2 text-right font-mono text-slate-700">
+                              {price.toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
+                            </td>
+                            <td className="p-2.5 print:p-2 text-right font-mono font-bold text-slate-900">
+                              {sub.toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
+                      <tr>
+                        <td colSpan={6} className="p-2.5 print:p-2 text-right text-slate-700">
+                          Total Químicos (Incluso na Proposta):
+                        </td>
+                        <td
+                          className={`p-2.5 print:p-2 text-right font-mono font-bold ${
+                            isInternal ? 'text-amber-900' : 'text-teal-900'
+                          }`}
+                        >
+                          {chemicalProductsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             )}
 

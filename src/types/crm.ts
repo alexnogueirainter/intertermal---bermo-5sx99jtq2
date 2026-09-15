@@ -185,6 +185,16 @@ export interface QuoteCustomMaterial {
   subtotal?: number
 }
 
+export interface QuoteChemicalProductItem {
+  id: string
+  category: 'cleaning' | 'painting'
+  description: string
+  unit: 'L' | 'kg' | 'un' | 'gl' | 'lata'
+  quantity: number
+  unit_price: number
+  subtotal: number
+}
+
 export interface QuoteEquipmentItem {
   id: string
   model?: string
@@ -258,6 +268,7 @@ export interface QuoteRecord {
   dimensions_w_h_d?: string
   weight_kg?: number
   equipments?: QuoteEquipmentItem[]
+  chemical_products?: QuoteChemicalProductItem[]
   work_fluid?: string
   custom_work_fluid?: string
   scope_of_work?: string

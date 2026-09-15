@@ -174,9 +174,12 @@ export async function getQuotes(): Promise<QuoteRecord[]> {
       sort: '-created',
       requestKey: null,
     })
-    // Se o backend respondeu com sucesso (mesmo array vazio []), retorna os dados reais
+    // Se o backend respondeu com sucesso (mesmo array vazio []), retorna os dados reais com retrocompatibilidade
     if (Array.isArray(records)) {
-      return records
+      return records.map((record) => ({
+        ...record,
+        chemical_products: Array.isArray(record.chemical_products) ? record.chemical_products : [],
+      }))
     }
   } catch (error) {
     console.warn('Erro ao carregar quotes do backend:', error)
@@ -191,6 +194,7 @@ export async function createQuote(data: Partial<QuoteRecord>): Promise<QuoteReco
       quote_number: data.quote_number || data.code || `INT-${Date.now().toString().slice(-4)}`,
       total: data.total || data.final_price || 0,
       subtotal: data.subtotal || data.total_cost || 0,
+      chemical_products: Array.isArray(data.chemical_products) ? data.chemical_products : [],
       payment_terms:
         data.payment_terms || (data.payment_conditions ? `${data.payment_conditions}` : '28 DDL'),
     }
@@ -237,6 +241,12 @@ export async function updateQuote(id: string, data: Partial<QuoteRecord>): Promi
       ...data,
       total: data.total !== undefined ? data.total : data.final_price,
       subtotal: data.subtotal !== undefined ? data.subtotal : data.total_cost,
+      chemical_products:
+        data.chemical_products !== undefined
+          ? Array.isArray(data.chemical_products)
+            ? data.chemical_products
+            : []
+          : undefined,
       payment_terms:
         data.payment_terms || (data.payment_conditions ? `${data.payment_conditions}` : undefined),
     }
@@ -514,7 +524,11 @@ export async function sendProposalApprovalEmail(quoteId: string): Promise<SendPr
 export const quotesService = {
   getAll: getQuotes,
   getById: async (id: string): Promise<QuoteRecord> => {
-    return await pb.collection(QUOTES_COLLECTION).getOne<QuoteRecord>(id)
+    const record = await pb.collection(QUOTES_COLLECTION).getOne<QuoteRecord>(id)
+    return {
+      ...record,
+      chemical_products: Array.isArray(record.chemical_products) ? record.chemical_products : [],
+    }
   },
   create: createQuote,
   update: updateQuote,

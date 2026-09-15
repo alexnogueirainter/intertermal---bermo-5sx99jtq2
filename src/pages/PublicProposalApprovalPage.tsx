@@ -361,6 +361,94 @@ export const PublicProposalApprovalPage: React.FC = () => {
               </div>
             </div>
 
+            {/* Seção: Produtos Químicos (Limpeza e Pintura) */}
+            {quote.chemical_products &&
+              Array.isArray(quote.chemical_products) &&
+              quote.chemical_products.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-teal-800 dark:text-teal-400 flex items-center justify-between border-b pb-1">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4" />
+                      Insumos Químicos (Limpeza e Pintura Industrial)
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-teal-700 dark:text-teal-300">
+                      Total:{' '}
+                      {quote.chemical_products
+                        .reduce(
+                          (acc: number, p: any) =>
+                            acc +
+                            (Number(p.subtotal) ||
+                              (Number(p.quantity) || 0) * (Number(p.unit_price) || 0) ||
+                              0),
+                          0,
+                        )
+                        .toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
+                  </h3>
+
+                  <div className="border rounded-lg overflow-hidden border-slate-200 dark:border-slate-800">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-semibold uppercase">
+                        <tr>
+                          <th className="p-2.5">Finalidade</th>
+                          <th className="p-2.5">Descrição do Produto</th>
+                          <th className="p-2.5 text-center">Unid.</th>
+                          <th className="p-2.5 text-right">Qtd</th>
+                          <th className="p-2.5 text-right">Valor Unit.</th>
+                          <th className="p-2.5 text-right">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {quote.chemical_products.map((p: any, idx: number) => {
+                          const isCleaning = p.category === 'cleaning'
+                          const qty = Number(p.quantity) || 0
+                          const price = Number(p.unit_price) || 0
+                          const sub = Number(p.subtotal) || qty * price
+                          return (
+                            <tr
+                              key={idx}
+                              className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50"
+                            >
+                              <td className="p-2.5">
+                                <Badge
+                                  variant="secondary"
+                                  className={`text-[9.5px] font-semibold ${
+                                    isCleaning
+                                      ? 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300'
+                                      : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                                  }`}
+                                >
+                                  {isCleaning ? 'Limpeza' : 'Pintura'}
+                                </Badge>
+                              </td>
+                              <td className="p-2.5 font-medium text-slate-900 dark:text-slate-100">
+                                {p.description}
+                              </td>
+                              <td className="p-2.5 text-center font-mono text-muted-foreground">
+                                {p.unit}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-semibold">{qty}</td>
+                              <td className="p-2.5 text-right font-mono text-muted-foreground">
+                                {price.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
+                                {sub.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
             {/* Seção 3: Escopo de Serviços & Itens */}
             <div className="space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-teal-800 dark:text-teal-400 flex items-center gap-1.5 border-b pb-1">

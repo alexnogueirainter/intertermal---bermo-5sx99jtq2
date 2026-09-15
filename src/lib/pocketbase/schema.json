@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-14T20:48:05.371Z",
+  "generatedAt": "2026-09-15T12:04:36.077Z",
   "collections": [
     {
       "name": "users",
@@ -1051,6 +1051,12 @@
         },
         {
           "name": "equipments",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "chemical_products",
           "type": "json",
           "required": false,
           "system": false
