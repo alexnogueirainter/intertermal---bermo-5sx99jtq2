@@ -285,6 +285,9 @@ export function QuotesManager({
   const [carRentalDailyRate, setCarRentalDailyRate] = useState(230)
   const [carRentalDays, setCarRentalDays] = useState(1)
 
+  // Ref para controle de carregamento de proposta selecionada (evita re-carregamento indevido no auto-save)
+  const loadedQuoteIdRef = useRef<string | null>(null)
+
   // Seção 3D: Hospedagem & Alimentação
   const [hotelDays, setHotelDays] = useState(0)
   const [hotelRate, setHotelRate] = useState(220)
@@ -295,11 +298,10 @@ export function QuotesManager({
   const [mealVoucherUnhousedQty, setMealVoucherUnhousedQty] = useState(0)
   const [mealVoucherUnhousedRate, setMealVoucherUnhousedRate] = useState(40)
 
-  // Peças, Terceiros, Outros
+  // Custos Diretos
   const [materialsCost, setMaterialsCost] = useState(0)
   const [thirdPartyCost, setThirdPartyCost] = useState(0)
   const [otherCosts, setOtherCosts] = useState(0)
-
   // Impostos & Margens (Markup divisor)
   const [serviceMargin, setServiceMargin] = useState(25)
   const [salesCommission, setSalesCommission] = useState(6)
@@ -362,7 +364,7 @@ export function QuotesManager({
   const lodgingMealsTotalCost = hotelTotal + mealsTotal + voucherHousedTotal + voucherUnhousedTotal
 
   // Total Custos Diretos
-  // O total de produtos químicos soma ao custo de materiais (junto com materiais customizados já existentes)
+  // O total de produtos químicos soma ao custo de materiais apenas nos cálculos internos/exibidos de custos diretos
   const totalMaterialsWithChemicals = materialsCost + chemicalProductsTotal
   const directCostsTotal =
     totalLaborCost +
@@ -1559,7 +1561,6 @@ export function QuotesManager({
   }
 
   // Se receber selectedQuote das props externas (ex: do Kanban ou Pipeline), carrega e abre apenas se mudou de ID ou ao abrir
-  const loadedQuoteIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (selectedQuote && selectedQuote.id !== loadedQuoteIdRef.current) {
       loadedQuoteIdRef.current = selectedQuote.id
@@ -3317,6 +3318,51 @@ export function QuotesManager({
                           </p>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Bloco: Custo de Materiais & Peças */}
+                  <div className="p-3.5 bg-slate-50 dark:bg-slate-900/90 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 dark:border-slate-800 pb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="secondary"
+                          className="text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                        >
+                          Materiais
+                        </Badge>
+                        <Label className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide">
+                          Materiais / Peças / Componentes
+                        </Label>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400">
+                        Total Materiais:{' '}
+                        {materialsCost.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end bg-white dark:bg-slate-950 p-2.5 rounded-md border border-slate-200 dark:border-slate-800">
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          Custo de Materiais e Peças (R$)
+                        </Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          min="0"
+                          value={materialsCost}
+                          onChange={(e) => setMaterialsCost(parseFloat(e.target.value) || 0)}
+                          placeholder="0,00"
+                          className="text-xs h-8 font-mono"
+                        />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Informe o valor direto de materiais (ex: gaxetas, juntas, placas
+                        adicionais). Produtos químicos são quantificados separadamente acima.
+                      </p>
                     </div>
                   </div>
 
