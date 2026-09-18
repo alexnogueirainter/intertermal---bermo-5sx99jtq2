@@ -44,6 +44,7 @@ import {
   CheckCheck,
   XCircle,
   Globe,
+  Package,
 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
@@ -89,6 +90,7 @@ import {
   QuoteEquipmentItem,
   QuoteCustomMaterial,
   QuoteChemicalProductItem,
+  QuoteMaterialItem,
 } from '@/types/crm'
 import { QuotePdfPreviewDialog } from './QuotePdfPreviewDialog'
 import {
@@ -148,7 +150,13 @@ export function QuotesManager({
   const [quoteForPreview, setQuoteForPreview] = useState<QuoteRecord | null>(null)
   const [previewViewMode, setPreviewViewMode] = useState<'client' | 'internal'>('client')
 
-  // Materiais Customizados - input temporário para novo item
+  // Peças e Componentes (materials_items)
+  const [materialsItems, setMaterialsItems] = useState<QuoteMaterialItem[]>([])
+  const [newPartDescription, setNewPartDescription] = useState('')
+  const [newPartQty, setNewPartQty] = useState<number>(1)
+  const [newPartUnitPrice, setNewPartUnitPrice] = useState<number>(0)
+
+  // Materiais Customizados legados - input temporário para novo item
   const [newMaterialDescription, setNewMaterialDescription] = useState('')
   const [newMaterialQty, setNewMaterialQty] = useState(1)
   const [newMaterialUnitCost, setNewMaterialUnitCost] = useState(0)
@@ -324,6 +332,14 @@ export function QuotesManager({
   const autoSaveTimerRef = useRef<any>(null)
   const isInitialMount = useRef(true)
 
+  // Cálculos de Peças e Componentes (materials_items)
+  const materialsItemsTotal = materialsItems.reduce(
+    (acc, item) =>
+      acc +
+      (Number(item.subtotal) || (Number(item.quantity) || 0) * (Number(item.unit_price) || 0) || 0),
+    0,
+  )
+
   // Cálculos de Produtos Químicos
   const chemicalProductsTotal = chemicalProducts.reduce((acc, p) => acc + (p.subtotal || 0), 0)
 
@@ -364,8 +380,9 @@ export function QuotesManager({
   const lodgingMealsTotalCost = hotelTotal + mealsTotal + voucherHousedTotal + voucherUnhousedTotal
 
   // Total Custos Diretos
-  // O total de produtos químicos soma ao custo de materiais apenas nos cálculos internos/exibidos de custos diretos
-  const totalMaterialsWithChemicals = materialsCost + chemicalProductsTotal
+  // Materiais digitados + Peças da tabela somam ao custo de materiais; químicos somam aos custos diretos
+  const totalMaterialsCostCombined = materialsCost + materialsItemsTotal
+  const totalMaterialsWithChemicals = totalMaterialsCostCombined + chemicalProductsTotal
   const directCostsTotal =
     totalLaborCost +
     travelTotalCost +
@@ -566,7 +583,8 @@ export function QuotesManager({
       work_permit_needed: workPermitRequired,
       work_permit_cost: 0,
 
-      // Materiais customizados e Produtos Químicos
+      // Peças, Materiais customizados e Produtos Químicos
+      materials_items: materialsItems && materialsItems.length > 0 ? materialsItems : [],
       custom_materials: customMaterials && customMaterials.length > 0 ? customMaterials : undefined,
       chemical_products: chemicalProducts && chemicalProducts.length > 0 ? chemicalProducts : [],
 
@@ -624,7 +642,7 @@ export function QuotesManager({
 
       lodging_meals_cost: lodgingMealsTotalCost,
       travel_cost: travelTotalCost,
-      materials_cost: materialsCost,
+      materials_cost: totalMaterialsCostCombined,
       third_party_cost: thirdPartyCost,
       other_costs: otherCosts,
       total_cost: directCostsTotal,
@@ -694,6 +712,10 @@ export function QuotesManager({
     setIntegrationWeekday('')
     setIntegrationCost(0)
     setWorkPermitRequired(false)
+    setMaterialsItems([])
+    setNewPartDescription('')
+    setNewPartQty(1)
+    setNewPartUnitPrice(0)
     setCustomMaterials([])
     setChemicalProducts([])
     setNewChemicalCategory('cleaning')
@@ -1103,6 +1125,41 @@ export function QuotesManager({
     }
   }
 
+  // Adicionar Peça / Componente (materials_items)
+  const handleAddMaterialItem = () => {
+    if (!newPartDescription.trim()) {
+      toast({
+        title: 'Descrição obrigatória',
+        description: 'Informe a descrição da peça ou componente.',
+        variant: 'destructive',
+      })
+      return
+    }
+    const qty = Math.max(0.01, Number(newPartQty) || 1)
+    const unitPrice = Math.max(0, Number(newPartUnitPrice) || 0)
+    const subtotal = Math.round(qty * unitPrice * 100) / 100
+    const newItem: QuoteMaterialItem = {
+      id: `part-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      description: newPartDescription.trim(),
+      quantity: qty,
+      unit_price: unitPrice,
+      subtotal,
+    }
+    setMaterialsItems((prev) => [...prev, newItem])
+    setNewPartDescription('')
+    setNewPartQty(1)
+    setNewPartUnitPrice(0)
+    toast({
+      title: 'Peça/componente adicionado',
+      description: `${newItem.description} inserido com sucesso.`,
+    })
+  }
+
+  // Remover Peça / Componente
+  const handleRemoveMaterialItem = (id: string) => {
+    setMaterialsItems((prev) => prev.filter((item) => item.id !== id))
+  }
+
   // Adicionar Material Customizado
   const handleAddCustomMaterial = () => {
     if (!newMaterialDescription.trim()) {
@@ -1348,17 +1405,26 @@ export function QuotesManager({
     setIntegrationCost(quote.integration_cost ?? 532.0)
     setWorkPermitRequired(quote.work_permit_needed ?? (quote as any).work_permit_required ?? false)
 
+    if (quote.materials_items && Array.isArray(quote.materials_items)) {
+      setMaterialsItems(quote.materials_items)
+    } else {
+      setMaterialsItems([])
+    }
+    setNewPartDescription('')
+    setNewPartQty(1)
+    setNewPartUnitPrice(0)
+
     if (quote.custom_materials && Array.isArray(quote.custom_materials)) {
       setCustomMaterials(quote.custom_materials)
     } else {
       setCustomMaterials([])
     }
 
-    if (quote.chemical_products && Array.isArray(quote.chemical_products)) {
-      setChemicalProducts(quote.chemical_products)
-    } else {
-      setChemicalProducts([])
-    }
+    const loadedChemicals =
+      quote.chemical_products && Array.isArray(quote.chemical_products)
+        ? quote.chemical_products
+        : []
+    setChemicalProducts(loadedChemicals)
 
     setScopeOfWork(quote.scope_of_work || '')
 
@@ -1424,7 +1490,25 @@ export function QuotesManager({
       quote.meal_voucher_unhoused_rate ?? quote.lodging_meals_config?.mealVoucherUnhousedRate ?? 40,
     )
 
-    setMaterialsCost(quote.materials_cost ?? 0)
+    // Isolar o campo digitado de materiais:
+    // Se materials_cost salvo continha peças salvas em materials_items, desconta para não duplicar na UI
+    const savedMaterialsItemsSum =
+      quote.materials_items && Array.isArray(quote.materials_items)
+        ? quote.materials_items.reduce(
+            (acc, it) =>
+              acc +
+              (Number(it.subtotal) ||
+                (Number(it.quantity) || 0) * (Number(it.unit_price) || 0) ||
+                0),
+            0,
+          )
+        : 0
+    const rawMaterialsCost = quote.materials_cost ?? 0
+    const baseDirectMaterials = Math.max(
+      0,
+      Math.round((rawMaterialsCost - savedMaterialsItemsSum) * 100) / 100,
+    )
+    setMaterialsCost(baseDirectMaterials)
     setThirdPartyCost(quote.third_party_cost ?? 0)
     setOtherCosts(quote.other_costs ?? 0)
     setServiceMargin(Math.round(quote.service_margin ?? 25))
@@ -1561,13 +1645,19 @@ export function QuotesManager({
   }
 
   // Se receber selectedQuote das props externas (ex: do Kanban ou Pipeline), carrega e abre apenas se mudou de ID ou ao abrir
+  // Durante a edição ativa (quando isEditorOpen é true e activeQuoteId === selectedQuote.id), NÃO recarrega para evitar reset/duplicação
   useEffect(() => {
     if (selectedQuote && selectedQuote.id !== loadedQuoteIdRef.current) {
+      // Se já estamos editando ativamente a proposta com o mesmo ID, não recarrega os campos locais
+      if (isEditorOpen && activeQuoteId === selectedQuote.id) {
+        loadedQuoteIdRef.current = selectedQuote.id
+        return
+      }
       loadedQuoteIdRef.current = selectedQuote.id
       loadQuoteIntoForm(selectedQuote)
       setIsEditorOpen(true)
     }
-  }, [selectedQuote])
+  }, [selectedQuote, isEditorOpen, activeQuoteId])
 
   // AUTO-SAVE DE 2 SEGUNDOS: apenas se o modal estiver aberto e activeQuoteId existir
   useEffect(() => {
@@ -1676,6 +1766,7 @@ export function QuotesManager({
     integrationWeekday,
     integrationCost,
     workPermitRequired,
+    materialsItems,
     customMaterials,
     chemicalProducts,
     pisRate,
@@ -3336,8 +3427,8 @@ export function QuotesManager({
                         </Label>
                       </div>
                       <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400">
-                        Total Materiais:{' '}
-                        {materialsCost.toLocaleString('pt-BR', {
+                        Total Materiais (com peças):{' '}
+                        {totalMaterialsCostCombined.toLocaleString('pt-BR', {
                           style: 'currency',
                           currency: 'BRL',
                         })}
@@ -3347,7 +3438,7 @@ export function QuotesManager({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end bg-white dark:bg-slate-950 p-2.5 rounded-md border border-slate-200 dark:border-slate-800">
                       <div className="space-y-1">
                         <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                          Custo de Materiais e Peças (R$)
+                          Custo Direto de Materiais (R$)
                         </Label>
                         <Input
                           type="number"
@@ -3360,9 +3451,190 @@ export function QuotesManager({
                         />
                       </div>
                       <p className="text-[11px] text-muted-foreground">
-                        Informe o valor direto de materiais (ex: gaxetas, juntas, placas
-                        adicionais). Produtos químicos são quantificados separadamente acima.
+                        Informe o valor direto de materiais ou use a tabela de peças e componentes
+                        abaixo. Ambos somam ao custo de materiais.
                       </p>
+                    </div>
+
+                    {/* Bloco: Peças e Componentes (materials_items) */}
+                    <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Package className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
+                          <Label className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            Peças e Componentes ({materialsItems.length})
+                          </Label>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-amber-700 dark:text-amber-400">
+                          Total do Grupo:{' '}
+                          {materialsItemsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </span>
+                      </div>
+
+                      {/* Formulário para Inserir Peça / Componente */}
+                      <div className="p-2.5 bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                          <div className="sm:col-span-5 space-y-1">
+                            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                              Descrição da Peça / Componente
+                            </Label>
+                            <Input
+                              value={newPartDescription}
+                              onChange={(e) => setNewPartDescription(e.target.value)}
+                              placeholder="Ex: Jogo de Gaxetas NBR Clip-on, Placa Inox 316 0.5mm..."
+                              className="text-xs h-8"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  handleAddMaterialItem()
+                                }
+                              }}
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2 space-y-1">
+                            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                              Quantidade
+                            </Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0.01"
+                              value={newPartQty}
+                              onChange={(e) => setNewPartQty(parseFloat(e.target.value) || 0)}
+                              className="text-xs h-8 font-mono text-center"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-2 space-y-1">
+                            <Label className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                              Preço Unit. (R$)
+                            </Label>
+                            <Input
+                              type="number"
+                              step="any"
+                              min="0"
+                              value={newPartUnitPrice}
+                              onChange={(e) => setNewPartUnitPrice(parseFloat(e.target.value) || 0)}
+                              placeholder="0,00"
+                              className="text-xs h-8 font-mono text-right"
+                            />
+                          </div>
+
+                          <div className="sm:col-span-3 flex items-center gap-2">
+                            <div className="flex-1 text-right">
+                              <span className="text-[10px] text-muted-foreground block">
+                                Subtotal
+                              </span>
+                              <span className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 block truncate">
+                                {((newPartQty || 0) * (newPartUnitPrice || 0)).toLocaleString(
+                                  'pt-BR',
+                                  { style: 'currency', currency: 'BRL' },
+                                )}
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={handleAddMaterialItem}
+                              className="h-8 px-3 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0"
+                            >
+                              <Plus className="h-3.5 w-3.5 mr-1" />
+                              Adicionar Peça
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Lista de Peças e Componentes Adicionados */}
+                      {materialsItems.length > 0 ? (
+                        <div className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden bg-white dark:bg-slate-950">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-amber-50/70 dark:bg-amber-950/40 text-slate-700 dark:text-slate-300 uppercase text-[10px] font-bold border-b border-slate-200 dark:border-slate-800">
+                              <tr>
+                                <th className="p-2 w-8 text-center">#</th>
+                                <th className="p-2">Descrição</th>
+                                <th className="p-2 text-right w-20">Qtd</th>
+                                <th className="p-2 text-right w-28">Preço Unit.</th>
+                                <th className="p-2 text-right w-28">Subtotal</th>
+                                <th className="p-2 w-10 text-center">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                              {materialsItems.map((item, idx) => {
+                                const qty = Number(item.quantity) || 0
+                                const unitPrice = Number(item.unit_price) || 0
+                                const sub = Number(item.subtotal) || qty * unitPrice
+                                return (
+                                  <tr
+                                    key={item.id || idx}
+                                    className="hover:bg-slate-50/70 dark:hover:bg-slate-900/60"
+                                  >
+                                    <td className="p-2 text-center font-mono text-slate-400 text-[11px]">
+                                      {idx + 1}
+                                    </td>
+                                    <td className="p-2 font-medium text-slate-900 dark:text-slate-100">
+                                      {item.description}
+                                    </td>
+                                    <td className="p-2 text-right font-mono font-semibold">
+                                      {qty}
+                                    </td>
+                                    <td className="p-2 text-right font-mono text-slate-700 dark:text-slate-300">
+                                      {unitPrice.toLocaleString('pt-BR', {
+                                        style: 'currency',
+                                        currency: 'BRL',
+                                      })}
+                                    </td>
+                                    <td className="p-2 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
+                                      {sub.toLocaleString('pt-BR', {
+                                        style: 'currency',
+                                        currency: 'BRL',
+                                      })}
+                                    </td>
+                                    <td className="p-2 text-center">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleRemoveMaterialItem(item.id)}
+                                        className="h-7 w-7 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                        title="Remover peça"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                            <tfoot className="bg-slate-50 dark:bg-slate-900/80 font-bold border-t border-slate-200 dark:border-slate-800">
+                              <tr>
+                                <td
+                                  colSpan={4}
+                                  className="p-2 text-right text-slate-700 dark:text-slate-300"
+                                >
+                                  Total do Grupo (Peças e Componentes):
+                                </td>
+                                <td className="p-2 text-right font-mono text-amber-700 dark:text-amber-400 font-bold">
+                                  {materialsItemsTotal.toLocaleString('pt-BR', {
+                                    style: 'currency',
+                                    currency: 'BRL',
+                                  })}
+                                </td>
+                                <td></td>
+                              </tr>
+                            </tfoot>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-muted-foreground italic px-1">
+                          Nenhuma peça ou componente adicionado. Utilize o formulário acima para
+                          inserir itens detalhados (ex: gaxetas, placas adicionais, tirantes).
+                        </p>
+                      )}
                     </div>
                   </div>
 

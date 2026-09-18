@@ -32,6 +32,7 @@ import {
   Layers,
   AlertTriangle,
   Sparkles,
+  Package,
 } from 'lucide-react'
 import { PROPOSAL_INCLUSIONS_TEXT } from '@/data/bermo-catalog'
 import {
@@ -323,6 +324,15 @@ export function QuotePdfPreviewDialog({
   const calculatedLodgingMeals = hotelTotal + mealsTotal + mealVouchersTotal
   const totalLodgingMeals =
     lodgingDetails?.totalLodgingMeals ?? quote.lodging_meals_cost ?? calculatedLodgingMeals
+
+  // Peças e Componentes Técnicos (materials_items)
+  const quoteMaterialsItems: any[] =
+    quote.materials_items && Array.isArray(quote.materials_items) ? quote.materials_items : []
+  const materialsItemsTotal = quoteMaterialsItems.reduce(
+    (acc, it) =>
+      acc + (Number(it.subtotal) || (Number(it.quantity) || 0) * (Number(it.unit_price) || 0) || 0),
+    0,
+  )
 
   // Produtos químicos (Limpeza e Pintura)
   const quoteChemicalProducts: any[] =
@@ -1149,6 +1159,87 @@ export function QuotePdfPreviewDialog({
                 </div>
               </div>
 
+              {/* Seção Interna: Peças e Componentes Técnicos */}
+              {quoteMaterialsItems.length > 0 && (
+                <div className="quote-print-card space-y-2 print:space-y-1">
+                  <div className="quote-section-header flex items-center justify-between border-b border-amber-300 pb-1">
+                    <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
+                      <Package className="h-3.5 w-3.5 text-amber-700" />
+                      Peças e Componentes Técnicos
+                    </h3>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] print:text-[9px] font-mono border-amber-300 text-amber-800 font-bold"
+                    >
+                      Total Peças:{' '}
+                      {materialsItemsTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </Badge>
+                  </div>
+
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-xs print:text-[10px]">
+                      <thead className="bg-amber-50/70 text-slate-700 uppercase text-[10px] print:text-[9px] font-bold border-b border-slate-200">
+                        <tr>
+                          <th className="p-2 print:p-1.5 w-8 text-center">#</th>
+                          <th className="p-2 print:p-1.5">Descrição da Peça / Componente</th>
+                          <th className="p-2 print:p-1.5 text-right w-20">Qtd</th>
+                          <th className="p-2 print:p-1.5 text-right w-28">Preço Unit.</th>
+                          <th className="p-2 print:p-1.5 text-right w-28">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {quoteMaterialsItems.map((item, idx) => {
+                          const qty = Number(item.quantity) || 0
+                          const price = Number(item.unit_price) || 0
+                          const sub = Number(item.subtotal) || qty * price
+                          return (
+                            <tr key={item.id || idx} className="hover:bg-slate-50/50">
+                              <td className="p-2 print:p-1.5 text-center font-mono text-slate-500">
+                                {idx + 1}
+                              </td>
+                              <td className="p-2 print:p-1.5 font-medium text-slate-900">
+                                {item.description}
+                              </td>
+                              <td className="p-2 print:p-1.5 text-right font-mono font-semibold">
+                                {qty}
+                              </td>
+                              <td className="p-2 print:p-1.5 text-right font-mono text-slate-700">
+                                {price.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </td>
+                              <td className="p-2 print:p-1.5 text-right font-mono font-bold text-slate-900">
+                                {sub.toLocaleString('pt-BR', {
+                                  style: 'currency',
+                                  currency: 'BRL',
+                                })}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                      <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
+                        <tr>
+                          <td colSpan={4} className="p-2 print:p-1.5 text-right text-slate-700">
+                            Total Peças e Componentes:
+                          </td>
+                          <td className="p-2 print:p-1.5 text-right font-mono text-amber-900 font-bold">
+                            {materialsItemsTotal.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {/* Seção Interna C: Produtos Químicos (Limpeza e Pintura) */}
               {quoteChemicalProducts.length > 0 && (
                 <div className="quote-print-card space-y-2 print:space-y-1">
@@ -1770,6 +1861,105 @@ export function QuotePdfPreviewDialog({
                     {effectiveWorkFluid}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* SEÇÃO ESPECÍFICA DE PEÇAS E COMPONENTES TÉCNICOS CONTEMPLADOS NA PROPOSTA DO CLIENTE */}
+            {quoteMaterialsItems.length > 0 && (
+              <div className="quote-print-card space-y-2 print:space-y-1.5">
+                <div
+                  className={`quote-section-header flex items-center justify-between border-b pb-1.5 ${
+                    isInternal ? 'border-amber-300' : 'border-teal-200'
+                  }`}
+                >
+                  <h4 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[11pt] flex items-center gap-1.5">
+                    <Package
+                      className={`h-3.5 w-3.5 ${isInternal ? 'text-amber-700' : 'text-teal-700'}`}
+                    />
+                    Peças e Componentes Técnicos
+                  </h4>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] print:text-[9.5pt] font-mono font-bold ${
+                      isInternal
+                        ? 'border-amber-300 text-amber-800'
+                        : 'border-teal-300 text-teal-800'
+                    }`}
+                  >
+                    Total do Grupo:{' '}
+                    {materialsItemsTotal.toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </Badge>
+                </div>
+
+                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                  <table className="w-full text-left text-xs print:text-[10.5pt]">
+                    <thead
+                      className={`uppercase text-[10px] print:text-[9.5pt] font-bold border-b border-slate-200 ${
+                        isInternal ? 'bg-amber-50/70 text-slate-800' : 'bg-slate-100 text-slate-700'
+                      }`}
+                    >
+                      <tr>
+                        <th className="p-2.5 print:p-2 w-8 text-center">#</th>
+                        <th className="p-2.5 print:p-2">Descrição da Peça / Componente</th>
+                        <th className="p-2.5 print:p-2 text-right w-20">Qtd</th>
+                        <th className="p-2.5 print:p-2 text-right w-28">Preço Unit.</th>
+                        <th className="p-2.5 print:p-2 text-right w-28">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {quoteMaterialsItems.map((item, idx) => {
+                        const qty = Number(item.quantity) || 0
+                        const price = Number(item.unit_price) || 0
+                        const sub = Number(item.subtotal) || qty * price
+                        return (
+                          <tr key={item.id || idx} className="hover:bg-slate-50/50">
+                            <td className="p-2.5 print:p-2 text-center font-mono text-slate-500">
+                              {idx + 1}
+                            </td>
+                            <td className="p-2.5 print:p-2 font-medium text-slate-900">
+                              {item.description}
+                            </td>
+                            <td className="p-2.5 print:p-2 text-right font-mono font-semibold">
+                              {qty}
+                            </td>
+                            <td className="p-2.5 print:p-2 text-right font-mono text-slate-700">
+                              {price.toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
+                            </td>
+                            <td className="p-2.5 print:p-2 text-right font-mono font-bold text-slate-900">
+                              {sub.toLocaleString('pt-BR', {
+                                style: 'currency',
+                                currency: 'BRL',
+                              })}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot className="bg-slate-50 font-bold border-t border-slate-200">
+                      <tr>
+                        <td colSpan={4} className="p-2.5 print:p-2 text-right text-slate-700">
+                          Total Peças e Componentes (Incluso na Proposta):
+                        </td>
+                        <td
+                          className={`p-2.5 print:p-2 text-right font-mono font-bold ${
+                            isInternal ? 'text-amber-900' : 'text-teal-900'
+                          }`}
+                        >
+                          {materialsItemsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
               </div>
             )}
 
