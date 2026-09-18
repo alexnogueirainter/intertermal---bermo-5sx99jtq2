@@ -185,6 +185,14 @@ export interface QuoteCustomMaterial {
   subtotal?: number
 }
 
+export interface QuoteMaterialItem {
+  id: string
+  description: string
+  quantity: number
+  unit_price: number
+  subtotal: number
+}
+
 export interface QuoteChemicalProductItem {
   id: string
   category: 'cleaning' | 'painting'
@@ -327,6 +335,7 @@ export interface QuoteRecord {
 
   // Peças & Consumíveis adicionais
   custom_materials?: QuoteCustomMaterial[]
+  materials_items?: QuoteMaterialItem[]
 
   // Custos Diretos
   lodging_meals_cost?: number
