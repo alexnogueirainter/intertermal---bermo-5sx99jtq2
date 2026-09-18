@@ -380,16 +380,18 @@ export function QuotesManager({
   const lodgingMealsTotalCost = hotelTotal + mealsTotal + voucherHousedTotal + voucherUnhousedTotal
 
   // Total Custos Diretos
-  // Materiais digitados + Peças da tabela somam ao custo de materiais; químicos somam aos custos diretos
+  // Grupo de Materiais = Campo Materiais + Peças e Componentes (materials_items) + Produtos Químicos (chemical_products)
+  // REGRA: Este grupo é REPASSE PURO — entra no preço final pelo valor exato, sem overhead (admin), margem, comissão ou imposto.
   const totalMaterialsCostCombined = materialsCost + materialsItemsTotal
   const totalMaterialsWithChemicals = totalMaterialsCostCombined + chemicalProductsTotal
-  const directCostsTotal =
-    totalLaborCost +
-    travelTotalCost +
-    lodgingMealsTotalCost +
-    totalMaterialsWithChemicals +
-    thirdPartyCost +
-    otherCosts
+  const materialsPassThrough = totalMaterialsWithChemicals
+
+  // Custos Diretos de Serviços (SEM materiais)
+  const serviceDirectCostsTotal =
+    totalLaborCost + travelTotalCost + lodgingMealsTotalCost + thirdPartyCost + otherCosts
+
+  // Custos Diretos Totais (Serviços + Materiais)
+  const directCostsTotal = serviceDirectCostsTotal + materialsPassThrough
 
   // Total Tributos (Soma das alíquotas individuais de impostos)
   const totalTaxesPercent =
@@ -403,12 +405,27 @@ export function QuotesManager({
         10000,
     ) / 10000
 
-  // Divisor de formação de preço (Markup)
+  // Divisor de formação de preço (Markup) — incide apenas sobre a parte de serviço
   const totalDeductionsPercent = (serviceMargin + salesCommission + totalTaxesPercent) / 100
   const divisor = Math.max(0.1, 1 - totalDeductionsPercent)
-  const adminAmount = directCostsTotal * (adminRate / 100)
-  const baseGrossCost = directCostsTotal + adminAmount
-  const calculatedSalePrice = Math.max(0, Math.round((baseGrossCost / divisor) * 100) / 100)
+
+  // Overhead (adminRate) incide apenas sobre custos de serviço
+  const adminAmount = Math.round(serviceDirectCostsTotal * (adminRate / 100) * 100) / 100
+  const baseGrossCost = Math.round((serviceDirectCostsTotal + adminAmount) * 100) / 100
+
+  // Preço da parcela de serviço (com tributos)
+  const serviceSalePrice = Math.max(0, Math.round((baseGrossCost / divisor) * 100) / 100)
+
+  // Preço Final ao Cliente = Serviço (com tributos) + Materiais/Peças (repasso puro sem tributos)
+  const calculatedSalePrice = Math.round((serviceSalePrice + materialsPassThrough) * 100) / 100
+
+  // Desdobramento de Margens, Comissão e Tributos (incidem exclusivamente sobre serviceSalePrice)
+  const serviceMarginAmount = Math.round(serviceSalePrice * (serviceMargin / 100) * 100) / 100
+  const salesCommissionAmount = Math.round(serviceSalePrice * (salesCommission / 100) * 100) / 100
+  const taxesAmount = Math.round(serviceSalePrice * (totalTaxesPercent / 100) * 100) / 100
+  const totalIndirectMarkupSum =
+    Math.round((serviceMarginAmount + salesCommissionAmount + taxesAmount + adminAmount) * 100) /
+    100
 
   // Objeto de dados do formulário para salvar / criar / atualizar
   const getFormDataObject = (): Partial<QuoteRecord> => {
@@ -642,7 +659,7 @@ export function QuotesManager({
 
       lodging_meals_cost: lodgingMealsTotalCost,
       travel_cost: travelTotalCost,
-      materials_cost: totalMaterialsCostCombined,
+      materials_cost: materialsCost,
       third_party_cost: thirdPartyCost,
       other_costs: otherCosts,
       total_cost: directCostsTotal,
@@ -668,6 +685,137 @@ export function QuotesManager({
         csllRate,
         irpjRate,
         irDiffRate,
+      },
+
+      // Atualização em tempo real de service_details para manter a Composição Interna e relatórios 100% sincronizados
+      service_details: {
+        service_technical_specs: {
+          productCode: primaryEq.model || equipmentModel || '',
+          productName: primaryEq.model || equipmentModel || '',
+          productModel: primaryEq.model || equipmentModel || '',
+          productBrand: primaryEq.brand || equipmentBrand || 'BERMO',
+          fluidType: workFluid || '',
+          pipeMeasurement: primaryEq.connection_size || connectionSize || '',
+          platesCount: String(primaryEq.plate_count ?? plateCount ?? ''),
+          frameMaterial: primaryEq.plate_material || plateMaterial || '',
+          gasketType: primaryEq.gasket_material || gasketMaterial || '',
+          operatingPressure: String(primaryEq.working_pressure_bar ?? workingPressureBar ?? ''),
+          testPressure: String(primaryEq.pressure_test_bar ?? pressureTestBar ?? ''),
+          workFluid: workFluid || '',
+          custom_work_fluid: '',
+          scopeOfWork: scopeOfWork,
+          equipments_list: sanitizedEquipments,
+        },
+        labor_costs: {
+          techMechanical: {
+            count: techCount,
+            hours: techHours,
+            ratePerHour: techRate,
+            total: techTotal,
+          },
+          helper: {
+            count: helperCount,
+            hours: helperHours,
+            ratePerHour: helperRate,
+            total: helperTotal,
+          },
+          inspectorNDT: {
+            count: inspectorCount,
+            hours: inspectorHours,
+            ratePerHour: inspectorRate,
+            total: inspectorTotal,
+          },
+          welder: {
+            count: welderCount,
+            hours: welderHours,
+            ratePerHour: welderRate,
+            total: welderTotal,
+          },
+          plumber: {
+            count: plumberCount,
+            hours: plumberHours,
+            ratePerHour: plumberRate,
+            total: plumberTotal,
+          },
+          foreman: {
+            count: foremanCount,
+            hours: foremanHours,
+            ratePerHour: foremanRate,
+            total: foremanTotal,
+          },
+          totalLabor: totalLaborCost,
+        },
+        travel_costs: {
+          originCep,
+          originAddress,
+          destinationCep,
+          destinationAddress,
+          distanceKm,
+          isRoundTrip,
+          fuelPrice,
+          consumptionKmL,
+          tollRoadPercent,
+          calculatedFuelCost: baseFuelCost,
+          calculatedTollCost: baseTollCost,
+          manualFuelAdjustment: manualFuelAdj,
+          manualTollAdjustment: manualTollAdj,
+          car_rental_type: carRentalType,
+          car_rental_daily_rate: carRentalDailyRate,
+          car_rental_days: carRentalDays,
+          car_rental_total: carRentalSubtotal,
+          totalTravelCost: travelTotalCost,
+        },
+        lodging_meals_costs: {
+          hotelDays,
+          hotelRatePerDay: hotelRate,
+          mealsDays,
+          mealsRatePerDay: mealsRate,
+          mealVoucherHousedQty,
+          mealVoucherHousedRatePerDay: mealVoucherHousedRate,
+          mealVoucherUnhousedQty,
+          mealVoucherUnhousedRatePerDay: mealVoucherUnhousedRate,
+          totalLodgingMeals: lodgingMealsTotalCost,
+        },
+        materials_breakdown: {
+          typedMaterialsCost: materialsCost,
+          materialsItemsTotal,
+          chemicalProductsTotal,
+          materialsPassThrough,
+          totalMaterials: totalMaterialsWithChemicals,
+        },
+        indirect_costs: {
+          serviceMarginPercent: serviceMargin,
+          administrativeCostPercent: adminRate,
+          adminRate,
+          salesCommissionPercent: salesCommission,
+          taxes: {
+            pis: pisRate,
+            cofins: cofinsRate,
+            iss: issRate,
+            csll: csllRate,
+            irpj: irpjRate,
+            irDiff: irDiffRate,
+            totalTaxes: totalTaxesPercent,
+          },
+          serviceDirectCostsTotal,
+          materialsPassThrough,
+          totalDirectCosts: directCostsTotal,
+          directCostsTotal,
+          serviceMarginAmount,
+          adminCostAmount: adminAmount,
+          salesCommissionAmount,
+          taxesAmount,
+          totalIndirectAmount: totalIndirectMarkupSum,
+          totalIndirectMarkupSum,
+          divisor,
+          serviceSalePrice,
+          calculatedSalePrice,
+          finalSalePrice: calculatedSalePrice,
+        },
+        payment_and_validity: {
+          validityDays,
+          paymentTerms,
+        },
       },
 
       final_price: calculatedSalePrice,
@@ -1490,25 +1638,9 @@ export function QuotesManager({
       quote.meal_voucher_unhoused_rate ?? quote.lodging_meals_config?.mealVoucherUnhousedRate ?? 40,
     )
 
-    // Isolar o campo digitado de materiais:
-    // Se materials_cost salvo continha peças salvas em materials_items, desconta para não duplicar na UI
-    const savedMaterialsItemsSum =
-      quote.materials_items && Array.isArray(quote.materials_items)
-        ? quote.materials_items.reduce(
-            (acc, it) =>
-              acc +
-              (Number(it.subtotal) ||
-                (Number(it.quantity) || 0) * (Number(it.unit_price) || 0) ||
-                0),
-            0,
-          )
-        : 0
+    // Campo digitado puro de materiais (peças e químicos somam à parte no repasse)
     const rawMaterialsCost = quote.materials_cost ?? 0
-    const baseDirectMaterials = Math.max(
-      0,
-      Math.round((rawMaterialsCost - savedMaterialsItemsSum) * 100) / 100,
-    )
-    setMaterialsCost(baseDirectMaterials)
+    setMaterialsCost(Math.max(0, Number(rawMaterialsCost) || 0))
     setThirdPartyCost(quote.third_party_cost ?? 0)
     setOtherCosts(quote.other_costs ?? 0)
     setServiceMargin(Math.round(quote.service_margin ?? 25))
@@ -4849,13 +4981,10 @@ export function QuotesManager({
                           className="text-[11px] font-mono font-bold bg-rose-50 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border-rose-300 dark:border-rose-800 shadow-xs"
                         >
                           Carga Tributária Total: {totalTaxesPercent.toFixed(2)}% •{' '}
-                          {(calculatedSalePrice * (totalTaxesPercent / 100)).toLocaleString(
-                            'pt-BR',
-                            {
-                              style: 'currency',
-                              currency: 'BRL',
-                            },
-                          )}
+                          {taxesAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
                         </Badge>
                       </div>
                     </div>
@@ -4877,7 +5006,7 @@ export function QuotesManager({
                           className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
                         />
                         <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
-                          {(calculatedSalePrice * (Number(pisRate || 0) / 100)).toLocaleString(
+                          {(serviceSalePrice * (Number(pisRate || 0) / 100)).toLocaleString(
                             'pt-BR',
                             {
                               style: 'currency',
@@ -4903,7 +5032,7 @@ export function QuotesManager({
                           className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
                         />
                         <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
-                          {(calculatedSalePrice * (Number(cofinsRate || 0) / 100)).toLocaleString(
+                          {(serviceSalePrice * (Number(cofinsRate || 0) / 100)).toLocaleString(
                             'pt-BR',
                             {
                               style: 'currency',
@@ -4929,7 +5058,7 @@ export function QuotesManager({
                           className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
                         />
                         <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
-                          {(calculatedSalePrice * (Number(issRate || 0) / 100)).toLocaleString(
+                          {(serviceSalePrice * (Number(issRate || 0) / 100)).toLocaleString(
                             'pt-BR',
                             {
                               style: 'currency',
@@ -4955,7 +5084,7 @@ export function QuotesManager({
                           className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
                         />
                         <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
-                          {(calculatedSalePrice * (Number(csllRate || 0) / 100)).toLocaleString(
+                          {(serviceSalePrice * (Number(csllRate || 0) / 100)).toLocaleString(
                             'pt-BR',
                             {
                               style: 'currency',
@@ -4981,7 +5110,7 @@ export function QuotesManager({
                           className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
                         />
                         <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
-                          {(calculatedSalePrice * (Number(irpjRate || 0) / 100)).toLocaleString(
+                          {(serviceSalePrice * (Number(irpjRate || 0) / 100)).toLocaleString(
                             'pt-BR',
                             {
                               style: 'currency',
@@ -5007,7 +5136,7 @@ export function QuotesManager({
                           className="text-xs h-7 font-mono font-bold text-slate-900 dark:text-slate-100"
                         />
                         <div className="text-[10px] font-mono font-semibold text-rose-600 dark:text-rose-400 text-right truncate">
-                          {(calculatedSalePrice * (Number(irDiffRate || 0) / 100)).toLocaleString(
+                          {(serviceSalePrice * (Number(irDiffRate || 0) / 100)).toLocaleString(
                             'pt-BR',
                             {
                               style: 'currency',
@@ -5042,84 +5171,203 @@ export function QuotesManager({
                   </div>
 
                   {/* Bloco 3: Formação de Preço & Fechamento Gerencial */}
-                  <div className="p-3.5 rounded-lg border-2 border-amber-300 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/20 space-y-2.5">
-                    <div className="flex items-center justify-between">
+                  <div className="p-3.5 rounded-lg border-2 border-amber-300 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/20 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-amber-950 dark:text-amber-200 flex items-center gap-1.5">
                         <Calculator className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
-                        Formação de Preço (Soma Custos Diretos + Indiretos + Tributos)
+                        Formação de Preço: Serviços Tributados + Repasse Puro de Materiais
                       </span>
-                      <Badge className="bg-amber-700 dark:bg-amber-800 text-white font-mono text-[10px]">
-                        DIVISOR {(divisor * 100).toFixed(1)}%
-                      </Badge>
+                      <div className="flex items-center gap-1.5">
+                        <Badge className="bg-amber-700 dark:bg-amber-800 text-white font-mono text-[10px]">
+                          DIVISOR DE SERVIÇO: {(divisor * 100).toFixed(1)}%
+                        </Badge>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                      {/* Custos Diretos */}
-                      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-md border border-amber-200 dark:border-amber-900/50 space-y-0.5">
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">
-                          Custos Diretos Totais
-                        </span>
-                        <div className="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">
-                          {directCostsTotal.toLocaleString('pt-BR', {
+                    {/* Destaque das 3 Parcelas Obrigatórias */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                      {/* Parcela 1: Serviços Especializados */}
+                      <div className="bg-white dark:bg-slate-900 p-3 rounded-lg border-2 border-teal-500/40 dark:border-teal-700/50 space-y-1 shadow-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold text-teal-800 dark:text-teal-300 flex items-center gap-1">
+                            <Wrench className="h-3 w-3 text-teal-600" />
+                            Serviços Especializados
+                          </span>
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] font-mono bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300"
+                          >
+                            com tributos e margem
+                          </Badge>
+                        </div>
+                        <div className="font-mono font-black text-teal-900 dark:text-teal-100 text-base">
+                          {serviceSalePrice.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
                           })}
                         </div>
-                        <div className="text-[9.5px] text-slate-500 dark:text-slate-400">
-                          Mão de obra + Viagem + Hotel
-                        </div>
-                      </div>
-
-                      {/* Overhead Adm */}
-                      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-md border border-amber-200 dark:border-amber-900/50 space-y-0.5">
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">
-                          Overhead Adm ({adminRate}%)
-                        </span>
-                        <div className="font-mono font-bold text-purple-700 dark:text-purple-400 text-sm">
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                          Direto:{' '}
+                          {serviceDirectCostsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}{' '}
+                          + Adm ({adminRate}%):{' '}
                           {adminAmount.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
-                          })}
-                        </div>
-                        <div className="text-[9.5px] text-slate-500 dark:text-slate-400">
-                          Custo Indireto Operacional
+                          })}{' '}
+                          ÷ {divisor.toFixed(4)}
                         </div>
                       </div>
 
-                      {/* Margem + Comis + Impostos */}
-                      <div className="bg-white dark:bg-slate-900 p-2.5 rounded-md border border-amber-200 dark:border-amber-900/50 space-y-0.5">
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold block">
-                          Margem + Comis + Impostos
-                        </span>
-                        <div className="font-mono font-bold text-amber-800 dark:text-amber-300 text-sm">
-                          {(
-                            calculatedSalePrice * (serviceMargin / 100) +
-                            calculatedSalePrice * (salesCommission / 100) +
-                            calculatedSalePrice * (totalTaxesPercent / 100) +
-                            adminAmount
-                          ).toLocaleString('pt-BR', {
+                      {/* Parcela 2: Repasse de Materiais e Componentes */}
+                      <div className="bg-white dark:bg-slate-900 p-3 rounded-lg border-2 border-blue-500/40 dark:border-blue-700/50 space-y-1 shadow-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold text-blue-800 dark:text-blue-300 flex items-center gap-1">
+                            <Package className="h-3 w-3 text-blue-600" />
+                            Repasse de Materiais e Componentes
+                          </span>
+                          <Badge
+                            variant="secondary"
+                            className="text-[9px] font-mono bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                          >
+                            sem tributos
+                          </Badge>
+                        </div>
+                        <div className="font-mono font-black text-blue-900 dark:text-blue-100 text-base">
+                          {materialsPassThrough.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
                           })}
                         </div>
-                        <div className="text-[9.5px] text-slate-500 dark:text-slate-400">
-                          {(serviceMargin + salesCommission + totalTaxesPercent).toFixed(2)}% sobre
-                          receita
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                          Materiais:{' '}
+                          {materialsCost.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}{' '}
+                          • Peças:{' '}
+                          {materialsItemsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}{' '}
+                          • Químicos:{' '}
+                          {chemicalProductsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
                         </div>
                       </div>
 
-                      {/* Preço Final */}
-                      <div className="bg-amber-900 text-white p-2.5 rounded-md space-y-0.5">
-                        <span className="text-[10px] text-amber-200 uppercase font-bold block">
-                          Preço Final Homologado
-                        </span>
-                        <div className="font-mono font-black text-white text-base">
+                      {/* Parcela 3: Preço Final Consolidado */}
+                      <div className="bg-amber-900 text-white p-3 rounded-lg space-y-1 shadow-sm border-2 border-amber-800">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase font-bold text-amber-200">
+                            Preço Final Consolidado
+                          </span>
+                          <Badge className="bg-amber-700 text-white text-[9px] font-mono">
+                            Total Proposta
+                          </Badge>
+                        </div>
+                        <div className="font-mono font-black text-white text-lg">
                           {calculatedSalePrice.toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
                           })}
                         </div>
-                        <div className="text-[9.5px] text-amber-300">Valor de Venda ao Cliente</div>
+                        <div className="text-[10px] text-amber-300 leading-tight">
+                          Serviço tributado (
+                          {serviceSalePrice.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                          ) + Repasse puro (
+                          {materialsPassThrough.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                          )
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Linha de Apoio: Custos Diretos Totais e Margem/Comissão/Tributos */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-amber-200 dark:border-amber-900/40">
+                      <div className="bg-white/80 dark:bg-slate-900/80 p-2 rounded border border-amber-200/80 dark:border-amber-900/50 space-y-0.5">
+                        <span className="text-[9.5px] text-slate-500 uppercase font-semibold block">
+                          Custos Diretos Totais
+                        </span>
+                        <div className="font-mono font-bold text-slate-800 dark:text-slate-200 text-xs">
+                          {directCostsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[9px] text-slate-500">
+                          Serviços{' '}
+                          {serviceDirectCostsTotal.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}{' '}
+                          + Repasse{' '}
+                          {materialsPassThrough.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="bg-white/80 dark:bg-slate-900/80 p-2 rounded border border-amber-200/80 dark:border-amber-900/50 space-y-0.5">
+                        <span className="text-[9.5px] text-slate-500 uppercase font-semibold block">
+                          Overhead Adm ({adminRate}%)
+                        </span>
+                        <div className="font-mono font-bold text-purple-700 dark:text-purple-400 text-xs">
+                          {adminAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[9px] text-slate-500">Incide apenas sobre serviço</div>
+                      </div>
+
+                      <div className="bg-white/80 dark:bg-slate-900/80 p-2 rounded border border-amber-200/80 dark:border-amber-900/50 space-y-0.5">
+                        <span className="text-[9.5px] text-slate-500 uppercase font-semibold block">
+                          Margem ({serviceMargin}%) + Comis ({salesCommission}%)
+                        </span>
+                        <div className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-xs">
+                          {(serviceMarginAmount + salesCommissionAmount).toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[9px] text-slate-500">
+                          Sobre serviço:{' '}
+                          {serviceMarginAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}{' '}
+                          +{' '}
+                          {salesCommissionAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="bg-white/80 dark:bg-slate-900/80 p-2 rounded border border-amber-200/80 dark:border-amber-900/50 space-y-0.5">
+                        <span className="text-[9.5px] text-slate-500 uppercase font-semibold block">
+                          Tributos Totais ({totalTaxesPercent.toFixed(2)}%)
+                        </span>
+                        <div className="font-mono font-bold text-rose-700 dark:text-rose-400 text-xs">
+                          {taxesAmount.toLocaleString('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          })}
+                        </div>
+                        <div className="text-[9px] text-slate-500">
+                          Incidem exclusivamente no serviço
+                        </div>
                       </div>
                     </div>
                   </div>

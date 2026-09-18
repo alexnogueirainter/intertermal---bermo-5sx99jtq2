@@ -32,13 +32,13 @@ import {
   Printer,
   Sparkles,
 } from 'lucide-react'
+import { calculateQuotePricing } from '@/lib/quote-calculator'
 
 export const PublicProposalApprovalPage: React.FC = () => {
   const { token } = useParams<{ token: string }>()
   const [loading, setLoading] = useState(true)
   const [quote, setQuote] = useState<any | null>(null)
   const [error, setError] = useState<string | null>(null)
-
   // Modais de Aprovação e Reprovação
   const [isApproveModalOpen, setIsApproveModalOpen] = useState(false)
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false)
@@ -46,7 +46,6 @@ export const PublicProposalApprovalPage: React.FC = () => {
   const [rejectReason, setRejectReason] = useState('')
   const [submittingAction, setSubmittingAction] = useState(false)
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null)
-
   const loadProposal = async () => {
     if (!token) {
       setError('Token de proposta não especificado.')
@@ -73,7 +72,6 @@ export const PublicProposalApprovalPage: React.FC = () => {
   useEffect(() => {
     loadProposal()
   }, [token])
-
   // Notificar outros componentes/abas sobre alteração no status da proposta
   const notifyProposalChange = (
     status: 'approved' | 'rejected',
@@ -87,13 +85,11 @@ export const PublicProposalApprovalPage: React.FC = () => {
       timestamp: Date.now(),
       ...extraData,
     }
-
     try {
       window.dispatchEvent(new CustomEvent('intertermal:proposal-updated', { detail: payload }))
     } catch {
       /* intentionally ignored */
     }
-
     try {
       if (typeof BroadcastChannel !== 'undefined') {
         const bc = new BroadcastChannel('intertermal_proposals_channel')
@@ -104,6 +100,29 @@ export const PublicProposalApprovalPage: React.FC = () => {
       /* intentionally ignored */
     }
   }
+  // Cálculos de Formação de Preço (Separação Serviço vs Repasse Puro)
+  const materialsItemsTotal =
+    quote?.materials_items && Array.isArray(quote.materials_items)
+      ? quote.materials_items.reduce(
+          (acc: number, item: any) =>
+            acc +
+            (Number(item.subtotal) ||
+              (Number(item.quantity) || 0) * (Number(item.unit_price) || 0) ||
+              0),
+          0,
+        )
+      : 0
+
+  const chemicalsTotal =
+    quote?.chemical_products && Array.isArray(quote.chemical_products)
+      ? quote.chemical_products.reduce((acc: number, p: any) => acc + (Number(p.subtotal) || 0), 0)
+      : 0
+
+  const passThroughMaterials =
+    Number(quote?.materials_cost || 0) + materialsItemsTotal + chemicalsTotal
+
+  const calculatedSalePrice = Number(quote?.final_price || quote?.total || 0)
+  const serviceSalePrice = Math.max(0, calculatedSalePrice - passThroughMaterials)
 
   const handleApprove = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,7 +131,6 @@ export const PublicProposalApprovalPage: React.FC = () => {
     setSubmittingAction(true)
     try {
       const approverName = clientApproverName.trim()
-
       // Tenta gerar e subir o PDF oficial da proposta a partir do documento renderizado na tela pública
       try {
         const docEl =
@@ -123,11 +141,11 @@ export const PublicProposalApprovalPage: React.FC = () => {
       } catch (pdfErr) {
         console.warn('PDF não gerado previamente no fluxo público:', pdfErr)
       }
-
       const res = await quotesService.actionPublicProposal(token!, 'approve', {
         client_name: approverName,
       })
       if (res.success) {
+        // MARKER_SUCCESS_HANDLE
         notifyProposalChange('approved', { client_name: approverName })
         setActionSuccessMessage(
           res.message || 'Proposta aprovada com sucesso! A Ordem de Serviço foi emitida.',
@@ -504,27 +522,83 @@ export const PublicProposalApprovalPage: React.FC = () => {
               )}
             </div>
 
-            {/* Seção 4: Condições Comerciais & Total */}
-            <div className="p-4 rounded-xl bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1 text-xs">
-                <span className="font-bold text-teal-950 dark:text-teal-200 block">
-                  Condições de Pagamento:
-                </span>
-                <span className="text-slate-700 dark:text-slate-300">
-                  {quote.payment_terms || '28 DDL faturado após entrega técnica'}
-                </span>
-                <span className="text-muted-foreground block text-[11px]">
-                  Impostos inclusos conforme regime tributário nacional.
-                </span>
-              </div>
+            {/* Seção 4: Condições Comerciais & Decomposição (Serviços + Repasse Puro de Materiais) */}
+            <div className="space-y-3">
+              {/* Decomposição quando houver repasse puro de materiais/peças/químicos */}
+              {passThroughMaterials > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3.5 rounded-lg bg-teal-50/70 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-900 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-teal-950 dark:text-teal-200 uppercase text-[10.5px]">
+                        Prestação de Serviços Técnicos
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[9.5px] border-teal-300 text-teal-800 dark:text-teal-300"
+                      >
+                        tributado
+                      </Badge>
+                    </div>
+                    <div className="text-lg font-bold font-mono text-teal-900 dark:text-teal-100">
+                      {serviceSalePrice.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Mão de obra técnica, desmontagem, inspeção, testes hidrostáticos, logística e
+                      emissão de laudo técnico com ART.
+                    </p>
+                  </div>
 
-              <div className="text-left sm:text-right">
-                <span className="text-[11px] text-muted-foreground uppercase font-bold block">
-                  Valor Total da Proposta
-                </span>
-                <span className="text-2xl font-black text-teal-800 dark:text-teal-300">
-                  {formattedTotal}
-                </span>
+                  <div className="p-3.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-blue-950 dark:text-blue-200 uppercase text-[10.5px]">
+                        Fornecimento / Repasse de Materiais
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[9.5px] border-blue-300 text-blue-800 dark:text-blue-300"
+                      >
+                        sem tributos
+                      </Badge>
+                    </div>
+                    <div className="text-lg font-bold font-mono text-blue-900 dark:text-blue-100">
+                      {passThroughMaterials.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Repasse a custo puro de materiais, gaxetas, placas e químicos homologados, sem
+                      incidência de impostos de serviço.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Totalizador Consolidado e Faturamento */}
+              <div className="p-4 rounded-xl bg-teal-50/60 dark:bg-teal-950/30 border border-teal-200 dark:border-teal-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1 text-xs">
+                  <span className="font-bold text-teal-950 dark:text-teal-200 block">
+                    Condições de Pagamento:
+                  </span>
+                  <span className="text-slate-700 dark:text-slate-300 font-medium">
+                    {quote.payment_terms || '28 DDL faturado após entrega técnica'}
+                  </span>
+                  <span className="text-muted-foreground block text-[11px]">
+                    Faturamento direto contra CNPJ cadastrado após homologação do serviço.
+                  </span>
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <span className="text-[11px] text-muted-foreground uppercase font-bold block">
+                    Preço Final Consolidado
+                  </span>
+                  <span className="text-2xl font-black text-teal-800 dark:text-teal-300">
+                    {formattedTotal}
+                  </span>
+                </div>
               </div>
             </div>
 

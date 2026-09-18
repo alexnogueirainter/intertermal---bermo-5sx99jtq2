@@ -351,17 +351,21 @@ export function QuotePdfPreviewDialog({
   const thirdPartyCost = quote.third_party_cost ?? 0
   const otherCosts = quote.other_costs ?? 0
 
-  // Total de Custos Diretos
+  // Repasse puro de materiais, peças e químicos (sem tributos/margem)
+  const passThroughMaterials = Math.max(
+    0,
+    materialsCost + materialsItemsTotal + chemicalProductsTotal,
+  )
+
+  // Custo direto exclusivo da prestação de serviços (mão de obra + logística + hospedagem + terceiros + outros)
+  const serviceDirectCostsTotal =
+    totalLabor + totalTravelCost + totalLodgingMeals + thirdPartyCost + otherCosts
+
+  // Total de Custos Diretos Consolidado (com peças e químicos)
   const directCostsTotal =
     indirectCosts?.directCostsTotal ??
     quote.total_cost ??
-    totalLabor +
-      totalTravelCost +
-      totalLodgingMeals +
-      materialsCost +
-      chemicalProductsTotal +
-      thirdPartyCost +
-      otherCosts
+    serviceDirectCostsTotal + passThroughMaterials
 
   // Custos Indiretos, Margens e Tributos
   const serviceMarginPercent =
@@ -391,6 +395,30 @@ export function QuotePdfPreviewDialog({
   const totalTaxesPercent =
     taxes.totalTaxes ??
     pisPercent + cofinsPercent + issPercent + csllPercent + irpjPercent + irDiffPercent
+
+  // Divisor de formação de preço incidente EXCLUSIVAMENTE sobre o serviço
+  const totalServiceDeductions = serviceMarginPercent + salesCommissionPercent + totalTaxesPercent
+  const serviceDivisor = Math.max(0.05, 1 - totalServiceDeductions / 100)
+
+  // Overhead administrativo incide sobre o custo direto de serviço
+  const adminCostAmount =
+    indirectCosts?.adminCostAmount ??
+    quote.admin_cost ??
+    serviceDirectCostsTotal * (adminCostPercent / 100)
+
+  // Preço de venda dos serviços especializados calculado pelo divisor
+  const calculatedServiceSale = (serviceDirectCostsTotal + adminCostAmount) / serviceDivisor
+
+  // Se a cotação salva já possui service_details com valores separados, prioriza-os
+  const serviceSalePrice =
+    quote.service_details?.pricing?.service_sale_price != null
+      ? Number(quote.service_details.pricing.service_sale_price)
+      : calculatedServiceSale
+
+  const effectivePassThrough =
+    quote.service_details?.pricing?.materials_pass_through != null
+      ? Number(quote.service_details.pricing.materials_pass_through)
+      : passThroughMaterials
 
   // Lista unificada de equipamentos da proposta (prioriza quote.equipments individualizado)
   let quoteEquipmentsList: any[] = []
@@ -569,19 +597,12 @@ export function QuotePdfPreviewDialog({
   )
 
   const equipmentQuantity = totalEquipmentUnits || quote.equipment_quantity || 1
-  const finalSalePrice = quote.total ?? quote.final_price ?? indirectCosts?.finalSalePrice ?? 0
+  const finalSalePrice = quote.total ?? quote.final_price ?? serviceSalePrice + effectivePassThrough
 
-  const adminCostAmount =
-    indirectCosts?.adminCostAmount ??
-    quote.admin_cost ??
-    directCostsTotal * (adminCostPercent / 100)
-
-  const marginAmount = finalSalePrice * (serviceMarginPercent / 100)
-  const commissionAmount = finalSalePrice * (salesCommissionPercent / 100)
-  const taxesAmount = finalSalePrice * (totalTaxesPercent / 100)
-  const totalIndirectMarkupSum =
-    indirectCosts?.totalIndirectMarkupSum ??
-    marginAmount + commissionAmount + taxesAmount + adminCostAmount
+  const marginAmount = serviceSalePrice * (serviceMarginPercent / 100)
+  const commissionAmount = serviceSalePrice * (salesCommissionPercent / 100)
+  const taxesAmount = serviceSalePrice * (totalTaxesPercent / 100)
+  const totalIndirectMarkupSum = marginAmount + commissionAmount + taxesAmount + adminCostAmount
 
   const isInternal = currentViewMode === 'internal'
 
@@ -1599,62 +1620,73 @@ export function QuotePdfPreviewDialog({
                 <div className="quote-section-header flex items-center justify-between">
                   <span className="font-bold uppercase tracking-wider text-xs print:text-[10px] text-amber-950 flex items-center gap-1.5">
                     <Calculator className="h-4 w-4 text-amber-700" />
-                    Consolidação Financeira da Proposta (Formação de Preço Divisor)
+                    Consolidação Financeira & Memória de Cálculo (Serviço Tributado + Repasse Puro)
                   </span>
                   <Badge className="bg-amber-700 text-white font-mono text-[10px] print:text-[8.5px]">
-                    RESUMO GERENCIAL
+                    DIVISOR SERVIÇO: {(serviceDivisor * 100).toFixed(2)}%
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:gap-1.5 text-xs print:text-[10px]">
-                  <div className="bg-white p-2.5 print:p-1.5 rounded-lg border border-amber-200 space-y-0.5">
-                    <span className="text-[10px] print:text-[8.5px] text-slate-500 uppercase font-semibold block">
-                      Custos Diretos Totais
+                {/* Destaque das 3 Parcelas Obrigatórias Internas */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 print:gap-1.5 text-xs print:text-[10px]">
+                  <div className="bg-white p-2.5 print:p-1.5 rounded-lg border-2 border-teal-500/40 space-y-1">
+                    <span className="text-[10px] print:text-[8.5px] text-teal-800 uppercase font-bold block">
+                      Serviços Especializados
                     </span>
-                    <div className="font-mono font-bold text-slate-900 text-sm print:text-xs">
-                      {directCostsTotal.toLocaleString('pt-BR', {
+                    <div className="font-mono font-bold text-teal-950 text-sm print:text-xs">
+                      {serviceSalePrice.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
                       })}
                     </div>
-                    <div className="text-[9.5px] print:text-[8px] text-slate-500">
-                      Mão de obra + Logística + Hotel
-                    </div>
-                  </div>
-
-                  <div className="bg-white p-2.5 print:p-1.5 rounded-lg border border-amber-200 space-y-0.5">
-                    <span className="text-[10px] print:text-[8.5px] text-slate-500 uppercase font-semibold block">
-                      Custos Indiretos & Adm
-                    </span>
-                    <div className="font-mono font-bold text-purple-800 text-sm print:text-xs">
+                    <div className="text-[9.5px] print:text-[8px] text-slate-500 leading-snug">
+                      Direto:{' '}
+                      {serviceDirectCostsTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}{' '}
+                      + Adm ({adminCostPercent}%):{' '}
                       {adminCostAmount.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
-                      })}
-                    </div>
-                    <div className="text-[9.5px] print:text-[8px] text-slate-500">
-                      Overhead operacional
+                      })}{' '}
+                      ÷ {serviceDivisor.toFixed(4)}
                     </div>
                   </div>
 
-                  <div className="bg-white p-2.5 print:p-1.5 rounded-lg border border-amber-200 space-y-0.5">
-                    <span className="text-[10px] print:text-[8.5px] text-slate-500 uppercase font-semibold block">
-                      Margem + Comis + Impostos
+                  <div className="bg-white p-2.5 print:p-1.5 rounded-lg border-2 border-blue-500/40 space-y-1">
+                    <span className="text-[10px] print:text-[8.5px] text-blue-800 uppercase font-bold block">
+                      Repasse de Materiais e Peças
                     </span>
-                    <div className="font-mono font-bold text-amber-800 text-sm print:text-xs">
-                      {totalIndirectMarkupSum.toLocaleString('pt-BR', {
+                    <div className="font-mono font-bold text-blue-950 text-sm print:text-xs">
+                      {effectivePassThrough.toLocaleString('pt-BR', {
                         style: 'currency',
                         currency: 'BRL',
                       })}
                     </div>
-                    <div className="text-[9.5px] print:text-[8px] text-slate-500">
-                      Markup divisor aplicado
+                    <div className="text-[9.5px] print:text-[8px] text-slate-500 leading-snug">
+                      Materiais{' '}
+                      {materialsCost.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}{' '}
+                      + Peças{' '}
+                      {materialsItemsTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}{' '}
+                      + Químicos{' '}
+                      {chemicalProductsTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}{' '}
+                      (sem tributos/margem)
                     </div>
                   </div>
 
-                  <div className="bg-amber-900 text-white p-2.5 print:p-1.5 rounded-lg space-y-0.5">
+                  <div className="bg-amber-900 text-white p-2.5 print:p-1.5 rounded-lg space-y-1">
                     <span className="text-[10px] print:text-[8.5px] text-amber-200 uppercase font-bold block">
-                      Preço Final Homologado
+                      Preço Final Consolidado
                     </span>
                     <div className="font-mono font-black text-white text-base print:text-sm">
                       {finalSalePrice.toLocaleString('pt-BR', {
@@ -1662,9 +1694,73 @@ export function QuotePdfPreviewDialog({
                         currency: 'BRL',
                       })}
                     </div>
-                    <div className="text-[9.5px] print:text-[8px] text-amber-300">
-                      Valor de Venda ao Cliente
+                    <div className="text-[9.5px] print:text-[8px] text-amber-300 leading-snug">
+                      Serviço tributado (
+                      {serviceSalePrice.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                      ) + Repasse puro (
+                      {effectivePassThrough.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                      )
                     </div>
+                  </div>
+                </div>
+
+                {/* Sub-painel com abertura dos custos diretos totais e markup */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 border-t border-amber-200">
+                  <div className="bg-white/80 p-2 rounded border border-amber-200 space-y-0.5">
+                    <span className="text-[9.5px] text-slate-500 uppercase font-semibold block">
+                      Custos Diretos Totais
+                    </span>
+                    <div className="font-mono font-bold text-slate-900 text-xs">
+                      {directCostsTotal.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                    <div className="text-[9px] text-slate-500">Serviço + Repasse</div>
+                  </div>
+
+                  <div className="bg-white/80 p-2 rounded border border-amber-200 space-y-0.5">
+                    <span className="text-[9.5px] text-slate-500 uppercase font-semibold block">
+                      Overhead Adm ({adminCostPercent}%)
+                    </span>
+                    <div className="font-mono font-bold text-purple-700 text-xs">
+                      {adminCostAmount.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                    <div className="text-[9px] text-slate-500">Sobre serviços diretos</div>
+                  </div>
+
+                  <div className="bg-white/80 p-2 rounded border border-amber-200 space-y-0.5">
+                    <span className="text-[9.5px] text-slate-500 uppercase font-semibold block">
+                      Margem + Comissão
+                    </span>
+                    <div className="font-mono font-bold text-emerald-700 text-xs">
+                      {(marginAmount + commissionAmount).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </div>
+                    <div className="text-[9px] text-slate-500">
+                      Margem {serviceMarginPercent}% + Comis {salesCommissionPercent}%
+                    </div>
+                  </div>
+
+                  <div className="bg-white/80 p-2 rounded border border-amber-200 space-y-0.5">
+                    <span className="text-[9.5px] text-slate-500 uppercase font-semibold block">
+                      Tributos Totais ({totalTaxesPercent.toFixed(2)}%)
+                    </span>
+                    <div className="font-mono font-bold text-rose-700 text-xs">
+                      {taxesAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </div>
+                    <div className="text-[9px] text-slate-500">Apenas sobre serviços</div>
                   </div>
                 </div>
               </div>
@@ -2080,34 +2176,81 @@ export function QuotePdfPreviewDialog({
               </div>
             )}
 
-            {/* TABELA DE VALOR DO SERVIÇO GLOBAL */}
+            {/* TABELA DE VALOR DO SERVIÇO GLOBAL & REPASSE DE MATERIAIS */}
             <div className="quote-print-keep-together border border-slate-200 rounded-lg overflow-hidden">
               <table className="w-full text-left text-xs print:text-[11pt]">
                 <thead className="bg-slate-100 text-slate-700 uppercase text-[10px] print:text-[10pt] font-bold">
                   <tr>
                     <th className="p-3 print:p-2.5">
-                      Descrição do Pacote de Serviços de Engenharia
+                      Item / Descrição da Prestação e Fornecimentos
                     </th>
-                    <th className="p-3 print:p-2.5 text-center w-28">Equipamentos</th>
-                    <th className="p-3 print:p-2.5 text-right w-40">Total Global</th>
+                    <th className="p-3 print:p-2.5 text-center w-28">Escopo</th>
+                    <th className="p-3 print:p-2.5 text-right w-40">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {/* Linha 1: Prestação de Serviços Técnicos Especializados */}
                   <tr className="hover:bg-slate-50/50">
                     <td className="p-3 print:p-2.5 space-y-1 print:space-y-0.5">
                       <div className="font-bold text-slate-900 text-xs print:text-[11.5pt]">
-                        {quote.title ||
-                          `Serviço Especializado de Manutenção e Engenharia (${quoteEquipmentsList.length} ${quoteEquipmentsList.length === 1 ? 'Equipamento' : 'Equipamentos'})`}
+                        1. Prestação de Serviços Técnicos Especializados
                       </div>
                       <div className="text-[10.5px] print:text-[10.5pt] text-slate-600 leading-snug">
-                        Manutenção técnica completa contemplando os equipamentos listados acima, com
-                        mão de obra especializada, testes e relatórios.
+                        Mão de obra especializada de engenharia e mecânica de campo, abertura,
+                        limpeza química, testes hidrostáticos, inspeção técnica e emissão de
+                        ART/relatório.
                       </div>
                     </td>
                     <td className="p-3 print:p-2.5 text-center font-semibold font-mono text-xs print:text-[11pt]">
-                      {totalEquipmentUnits} un
+                      {totalEquipmentUnits} {totalEquipmentUnits === 1 ? 'un' : 'un'}
                     </td>
-                    <td className="p-3 print:p-2.5 text-right font-mono font-bold text-slate-900 text-sm print:text-[12pt]">
+                    <td className="p-3 print:p-2.5 text-right font-mono font-bold text-teal-900 text-sm print:text-[12pt]">
+                      {(effectivePassThrough > 0
+                        ? serviceSalePrice
+                        : (quote.total ?? quote.final_price ?? finalSalePrice ?? 0)
+                      ).toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </td>
+                  </tr>
+
+                  {/* Linha 2: Fornecimento / Repasse de Materiais e Componentes (quando houver) */}
+                  {effectivePassThrough > 0 && (
+                    <tr className="hover:bg-slate-50/50 bg-slate-50/30">
+                      <td className="p-3 print:p-2.5 space-y-1 print:space-y-0.5">
+                        <div className="font-bold text-slate-900 text-xs print:text-[11.5pt] flex items-center gap-1.5">
+                          <span>2. Fornecimento / Repasse de Materiais e Componentes</span>
+                          <span className="text-[9.5px] font-semibold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                            sem impostos / repasse puro
+                          </span>
+                        </div>
+                        <div className="text-[10.5px] print:text-[10.5pt] text-slate-600 leading-snug">
+                          Repasse direto de insumos e peças de reposição (placas, gaxetas, químicos
+                          para limpeza química/pintura) homologados pelo fabricante.
+                        </div>
+                      </td>
+                      <td className="p-3 print:p-2.5 text-center font-semibold font-mono text-xs print:text-[11pt]">
+                        Insumos
+                      </td>
+                      <td className="p-3 print:p-2.5 text-right font-mono font-bold text-blue-900 text-sm print:text-[12pt]">
+                        {effectivePassThrough.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-300">
+                  <tr>
+                    <td
+                      colSpan={2}
+                      className="p-3 print:p-2.5 text-right text-slate-800 text-xs print:text-[11pt] uppercase tracking-wide"
+                    >
+                      Valor Total Homologado da Proposta:
+                    </td>
+                    <td className="p-3 print:p-2.5 text-right font-mono font-black text-slate-950 text-base print:text-[13pt]">
                       {(quote.total ?? quote.final_price ?? finalSalePrice ?? 0).toLocaleString(
                         'pt-BR',
                         {
@@ -2117,7 +2260,7 @@ export function QuotePdfPreviewDialog({
                       )}
                     </td>
                   </tr>
-                </tbody>
+                </tfoot>
               </table>
             </div>
           </div>
