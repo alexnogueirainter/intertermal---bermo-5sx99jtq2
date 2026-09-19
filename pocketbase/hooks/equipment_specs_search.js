@@ -15,7 +15,7 @@
 routerAdd('POST', '/backend/v1/intertermal/equipment-web-search', (c) => {
   let body = {}
   try {
-    body = $apis.requestInfo(c).body || {}
+    body = c.requestInfo().body || {}
   } catch (_) {
     body = {}
   }
@@ -463,7 +463,7 @@ Retorne EXCLUSIVAMENTE o bloco JSON válido, sem texto introdutório ou explica�
 routerAdd('POST', '/backend/v1/equipment/search-specs', (c) => {
   let body = {}
   try {
-    body = $apis.requestInfo(c).body || {}
+    body = c.requestInfo().body || {}
   } catch (_) {
     body = {}
   }
@@ -550,7 +550,7 @@ routerAdd('POST', '/backend/v1/equipment/search-specs', (c) => {
 routerAdd('POST', '/backend/v1/intertermal/equipment-specs', (c) => {
   let body = {}
   try {
-    body = $apis.requestInfo(c).body || {}
+    body = c.requestInfo().body || {}
   } catch (_) {
     body = {}
   }
