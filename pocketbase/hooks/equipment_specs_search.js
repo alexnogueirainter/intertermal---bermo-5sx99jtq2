@@ -319,117 +319,13 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-web-search', (c) => {
     }
   }
 
-  // 3. Busca server-side com IA ($ai.chat) para sintetizar ficha técnica precisa
-  // Isso resolve qualquer modelo novo ou raro sem depender de janela externa do navegador
-  let aiSpecs = null
-  let aiSourceInfo = ''
-  try {
-    const promptText = `Você é um engenheiro sênior especialista em trocadores de calor a placas (BERMO, Alfa Laval, Swep, Kelvion, Sondex, Tranter).
-Analise o modelo solicitado: "${model || customQuery}" (Marca sugerida: "${targetBrand || 'Industrial'}").
-Retorne um JSON estrito contendo os dados técnicos típicos de engenharia para este modelo.
-Campos obrigatórios no JSON:
-{
-  "brand": "Nome da Marca mais provável (ex: BERMO, Alfa Laval, Kelvion, etc)",
-  "model": "Código normalizado do modelo",
-  "fullName": "Nome técnico completo",
-  "plateCount": número inteiro estimado típico (ex: 40, 50, 60),
-  "plateMaterial": "ex: AISI 316L (0.5mm) ou Titânio",
-  "plateThickness": número decimal (ex: 0.5 ou 0.6),
-  "gasketMaterial": "ex: EPDM Clip-on, NBR ou Solda Cobre (se brasado)",
-  "connectionSize": "ex: DN50 (2 pol) ou 1.1/4 BSP",
-  "workingPressureBar": número inteiro (ex: 10, 16 ou 25),
-  "maxTemperature": "ex: 160°C ou 180°C",
-  "dimensions": "ex: 850 x 300 x 600 mm",
-  "weightKg": número (ex: 120),
-  "sourceUrl": "URL de referência técnica real do fabricante",
-  "summary": "Resumo técnico de 2 frases sobre a aplicação e características do modelo"
-}
-Retorne EXCLUSIVAMENTE o bloco JSON válido, sem texto introdutório ou explicações extras.`
-
-    const aiRes = $ai.chat({
-      model: 'fast',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'Você é um assistente de engenharia mecânica térmica que responde estritamente em JSON puro.',
-        },
-        {
-          role: 'user',
-          content: promptText,
-        },
-      ],
-    })
-
-    const rawContent =
-      aiRes && aiRes.choices && aiRes.choices[0] && aiRes.choices[0].message
-        ? String(aiRes.choices[0].message.content || '').trim()
-        : ''
-
-    if (rawContent) {
-      // Extrair JSON mesmo se houver markdown ```json ... ```
-      let jsonStr = rawContent
-      const matchBlock = rawContent.match(/\{[\s\S]*\}/)
-      if (matchBlock) {
-        jsonStr = matchBlock[0]
-      }
-
-      try {
-        const parsed = JSON.parse(jsonStr)
-        if (parsed && (parsed.model || parsed.fullName)) {
-          const aiPlateCount = Number(parsed.plateCount) || 40
-          const aiPressure = Number(parsed.workingPressureBar) || 16
-          const aiWeight = Number(parsed.weightKg) || 0
-
-          aiSpecs = {
-            platesRange: `${Math.max(10, aiPlateCount - 15)} a ${aiPlateCount + 40} placas`,
-            platesCount: String(aiPlateCount),
-            plateDimensions: parsed.dimensions || '850 x 300 mm',
-            gasketMaterial: parsed.gasketMaterial || 'EPDM Clip-on / NBR',
-            gasketsCount: String(aiPlateCount),
-            connection: parsed.connectionSize || 'DN50 (2 pol)',
-            material: parsed.plateMaterial || 'AISI 316L (0.5mm)',
-            pressure: `${aiPressure} bar`,
-            maxTemperature: parsed.maxTemperature || '160°C',
-            weightKg: aiWeight > 0 ? `${aiWeight} kg` : '',
-          }
-
-          aiSourceInfo =
-            parsed.sourceUrl ||
-            (parsed.brand === 'BERMO'
-              ? 'https://bermo.com.br/produtos/trocadores-de-calor/'
-              : 'https://alfalaval.com.br')
-
-          // Adiciona resultado aos itens retornados
-          results.push({
-            id: `ai-specs-${Date.now()}`,
-            sourceType: 'ai_web_synthesis',
-            title: `${parsed.brand || targetBrand || 'Industrial'} ${parsed.model || model} — ${parsed.fullName || 'Especificação Técnica'}`,
-            url: aiSourceInfo,
-            snippet:
-              parsed.summary ||
-              `Ficha técnica estruturada para ${parsed.model || model}: ${aiSpecs.material}, vedação ${aiSpecs.gasketMaterial}, conexões ${aiSpecs.connection}, pressão nominal ${aiSpecs.pressure}.`,
-            brand: parsed.brand || targetBrand || 'Fabricante Industrial',
-            model: parsed.model || model,
-            specs: aiSpecs,
-            badge: 'Pesquisa Técnica Server-Side',
-          })
-
-          if (!bestSpecs) {
-            bestSpecs = aiSpecs
-            targetBrand = parsed.brand || targetBrand
-          }
-        }
-      } catch (jsonErr) {
-        console.log('Erro ao parsear JSON da IA de specs:', jsonErr)
-      }
-    }
-  } catch (aiErr) {
-    console.log('Falha na consulta AI de specs server-side:', aiErr)
-  }
+  // 3. Fallback de IA desativado nesta fase.
+  // A IA não pode criar, completar ou estimar especificações sem uma fonte técnica
+  // real previamente localizada e apresentada ao usuário. A busca por fonte oficial
+  // será implementada em uma etapa posterior, com evidência por campo e aprovação.
 
   // 4. Estimativa paramétrica desativada como preenchimento automático:
-  // Se não houver dados confirmados do catálogo ou de busca técnica/IA, não inventa specs sintéticas
+  // Se não houver dados confirmados do catálogo, não inventa specs sintéticas
   // mantendo os campos vazios para preenchimento manual pelo usuário.
 
   // Deduplicar resultados por título/modelo
