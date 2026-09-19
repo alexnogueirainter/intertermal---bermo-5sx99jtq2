@@ -372,8 +372,8 @@ export async function searchEquipmentWeb(
       '/backend/v1/intertermal/equipment-web-search',
       {
         method: 'POST',
-        body: { model: cleanModel, brand: cleanBrand, query: cleanQuery },
-        requestKey: null,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: cleanModel, brand: cleanBrand, query: cleanQuery }),
       },
     )
     return res
@@ -445,8 +445,8 @@ export async function searchEquipmentSpecsOnline(
       '/backend/v1/intertermal/equipment-specs',
       {
         method: 'POST',
-        body: { model: clean, brand: brand || '' },
-        requestKey: null,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: clean, brand: brand || '' }),
       },
     )
     return res
@@ -456,8 +456,8 @@ export async function searchEquipmentSpecsOnline(
         '/backend/v1/equipment/search-specs',
         {
           method: 'POST',
-          body: { model: clean, brand: brand || '' },
-          requestKey: null,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: clean, brand: brand || '' }),
         },
       )
       return resFallback
