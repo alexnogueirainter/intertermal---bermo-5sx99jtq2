@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-18T15:24:53.285Z",
+  "generatedAt": "2026-09-19T21:54:21.382Z",
   "collections": [
     {
       "name": "users",
@@ -29,14 +29,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -102,7 +107,13 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["lead", "prospect", "active", "churned", "partner"]
+          "selectValues": [
+            "lead",
+            "prospect",
+            "active",
+            "churned",
+            "partner"
+          ]
         },
         {
           "name": "score",
@@ -151,14 +162,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "contacts",
@@ -245,14 +261,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "specs",
@@ -319,7 +340,14 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["prospecting", "qualification", "proposal", "negotiation", "won", "lost"]
+          "selectValues": [
+            "prospecting",
+            "qualification",
+            "proposal",
+            "negotiation",
+            "won",
+            "lost"
+          ]
         },
         {
           "name": "probability",
@@ -344,7 +372,12 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["low", "medium", "high", "urgent"]
+          "selectValues": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ]
         },
         {
           "name": "loss_reason",
@@ -363,14 +396,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -421,7 +459,13 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["draft", "sent", "approved", "rejected", "expired"]
+          "selectValues": [
+            "draft",
+            "sent",
+            "approved",
+            "rejected",
+            "expired"
+          ]
         },
         {
           "name": "items",
@@ -482,14 +526,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "tech_rate",
@@ -1066,6 +1115,12 @@
           "type": "json",
           "required": false,
           "system": false
+        },
+        {
+          "name": "technical_provenance",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -1109,7 +1164,13 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["whatsapp", "email", "phone", "chat", "in_person"]
+          "selectValues": [
+            "whatsapp",
+            "email",
+            "phone",
+            "chat",
+            "in_person"
+          ]
         },
         {
           "name": "subject",
@@ -1128,14 +1189,24 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["low", "medium", "high", "urgent"]
+          "selectValues": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ]
         },
         {
           "name": "status",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["open", "in_progress", "resolved", "closed"]
+          "selectValues": [
+            "open",
+            "in_progress",
+            "resolved",
+            "closed"
+          ]
         },
         {
           "name": "assigned_to",
@@ -1160,14 +1231,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -1232,7 +1308,13 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["planning", "in_progress", "pending_client", "completed", "cancelled"]
+          "selectValues": [
+            "planning",
+            "in_progress",
+            "pending_client",
+            "completed",
+            "cancelled"
+          ]
         },
         {
           "name": "start_date",
@@ -1287,14 +1369,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -1325,7 +1412,14 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["call", "meeting", "follow_up", "visit", "email", "task"]
+          "selectValues": [
+            "call",
+            "meeting",
+            "follow_up",
+            "visit",
+            "email",
+            "task"
+          ]
         },
         {
           "name": "client_id",
@@ -1364,14 +1458,22 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["low", "medium", "high"]
+          "selectValues": [
+            "low",
+            "medium",
+            "high"
+          ]
         },
         {
           "name": "status",
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["pending", "completed", "cancelled"]
+          "selectValues": [
+            "pending",
+            "completed",
+            "cancelled"
+          ]
         },
         {
           "name": "assigned_to",
@@ -1396,14 +1498,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -1497,7 +1604,12 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["low", "medium", "high", "urgent"]
+          "selectValues": [
+            "low",
+            "medium",
+            "high",
+            "urgent"
+          ]
         },
         {
           "name": "assigned_to",
@@ -1552,14 +1664,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         },
         {
           "name": "status_history",
@@ -1638,7 +1755,12 @@
           "type": "select",
           "required": false,
           "system": false,
-          "selectValues": ["recebido", "rascunho_criado", "revisado", "erro"]
+          "selectValues": [
+            "recebido",
+            "rascunho_criado",
+            "revisado",
+            "erro"
+          ]
         },
         {
           "name": "quote_id",
@@ -1671,14 +1793,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -1740,14 +1867,19 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
@@ -1892,19 +2024,282 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        },
+        {
+          "name": "approval_status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "needs_review",
+            "approved",
+            "rejected"
+          ]
+        },
+        {
+          "name": "source_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source_title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source_excerpt",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "provenance",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "verified_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "verified_by",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
         "CREATE INDEX idx_equip_catalog_model ON equipment_catalog (model)",
-        "CREATE INDEX idx_equip_catalog_brand ON equipment_catalog (brand)"
+        "CREATE INDEX idx_equip_catalog_brand ON equipment_catalog (brand)",
+        "CREATE INDEX `idx_equip_catalog_approval_status` ON `equipment_catalog` (approval_status)"
+      ]
+    },
+    {
+      "name": "equipment_researches",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != \"\"",
+        "view": "@request.auth.id != \"\"",
+        "create": "@request.auth.id != \"\"",
+        "update": "@request.auth.id != \"\"",
+        "delete": "@request.auth.id != \"\""
+      },
+      "fields": [
+        {
+          "name": "requested_model",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "requested_brand",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "query",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "quote_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "requested_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "results_json",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "selected_result_json",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "error_message",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "completed_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_equipment_researches_model ON equipment_researches (requested_model)",
+        "CREATE INDEX idx_equipment_researches_status ON equipment_researches (status)"
+      ]
+    },
+    {
+      "name": "equipment_research_candidates",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != \"\"",
+        "view": "@request.auth.id != \"\"",
+        "create": "@request.auth.id != \"\"",
+        "update": "@request.auth.id != \"\"",
+        "delete": "@request.auth.id != \"\""
+      },
+      "fields": [
+        {
+          "name": "research_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "source_url",
+          "type": "url",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source_title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source_domain",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolved_brand",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resolved_model",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "match_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "confirmed_specs",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "evidence",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approval_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate"
+          ]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_equipment_candidates_research ON equipment_research_candidates (research_id)",
+        "CREATE INDEX idx_equipment_candidates_model ON equipment_research_candidates (resolved_model)"
       ]
     }
   ]
