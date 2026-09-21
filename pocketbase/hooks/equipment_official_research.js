@@ -71,6 +71,7 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
   }
 
   const researchId = researchRecord ? String(researchRecord.id || '') : ''
+  let bermoDiagnostics = []
   const emptyResponse = (status, message) => {
     if (researchRecord) {
       try {
@@ -94,6 +95,7 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       recommendedSpecs: null,
       message,
       researchId,
+      debug: sourceBrand === 'BERMO' ? bermoDiagnostics : undefined,
     })
   }
 
@@ -147,6 +149,17 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
         'A fonte oficial da BERMO não pôde ser consultada agora. Tente novamente.',
       )
     }
+
+    bermoDiagnostics.push({
+      stage: 'catalog',
+      statusCode: catalogResponse ? catalogResponse.statusCode : 0,
+      bodyType: catalogResponse ? typeof catalogResponse.body : 'none',
+      bodyLength:
+        catalogResponse && catalogResponse.body && catalogResponse.body.length
+          ? catalogResponse.body.length
+          : 0,
+      headers: catalogResponse && catalogResponse.headers ? String(catalogResponse.headers) : '',
+    })
 
     if (!catalogResponse || catalogResponse.statusCode !== 200) {
       const statusCode = catalogResponse ? catalogResponse.statusCode : 0
@@ -209,6 +222,17 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       } catch (detailErr) {
         continue
       }
+      bermoDiagnostics.push({
+        stage: 'detail',
+        url: href,
+        statusCode: detailResponse ? detailResponse.statusCode : 0,
+        bodyType: detailResponse ? typeof detailResponse.body : 'none',
+        bodyLength:
+          detailResponse && detailResponse.body && detailResponse.body.length
+            ? detailResponse.body.length
+            : 0,
+        headers: detailResponse && detailResponse.headers ? String(detailResponse.headers) : '',
+      })
       if (!detailResponse || detailResponse.statusCode !== 200) continue
 
       let detailHtml = ''
@@ -384,5 +408,6 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
     recommendedSpecs: null,
     message,
     researchId,
+    debug: sourceBrand === 'BERMO' ? bermoDiagnostics : undefined,
   })
 })
