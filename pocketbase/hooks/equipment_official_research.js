@@ -192,7 +192,13 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       `https://bermo.com.br/produtos/detalhes/trocador-de-calor-a-placas-sanitario-${normalizedModel}/`,
     ]
 
+    const catalogHtmlLower = html.toLowerCase()
     for (const href of directUrls) {
+      const hrefPath = href.replace('https://bermo.com.br', '').toLowerCase()
+      const linkFoundInOfficialCatalog = catalogHtmlLower.indexOf(hrefPath) !== -1
+      if (!linkFoundInOfficialCatalog) continue
+
+      let detailStatus = 'not_checked'
       let detailResponse
       try {
         detailResponse = $http.send({
@@ -204,22 +210,11 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
           },
           timeout: 20,
         })
+        detailStatus =
+          detailResponse && detailResponse.statusCode === 200 ? 'validated' : 'catalog_link_match'
       } catch (detailErr) {
-        continue
+        detailStatus = 'catalog_link_match'
       }
-      if (!detailResponse || detailResponse.statusCode !== 200) continue
-
-      let detailHtml = ''
-      try {
-        const responseBody = detailResponse.body
-        detailHtml =
-          typeof responseBody === 'string'
-            ? responseBody
-            : new TextDecoder('utf-8').decode(responseBody || new Uint8Array())
-      } catch (decodeErr) {
-        detailHtml = String(detailResponse.body || '')
-      }
-      if (!detailHtml || detailHtml.toLowerCase().indexOf(normalizedModel) === -1) continue
 
       const result = {
         id: `official-${Date.now()}-${results.length + 1}`,
@@ -237,6 +232,8 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
           source_catalog_url: catalogUrl,
           extraction_status: 'pending',
           match_status: 'exact',
+          catalog_link_match: true,
+          detail_page_status: detailStatus,
         },
       }
       results.push(result)
