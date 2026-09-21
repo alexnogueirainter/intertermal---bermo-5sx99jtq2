@@ -71,7 +71,6 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
   }
 
   const researchId = researchRecord ? String(researchRecord.id || '') : ''
-  let bermoDebug = []
   const emptyResponse = (status, message) => {
     if (researchRecord) {
       try {
@@ -95,7 +94,6 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       recommendedSpecs: null,
       message,
       researchId,
-      debug: sourceBrand === 'BERMO' ? bermoDebug : undefined,
     })
   }
 
@@ -209,19 +207,8 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
           timeout: 20,
         })
       } catch (detailErr) {
-        bermoDebug.push({ url: href, transportError: String(detailErr) })
         continue
       }
-      bermoDebug.push({
-        url: href,
-        statusCode: detailResponse ? detailResponse.statusCode : 0,
-        bodyType: detailResponse ? typeof detailResponse.body : 'none',
-        bodyLength:
-          detailResponse && detailResponse.body && detailResponse.body.length
-            ? detailResponse.body.length
-            : 0,
-        headers: detailResponse && detailResponse.headers ? String(detailResponse.headers) : '',
-      })
       if (!detailResponse || detailResponse.statusCode !== 200) continue
 
       let detailHtml = ''
