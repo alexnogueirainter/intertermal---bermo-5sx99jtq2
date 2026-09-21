@@ -371,6 +371,7 @@ export interface QuoteRecord {
   payment_terms?: string
   technical_notes?: string
   commercial_notes?: string
+  technical_provenance?: any
   service_details?: any
   items?: any[]
 

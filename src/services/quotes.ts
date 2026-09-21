@@ -297,6 +297,7 @@ export async function deleteQuote(id: string): Promise<boolean> {
 export interface EquipmentWebSearchResultItem {
   id: string
   sourceType: string
+  sourceDomain?: string
   title: string
   url?: string
   snippet?: string
@@ -317,6 +318,33 @@ export interface EquipmentWebSearchResultItem {
     weightKg?: string
     [key: string]: any
   } | null
+}
+
+export interface EquipmentSpecsExtractionResponse {
+  success: boolean
+  found: boolean
+  status?: string
+  brand?: string
+  model?: string
+  specs?: Record<string, any> | null
+  fieldEvidence?: Record<
+    string,
+    {
+      value: string
+      unit?: string
+      sourceText: string
+      sourceUrl: string
+      status: string
+      extractionMethod?: string
+    }
+  >
+  source?: {
+    url: string
+    domain?: string
+    title?: string
+  }
+  extraction?: Record<string, any>
+  message?: string
 }
 
 export interface EquipmentWebSearchResponse {
@@ -404,6 +432,50 @@ export async function searchEquipmentWeb(
       results: [],
       message:
         'Não foi possível consultar a fonte oficial agora. Nenhum dado técnico foi aplicado; preencha manualmente ou tente novamente.',
+    }
+  }
+}
+
+export async function extractEquipmentSpecs(
+  url: string,
+  brand?: string,
+  model?: string,
+): Promise<EquipmentSpecsExtractionResponse> {
+  const cleanUrl = (url || '').trim()
+  if (!cleanUrl) {
+    return {
+      success: false,
+      found: false,
+      status: 'invalid_request',
+      brand: brand || '',
+      model: model || '',
+      specs: null,
+      fieldEvidence: {},
+      message: 'Fonte não informada.',
+    }
+  }
+
+  try {
+    return await pb.send<EquipmentSpecsExtractionResponse>(
+      '/backend/v1/intertermal/equipment-specs-extract',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: cleanUrl, brand: brand || '', model: model || '' }),
+      },
+    )
+  } catch (error) {
+    console.warn('Erro ao extrair especificações da fonte oficial:', error)
+    return {
+      success: false,
+      found: false,
+      status: 'unavailable',
+      brand: brand || '',
+      model: model || '',
+      specs: null,
+      fieldEvidence: {},
+      source: { url: cleanUrl },
+      message: 'Não foi possível extrair dados da fonte agora. Tente novamente.',
     }
   }
 }
