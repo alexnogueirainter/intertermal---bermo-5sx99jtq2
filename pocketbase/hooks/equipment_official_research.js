@@ -279,6 +279,7 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       TS20: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/industrial/productleaflet_ts20_ptbr.pdf',
       T25: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/industrial/25_product-leaflet_en.pdf',
       T21: 'https://assets.alfalaval.com/documents/pe2a6be11/alfa-laval-t21-product-leaflet-en.pdf',
+      T5: 'https://assets.alfalaval.com/documents/p48694409/alfa-laval-t5-product-leaflet-en.pdf',
       T20: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/instruction-manuals/instruction-manual-alfa-laval-industrial-line-m15-tl10-tl15-t20-ts20-t25-mx25-ma30-widegap-100-english.pdf',
       TL10: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/instruction-manuals/instruction-manual-alfa-laval-industrial-line-m15-tl10-tl15-t20-ts20-t25-mx25-ma30-widegap-100-english.pdf',
       TL15: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/instruction-manuals/instruction-manual-alfa-laval-industrial-line-m15-tl10-tl15-t20-ts20-t25-mx25-ma30-widegap-100-english.pdf',
