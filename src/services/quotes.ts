@@ -382,7 +382,10 @@ export async function searchEquipmentWeb(
       '/backend/v1/intertermal/equipment-official-research',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: pb.authStore.token,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({ model: cleanModel, brand: cleanBrand, query: cleanQuery }),
       },
     )
