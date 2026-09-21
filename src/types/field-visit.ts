@@ -151,6 +151,66 @@ export function calculateDurationBetween(start: string, end: string): string {
  * Compresses an image file (data URL / file) to max dimension ~1000px and JPEG quality 0.7
  * so it safely fits into localStorage without blowing quota limits.
  */
+/**
+ * Converte um registro do PocketBase (`FieldVisitRecord`) para o formato `FieldVisitData`.
+ */
+export function recordToFieldVisitData(record: any): {
+  data: FieldVisitData
+  parsedCompany: string
+  parsedContact: string
+} {
+  let parsedCompany = record.company_name || ''
+  let parsedContact = record.client_name || ''
+
+  // Se veio no formato "Empresa (Contato: Nome)" ou "Empresa (Nome)"
+  if (record.client_name && !record.company_name) {
+    const match = record.client_name.match(/^(.+?)\s*\((?:Contato:\s*)?(.+?)\)$/i)
+    if (match) {
+      parsedCompany = match[1].trim()
+      parsedContact = match[2].trim()
+    } else {
+      parsedCompany = record.client_name
+    }
+  }
+
+  // Parse seguro do JSON de equipamentos se for string ou array
+  let safeEquipments: EquipmentItem[] = []
+  if (Array.isArray(record.equipment)) {
+    safeEquipments = record.equipment
+  } else if (typeof record.equipment === 'string' && record.equipment) {
+    try {
+      safeEquipments = JSON.parse(record.equipment)
+    } catch {
+      safeEquipments = []
+    }
+  }
+
+  const data: FieldVisitData = {
+    id: record.id,
+    employeeName: record.employee_name || 'Técnico Intertermal',
+    date: record.visit_date || (record.created ? record.created.slice(0, 10) : ''),
+    startTime: record.start_time || '',
+    endTime: record.end_time || '',
+    visitDuration: record.duration || '',
+    isDurationManuallyEdited: false,
+    companyName: parsedCompany,
+    clientName: parsedContact,
+    clientRole: record.client_role || '',
+    clientContact: record.client_contact || '',
+    clientWorkArea: record.work_area || '',
+    workType: (record.work_type as any) || '',
+    workTypeOther: record.work_type_other || '',
+    generalObservations: record.general_notes || '',
+    equipments: safeEquipments,
+    updatedAt: record.updated || record.created || new Date().toISOString(),
+    backendRecordId: record.id,
+    crmStatus: 'enviada',
+    lastSentAt: record.sent_at || record.created,
+  }
+
+  return { data, parsedCompany, parsedContact }
+}
+
 export function compressImageFile(file: File, maxDimension = 1000, quality = 0.7): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
