@@ -220,6 +220,8 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-specs-extract', (e) => {
     .replace(/&ndash;/gi, '–')
     .replace(/&mdash;/gi, '—')
     .replace(/&ordm;/gi, 'º')
+    .replace(/&rdquo;/gi, '”')
+    .replace(/&ldquo;/gi, '“')
     .replace(/&sup2;/gi, '²')
     .replace(/&frac14;/gi, '¼')
     .replace(/&frac12;/gi, '½')
@@ -328,40 +330,39 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-specs-extract', (e) => {
 
   // Documentos Alfa Laval costumam publicar tabelas em duas colunas.
   const alfaPlateMaterialMatch = firstMatch([
-    /Heat\s+transfer\s+plate,?\s*Single\s+plate\s*:\s*([^\n|]{2,180})/i,
-    /Heat\s+transfer\s+plate[^\n|]{0,80}Material\s*[:\-]\s*([^\n|]{2,180})/i,
+    /Heat\s+transfer\s+plate,?\s*Single\s+plate\s*:\s*(?:\|\s*)?([^\n|]{2,180})/i,
+    /Heat\s+transfer\s+plate[^\n|]{0,80}Material\s*[:\-]\s*(?:\|\s*)?([^\n|]{2,180})/i,
   ])
   if (!specs.plateMaterial && alfaPlateMaterialMatch) {
     addField('plateMaterial', alfaPlateMaterialMatch.value, alfaPlateMaterialMatch.sourceText)
   }
 
   const alfaGasketMaterialMatch = firstMatch([
-    /Field\s+gasket\s*:\s*([^\n|]{2,180})/i,
-    /Gasket\s+material\s*[:\-]\s*([^\n|]{2,180})/i,
+    /Field\s+gasket\s*:\s*(?:\|\s*)?([^\n|]{2,180})/i,
+    /Gasket\s+material\s*[:\-]\s*(?:\|\s*)?([^\n|]{2,180})/i,
   ])
   if (!specs.gasketMaterial && alfaGasketMaterialMatch) {
     addField('gasketMaterial', alfaGasketMaterialMatch.value, alfaGasketMaterialMatch.sourceText)
   }
 
   const alfaConnectionMatch = firstMatch([
-    /Threaded\s+port\s*([^\n|]{2,120})/i,
-    /Pipe\s+connections?\s*[:\-]?\s*([^\n|]{2,120})/i,
+    /Connection\s+(?:size|type|standard)\s*[:\-]\s*(?:\|\s*)?([^\n|]{2,120})/i,
   ])
   if (!specs.connection && alfaConnectionMatch) {
     addField('connection', alfaConnectionMatch.value, alfaConnectionMatch.sourceText)
   }
 
   const alfaTemperatureMatch = firstMatch([
-    /Temperature\s+range[\s\S]{0,180}?From\s+[-0-9.,]+\s+to\s+([0-9]+(?:[.,][0-9]+)?)[^\n|]{0,40}/i,
-    /Temperature\s+range\s*[:\-]?\s*([^\n|]{3,160})/i,
+    /Temperature\s+range[\s\S]{0,220}?From\s+[-0-9.,]+\s+to\s+([0-9]+(?:[.,][0-9]+)?)(?:\s*\([^\n|]{0,60}\))?/i,
+    /Temperature\s+range\s*[:\-]\s*(?:\|\s*)?([^\n|]{3,160})/i,
   ])
   if (!specs.maxTemperature && alfaTemperatureMatch) {
     addField('maxTemperature', alfaTemperatureMatch.value, alfaTemperatureMatch.sourceText, '°C')
   }
 
   const alfaPressureMatch = firstMatch([
-    /Pressure\s+range[\s\S]{0,180}?to\s+([0-9]+(?:[.,][0-9]+)?)[^\n|]{0,40}/i,
-    /Pressure\s+range\s*[:\-]?\s*([^\n|]{3,180})/i,
+    /Pressure\s+range[\s\S]{0,240}?to\s+([0-9]+(?:[.,][0-9]+)?)(?:\s*\([^\n|]{0,60}\))?/i,
+    /Pressure\s+range\s*[:\-]\s*(?:\|\s*)?([^\n|]{3,180})/i,
   ])
   if (!specs.pressure && alfaPressureMatch) {
     addField('pressure', alfaPressureMatch.value, alfaPressureMatch.sourceText, 'barg')
