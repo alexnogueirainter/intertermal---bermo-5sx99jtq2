@@ -71,7 +71,6 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
   }
 
   const researchId = researchRecord ? String(researchRecord.id || '') : ''
-  let bermoDiagnostics = []
   const emptyResponse = (status, message) => {
     if (researchRecord) {
       try {
@@ -95,7 +94,6 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       recommendedSpecs: null,
       message,
       researchId,
-      debug: sourceBrand === 'BERMO' ? bermoDiagnostics : undefined,
     })
   }
 
@@ -150,35 +148,6 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       )
     }
 
-    bermoDiagnostics.push({
-      stage: 'catalog',
-      statusCode: catalogResponse ? catalogResponse.statusCode : 0,
-      bodyType: catalogResponse ? typeof catalogResponse.body : 'none',
-      bodyLength:
-        catalogResponse && catalogResponse.body && catalogResponse.body.length
-          ? catalogResponse.body.length
-          : 0,
-      bodyKeys:
-        catalogResponse && catalogResponse.body
-          ? Object.keys(catalogResponse.body).slice(0, 8)
-          : [],
-      firstBytes:
-        catalogResponse && catalogResponse.body
-          ? [
-              catalogResponse.body[0],
-              catalogResponse.body[1],
-              catalogResponse.body[2],
-              catalogResponse.body[3],
-              catalogResponse.body[4],
-            ]
-          : [],
-      bodyConstructor:
-        catalogResponse && catalogResponse.body && catalogResponse.body.constructor
-          ? String(catalogResponse.body.constructor.name || '')
-          : '',
-      headers: catalogResponse && catalogResponse.headers ? String(catalogResponse.headers) : '',
-    })
-
     if (!catalogResponse || catalogResponse.statusCode !== 200) {
       const statusCode = catalogResponse ? catalogResponse.statusCode : 0
       $app.logger().warn('Fonte BERMO indisponível', 'statusCode', statusCode)
@@ -193,6 +162,8 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       const responseBody = catalogResponse.body
       if (typeof responseBody === 'string') {
         html = responseBody
+      } else if (Array.isArray(responseBody)) {
+        html = new TextDecoder('utf-8').decode(new Uint8Array(responseBody))
       } else {
         html = new TextDecoder('utf-8').decode(responseBody || new Uint8Array())
       }
@@ -240,42 +211,19 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       } catch (detailErr) {
         continue
       }
-      bermoDiagnostics.push({
-        stage: 'detail',
-        url: href,
-        statusCode: detailResponse ? detailResponse.statusCode : 0,
-        bodyType: detailResponse ? typeof detailResponse.body : 'none',
-        bodyLength:
-          detailResponse && detailResponse.body && detailResponse.body.length
-            ? detailResponse.body.length
-            : 0,
-        bodyKeys:
-          detailResponse && detailResponse.body ? Object.keys(detailResponse.body).slice(0, 8) : [],
-        firstBytes:
-          detailResponse && detailResponse.body
-            ? [
-                detailResponse.body[0],
-                detailResponse.body[1],
-                detailResponse.body[2],
-                detailResponse.body[3],
-                detailResponse.body[4],
-              ]
-            : [],
-        bodyConstructor:
-          detailResponse && detailResponse.body && detailResponse.body.constructor
-            ? String(detailResponse.body.constructor.name || '')
-            : '',
-        headers: detailResponse && detailResponse.headers ? String(detailResponse.headers) : '',
-      })
+
       if (!detailResponse || detailResponse.statusCode !== 200) continue
 
       let detailHtml = ''
       try {
         const responseBody = detailResponse.body
-        detailHtml =
-          typeof responseBody === 'string'
-            ? responseBody
-            : new TextDecoder('utf-8').decode(responseBody || new Uint8Array())
+        if (typeof responseBody === 'string') {
+          detailHtml = responseBody
+        } else if (Array.isArray(responseBody)) {
+          detailHtml = new TextDecoder('utf-8').decode(new Uint8Array(responseBody))
+        } else {
+          detailHtml = new TextDecoder('utf-8').decode(responseBody || new Uint8Array())
+        }
       } catch (decodeErr) {
         try {
           detailHtml = String(detailResponse.body || '')
@@ -442,6 +390,5 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
     recommendedSpecs: null,
     message,
     researchId,
-    debug: sourceBrand === 'BERMO' ? bermoDiagnostics : undefined,
   })
 })
