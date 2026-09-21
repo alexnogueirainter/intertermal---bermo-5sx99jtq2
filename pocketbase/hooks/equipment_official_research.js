@@ -158,6 +158,24 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
         catalogResponse && catalogResponse.body && catalogResponse.body.length
           ? catalogResponse.body.length
           : 0,
+      bodyKeys:
+        catalogResponse && catalogResponse.body
+          ? Object.keys(catalogResponse.body).slice(0, 8)
+          : [],
+      firstBytes:
+        catalogResponse && catalogResponse.body
+          ? [
+              catalogResponse.body[0],
+              catalogResponse.body[1],
+              catalogResponse.body[2],
+              catalogResponse.body[3],
+              catalogResponse.body[4],
+            ]
+          : [],
+      bodyConstructor:
+        catalogResponse && catalogResponse.body && catalogResponse.body.constructor
+          ? String(catalogResponse.body.constructor.name || '')
+          : '',
       headers: catalogResponse && catalogResponse.headers ? String(catalogResponse.headers) : '',
     })
 
@@ -231,6 +249,22 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
           detailResponse && detailResponse.body && detailResponse.body.length
             ? detailResponse.body.length
             : 0,
+        bodyKeys:
+          detailResponse && detailResponse.body ? Object.keys(detailResponse.body).slice(0, 8) : [],
+        firstBytes:
+          detailResponse && detailResponse.body
+            ? [
+                detailResponse.body[0],
+                detailResponse.body[1],
+                detailResponse.body[2],
+                detailResponse.body[3],
+                detailResponse.body[4],
+              ]
+            : [],
+        bodyConstructor:
+          detailResponse && detailResponse.body && detailResponse.body.constructor
+            ? String(detailResponse.body.constructor.name || '')
+            : '',
         headers: detailResponse && detailResponse.headers ? String(detailResponse.headers) : '',
       })
       if (!detailResponse || detailResponse.statusCode !== 200) continue
