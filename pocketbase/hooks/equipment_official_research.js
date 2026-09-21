@@ -184,45 +184,15 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
     if (!html || html.length === 0) {
       return emptyResponse('unavailable', 'A fonte oficial da BERMO retornou uma página vazia.')
     }
-    const parts = model
-      .toUpperCase()
-      .trim()
-      .split(/[\s\-_]+/)
-      .filter((part) => part.length > 0)
-      .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    const modelPattern = parts.length > 0 ? parts.join('[^A-Z0-9]*') : ''
-    const exactModelPattern = modelPattern
-      ? new RegExp('(^|[^A-Z0-9])' + modelPattern + '([^A-Z0-9]|$)', 'i')
-      : null
-    const linkPattern = /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
-    let linkMatch
+    const normalizedModel = model.toLowerCase().replace(/[^a-z0-9]+/g, '')
+    const directUrls = [
+      `https://bermo.com.br/produtos/detalhes/${normalizedModel}-trocador-de-calor-a-placas-gaxetado/`,
+      `https://bermo.com.br/produtos/detalhes/${normalizedModel}-trocador-de-calor-a-placas-semi-soldado/`,
+      `https://bermo.com.br/produtos/detalhes/${normalizedModel}-trocador-de-calor-a-placas-brasado/`,
+      `https://bermo.com.br/produtos/detalhes/trocador-de-calor-a-placas-sanitario-${normalizedModel}/`,
+    ]
 
-    while ((linkMatch = linkPattern.exec(html)) !== null) {
-      const rawHref = String(linkMatch[1] || '').trim()
-      const label = String(linkMatch[2] || '')
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/&nbsp;|&#160;/gi, ' ')
-        .replace(/&amp;/gi, '&')
-        .replace(/&quot;/gi, '"')
-        .replace(/&#39;|&apos;/gi, "'")
-        .replace(/\s+/g, ' ')
-        .trim()
-
-      if (!rawHref || rawHref.indexOf('/produtos/detalhes/') === -1) continue
-      const href = rawHref.startsWith('http')
-        ? rawHref
-        : 'https://bermo.com.br' + (rawHref.startsWith('/') ? rawHref : '/' + rawHref)
-      if (href.indexOf('https://bermo.com.br/') !== 0) continue
-
-      const searchable = `${href} ${label}`.toUpperCase()
-      if (!exactModelPattern || !exactModelPattern.test(searchable)) continue
-
-      let duplicate = false
-      for (const existing of results) {
-        if (existing.url === href) duplicate = true
-      }
-      if (duplicate) continue
-
+    for (const href of directUrls) {
       let detailResponse
       try {
         detailResponse = $http.send({
@@ -239,11 +209,23 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       }
       if (!detailResponse || detailResponse.statusCode !== 200) continue
 
+      let detailHtml = ''
+      try {
+        const responseBody = detailResponse.body
+        detailHtml =
+          typeof responseBody === 'string'
+            ? responseBody
+            : new TextDecoder('utf-8').decode(responseBody || new Uint8Array())
+      } catch (decodeErr) {
+        detailHtml = String(detailResponse.body || '')
+      }
+      if (!detailHtml || detailHtml.toLowerCase().indexOf(normalizedModel) === -1) continue
+
       const result = {
         id: `official-${Date.now()}-${results.length + 1}`,
         sourceType: 'official_product_page',
         sourceDomain: 'bermo.com.br',
-        title: label || `BERMO ${model}`,
+        title: `BERMO ${model} — página oficial`,
         url: href,
         snippet: 'Página oficial do fabricante localizada. Extração técnica pendente de revisão.',
         brand: 'BERMO',
@@ -259,6 +241,7 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       }
       results.push(result)
       addCandidate(result)
+      break
     }
   }
 
