@@ -329,11 +329,14 @@ export interface EquipmentWebSearchResponse {
     | 'partial'
     | 'not_found'
     | 'not_configured'
+    | 'search_provider_required'
     | 'unavailable'
     | string
   researchId?: string
   model: string
   brand: string
+  possibleBrands?: string[]
+  searchProvider?: string
   totalResults: number
   results: EquipmentWebSearchResultItem[]
   recommendedSpecs?: EquipmentWebSearchResultItem['specs']

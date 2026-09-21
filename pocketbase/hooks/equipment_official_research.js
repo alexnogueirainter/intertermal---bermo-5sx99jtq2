@@ -20,18 +20,6 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
     })
   }
 
-  if (!requestedBrand) {
-    return e.json(400, {
-      success: false,
-      found: false,
-      status: 'invalid_request',
-      model: requestedModel || customQuery,
-      brand: '',
-      results: [],
-      message: 'Informe o fabricante antes de pesquisar o modelo.',
-    })
-  }
-
   const model = requestedModel || customQuery
   const normalizedBrand = requestedBrand
     .toLowerCase()
@@ -40,6 +28,12 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
     .replace(/[._-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+
+  const autoDiscovery =
+    !requestedBrand ||
+    normalizedBrand === 'outro' ||
+    normalizedBrand === 'outros' ||
+    normalizedBrand === 'desconhecido'
 
   let sourceBrand = ''
   if (normalizedBrand === 'bermo' || normalizedBrand === 'bermo brasil') {
@@ -97,33 +91,206 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
     })
   }
 
-  if (!sourceBrand) {
-    return emptyResponse(
-      'not_configured',
-      `A pesquisa aceita a marca "${requestedBrand}", mas ainda não há fonte oficial configurada para ela. Os campos técnicos permanecem vazios.`,
-    )
-  }
-
   const results = []
   const addCandidate = (result) => {
     try {
       const candidate = new Record(candidateCollection)
       candidate.set('research_id', researchId)
-      candidate.set('source_url', result.url)
-      candidate.set('source_title', result.title)
-      candidate.set('source_type', result.sourceType)
-      candidate.set('source_domain', result.sourceDomain)
-      candidate.set('resolved_brand', result.brand)
-      candidate.set('resolved_model', result.model)
-      candidate.set('match_status', result.evidence.match_status || 'exact')
+      candidate.set('source_url', result.url || '')
+      candidate.set('source_title', result.title || '')
+      candidate.set('source_type', result.sourceType || '')
+      candidate.set('source_domain', result.sourceDomain || '')
+      candidate.set('resolved_brand', result.brand || '')
+      candidate.set('resolved_model', result.model || model)
+      candidate.set(
+        'match_status',
+        result.evidence && result.evidence.match_status
+          ? result.evidence.match_status
+          : 'candidate',
+      )
       candidate.set('confirmed_specs', {})
-      candidate.set('evidence', result.evidence)
+      candidate.set('evidence', result.evidence || {})
       candidate.set('approval_status', 'needs_review')
       $app.save(candidate)
       result.id = String(candidate.id || result.id)
     } catch (persistErr) {
       $app.logger().error('Falha ao registrar candidato técnico', 'error', String(persistErr))
     }
+  }
+
+  // Fabricante opcional: catálogo interno primeiro; Tavily depois.
+  if (!sourceBrand && autoDiscovery) {
+    let catalogMatches = []
+    try {
+      const searchToken = String(model)
+        .toLowerCase()
+        .split(/\s+/)[0]
+        .replace(/[^a-z0-9]+/g, '')
+      if (searchToken) {
+        const safeToken = searchToken.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+        catalogMatches = $app.findRecordsByFilter(
+          'equipment_catalog',
+          `model ~ '${safeToken}' || name ~ '${safeToken}' || series ~ '${safeToken}'`,
+          '-created',
+          8,
+        )
+      }
+    } catch (catalogErr) {
+      $app
+        .logger()
+        .warn('Falha ao consultar catálogo interno antes da busca web', 'error', String(catalogErr))
+    }
+
+    for (const record of catalogMatches) {
+      const recordBrand = record.getString('brand') || ''
+      const recordModel = record.getString('model') || model
+      const recordSource = record.getString('source_url') || ''
+      results.push({
+        id: `catalog-${record.id}`,
+        sourceType: 'catalog_db',
+        sourceDomain: 'catalogo-interno',
+        title: `${recordBrand ? recordBrand + ' ' : ''}${recordModel} — catálogo interno`,
+        url: recordSource,
+        snippet:
+          'Modelo localizado no catálogo interno. Revise a proveniência antes de usar qualquer dado.',
+        brand: recordBrand,
+        model: recordModel,
+        badge: 'Catálogo interno — revisão necessária',
+        specs: null,
+        evidence: {
+          source_url: recordSource,
+          extraction_status: 'pending',
+          match_status: 'catalog_match',
+          source_type: 'internal_catalog',
+        },
+      })
+    }
+
+    if (results.length === 0) {
+      const tavilyKey = $secrets.get('TAVILY_API_KEY') || ''
+      if (!tavilyKey) {
+        return emptyResponse(
+          'search_provider_required',
+          'O modelo não está no catálogo interno. A busca automática precisa de um provedor externo configurado.',
+        )
+      }
+
+      const searchQuery = `${model} fabricante trocador de calor ficha técnica manual datasheet`
+      let searchResponse
+      try {
+        searchResponse = $http.send({
+          url: 'https://api.tavily.com/search',
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${tavilyKey}`,
+          },
+          body: JSON.stringify({
+            api_key: tavilyKey,
+            query: searchQuery,
+            search_depth: 'advanced',
+            topic: 'general',
+            max_results: 8,
+            include_answer: false,
+            include_raw_content: false,
+          }),
+          timeout: 30,
+        })
+      } catch (searchErr) {
+        $app.logger().error('Falha de transporte na busca Tavily', 'error', String(searchErr))
+        return emptyResponse(
+          'unavailable',
+          'A busca automática na internet está indisponível agora. Tente novamente.',
+        )
+      }
+
+      if (!searchResponse || searchResponse.statusCode < 200 || searchResponse.statusCode >= 300) {
+        const statusCode = searchResponse ? searchResponse.statusCode : 0
+        $app.logger().warn('Tavily retornou erro', 'statusCode', statusCode)
+        return emptyResponse(
+          'unavailable',
+          'A busca automática na internet não pôde ser concluída agora. Tente novamente.',
+        )
+      }
+
+      const payload = searchResponse.json || {}
+      const webResults = Array.isArray(payload.results) ? payload.results : []
+      const terms = String(model)
+        .toUpperCase()
+        .split(/[^A-Z0-9]+/)
+        .filter(
+          (term) =>
+            term.length >= 3 &&
+            !['TROCADOR', 'CALOR', 'PLACA', 'PLACAS', 'HEAT', 'EXCHANGER'].includes(term),
+        )
+
+      for (let i = 0; i < webResults.length; i++) {
+        const item = webResults[i] || {}
+        const url = String(item.url || '').trim()
+        const title = String(item.title || '').trim()
+        const content = String(item.content || '').trim()
+        if (!/^https?:\/\//i.test(url)) continue
+
+        const searchable = `${url} ${title} ${content}`.toUpperCase()
+        if (terms.length > 0 && !terms.some((term) => searchable.indexOf(term) !== -1)) continue
+
+        const sourceDomain = url
+          .replace(/^https?:\/\//i, '')
+          .split('/')[0]
+          .split('?')[0]
+          .replace(/^www\./i, '')
+          .toLowerCase()
+        const titleUpper = title.toUpperCase()
+        let candidateBrand = ''
+        if (sourceDomain.indexOf('bermo.com.br') !== -1 || titleUpper.indexOf('BERMO') !== -1) {
+          candidateBrand = 'BERMO'
+        } else if (
+          sourceDomain.indexOf('alfalaval.com') !== -1 ||
+          titleUpper.indexOf('ALFA LAVAL') !== -1
+        ) {
+          candidateBrand = 'Alfa Laval'
+        } else if (
+          sourceDomain.indexOf('kelvion.com') !== -1 ||
+          titleUpper.indexOf('KELVION') !== -1
+        ) {
+          candidateBrand = 'Kelvion'
+        } else if (sourceDomain.indexOf('swep.net') !== -1 || titleUpper.indexOf('SWEP') !== -1) {
+          candidateBrand = 'SWEP'
+        }
+
+        results.push({
+          id: `tavily-${Date.now()}-${i + 1}`,
+          sourceType: 'web_discovery_candidate',
+          sourceDomain,
+          title: title || url,
+          url,
+          snippet: content.slice(0, 700),
+          brand: candidateBrand,
+          model,
+          badge: candidateBrand
+            ? `Possível fonte oficial ${candidateBrand}`
+            : 'Candidato encontrado na internet',
+          specs: null,
+          evidence: {
+            source_url: url,
+            source_domain: sourceDomain,
+            extraction_status: 'pending',
+            match_status: 'candidate',
+            discovery_provider: 'tavily',
+            search_query: searchQuery,
+            official_domain_match: Boolean(candidateBrand),
+          },
+        })
+      }
+
+      for (const result of results) addCandidate(result)
+    }
+  } else if (!sourceBrand && !autoDiscovery) {
+    return emptyResponse(
+      'not_configured',
+      `A pesquisa aceita a marca "${requestedBrand}", mas ainda não há fonte oficial configurada para ela. Os campos técnicos permanecem vazios.`,
+    )
   }
 
   if (sourceBrand === 'BERMO') {
@@ -363,11 +530,20 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
     addCandidate(result)
   }
 
+  const discoveredBrands = []
+  for (const result of results) {
+    if (result.brand && discoveredBrands.indexOf(result.brand) === -1)
+      discoveredBrands.push(result.brand)
+  }
   const status = results.length > 0 ? 'found' : 'not_found'
   const message =
     results.length > 0
-      ? `Fonte oficial da ${sourceBrand} localizada para "${model}". Revise a fonte antes de extrair ou aplicar dados.`
-      : `Nenhuma fonte oficial da ${sourceBrand} foi localizada para "${model}". Os campos técnicos permanecem vazios.`
+      ? autoDiscovery
+        ? `Localizados ${results.length} candidatos para "${model}"${discoveredBrands.length > 0 ? `; possíveis fabricantes: ${discoveredBrands.join(', ')}` : ''}. Revise as fontes antes de extrair ou aplicar dados.`
+        : `Fonte oficial da ${sourceBrand} localizada para "${model}". Revise a fonte antes de extrair ou aplicar dados.`
+      : autoDiscovery
+        ? `Nenhuma fonte foi localizada para "${model}". Os campos técnicos permanecem vazios.`
+        : `Nenhuma fonte oficial da ${sourceBrand} foi localizada para "${model}". Os campos técnicos permanecem vazios.`
 
   if (researchRecord) {
     try {
@@ -385,7 +561,9 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
     found: results.length > 0,
     status,
     model,
-    brand: sourceBrand,
+    brand: sourceBrand || requestedBrand,
+    possibleBrands: discoveredBrands,
+    searchProvider: autoDiscovery ? 'tavily' : 'official_source',
     totalResults: results.length,
     results,
     recommendedSpecs: null,

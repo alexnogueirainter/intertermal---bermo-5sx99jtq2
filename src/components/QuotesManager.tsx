@@ -184,7 +184,7 @@ export function QuotesManager({
   const [quoteNumber, setQuoteNumber] = useState('')
   const [status, setStatus] = useState<QuoteStatus>('draft')
   const [equipmentModel, setEquipmentModel] = useState('')
-  const [equipmentBrand, setEquipmentBrand] = useState('BERMO')
+  const [equipmentBrand, setEquipmentBrand] = useState('')
   const [equipmentQuantity, setEquipmentQuantity] = useState(1)
   const [plateCount, setPlateCount] = useState<number | undefined>(undefined)
   const [plateMaterial, setPlateMaterial] = useState('')
@@ -214,7 +214,7 @@ export function QuotesManager({
     {
       id: 'eq-1',
       model: '',
-      brand: 'BERMO',
+      brand: '',
       quantity: 1,
       tag: '',
       serial_number: '',
@@ -481,7 +481,7 @@ export function QuotesManager({
             {
               id: `eq-${Date.now()}-1`,
               model: equipmentModel || '',
-              brand: equipmentBrand || 'BERMO',
+              brand: equipmentBrand || '',
               quantity: equipmentQuantity || 1,
               tag: '',
               serial_number: '',
@@ -497,8 +497,7 @@ export function QuotesManager({
     ).map((eq, idx) => ({
       id: eq.id || `eq-${idx + 1}`,
       model: eq.model != null ? String(eq.model).trim() : '',
-      brand: eq.brand != null && String(eq.brand).trim() ? String(eq.brand).trim() : 'BERMO',
-      series: eq.series || undefined,
+      brand: eq.brand != null && String(eq.brand).trim() ? String(eq.brand).trim() : '',      series: eq.series || undefined,
       quantity: Math.max(1, Number(eq.quantity) || 1),
       tag: eq.tag || undefined,
       serial_number: eq.serial_number || undefined,
@@ -542,7 +541,7 @@ export function QuotesManager({
     const primaryEq = sanitizedEquipments[0] || {
       id: 'eq-1',
       model: equipmentModel || '',
-      brand: equipmentBrand || 'BERMO',
+      brand: equipmentBrand || '',
       quantity: equipmentQuantity || 1,
       plate_count: plateCount,
       plate_material: plateMaterial || '',
@@ -569,7 +568,7 @@ export function QuotesManager({
       approval_token: approvalToken || undefined,
       status,
       equipments: sanitizedEquipments,
-      equipment_brand: primaryEq.brand || equipmentBrand || 'BERMO',
+      equipment_brand: primaryEq.brand || equipmentBrand || '',
       equipment_model: primaryEq.model || equipmentModel || '',
       equipment_quantity: primaryEq.quantity || equipmentQuantity || 1,
       plate_count: primaryEq.plate_count ?? plateCount,
@@ -688,7 +687,7 @@ export function QuotesManager({
           productCode: primaryEq.model || equipmentModel || '',
           productName: primaryEq.model || equipmentModel || '',
           productModel: primaryEq.model || equipmentModel || '',
-          productBrand: primaryEq.brand || equipmentBrand || 'BERMO',
+          productBrand: primaryEq.brand || equipmentBrand || '',
           fluidType: workFluid || '',
           pipeMeasurement: primaryEq.connection_size || connectionSize || '',
           platesCount: String(primaryEq.plate_count ?? plateCount ?? ''),
@@ -952,7 +951,7 @@ export function QuotesManager({
       {
         id: `eq-${Date.now()}-${prev.length + 1}`,
         model: '',
-        brand: 'BERMO',
+        brand: '',
         quantity: 1,
         tag: '',
         serial_number: '',
@@ -974,7 +973,7 @@ export function QuotesManager({
       const next = prev.filter((_, idx) => idx !== index)
       if (index === 0 && next[0]) {
         setEquipmentModel(next[0].model || '')
-        setEquipmentBrand(next[0].brand || 'BERMO')
+        setEquipmentBrand(next[0].brand || '')
         setEquipmentQuantity(next[0].quantity || 1)
         setPlateCount(next[0].plate_count)
         setPlateMaterial(next[0].plate_material || '')
@@ -1173,8 +1172,7 @@ export function QuotesManager({
     setWebSearchMessage('')
     try {
       const activeEq = equipments[webSearchActiveIndex]
-      const brand = activeEq?.brand || equipmentBrand || ''
-      const res = await searchEquipmentWeb(cleanQuery, brand, cleanQuery)
+      const brand = activeEq?.brand || equipmentBrand || ''      const res = await searchEquipmentWeb(cleanQuery, brand, cleanQuery)
       if (res && res.results && res.results.length > 0) {
         setWebSearchResults(res.results)
         setWebSearchMessage(res.message || `Localizados ${res.results.length} resultados.`)
@@ -1374,7 +1372,7 @@ export function QuotesManager({
   const handleSelectCatalogItem = (index: number, item: EquipmentCatalogItem) => {
     const patch: Partial<QuoteEquipmentItem> = {
       model: item.model,
-      brand: item.brand || 'BERMO',
+      brand: item.brand || '',
     }
 
     if (item.plate_count && item.plate_count > 0) {
@@ -1421,7 +1419,7 @@ export function QuotesManager({
     setQuoteNumber(quote.quote_number || '')
     setStatus(quote.status || 'draft')
     setEquipmentModel(quote.equipment_model || '')
-    setEquipmentBrand(quote.equipment_brand || 'BERMO')
+    setEquipmentBrand(quote.equipment_brand || '')
     setEquipmentQuantity(quote.equipment_quantity || 1)
     setPlateCount(quote.plate_count ?? undefined)
     setPlateMaterial(quote.plate_material || '')
@@ -1501,7 +1499,7 @@ export function QuotesManager({
         {
           id: `eq-${quote.id || 'item'}-1`,
           model: quote.equipment_model || '',
-          brand: quote.equipment_brand || 'BERMO',
+          brand: quote.equipment_brand || '',
           quantity: quote.equipment_quantity || 1,
           tag: '',
           serial_number: '',
@@ -2909,8 +2907,8 @@ export function QuotesManager({
                           eq.brand != null && eq.brand !== ''
                             ? eq.brand
                             : isPrimary
-                              ? equipmentBrand || 'BERMO'
-                              : 'BERMO'
+                              ? equipmentBrand || ''
+                              : ''
                         const currentQty =
                           eq.quantity != null ? eq.quantity : isPrimary ? equipmentQuantity || 1 : 1
                         const currentPlateCount = eq.plate_count
@@ -3174,7 +3172,7 @@ export function QuotesManager({
                                   onChange={(e) =>
                                     handleUpdateEquipment(eqIdx, { brand: e.target.value })
                                   }
-                                  placeholder="Ex: BERMO / Alfa Laval"
+                                  placeholder="Opcional: BERMO / Alfa Laval"
                                   className="text-xs h-8"
                                 />
                               </div>
