@@ -314,16 +314,58 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-specs-extract', (e) => {
   if (weightMatch) addField('weightKg', weightMatch.value, weightMatch.sourceText, 'kg')
 
   const dimensionsMatch = firstMatch([
-    /Dimens(?:ões|oes|ions)\s*[:\-]?\s*([^\n|]{3,220})/i,
+    /Dimens(?:ões|oes|ions)\s*[:\-]?\s*((?!Modelo(?:\s|$))[^\n|]{3,220})/i,
     /(?:height|altura)[^\n|]{0,80}(?:width|largura)[^\n|]{0,80}(?:length|comprimento)[^\n|]{0,80}/i,
   ])
-  if (dimensionsMatch)
+  if (dimensionsMatch && dimensionsMatch.value.trim().toLowerCase() !== 'modelo') {
     addField('plateDimensions', dimensionsMatch.value, dimensionsMatch.sourceText, 'mm')
+  }
 
   const maxAreaMatch = firstMatch([
     /(?:[ÁA]rea|Area)\s+(?:M[aá]xima|Maximum)\s+(?:de\s+Transfer[eê]ncia|Transfer\s*Area)\s*[:\-]?\s*([0-9]+(?:[.,][0-9]+)?\s*m[²2])/i,
   ])
   if (maxAreaMatch) addField('maxTransferArea', maxAreaMatch.value, maxAreaMatch.sourceText, 'm²')
+
+  // Documentos Alfa Laval costumam publicar tabelas em duas colunas.
+  const alfaPlateMaterialMatch = firstMatch([
+    /Heat\s+transfer\s+plate,?\s*Single\s+plate\s*:\s*([^\n|]{2,180})/i,
+    /Heat\s+transfer\s+plate[^\n|]{0,80}Material\s*[:\-]\s*([^\n|]{2,180})/i,
+  ])
+  if (!specs.plateMaterial && alfaPlateMaterialMatch) {
+    addField('plateMaterial', alfaPlateMaterialMatch.value, alfaPlateMaterialMatch.sourceText)
+  }
+
+  const alfaGasketMaterialMatch = firstMatch([
+    /Field\s+gasket\s*:\s*([^\n|]{2,180})/i,
+    /Gasket\s+material\s*[:\-]\s*([^\n|]{2,180})/i,
+  ])
+  if (!specs.gasketMaterial && alfaGasketMaterialMatch) {
+    addField('gasketMaterial', alfaGasketMaterialMatch.value, alfaGasketMaterialMatch.sourceText)
+  }
+
+  const alfaConnectionMatch = firstMatch([
+    /Threaded\s+port\s*([^\n|]{2,120})/i,
+    /Pipe\s+connections?\s*[:\-]?\s*([^\n|]{2,120})/i,
+  ])
+  if (!specs.connection && alfaConnectionMatch) {
+    addField('connection', alfaConnectionMatch.value, alfaConnectionMatch.sourceText)
+  }
+
+  const alfaTemperatureMatch = firstMatch([
+    /Temperature\s+range[\s\S]{0,180}?From\s+[-0-9.,]+\s+to\s+([0-9]+(?:[.,][0-9]+)?)[^\n|]{0,40}/i,
+    /Temperature\s+range\s*[:\-]?\s*([^\n|]{3,160})/i,
+  ])
+  if (!specs.maxTemperature && alfaTemperatureMatch) {
+    addField('maxTemperature', alfaTemperatureMatch.value, alfaTemperatureMatch.sourceText, '°C')
+  }
+
+  const alfaPressureMatch = firstMatch([
+    /Pressure\s+range[\s\S]{0,180}?to\s+([0-9]+(?:[.,][0-9]+)?)[^\n|]{0,40}/i,
+    /Pressure\s+range\s*[:\-]?\s*([^\n|]{3,180})/i,
+  ])
+  if (!specs.pressure && alfaPressureMatch) {
+    addField('pressure', alfaPressureMatch.value, alfaPressureMatch.sourceText, 'barg')
+  }
 
   // BERMO publica alguns dados em linhas de tabela sem dois-pontos.
   if (hostname === 'bermo.com.br' || hostname.endsWith('.bermo.com.br')) {
