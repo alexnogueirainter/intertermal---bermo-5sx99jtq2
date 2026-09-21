@@ -1,3 +1,4 @@
+// Busca automática multi-fabricante: catálogo interno primeiro, Tavily depois.
 routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => {
   let body = {}
   try {
