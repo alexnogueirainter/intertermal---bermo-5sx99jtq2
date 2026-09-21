@@ -31,6 +31,13 @@ export const fieldVisitsService = {
     })
   },
 
+  async getRecentSummary(limit = 100): Promise<FieldVisitRecord[]> {
+    return await pb.collection('field_visits').getFullList<FieldVisitRecord>({
+      sort: '-created',
+      requestKey: null,
+    })
+  },
+
   async getById(id: string): Promise<FieldVisitRecord> {
     return await pb.collection('field_visits').getOne<FieldVisitRecord>(id)
   },

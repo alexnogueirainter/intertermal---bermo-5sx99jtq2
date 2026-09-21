@@ -42,6 +42,7 @@ import {
   activitiesService,
   productsService,
 } from '@/services/crm-extras'
+import { fieldVisitsService, type FieldVisitRecord } from '@/services/field-visits'
 import type {
   ClientRecord,
   DealRecord,
@@ -106,6 +107,8 @@ export default function IndexPage() {
   const [services, setServices] = useState<ServiceRecord[]>([])
   const [serviceOrders, setServiceOrders] = useState<ServiceOrderRecord[]>([])
   const [activities, setActivities] = useState<ActivityRecord[]>([])
+  const [fieldVisits, setFieldVisits] = useState<FieldVisitRecord[]>([])
+  const [fieldVisitsError, setFieldVisitsError] = useState(false)
 
   // Selection states for cross-view navigation
   const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(null)
@@ -134,6 +137,7 @@ export default function IndexPage() {
         servicesRes,
         serviceOrdersRes,
         activitiesRes,
+        fieldVisitsRes,
       ] = await Promise.all([
         clientsService.getAll(),
         dealsService.getAll(),
@@ -143,6 +147,11 @@ export default function IndexPage() {
         servicesExtraService.getAll(),
         serviceOrdersService.getAll().catch(() => [] as ServiceOrderRecord[]),
         activitiesService.getAll(),
+        fieldVisitsService.getAll().catch((err) => {
+          console.warn('Erro ao carregar visitas a campo no dashboard:', err)
+          setFieldVisitsError(true)
+          return [] as FieldVisitRecord[]
+        }),
       ])
 
       setClients(clientsRes)
@@ -153,6 +162,7 @@ export default function IndexPage() {
       setServices(servicesRes)
       setServiceOrders(serviceOrdersRes)
       setActivities(activitiesRes)
+      setFieldVisits(fieldVisitsRes)
 
       // Sincronização em lote das propostas existentes com o pipeline comercial
       // Idempotente: atualiza deals vinculados ou cria os faltantes sem alterar os cálculos
@@ -250,6 +260,23 @@ export default function IndexPage() {
       setServiceOrders((prev) => prev.map((o) => (o.id === record.id ? { ...o, ...record } : o)))
     } else if (e.action === 'delete') {
       setServiceOrders((prev) => prev.filter((o) => o.id !== record.id))
+    }
+  })
+
+  // Inscrição em Realtime para a coleção 'field_visits'
+  useRealtime<any>('field_visits', (e) => {
+    const record = e.record as unknown as FieldVisitRecord
+    if (e.action === 'create') {
+      setFieldVisits((prev) => {
+        const exists = prev.some((v) => v.id === record.id)
+        return exists
+          ? prev.map((v) => (v.id === record.id ? { ...v, ...record } : v))
+          : [record, ...prev]
+      })
+    } else if (e.action === 'update') {
+      setFieldVisits((prev) => prev.map((v) => (v.id === record.id ? { ...v, ...record } : v)))
+    } else if (e.action === 'delete') {
+      setFieldVisits((prev) => prev.filter((v) => v.id !== record.id))
     }
   })
 
@@ -977,6 +1004,8 @@ export default function IndexPage() {
               tickets={tickets}
               services={services}
               serviceOrders={serviceOrders}
+              fieldVisits={fieldVisits}
+              fieldVisitsError={fieldVisitsError}
               onNavigate={(tab) => setActiveTab(tab as ActiveTab)}
             />
           )}
