@@ -1,78 +1,132 @@
-routerAdd(
-  'POST',
-  '/backend/v1/intertermal/equipment-official-research',
-  (e) => {
-    const body = e.requestInfo().body || {}
-    const requestedModel = String(body.model || '').trim()
-    const requestedBrand = String(body.brand || '').trim()
-    const customQuery = String(body.query || '').trim()
+routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => {
+  let body = {}
+  try {
+    body = e.requestInfo().body || {}
+  } catch (_) {
+    body = {}
+  }
 
-    if (!requestedModel && !customQuery) {
-      return e.json(400, {
-        success: false,
-        found: false,
-        status: 'invalid_request',
-        results: [],
-        message: 'Modelo ou consulta é obrigatório.',
-      })
-    }
+  const requestedModel = String(body.model || '').trim()
+  const requestedBrand = String(body.brand || '').trim()
+  const customQuery = String(body.query || '').trim()
 
-    const model = requestedModel || customQuery
-    const normalizedBrand = requestedBrand.toLowerCase()
-    const researchCollection = $app.findCollectionByNameOrId('equipment_researches')
-    const candidateCollection = $app.findCollectionByNameOrId('equipment_research_candidates')
-    let researchRecord = null
-    const requestedBy = e.auth ? String(e.auth.id || '') : ''
+  if (!requestedModel && !customQuery) {
+    return e.json(400, {
+      success: false,
+      found: false,
+      status: 'invalid_request',
+      results: [],
+      message: 'Informe o fabricante e o modelo do equipamento.',
+    })
+  }
 
-    try {
-      researchRecord = new Record(researchCollection)
-      researchRecord.set('requested_model', model)
-      researchRecord.set('requested_brand', requestedBrand)
-      researchRecord.set('query', customQuery || model)
-      researchRecord.set('status', 'searching')
-      researchRecord.set('requested_by', requestedBy)
-      researchRecord.set('results_json', [])
-      $app.save(researchRecord)
-    } catch (persistErr) {
-      $app.logger().error('Falha ao registrar pesquisa técnica', 'error', String(persistErr))
-    }
+  if (!requestedBrand) {
+    return e.json(400, {
+      success: false,
+      found: false,
+      status: 'invalid_request',
+      model: requestedModel || customQuery,
+      brand: '',
+      results: [],
+      message: 'Informe o fabricante antes de pesquisar o modelo.',
+    })
+  }
 
-    const researchId = researchRecord ? String(researchRecord.id || '') : ''
-    const emptyResponse = (status, message) => {
-      if (researchRecord) {
-        try {
-          researchRecord.set('status', status)
-          researchRecord.set('results_json', [])
-          researchRecord.set('completed_at', new Date().toISOString())
-          researchRecord.set('error_message', status === 'unavailable' ? message : '')
-          $app.save(researchRecord)
-        } catch (persistErr) {
-          $app.logger().error('Falha ao atualizar pesquisa técnica', 'error', String(persistErr))
-        }
+  const model = requestedModel || customQuery
+  const normalizedBrand = requestedBrand
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[._-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  let sourceBrand = ''
+  if (normalizedBrand === 'bermo' || normalizedBrand === 'bermo brasil') {
+    sourceBrand = 'BERMO'
+  } else if (
+    normalizedBrand === 'alfa laval' ||
+    normalizedBrand === 'alfalaval' ||
+    normalizedBrand === 'alfa-laval'
+  ) {
+    sourceBrand = 'Alfa Laval'
+  }
+
+  const researchCollection = $app.findCollectionByNameOrId('equipment_researches')
+  const candidateCollection = $app.findCollectionByNameOrId('equipment_research_candidates')
+  let researchRecord = null
+  const requestedBy = e.auth ? String(e.auth.id || '') : ''
+
+  try {
+    researchRecord = new Record(researchCollection)
+    researchRecord.set('requested_model', model)
+    researchRecord.set('requested_brand', requestedBrand)
+    researchRecord.set('query', customQuery || model)
+    researchRecord.set('status', 'searching')
+    researchRecord.set('requested_by', requestedBy)
+    researchRecord.set('results_json', [])
+    $app.save(researchRecord)
+  } catch (persistErr) {
+    $app.logger().error('Falha ao registrar pesquisa técnica', 'error', String(persistErr))
+  }
+
+  const researchId = researchRecord ? String(researchRecord.id || '') : ''
+  const emptyResponse = (status, message) => {
+    if (researchRecord) {
+      try {
+        researchRecord.set('status', status)
+        researchRecord.set('results_json', [])
+        researchRecord.set('completed_at', new Date().toISOString())
+        researchRecord.set('error_message', status === 'unavailable' ? message : '')
+        $app.save(researchRecord)
+      } catch (persistErr) {
+        $app.logger().error('Falha ao atualizar pesquisa técnica', 'error', String(persistErr))
       }
-      return e.json(200, {
-        success: true,
-        found: false,
-        status,
-        model,
-        brand: requestedBrand || 'BERMO',
-        totalResults: 0,
-        results: [],
-        recommendedSpecs: null,
-        message,
-        researchId,
-      })
     }
+    return e.json(200, {
+      success: true,
+      found: false,
+      status,
+      model,
+      brand: sourceBrand || requestedBrand,
+      totalResults: 0,
+      results: [],
+      recommendedSpecs: null,
+      message,
+      researchId,
+    })
+  }
 
-    // Esta primeira fonte oficial é restrita ao site da BERMO.
-    // Outros fabricantes entram em etapas posteriores, com fontes próprias.
-    if (normalizedBrand && normalizedBrand !== 'bermo' && normalizedBrand !== 'outro') {
-      return emptyResponse(
-        'not_found',
-        'Nenhuma fonte oficial configurada para esta marca nesta etapa. Os campos técnicos permanecem vazios.',
-      )
+  if (!sourceBrand) {
+    return emptyResponse(
+      'not_configured',
+      `A pesquisa aceita a marca "${requestedBrand}", mas ainda não há fonte oficial configurada para ela. Os campos técnicos permanecem vazios.`,
+    )
+  }
+
+  const results = []
+  const addCandidate = (result) => {
+    try {
+      const candidate = new Record(candidateCollection)
+      candidate.set('research_id', researchId)
+      candidate.set('source_url', result.url)
+      candidate.set('source_title', result.title)
+      candidate.set('source_type', result.sourceType)
+      candidate.set('source_domain', result.sourceDomain)
+      candidate.set('resolved_brand', result.brand)
+      candidate.set('resolved_model', result.model)
+      candidate.set('match_status', result.evidence.match_status || 'exact')
+      candidate.set('confirmed_specs', {})
+      candidate.set('evidence', result.evidence)
+      candidate.set('approval_status', 'needs_review')
+      $app.save(candidate)
+      result.id = String(candidate.id || result.id)
+    } catch (persistErr) {
+      $app.logger().error('Falha ao registrar candidato técnico', 'error', String(persistErr))
     }
+  }
 
+  if (sourceBrand === 'BERMO') {
     const catalogUrl = 'https://bermo.com.br/produtos/troca-termica'
     let catalogResponse
     try {
@@ -121,7 +175,6 @@ routerAdd(
       ? new RegExp('(^|[^A-Z0-9])' + modelPattern + '([^A-Z0-9]|$)', 'i')
       : null
     const linkPattern = /<a\b[^>]*href\s*=\s*["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
-    const results = []
     let linkMatch
 
     while ((linkMatch = linkPattern.exec(html)) !== null) {
@@ -150,7 +203,6 @@ routerAdd(
       }
       if (duplicate) continue
 
-      // Confirma que a página específica também está acessível antes de criar o candidato.
       let detailResponse
       try {
         detailResponse = $http.send({
@@ -170,6 +222,7 @@ routerAdd(
       const result = {
         id: `official-${Date.now()}-${results.length + 1}`,
         sourceType: 'official_product_page',
+        sourceDomain: 'bermo.com.br',
         title: label || `BERMO ${model}`,
         url: href,
         snippet: 'Página oficial do fabricante localizada. Extração técnica pendente de revisão.',
@@ -181,59 +234,137 @@ routerAdd(
           source_url: href,
           source_catalog_url: catalogUrl,
           extraction_status: 'pending',
+          match_status: 'exact',
         },
       }
       results.push(result)
+      addCandidate(result)
+    }
+  }
 
-      try {
-        const candidate = new Record(candidateCollection)
-        candidate.set('research_id', researchId)
-        candidate.set('source_url', href)
-        candidate.set('source_title', result.title)
-        candidate.set('source_type', result.sourceType)
-        candidate.set('source_domain', 'bermo.com.br')
-        candidate.set('resolved_brand', 'BERMO')
-        candidate.set('resolved_model', model)
-        candidate.set('match_status', 'exact')
-        candidate.set('confirmed_specs', {})
-        candidate.set('evidence', result.evidence)
-        candidate.set('approval_status', 'needs_review')
-        $app.save(candidate)
-        result.id = String(candidate.id || result.id)
-      } catch (persistErr) {
-        $app.logger().error('Falha ao registrar candidato técnico', 'error', String(persistErr))
+  if (sourceBrand === 'Alfa Laval') {
+    const catalogUrl =
+      'https://www.alfalaval.com/products/heat-transfer/plate-heat-exchangers/plate-heat-exchangers/'
+    const normalizedModel = model
+      .toUpperCase()
+      .replace(/[\s\-_]+/g, '')
+      .replace(/[^A-Z0-9]/g, '')
+    const documentByFamily = {
+      M15: 'https://www.alfalaval.com/globalassets/documents/microsites/heating-and-cooling-hub/pd-leaflets---gasketed/m15.pdf',
+      M10: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/industrial-sw/alfa-laval-m10-w_en.pdf',
+      TS20: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/industrial/productleaflet_ts20_ptbr.pdf',
+      T25: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/industrial/25_product-leaflet_en.pdf',
+      T21: 'https://assets.alfalaval.com/documents/pe2a6be11/alfa-laval-t21-product-leaflet-en.pdf',
+      T20: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/instruction-manuals/instruction-manual-alfa-laval-industrial-line-m15-tl10-tl15-t20-ts20-t25-mx25-ma30-widegap-100-english.pdf',
+      TL10: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/instruction-manuals/instruction-manual-alfa-laval-industrial-line-m15-tl10-tl15-t20-ts20-t25-mx25-ma30-widegap-100-english.pdf',
+      TL15: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/instruction-manuals/instruction-manual-alfa-laval-industrial-line-m15-tl10-tl15-t20-ts20-t25-mx25-ma30-widegap-100-english.pdf',
+      MX25: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/instruction-manuals/instruction-manual-alfa-laval-industrial-line-m15-tl10-tl15-t20-ts20-t25-mx25-ma30-widegap-100-english.pdf',
+      MA30: 'https://www.alfalaval.com/globalassets/documents/products/heat-transfer/plate-heat-exchangers/gasketed-plate-and-frame-heat-exchangers/instruction-manuals/instruction-manual-alfa-laval-industrial-line-m15-tl10-tl15-t20-ts20-t25-mx25-ma30-widegap-100-english.pdf',
+      ACH70X:
+        'https://shop.alfalaval.com/en-us/brazed-fusion-bonded-plate-heat-exchangers--1385381/ach70x-62-plates-brazed-plate-heat-exchanger--1259551-',
+    }
+
+    let family = ''
+    const familyKeys = Object.keys(documentByFamily)
+    for (const key of familyKeys) {
+      if (normalizedModel.indexOf(key) === 0) {
+        family = key
+        break
       }
     }
 
-    const status = results.length > 0 ? 'found' : 'not_found'
-    const message =
-      results.length > 0
-        ? `Fonte oficial da BERMO localizada para "${model}". Revise antes de extrair ou aplicar dados.`
-        : `Nenhuma página oficial da BERMO foi localizada para "${model}". Os campos técnicos permanecem vazios.`
-
-    if (researchRecord) {
-      try {
-        researchRecord.set('status', status)
-        researchRecord.set('results_json', results)
-        researchRecord.set('completed_at', new Date().toISOString())
-        $app.save(researchRecord)
-      } catch (persistErr) {
-        $app.logger().error('Falha ao concluir pesquisa técnica', 'error', String(persistErr))
-      }
+    if (!family) {
+      return emptyResponse(
+        'not_found',
+        `Nenhum documento oficial da Alfa Laval foi configurado para o modelo "${model}" nesta etapa. Os campos técnicos permanecem vazios.`,
+      )
     }
 
-    return e.json(200, {
-      success: true,
-      found: results.length > 0,
-      status,
+    const sourceUrl = documentByFamily[family]
+    let documentResponse
+    try {
+      documentResponse = $http.send({
+        url: sourceUrl,
+        method: 'GET',
+        headers: {
+          Accept: 'application/pdf,text/html,application/xhtml+xml',
+          'User-Agent': 'Intertermal-Technical-Research/1.0',
+        },
+        timeout: 20,
+      })
+    } catch (httpErr) {
+      $app.logger().error('Falha de transporte na fonte Alfa Laval', 'error', String(httpErr))
+      return emptyResponse(
+        'unavailable',
+        'A fonte oficial da Alfa Laval não pôde ser consultada agora. Tente novamente.',
+      )
+    }
+
+    if (!documentResponse || documentResponse.statusCode !== 200) {
+      const statusCode = documentResponse ? documentResponse.statusCode : 0
+      $app.logger().warn('Fonte Alfa Laval indisponível', 'statusCode', statusCode)
+      return emptyResponse(
+        'unavailable',
+        'A fonte oficial da Alfa Laval não pôde ser validada agora. Tente novamente.',
+      )
+    }
+
+    const matchStatus = normalizedModel === family ? 'exact' : 'family_match'
+    const result = {
+      id: `official-${Date.now()}-1`,
+      sourceType:
+        sourceUrl.indexOf('.pdf') !== -1 ? 'official_product_document' : 'official_product_page',
+      sourceDomain:
+        sourceUrl.indexOf('shop.alfalaval.com') !== -1 ? 'shop.alfalaval.com' : 'alfalaval.com',
+      title: `Alfa Laval ${family} — fonte oficial`,
+      url: sourceUrl,
+      snippet:
+        matchStatus === 'exact'
+          ? 'Documento oficial do fabricante localizado para o modelo informado. Extração técnica pendente de revisão.'
+          : `Documento oficial da família ${family} localizado. Confirme a variante do equipamento antes de usar qualquer dado.`,
+      brand: 'Alfa Laval',
       model,
-      brand: 'BERMO',
-      totalResults: results.length,
-      results,
-      recommendedSpecs: null,
-      message,
-      researchId,
-    })
-  },
-  $apis.requireAuth(),
-)
+      badge: 'Fonte oficial Alfa Laval',
+      specs: null,
+      evidence: {
+        source_url: sourceUrl,
+        source_catalog_url: catalogUrl,
+        extraction_status: 'pending',
+        match_status: matchStatus,
+        matched_family: family,
+      },
+    }
+    results.push(result)
+    addCandidate(result)
+  }
+
+  const status = results.length > 0 ? 'found' : 'not_found'
+  const message =
+    results.length > 0
+      ? `Fonte oficial da ${sourceBrand} localizada para "${model}". Revise a fonte antes de extrair ou aplicar dados.`
+      : `Nenhuma fonte oficial da ${sourceBrand} foi localizada para "${model}". Os campos técnicos permanecem vazios.`
+
+  if (researchRecord) {
+    try {
+      researchRecord.set('status', status)
+      researchRecord.set('results_json', results)
+      researchRecord.set('completed_at', new Date().toISOString())
+      $app.save(researchRecord)
+    } catch (persistErr) {
+      $app.logger().error('Falha ao concluir pesquisa técnica', 'error', String(persistErr))
+    }
+  }
+
+  return e.json(200, {
+    success: true,
+    found: results.length > 0,
+    status,
+    model,
+    brand: sourceBrand,
+    totalResults: results.length,
+    results,
+    recommendedSpecs: null,
+    message,
+    researchId,
+  })
+})

@@ -99,12 +99,7 @@ import {
   fetchCepCoordinates,
   haversineDistance,
 } from '@/lib/mapeia-calculator'
-import {
-  quotesService,
-  searchEquipmentSpecsOnline,
-  searchEquipmentWeb,
-  EquipmentWebSearchResultItem,
-} from '@/services/quotes'
+import { quotesService, searchEquipmentWeb, EquipmentWebSearchResultItem } from '@/services/quotes'
 import { getStandardServiceMethodology } from '@/data/bermo-catalog'
 import { equipmentCatalogService, EquipmentCatalogItem } from '@/services/equipment-catalog'
 import { clientsService } from '@/services/clients'
@@ -1152,30 +1147,11 @@ export function QuotesManager({
           }
         }
       } else {
-        // Fallback para endpoint de specs se webResult vier vazio
-        const singleResult = await searchEquipmentSpecsOnline(model, brand)
-        if (singleResult && singleResult.found && singleResult.specs) {
-          const fallbackItem: EquipmentWebSearchResultItem = {
-            id: 'fb-specs-1',
-            sourceType: 'specs_catalog',
-            title:
-              singleResult.name || `${singleResult.brand || brand} ${singleResult.model || model}`,
-            url: singleResult.source || 'https://bermo.com.br',
-            snippet: singleResult.message || 'Dados técnicos oficiais obtidos pelo servidor.',
-            brand: singleResult.brand,
-            model: singleResult.model,
-            specs: singleResult.specs,
-            badge: 'Base Técnica BERMO',
-          }
-          setWebSearchResults([fallbackItem])
-          setWebSearchMessage('Especificações localizadas no catálogo técnico interno.')
-          applySpecsToEquipment(index, singleResult.specs, singleResult.brand, singleResult.model)
-        } else {
-          setWebSearchResults([])
-          setWebSearchMessage(
-            `Nenhum dado encontrado no servidor para "${model}". Você pode preencher manualmente ou copiar o termo abaixo para pesquisa manual.`,
-          )
-        }
+        setWebSearchResults([])
+        setWebSearchMessage(
+          webResult?.message ||
+            `Nenhuma fonte oficial retornou um resultado para "${brand} ${model}". Os campos técnicos permanecem vazios.`,
+        )
       }
     } catch (err) {
       console.warn('Erro na busca server-side de especificações:', err)
@@ -3018,7 +2994,7 @@ export function QuotesManager({
                                   <Label className="text-xs font-semibold flex items-center gap-1.5">
                                     <span>Modelo do Equipamento</span>
                                     <span className="text-[10px] text-teal-700 dark:text-teal-400 font-normal">
-                                      (Catálogo BERMO integrado)
+                                      (catálogo multi-fabricante)
                                     </span>
                                   </Label>
                                   {currentModel && (
@@ -3069,8 +3045,8 @@ export function QuotesManager({
                                       <div className="p-2 bg-teal-50/80 dark:bg-teal-950/60 border-b border-teal-100 dark:border-teal-900/60 flex items-center justify-between text-[11px]">
                                         <span className="font-semibold text-teal-900 dark:text-teal-200 flex items-center gap-1">
                                           <Sparkles className="h-3 w-3 text-teal-600" />
-                                          Base de dados BERMO ({catalogSuggestions.length}{' '}
-                                          encontrado{catalogSuggestions.length !== 1 ? 's' : ''})
+                                          Catálogo interno ({catalogSuggestions.length} encontrado
+                                          {catalogSuggestions.length !== 1 ? 's' : ''})
                                         </span>
                                         <span className="text-[10px] text-muted-foreground">
                                           Clique para autocompletar
@@ -3169,7 +3145,7 @@ export function QuotesManager({
                                         <div className="p-3 text-center space-y-2">
                                           <p className="text-xs text-muted-foreground">
                                             Nenhum equipamento com &ldquo;{currentModel}&rdquo;
-                                            encontrado na base local BERMO.
+                                            encontrado no catálogo interno.
                                           </p>
                                           <Button
                                             type="button"

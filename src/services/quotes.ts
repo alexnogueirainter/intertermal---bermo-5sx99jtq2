@@ -328,6 +328,7 @@ export interface EquipmentWebSearchResponse {
     | 'found'
     | 'partial'
     | 'not_found'
+    | 'not_configured'
     | 'unavailable'
     | string
   researchId?: string
@@ -383,7 +384,6 @@ export async function searchEquipmentWeb(
       {
         method: 'POST',
         headers: {
-          Authorization: pb.authStore.token,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ model: cleanModel, brand: cleanBrand, query: cleanQuery }),
@@ -391,40 +391,7 @@ export async function searchEquipmentWeb(
     )
     return res
   } catch (err) {
-    console.warn('Erro ao consultar /backend/v1/intertermal/equipment-web-search:', err)
-    // Tenta fallback com a rota básica de specs
-    try {
-      const fallbackSpecs = await searchEquipmentSpecsOnline(cleanModel, cleanBrand)
-      if (fallbackSpecs && fallbackSpecs.found) {
-        return {
-          success: true,
-          found: true,
-          model: cleanModel,
-          brand: fallbackSpecs.brand || cleanBrand || 'BERMO',
-          totalResults: 1,
-          results: [
-            {
-              id: 'fallback-1',
-              sourceType: 'backend_fallback',
-              title:
-                fallbackSpecs.name ||
-                `${fallbackSpecs.brand || 'BERMO'} ${fallbackSpecs.model || cleanModel}`,
-              url: fallbackSpecs.source || 'https://bermo.com.br',
-              snippet: fallbackSpecs.message || 'Especificações recuperadas via servidor.',
-              brand: fallbackSpecs.brand,
-              model: fallbackSpecs.model,
-              specs: fallbackSpecs.specs,
-              badge: 'Servidor Intertermal',
-            },
-          ],
-          recommendedSpecs: fallbackSpecs.specs,
-          message: fallbackSpecs.message,
-        }
-      }
-    } catch {
-      /* intentionally ignored */
-    }
-
+    console.warn('Erro ao consultar a fonte oficial multi-fabricante:', err)
     return {
       success: false,
       found: false,
@@ -433,7 +400,7 @@ export async function searchEquipmentWeb(
       totalResults: 0,
       results: [],
       message:
-        'Não foi possível conectar ao serviço de busca no momento. Preencha manualmente os dados técnicos.',
+        'Não foi possível consultar a fonte oficial agora. Nenhum dado técnico foi aplicado; preencha manualmente ou tente novamente.',
     }
   }
 }
