@@ -390,7 +390,7 @@ export function QuotePdfPreviewDialog({
   const csllPercent = taxes.csll ?? quote.csll_rate ?? quote.pricing_config?.csllRate ?? 2.88
   const irpjPercent = taxes.irpj ?? quote.irpj_rate ?? quote.pricing_config?.irpjRate ?? 4.8
   const irDiffPercent =
-    taxes.irDiff ?? quote.ir_diff_rate ?? quote.pricing_config?.irDiffRate ?? 1.5
+    taxes.irDiff ?? quote.ir_diff_rate ?? quote.pricing_config?.irDiffRate ?? 5.0
 
   const totalTaxesPercent =
     taxes.totalTaxes ??

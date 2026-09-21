@@ -323,13 +323,13 @@ export function QuotesManager({
   const [serviceMargin, setServiceMargin] = useState(25)
   const [salesCommission, setSalesCommission] = useState(6)
   const [adminRate, setAdminRate] = useState(3)
-  const [taxRate, setTaxRate] = useState(14.83)
+  const [taxRate, setTaxRate] = useState(21.33)
   const [pisRate, setPisRate] = useState(0.65)
   const [cofinsRate, setCofinsRate] = useState(3.0)
   const [issRate, setIssRate] = useState(5.0)
   const [csllRate, setCsllRate] = useState(2.88)
   const [irpjRate, setIrpjRate] = useState(4.8)
-  const [irDiffRate, setIrDiffRate] = useState(1.5)
+  const [irDiffRate, setIrDiffRate] = useState(5.0)
 
   // Notas e Condições
   const [paymentTerms, setPaymentTerms] = useState('28 DDL faturado após entrega técnica')
@@ -958,8 +958,8 @@ export function QuotesManager({
     setIssRate(5.0)
     setCsllRate(2.88)
     setIrpjRate(4.8)
-    setIrDiffRate(1.5)
-    setTaxRate(17.83)
+    setIrDiffRate(5.0)
+    setTaxRate(21.33)
     setPaymentTerms('')
     setValidityDays(0)
     setTechnicalNotes('')
@@ -1831,7 +1831,7 @@ export function QuotesManager({
     setIssRate(quote.iss_rate ?? quote.pricing_config?.issRate ?? 5.0)
     setCsllRate(quote.csll_rate ?? quote.pricing_config?.csllRate ?? 2.88)
     setIrpjRate(quote.irpj_rate ?? quote.pricing_config?.irpjRate ?? 4.8)
-    setIrDiffRate(quote.ir_diff_rate ?? quote.pricing_config?.irDiffRate ?? 1.5)
+    setIrDiffRate(quote.ir_diff_rate ?? quote.pricing_config?.irDiffRate ?? 5.0)
     setPaymentTerms(quote.payment_terms || '28 DDL faturado após entrega técnica')
     setValidityDays(quote.validity_days || 15)
     setTechnicalNotes(quote.technical_notes || '')
@@ -5521,11 +5521,11 @@ export function QuotesManager({
                           setIssRate(5.0)
                           setCsllRate(2.88)
                           setIrpjRate(4.8)
-                          setIrDiffRate(1.5)
+                          setIrDiffRate(5.0)
                         }}
                         className="h-6 text-[10px] font-medium text-slate-500 hover:text-rose-600 px-2"
                       >
-                        Restaurar Alíquotas Padrão (17,83%)
+                        Restaurar Alíquotas Padrão (21,33%)
                       </Button>
                     </div>
                   </div>

@@ -46,6 +46,10 @@ export interface FieldVisitData {
   generalObservations: string
   equipments: EquipmentItem[]
   updatedAt: string
+  // Dados de sincronização com o CRM PocketBase
+  backendRecordId?: string
+  crmStatus?: 'rascunho' | 'enviada'
+  lastSentAt?: string
 }
 
 export const STORAGE_KEY_CURRENT_VISIT = 'intertermal_field_visit_draft_v1'

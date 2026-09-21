@@ -21,12 +21,19 @@ import {
   Wrench,
   FileText,
   Save,
+  Send,
+  Printer,
+  Loader2,
+  Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { toast } from '@/hooks/use-toast'
+import { fieldVisitsService, type FieldVisitRecord } from '@/services/field-visits'
+import { FieldVisitPdfDialog } from '@/components/FieldVisitPdfDialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -111,10 +118,89 @@ export default function FieldVisitPage() {
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved')
   const [quotaWarning, setQuotaWarning] = useState<string | null>(null)
   const [imageCompressingId, setImageCompressingId] = useState<string | null>(null)
+  const [isSendingToCrm, setIsSendingToCrm] = useState(false)
+  const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false)
 
   // Modais de confirmação
   const [isNewVisitDialogOpen, setIsNewVisitDialogOpen] = useState(false)
   const [equipmentToDelete, setEquipmentToDelete] = useState<string | null>(null)
+
+  // Envio ao CRM PocketBase
+  const handleSendToCrm = async () => {
+    // Validação mínima solicitada: nome do funcionário e/ou data
+    const trimmedEmployee = (visit.employeeName || '').trim()
+    const trimmedDate = (visit.date || '').trim()
+
+    if (!trimmedEmployee && !trimmedDate) {
+      toast({
+        title: 'Dados insuficientes',
+        description:
+          'Informe ao menos o nome do funcionário ou a data da visita para enviar ao CRM.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsSendingToCrm(true)
+    const nowIso = new Date().toISOString()
+
+    const payload: Partial<FieldVisitRecord> = {
+      employee_name: trimmedEmployee || 'Técnico Intertermal',
+      visit_date: trimmedDate || undefined,
+      start_time: visit.startTime || undefined,
+      end_time: visit.endTime || undefined,
+      duration: visit.visitDuration || undefined,
+      client_name: visit.clientName?.trim() || undefined,
+      client_role: visit.clientRole?.trim() || undefined,
+      client_contact: visit.clientContact?.trim() || undefined,
+      work_area: visit.clientWorkArea?.trim() || undefined,
+      work_type: visit.workType || undefined,
+      work_type_other: visit.workTypeOther?.trim() || undefined,
+      general_notes: visit.generalObservations?.trim() || undefined,
+      equipment: visit.equipments || [],
+      status: 'enviada',
+      sent_at: nowIso,
+    }
+
+    try {
+      let savedRecord: FieldVisitRecord
+      if (visit.backendRecordId) {
+        // Reenvio: atualiza o mesmo registro no PocketBase em vez de duplicar
+        savedRecord = await fieldVisitsService.update(visit.backendRecordId, payload)
+        toast({
+          title: 'Visita atualizada no CRM!',
+          description: `Os dados da visita foram sincronizados com sucesso no sistema.`,
+        })
+      } else {
+        // Primeiro envio: cria novo registro
+        savedRecord = await fieldVisitsService.create(payload)
+        toast({
+          title: 'Visita enviada ao CRM!',
+          description: `Visita técnica gravada com sucesso no CRM Intertermal.`,
+        })
+      }
+
+      // Atualiza o rascunho local mantendo tudo editável e marcando o envio
+      setVisit((prev) => ({
+        ...prev,
+        backendRecordId: savedRecord.id,
+        crmStatus: 'enviada',
+        lastSentAt: nowIso,
+        updatedAt: nowIso,
+      }))
+    } catch (err: any) {
+      console.error('Erro ao enviar visita ao CRM:', err)
+      toast({
+        title: 'Erro ao enviar ao CRM',
+        description:
+          err.message ||
+          'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSendingToCrm(false)
+    }
+  }
 
   // Reconhecimento de Voz (Speech Recognition)
   const [isRecording, setIsRecording] = useState(false)
@@ -380,28 +466,77 @@ export default function FieldVisitPage() {
               {saveStatus === 'saving' ? (
                 <>
                   <RotateCcw className="h-3 w-3 animate-spin text-amber-500" />
-                  <span className="hidden sm:inline">Salvando...</span>
+                  <span className="hidden md:inline">Salvando...</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                  <span className="hidden sm:inline font-medium text-emerald-700 dark:text-emerald-400">
+                  <span className="hidden md:inline font-medium text-emerald-700 dark:text-emerald-400">
                     Salvo
                   </span>
                 </>
               )}
             </div>
 
-            {/* Botão Nova Visita */}
+            {/* Botão Gerar PDF Resumo */}
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setIsNewVisitDialogOpen(true)}
-              className="text-xs h-9 border-slate-300 dark:border-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200"
+              onClick={() => setIsPdfDialogOpen(true)}
+              className="text-xs h-9 border-teal-300 dark:border-teal-800 text-teal-800 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950 font-semibold"
+              title="Gerar visualização e PDF da visita em formato A4"
             >
-              <RotateCcw className="h-3.5 w-3.5 mr-1" />
-              Nova visita
+              <Printer className="h-3.5 w-3.5 mr-1 text-teal-600" />
+              <span className="hidden sm:inline">Resumo em </span>PDF
+            </Button>
+
+            {/* Botão Enviar ao CRM (Topo) */}
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSendToCrm}
+              disabled={isSendingToCrm}
+              className={`text-xs h-9 font-bold px-3 shadow-xs ${
+                visit.crmStatus === 'enviada'
+                  ? 'bg-emerald-700 hover:bg-emerald-600 text-white'
+                  : 'bg-teal-700 hover:bg-teal-600 text-white'
+              }`}
+              title={
+                visit.crmStatus === 'enviada'
+                  ? 'Reenviar alterações ao CRM'
+                  : 'Enviar relatório da visita ao CRM'
+              }
+            >
+              {isSendingToCrm ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                  Enviando...
+                </>
+              ) : visit.crmStatus === 'enviada' ? (
+                <>
+                  <Check className="h-3.5 w-3.5 mr-1" />
+                  Reenviar CRM
+                </>
+              ) : (
+                <>
+                  <Send className="h-3.5 w-3.5 mr-1" />
+                  Enviar CRM
+                </>
+              )}
+            </Button>
+
+            {/* Botão Nova Visita */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsNewVisitDialogOpen(true)}
+              className="text-xs h-9 text-slate-500 hover:bg-rose-50 hover:text-rose-700 px-2"
+              title="Iniciar nova visita em branco"
+            >
+              <RotateCcw className="h-3.5 w-3.5 sm:mr-1" />
+              <span className="hidden sm:inline">Nova</span>
             </Button>
           </div>
         </div>
@@ -416,6 +551,57 @@ export default function FieldVisitPage() {
             <div className="space-y-1">
               <p className="font-bold">Aviso de Armazenamento</p>
               <p className="leading-relaxed">{quotaWarning}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Banner de Status de Envio ao CRM */}
+        {visit.crmStatus === 'enviada' && (
+          <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex items-center justify-between flex-wrap gap-2 text-xs shadow-xs">
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                <Check className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
+                  <span>Enviado ao CRM Intertermal</span>
+                  <Badge className="bg-emerald-700 text-white text-[9px] font-mono">
+                    ID: {visit.backendRecordId?.slice(0, 8)}...
+                  </Badge>
+                </div>
+                <div className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">
+                  {visit.lastSentAt
+                    ? `Último envio sincronizado em: ${new Date(visit.lastSentAt).toLocaleString('pt-BR')}`
+                    : 'Registro sincronizado com o banco de dados.'}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsPdfDialogOpen(true)}
+                className="h-8 text-xs border-emerald-300 text-emerald-800 dark:border-emerald-700 dark:text-emerald-300 hover:bg-emerald-100/60"
+              >
+                <Printer className="h-3.5 w-3.5 mr-1" />
+                Resumo PDF
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSendToCrm}
+                disabled={isSendingToCrm}
+                className="h-8 text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white"
+              >
+                {isSendingToCrm ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                ) : (
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                )}
+                Reenviar Alterações
+              </Button>
             </div>
           </div>
         )}
@@ -1142,6 +1328,73 @@ export default function FieldVisitPage() {
           )}
         </div>
 
+        {/* Bloco de Envio Grande no Rodapé */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-teal-600/30 dark:border-teal-700/40 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                <Send className="h-4 w-4 text-teal-700 dark:text-teal-400" />
+                Finalizar Atendimento & Sincronizar com o CRM
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Gera o registro oficial da visita na base de dados do Intertermal e permite gerar o
+                relatório técnico em PDF.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={() => setIsPdfDialogOpen(true)}
+                className="h-11 px-4 text-xs font-bold border-teal-300 dark:border-teal-700 text-teal-800 dark:text-teal-300 hover:bg-teal-50"
+              >
+                <Printer className="h-4 w-4 mr-1.5 text-teal-600" />
+                Gerar Resumo em PDF
+              </Button>
+
+              <Button
+                type="button"
+                size="lg"
+                onClick={handleSendToCrm}
+                disabled={isSendingToCrm}
+                className={`h-11 px-6 text-xs font-bold shadow-sm ${
+                  visit.crmStatus === 'enviada'
+                    ? 'bg-emerald-700 hover:bg-emerald-600 text-white'
+                    : 'bg-teal-700 hover:bg-teal-600 text-white'
+                }`}
+              >
+                {isSendingToCrm ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Enviando ao CRM...
+                  </>
+                ) : visit.crmStatus === 'enviada' ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Reenviar ao CRM
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Enviar a Visita ao CRM
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {visit.lastSentAt && (
+            <div className="text-[11px] text-muted-foreground pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <span>Rascunho local vinculado ao CRM.</span>
+              <span className="font-medium text-emerald-700 dark:text-emerald-400">
+                Sincronizado em {new Date(visit.lastSentAt).toLocaleString('pt-BR')}
+              </span>
+            </div>
+          )}
+        </div>
+
         {/* Rodapé informativo */}
         <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-muted-foreground space-y-1">
           <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
@@ -1151,10 +1404,13 @@ export default function FieldVisitPage() {
           <p>
             Todos os dados digitados e fotos ficam guardados no seu celular (armazenamento local).
             Você pode fechar a tela, abrir outra aba ou reiniciar o aparelho que as informações
-            continuarão salvas aqui.
+            continuarão salvas aqui mesmo após enviar ao CRM.
           </p>
         </div>
       </main>
+
+      {/* Modal de Prévia e Impressão do PDF da Visita */}
+      <FieldVisitPdfDialog open={isPdfDialogOpen} onOpenChange={setIsPdfDialogOpen} visit={visit} />
 
       {/* Modal de Confirmação: Nova Visita */}
       <AlertDialog open={isNewVisitDialogOpen} onOpenChange={setIsNewVisitDialogOpen}>
