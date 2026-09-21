@@ -9,6 +9,8 @@ export interface FieldVisitRecord {
   end_time?: string
   duration?: string
   client_name?: string
+  company_name?: string
+  contact_person?: string
   client_role?: string
   client_contact?: string
   work_area?: string

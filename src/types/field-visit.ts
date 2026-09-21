@@ -37,6 +37,7 @@ export interface FieldVisitData {
   endTime: string
   visitDuration: string
   isDurationManuallyEdited: boolean
+  companyName: string
   clientName: string
   clientRole: string
   clientContact: string
@@ -97,6 +98,7 @@ export function createInitialVisitData(savedEmployeeName = ''): FieldVisitData {
     endTime: '',
     visitDuration: '',
     isDurationManuallyEdited: false,
+    companyName: '',
     clientName: '',
     clientRole: '',
     clientContact: '',

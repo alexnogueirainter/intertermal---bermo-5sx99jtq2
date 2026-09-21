@@ -176,9 +176,15 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                   Dados do Cliente
                 </span>
                 <div className="font-bold text-sm text-slate-900">
-                  {visit.clientName || 'Cliente não informado'}
+                  {visit.companyName || visit.clientName || 'Empresa não informada'}
                 </div>
                 <div className="space-y-1 text-slate-600 text-[11px]">
+                  {visit.companyName && visit.clientName && (
+                    <div className="flex items-center gap-1.5 sm:justify-end text-slate-800 font-medium">
+                      <User className="h-3 w-3 text-slate-400" />
+                      <span>Contato: {visit.clientName}</span>
+                    </div>
+                  )}
                   {visit.clientRole && (
                     <div className="flex items-center gap-1.5 sm:justify-end">
                       <Briefcase className="h-3 w-3 text-slate-400" />

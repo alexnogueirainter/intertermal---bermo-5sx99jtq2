@@ -102,9 +102,17 @@ export default function FieldVisitPage() {
       const savedDraft = localStorage.getItem(STORAGE_KEY_CURRENT_VISIT)
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft)
+        // Migração de compatibilidade retroativa: se existir parsed.clientName mas parsed.companyName estiver ausente,
+        // preencher companyName com o valor antigo para preservar o que já foi digitado.
+        const restoredCompanyName =
+          parsed.companyName !== undefined ? parsed.companyName : parsed.clientName || ''
+        const restoredClientName = parsed.companyName !== undefined ? parsed.clientName || '' : ''
+
         return {
           ...createInitialVisitData(savedEmployee),
           ...parsed,
+          companyName: restoredCompanyName,
+          clientName: restoredClientName,
           employeeName: parsed.employeeName || savedEmployee,
         }
       }
@@ -144,13 +152,29 @@ export default function FieldVisitPage() {
     setIsSendingToCrm(true)
     const nowIso = new Date().toISOString()
 
+    // Compatibilidade no PocketBase:
+    // O campo nativo da collection field_visits é client_name.
+    // Mapeamos a empresa e/ou nome do cliente de forma que:
+    // - se ambos estiverem preenchidos: "Empresa (Contato: Nome)"
+    // - se apenas um: o que estiver preenchido
+    const companyTrimmed = (visit.companyName || '').trim()
+    const contactPersonTrimmed = (visit.clientName || '').trim()
+    let combinedClientName: string | undefined = undefined
+    if (companyTrimmed && contactPersonTrimmed) {
+      combinedClientName = `${companyTrimmed} (${contactPersonTrimmed})`
+    } else if (companyTrimmed) {
+      combinedClientName = companyTrimmed
+    } else if (contactPersonTrimmed) {
+      combinedClientName = contactPersonTrimmed
+    }
+
     const payload: Partial<FieldVisitRecord> = {
       employee_name: trimmedEmployee || 'Técnico Intertermal',
       visit_date: trimmedDate || undefined,
       start_time: visit.startTime || undefined,
       end_time: visit.endTime || undefined,
       duration: visit.visitDuration || undefined,
-      client_name: visit.clientName?.trim() || undefined,
+      client_name: combinedClientName,
       client_role: visit.clientRole?.trim() || undefined,
       client_contact: visit.clientContact?.trim() || undefined,
       work_area: visit.clientWorkArea?.trim() || undefined,
@@ -205,59 +229,34 @@ export default function FieldVisitPage() {
   // Reconhecimento de Voz (Speech Recognition)
   const [isRecording, setIsRecording] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
+  const [interimTranscript, setInterimTranscript] = useState('')
   const recognitionRef = useRef<any>(null)
+  const isRunningRef = useRef(false)
+  const baseTextRef = useRef('')
+  const finalTranscriptRef = useRef('')
 
-  // Verificar suporte a Web Speech API
+  // Sincronizar o suporte da Web Speech API
   useEffect(() => {
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (SpeechRec) {
       setSpeechSupported(true)
-      const instance = new SpeechRec()
-      instance.lang = 'pt-BR'
-      instance.continuous = true
-      instance.interimResults = true
-
-      instance.onresult = (event: any) => {
-        let transcript = ''
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript
-        }
-        if (transcript) {
-          setVisit((prev) => {
-            const separator =
-              prev.generalObservations && !prev.generalObservations.endsWith(' ') ? ' ' : ''
-            return {
-              ...prev,
-              generalObservations: prev.generalObservations
-                ? `${prev.generalObservations}${separator}${transcript}`
-                : transcript,
-            }
-          })
-        }
-      }
-
-      instance.onerror = (err: any) => {
-        console.warn('SpeechRecognition erro:', err)
-        setIsRecording(false)
-      }
-
-      instance.onend = () => {
-        setIsRecording(false)
-      }
-
-      recognitionRef.current = instance
     } else {
       setSpeechSupported(false)
     }
 
     return () => {
-      if (recognitionRef.current) {
+      if (recognitionRef.current && isRunningRef.current) {
         try {
-          recognitionRef.current.stop()
+          if (typeof recognitionRef.current.abort === 'function') {
+            recognitionRef.current.abort()
+          } else if (typeof recognitionRef.current.stop === 'function') {
+            recognitionRef.current.stop()
+          }
         } catch {
           // ignore
         }
       }
+      isRunningRef.current = false
     }
   }, [])
 
@@ -347,25 +346,101 @@ export default function FieldVisitPage() {
     }))
   }
 
-  // Microfone toggle
+  // Microfone toggle (robusto, sem duplicação de texto)
   const toggleRecording = () => {
-    if (!speechSupported || !recognitionRef.current) return
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRec) return
 
-    if (isRecording) {
-      try {
-        recognitionRef.current.stop()
-      } catch (e) {
-        console.warn(e)
-      }
+    if (isRunningRef.current) {
+      // Parar gravação
+      isRunningRef.current = false
       setIsRecording(false)
-    } else {
-      try {
-        recognitionRef.current.start()
-        setIsRecording(true)
-      } catch (e) {
-        console.warn('Erro ao iniciar speech recognition:', e)
-        setIsRecording(false)
+      setInterimTranscript('')
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {
+          console.warn('Erro ao parar reconhecimento de voz:', e)
+        }
       }
+      return
+    }
+
+    // Iniciar gravação limpa
+    try {
+      // Guarda o texto existente antes da gravação começar
+      const currentObs = visit.generalObservations || ''
+      baseTextRef.current = currentObs
+      finalTranscriptRef.current = ''
+      setInterimTranscript('')
+
+      // Cria uma nova instância para evitar vazamento de estado de sessões anteriores
+      const instance = new SpeechRec()
+      instance.lang = 'pt-BR'
+      instance.continuous = true
+      instance.interimResults = true
+
+      instance.onresult = (event: any) => {
+        let currentInterim = ''
+        // event.resultIndex indica a partir de qual índice são novos resultados
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const res = event.results[i]
+          const phrase = res[0]?.transcript || ''
+          if (res.isFinal) {
+            // Apenas adiciona ao texto final UMA única vez
+            const trimmed = phrase.trim()
+            if (trimmed) {
+              finalTranscriptRef.current = finalTranscriptRef.current
+                ? `${finalTranscriptRef.current} ${trimmed}`
+                : trimmed
+            }
+          } else {
+            currentInterim += phrase
+          }
+        }
+
+        setInterimTranscript(currentInterim.trim())
+
+        // Atualiza o campo com baseText + finalTranscript consolidado
+        const base = baseTextRef.current.trim()
+        const addedFinal = finalTranscriptRef.current.trim()
+        let combined = base
+        if (addedFinal) {
+          combined = base ? `${base} ${addedFinal}` : addedFinal
+        }
+
+        setVisit((prev) => ({
+          ...prev,
+          generalObservations: combined,
+        }))
+      }
+
+      instance.onerror = (err: any) => {
+        console.warn('SpeechRecognition erro:', err)
+        // Erro "no-speech" é comum se o usuário demorar a falar
+        if (err.error !== 'no-speech') {
+          isRunningRef.current = false
+          setIsRecording(false)
+          setInterimTranscript('')
+        }
+      }
+
+      instance.onend = () => {
+        // Se a parada foi intencional ou se a sessão encerrou
+        isRunningRef.current = false
+        setIsRecording(false)
+        setInterimTranscript('')
+      }
+
+      recognitionRef.current = instance
+      instance.start()
+      isRunningRef.current = true
+      setIsRecording(true)
+    } catch (e) {
+      console.warn('Erro ao inicializar speech recognition:', e)
+      isRunningRef.current = false
+      setIsRecording(false)
+      setInterimTranscript('')
     }
   }
 
@@ -743,21 +818,35 @@ export default function FieldVisitPage() {
               <div>
                 <CardTitle className="text-sm font-bold">3. Cliente Industrial</CardTitle>
                 <p className="text-[11px] text-muted-foreground">
-                  Identificação do contato e local
+                  Identificação da empresa, contato e setor visitado
                 </p>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Campo Empresa */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Nome do cliente / empresa
+                  Empresa
+                </label>
+                <Input
+                  value={visit.companyName}
+                  onChange={(e) => setVisit((prev) => ({ ...prev, companyName: e.target.value }))}
+                  placeholder="Ex.: Usina São Martinho, Cervejaria Petrópolis"
+                  className="h-11 text-sm bg-slate-50/70 dark:bg-slate-950"
+                />
+              </div>
+
+              {/* Campo Nome do cliente (Pessoa de contato) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Nome do cliente
                 </label>
                 <Input
                   value={visit.clientName}
                   onChange={(e) => setVisit((prev) => ({ ...prev, clientName: e.target.value }))}
-                  placeholder="Ex.: Usina São Martinho / Cervejaria Petrópolis"
+                  placeholder="Ex.: Carlos Mendes, Amanda Silva"
                   className="h-11 text-sm bg-slate-50/70 dark:bg-slate-950"
                 />
               </div>
@@ -786,7 +875,7 @@ export default function FieldVisitPage() {
                 />
               </div>
 
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   Área de trabalho
                 </label>
@@ -922,18 +1011,26 @@ export default function FieldVisitPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {isRecording && (
-              <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
-                <span>
-                  Ouvindo sua fala em português... O texto será inserido no campo abaixo ao pausar.
-                </span>
+              <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
+                  <span className="font-semibold">Ouvindo sua fala em português...</span>
+                </div>
+                {interimTranscript && (
+                  <div className="italic text-[11px] text-rose-700 dark:text-rose-300 bg-white/70 dark:bg-slate-900/60 p-2 rounded border border-rose-200 dark:border-rose-800">
+                    &ldquo;{interimTranscript}&rdquo;
+                  </div>
+                )}
               </div>
             )}
             <Textarea
               value={visit.generalObservations}
-              onChange={(e) =>
-                setVisit((prev) => ({ ...prev, generalObservations: e.target.value }))
-              }
+              onChange={(e) => {
+                const val = e.target.value
+                setVisit((prev) => ({ ...prev, generalObservations: val }))
+                baseTextRef.current = val
+                finalTranscriptRef.current = ''
+              }}
               placeholder="Digite aqui ou use o botão de microfone acima para gravar seu relato técnico..."
               rows={5}
               className="text-sm leading-relaxed bg-slate-50/70 dark:bg-slate-950 resize-y"
