@@ -497,7 +497,8 @@ export function QuotesManager({
     ).map((eq, idx) => ({
       id: eq.id || `eq-${idx + 1}`,
       model: eq.model != null ? String(eq.model).trim() : '',
-      brand: eq.brand != null && String(eq.brand).trim() ? String(eq.brand).trim() : '',      series: eq.series || undefined,
+      brand: eq.brand != null && String(eq.brand).trim() ? String(eq.brand).trim() : '',
+      series: eq.series || undefined,
       quantity: Math.max(1, Number(eq.quantity) || 1),
       tag: eq.tag || undefined,
       serial_number: eq.serial_number || undefined,
@@ -1172,7 +1173,8 @@ export function QuotesManager({
     setWebSearchMessage('')
     try {
       const activeEq = equipments[webSearchActiveIndex]
-      const brand = activeEq?.brand || equipmentBrand || ''      const res = await searchEquipmentWeb(cleanQuery, brand, cleanQuery)
+      const brand = activeEq?.brand || equipmentBrand || ''
+      const res = await searchEquipmentWeb(cleanQuery, brand, cleanQuery)
       if (res && res.results && res.results.length > 0) {
         setWebSearchResults(res.results)
         setWebSearchMessage(res.message || `Localizados ${res.results.length} resultados.`)
