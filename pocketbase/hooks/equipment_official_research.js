@@ -158,12 +158,32 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
 
     let html = ''
     try {
-      html = new TextDecoder('utf-8').decode(catalogResponse.body || new Uint8Array())
+      const responseBody = catalogResponse.body
+      if (typeof responseBody === 'string') {
+        html = responseBody
+      } else {
+        html = new TextDecoder('utf-8').decode(responseBody || new Uint8Array())
+      }
     } catch (decodeErr) {
-      $app.logger().error('Falha ao ler resposta HTML da BERMO', 'error', String(decodeErr))
-      return emptyResponse('unavailable', 'Não foi possível ler a fonte oficial da BERMO.')
+      $app
+        .logger()
+        .warn(
+          'Falha na primeira leitura HTML da BERMO; tentando conversão textual',
+          'error',
+          String(decodeErr),
+        )
+      try {
+        html = String(catalogResponse.body || '')
+      } catch (fallbackDecodeErr) {
+        $app
+          .logger()
+          .error('Falha ao ler resposta HTML da BERMO', 'error', String(fallbackDecodeErr))
+        return emptyResponse('unavailable', 'Não foi possível ler a fonte oficial da BERMO.')
+      }
     }
-
+    if (!html || html.length === 0) {
+      return emptyResponse('unavailable', 'A fonte oficial da BERMO retornou uma página vazia.')
+    }
     const parts = model
       .toUpperCase()
       .trim()
