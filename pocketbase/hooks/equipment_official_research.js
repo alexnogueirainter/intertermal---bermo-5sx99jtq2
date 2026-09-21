@@ -209,6 +209,22 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       }
       if (!detailResponse || detailResponse.statusCode !== 200) continue
 
+      try {
+        $app
+          .logger()
+          .info(
+            'Diagnóstico fonte BERMO',
+            'statusCode',
+            detailResponse.statusCode,
+            'bodyType',
+            typeof detailResponse.body,
+            'bodyLength',
+            detailResponse.body && detailResponse.body.length ? detailResponse.body.length : 0,
+            'bodyPrefix',
+            String(detailResponse.body || '').slice(0, 80),
+          )
+      } catch (_) {}
+
       let detailHtml = ''
       try {
         const responseBody = detailResponse.body
