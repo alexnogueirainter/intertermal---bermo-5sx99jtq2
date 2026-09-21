@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams, useLocation } from 'react-router-dom'
 import {
   ArrowLeft,
   Calendar,
@@ -55,6 +55,7 @@ import {
   createInitialVisitData,
   calculateDurationBetween,
   compressImageFile,
+  recordToFieldVisitData,
 } from '@/types/field-visit'
 
 const WORK_TYPE_OPTIONS: { label: WorkTypeOption; description: string }[] = [
@@ -94,11 +95,26 @@ const DIFFICULTY_OPTIONS: { level: DifficultyLevel; color: string }[] = [
 ]
 
 export default function FieldVisitPage() {
+  const [searchParams] = useSearchParams()
+  const location = useLocation()
+  const queryVisitId = searchParams.get('id')
+
   // Estado principal do formulário
   const [visit, setVisit] = useState<FieldVisitData>(() => {
     let savedEmployee = ''
     try {
       savedEmployee = localStorage.getItem(STORAGE_KEY_EMPLOYEE_NAME) || ''
+
+      // Prioridade 1: se recebemos via location.state (navegação direta do botão Editar)
+      const locationStateData = (location?.state as any)?.visitData as FieldVisitData | undefined
+      if (locationStateData) {
+        return {
+          ...createInitialVisitData(savedEmployee),
+          ...locationStateData,
+        }
+      }
+
+      // Prioridade 2: draft do localStorage
       const savedDraft = localStorage.getItem(STORAGE_KEY_CURRENT_VISIT)
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft)
@@ -121,6 +137,55 @@ export default function FieldVisitPage() {
     }
     return createInitialVisitData(savedEmployee)
   })
+
+  // Efeito para carregar do backend caso tenhamos ?id= e os dados ainda não correspondam a ele
+  const [isLoadingRecord, setIsLoadingRecord] = useState(false)
+  useEffect(() => {
+    if (!queryVisitId) return
+
+    // Se o formulário já tem esse id carregado, não precisa buscar novamente
+    if (visit.backendRecordId === queryVisitId) return
+
+    let isMounted = true
+    setIsLoadingRecord(true)
+
+    fieldVisitsService
+      .getById(queryVisitId)
+      .then((record) => {
+        if (!isMounted || !record) return
+        const { data } = recordToFieldVisitData(record)
+        data.backendRecordId = record.id
+        data.crmStatus = 'enviada'
+        data.lastSentAt = record.sent_at || record.created
+
+        setVisit(data)
+        // Persistir imediatamente no localStorage para manter integridade
+        try {
+          localStorage.setItem(STORAGE_KEY_CURRENT_VISIT, JSON.stringify(data))
+          if (data.employeeName) {
+            localStorage.setItem(STORAGE_KEY_EMPLOYEE_NAME, data.employeeName)
+          }
+        } catch (e) {
+          console.warn('Erro ao sincronizar visita carregada no localStorage:', e)
+        }
+      })
+      .catch((err) => {
+        console.error('Erro ao carregar visita por ID:', err)
+        toast({
+          title: 'Aviso',
+          description:
+            'Não foi possível recuperar a visita pelo servidor. Usando dados salvos localmente.',
+          variant: 'destructive',
+        })
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingRecord(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [queryVisitId, visit.backendRecordId])
 
   // Mensagens e feedbacks
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved')
@@ -630,6 +695,14 @@ export default function FieldVisitPage() {
           </div>
         )}
 
+        {/* Indicador de carregamento caso esteja recuperando registro por id */}
+        {isLoadingRecord && (
+          <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 flex items-center gap-2 text-xs text-amber-900 dark:text-amber-200 shadow-xs">
+            <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
+            <span>Carregando dados da visita técnica para edição...</span>
+          </div>
+        )}
+
         {/* Banner de Status de Envio ao CRM */}
         {visit.crmStatus === 'enviada' && (
           <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex items-center justify-between flex-wrap gap-2 text-xs shadow-xs">
@@ -643,6 +716,14 @@ export default function FieldVisitPage() {
                   <Badge className="bg-emerald-700 text-white text-[9px] font-mono">
                     ID: {visit.backendRecordId?.slice(0, 8)}...
                   </Badge>
+                  {queryVisitId && (
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] bg-amber-50 text-amber-800 border-amber-300"
+                    >
+                      Modo Edição
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-0.5">
                   {visit.lastSentAt
@@ -653,6 +734,16 @@ export default function FieldVisitPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Link to="/visitas-recebidas">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Ver Visitas Recebidas
+                </Button>
+              </Link>
               <Button
                 type="button"
                 variant="outline"
@@ -675,7 +766,7 @@ export default function FieldVisitPage() {
                 ) : (
                   <RotateCcw className="h-3.5 w-3.5 mr-1" />
                 )}
-                Reenviar Alterações
+                Salvar Alterações
               </Button>
             </div>
           </div>

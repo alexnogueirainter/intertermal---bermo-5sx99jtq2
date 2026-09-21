@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   FileText,
   Search,
@@ -21,6 +21,7 @@ import {
   ArrowLeft,
   RefreshCw,
   Eye,
+  Pencil,
   Maximize2,
   X,
   AlertCircle,
@@ -49,70 +50,15 @@ import {
 import { useRealtime } from '@/hooks/use-realtime'
 import { fieldVisitsService, type FieldVisitRecord } from '@/services/field-visits'
 import { FieldVisitPdfDialog } from '@/components/FieldVisitPdfDialog'
-import type { EquipmentItem, FieldVisitData } from '@/types/field-visit'
-
-/**
- * Converte um registro do PocketBase (`FieldVisitRecord`) para o formato esperado pelo
- * `FieldVisitPdfDialog` e detalhe técnico (`FieldVisitData`).
- */
-function recordToFieldVisitData(record: FieldVisitRecord): {
-  data: FieldVisitData
-  parsedCompany: string
-  parsedContact: string
-} {
-  let parsedCompany = record.company_name || ''
-  let parsedContact = record.client_name || ''
-
-  // Se veio no formato "Empresa (Contato: Nome)" ou "Empresa (Nome)"
-  if (record.client_name && !record.company_name) {
-    const match = record.client_name.match(/^(.+?)\s*\((?:Contato:\s*)?(.+?)\)$/i)
-    if (match) {
-      parsedCompany = match[1].trim()
-      parsedContact = match[2].trim()
-    } else {
-      parsedCompany = record.client_name
-    }
-  }
-
-  // Parse seguro do JSON de equipamentos se for string ou array
-  let safeEquipments: EquipmentItem[] = []
-  if (Array.isArray(record.equipment)) {
-    safeEquipments = record.equipment
-  } else if (typeof record.equipment === 'string' && record.equipment) {
-    try {
-      safeEquipments = JSON.parse(record.equipment)
-    } catch {
-      safeEquipments = []
-    }
-  }
-
-  const data: FieldVisitData = {
-    id: record.id,
-    employeeName: record.employee_name || 'Técnico Intertermal',
-    date: record.visit_date || (record.created ? record.created.slice(0, 10) : ''),
-    startTime: record.start_time || '',
-    endTime: record.end_time || '',
-    visitDuration: record.duration || '',
-    isDurationManuallyEdited: false,
-    companyName: parsedCompany,
-    clientName: parsedContact,
-    clientRole: record.client_role || '',
-    clientContact: record.client_contact || '',
-    clientWorkArea: record.work_area || '',
-    workType: (record.work_type as any) || '',
-    workTypeOther: record.work_type_other || '',
-    generalObservations: record.general_notes || '',
-    equipments: safeEquipments,
-    updatedAt: record.updated || record.created || new Date().toISOString(),
-    backendRecordId: record.id,
-    crmStatus: 'enviada',
-    lastSentAt: record.sent_at || record.created,
-  }
-
-  return { data, parsedCompany, parsedContact }
-}
+import {
+  recordToFieldVisitData,
+  STORAGE_KEY_CURRENT_VISIT,
+  STORAGE_KEY_EMPLOYEE_NAME,
+  type FieldVisitData,
+} from '@/types/field-visit'
 
 export default function ReceivedFieldVisitsPage() {
+  const navigate = useNavigate()
   const [visits, setVisits] = useState<FieldVisitRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -253,6 +199,28 @@ export default function ReceivedFieldVisitsPage() {
     const { data } = recordToFieldVisitData(record)
     setPdfVisitData(data)
     setIsPdfOpen(true)
+  }
+
+  // Handler para editar a visita no modo formulário
+  const handleEditVisit = (record: FieldVisitRecord) => {
+    const { data } = recordToFieldVisitData(record)
+    // Garantir que backendRecordId está definido para atualizar o mesmo registro
+    data.backendRecordId = record.id
+    data.crmStatus = 'enviada'
+    data.lastSentAt = record.sent_at || record.created || data.lastSentAt
+
+    // Salva no localStorage como rascunho de trabalho para carregamento imediato
+    try {
+      localStorage.setItem(STORAGE_KEY_CURRENT_VISIT, JSON.stringify(data))
+      if (data.employeeName) {
+        localStorage.setItem(STORAGE_KEY_EMPLOYEE_NAME, data.employeeName)
+      }
+    } catch (e) {
+      console.warn('Erro ao salvar no localStorage para edição:', e)
+    }
+
+    // Navega para /visita-a-campo com query param ?id= e state com os dados
+    navigate(`/visita-a-campo?id=${record.id}`, { state: { visitData: data } })
   }
 
   // Estatísticas rápidas do topo
@@ -758,7 +726,6 @@ export default function ReceivedFieldVisitsPage() {
                           </p>
                         )}
                       </div>
-
                       {/* Lado Direito: Ações Diretas */}
                       <div className="flex sm:flex-row md:flex-col lg:flex-row items-center gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800">
                         <Button
@@ -772,6 +739,17 @@ export default function ReceivedFieldVisitsPage() {
                         </Button>
 
                         <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditVisit(record)}
+                          className="text-xs h-9 font-semibold flex-1 md:flex-none border-amber-300 dark:border-amber-700/80 text-amber-800 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-950/30 hover:bg-amber-100/80 hover:border-amber-400 dark:hover:bg-amber-900/40 transition-colors shadow-2xs"
+                          title="Editar Visita Técnica"
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-1 text-amber-700 dark:text-amber-400" />
+                          Editar
+                        </Button>
+
+                        <Button
                           size="sm"
                           onClick={() => handleOpenPdf(record)}
                           className="bg-teal-700 hover:bg-teal-600 text-white text-xs h-9 font-semibold flex-1 md:flex-none shadow-2xs"
@@ -779,7 +757,7 @@ export default function ReceivedFieldVisitsPage() {
                           <Printer className="h-3.5 w-3.5 mr-1" />
                           Gerar PDF
                         </Button>
-                      </div>
+                      </div>{' '}
                     </div>
                   </Card>
                 )
@@ -828,6 +806,23 @@ export default function ReceivedFieldVisitsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 mr-6">
+                  {selectedVisitRecord && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsDetailOpen(false)
+                        handleEditVisit(selectedVisitRecord)
+                      }}
+                      className="text-xs h-9 font-semibold border-amber-300 dark:border-amber-700 text-amber-800 dark:text-amber-300 bg-amber-50/60 dark:bg-amber-950/30 hover:bg-amber-100/80"
+                      title="Editar Visita Técnica"
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1.5 text-amber-700 dark:text-amber-400" />
+                      Editar Visita
+                    </Button>
+                  )}
+
                   <Button
                     type="button"
                     size="sm"
