@@ -209,6 +209,29 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
       }
       if (!detailResponse || detailResponse.statusCode !== 200) continue
 
+      let detailHtml = ''
+      try {
+        const responseBody = detailResponse.body
+        detailHtml =
+          typeof responseBody === 'string'
+            ? responseBody
+            : new TextDecoder('utf-8').decode(responseBody || new Uint8Array())
+      } catch (decodeErr) {
+        try {
+          detailHtml = String(detailResponse.body || '')
+        } catch (fallbackDecodeErr) {
+          detailHtml = ''
+        }
+      }
+      const detailHtmlLower = detailHtml.toLowerCase()
+      if (
+        !detailHtmlLower ||
+        detailHtmlLower.indexOf(normalizedModel) === -1 ||
+        detailHtmlLower.indexOf('bermo') === -1
+      ) {
+        continue
+      }
+
       const result = {
         id: `official-${Date.now()}-${results.length + 1}`,
         sourceType: 'official_product_page',
@@ -226,6 +249,7 @@ routerAdd('POST', '/backend/v1/intertermal/equipment-official-research', (e) => 
           extraction_status: 'pending',
           match_status: 'exact',
           detail_page_status: 'validated',
+          model_confirmed_in_page: true,
         },
       }
       results.push(result)
