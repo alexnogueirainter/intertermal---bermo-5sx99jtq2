@@ -303,6 +303,7 @@ export interface EquipmentWebSearchResultItem {
   brand?: string
   model?: string
   badge?: string
+  evidence?: Record<string, any> | null
   specs?: {
     platesRange?: string
     platesCount?: string | number
@@ -321,6 +322,15 @@ export interface EquipmentWebSearchResultItem {
 export interface EquipmentWebSearchResponse {
   success: boolean
   found: boolean
+  status?:
+    | 'invalid_request'
+    | 'searching'
+    | 'found'
+    | 'partial'
+    | 'not_found'
+    | 'unavailable'
+    | string
+  researchId?: string
   model: string
   brand: string
   totalResults: number
@@ -369,7 +379,7 @@ export async function searchEquipmentWeb(
 
   try {
     const res = await pb.send<EquipmentWebSearchResponse>(
-      '/backend/v1/intertermal/equipment-web-search',
+      '/backend/v1/intertermal/equipment-official-research',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
