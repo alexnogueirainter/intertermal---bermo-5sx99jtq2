@@ -41,6 +41,7 @@ import {
   Smartphone,
   MapPin,
   ExternalLink,
+  ClipboardList,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { FieldVisitRecord } from '@/services/field-visits'
@@ -1169,25 +1170,25 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
           {/* Cartão de Destaque / Indicador de Visitas a Campo Realizadas */}
           <Card
-            onClick={() => navigate('/visita-a-campo')}
+            onClick={() => navigate('/visitas-recebidas')}
             className="border-teal-200 dark:border-teal-900/60 bg-gradient-to-br from-white via-teal-50/30 to-emerald-50/40 dark:from-slate-900 dark:via-teal-950/20 dark:to-slate-900 shadow-xs cursor-pointer hover:border-teal-500 hover:shadow-md transition-all group"
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-teal-600 dark:bg-teal-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
-                  <Smartphone className="h-4 w-4" />
+                  <ClipboardList className="h-4 w-4" />
                 </div>
                 <div>
                   <CardTitle className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
                     Visitas a Campo Realizadas
                   </CardTitle>
                   <CardDescription className="text-[11px] text-muted-foreground">
-                    Relatórios técnicos gerados e enviados ao CRM
+                    Ver relatórios, fotos e pareceres dos técnicos no escritório
                   </CardDescription>
                 </div>
               </div>
               <div className="flex items-center gap-1 text-[11px] font-semibold text-teal-700 dark:text-teal-400 group-hover:translate-x-0.5 transition-transform">
-                <span className="hidden sm:inline">Acessar módulo</span>
+                <span className="hidden sm:inline">Ver lista de visitas</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </div>
             </CardHeader>

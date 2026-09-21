@@ -23,6 +23,7 @@ import {
   BarChart3,
   Mail,
   Smartphone,
+  ClipboardList,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -725,6 +726,19 @@ export default function IndexPage() {
             </button>
 
             <Link
+              to="/visitas-recebidas"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-800 dark:hover:text-teal-300 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <ClipboardList className="h-4 w-4 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
+                <span>Visitas Recebidas</span>
+              </div>
+              <Badge className="bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-200 text-[10px] px-1.5 font-bold">
+                {fieldVisits.length}
+              </Badge>
+            </Link>
+
+            <Link
               to="/visita-a-campo"
               className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-800 dark:hover:text-teal-300 transition-all group"
             >
@@ -946,11 +960,18 @@ export default function IndexPage() {
               </div>
               <span className="font-bold text-sm tracking-tight text-slate-900">Intertermal</span>
               <Link
-                to="/visita-a-campo"
+                to="/visitas-recebidas"
                 className="ml-2 inline-flex items-center gap-1 text-[11px] font-bold bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300 px-2 py-1 rounded-md border border-teal-200 dark:border-teal-800"
               >
+                <ClipboardList className="h-3 w-3" />
+                Visitas Recebidas
+              </Link>
+              <Link
+                to="/visita-a-campo"
+                className="inline-flex items-center gap-1 text-[11px] font-bold bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-300 px-2 py-1 rounded-md border border-slate-200 dark:border-slate-700"
+              >
                 <Smartphone className="h-3 w-3" />
-                Visita a campo
+                Campo
               </Link>
             </div>
 

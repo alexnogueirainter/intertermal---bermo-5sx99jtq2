@@ -8,6 +8,7 @@ import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import { PublicProposalApprovalPage } from './pages/PublicProposalApprovalPage'
 import FieldVisitPage from './pages/FieldVisitPage'
+import ReceivedFieldVisitsPage from './pages/ReceivedFieldVisitsPage'
 
 // ONLY IMPORT AND RENDER WORKING PAGES, NEVER ADD PLACEHOLDER COMPONENTS OR PAGES IN THIS FILE
 // AVOID REMOVING ANY CONTEXT PROVIDERS FROM THIS FILE (e.g. TooltipProvider, Toaster, Sonner)
@@ -24,6 +25,9 @@ const App = () => (
 
         {/* Rota de Visita a Campo para técnicos no celular */}
         <Route path="/visita-a-campo" element={<FieldVisitPage />} />
+
+        {/* Rota de Visitas Recebidas no escritório */}
+        <Route path="/visitas-recebidas" element={<ReceivedFieldVisitsPage />} />
 
         <Route element={<Layout />}>
           <Route path="/" element={<Index />} />
