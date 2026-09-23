@@ -538,7 +538,9 @@ export default function FieldVisitPage({
               ...parsed,
               employeeName: sellerName || baseSeller.employeeName,
             }
-          } catch (_) {}
+          } catch (_) {
+            // rascunho corrompido: ignora e segue com formulário limpo
+          }
         }
         return baseSeller
       }

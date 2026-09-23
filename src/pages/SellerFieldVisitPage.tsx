@@ -93,7 +93,9 @@ export default function SellerFieldVisitPage() {
     if (res.ok && res.seller_name) {
       try {
         localStorage.setItem(SELLER_TOKEN_KEY, token)
-      } catch (_) {}
+      } catch (_) {
+        // localStorage indisponível: segue sem persistir o token
+      }
       setSellerName(res.seller_name)
       setStatus('ok')
       return true
