@@ -125,10 +125,11 @@ export default function IndexPage() {
     }
   }
 
-  // Carregar todos os dados (com indicador opcional de loading)
+  // Carregar todos os dados (com indicador opcional de loading e resiliência por serviço)
   const loadAllData = async (silent = false) => {
     try {
       if (!silent) setIsLoading(true)
+
       const [
         clientsRes,
         dealsRes,
@@ -140,14 +141,38 @@ export default function IndexPage() {
         activitiesRes,
         fieldVisitsRes,
       ] = await Promise.all([
-        clientsService.getAll(),
-        dealsService.getAll(),
-        quotesService.getAll(),
-        productsService.getAll(),
-        ticketsService.getAll(),
-        servicesExtraService.getAll(),
-        serviceOrdersService.getAll().catch(() => [] as ServiceOrderRecord[]),
-        activitiesService.getAll(),
+        clientsService.getAll().catch((err) => {
+          console.warn('Erro ao carregar clientes:', err)
+          return [] as ClientRecord[]
+        }),
+        dealsService.getAll().catch((err) => {
+          console.warn('Erro ao carregar deals:', err)
+          return [] as DealRecord[]
+        }),
+        quotesService.getAll().catch((err) => {
+          console.warn('Erro ao carregar propostas:', err)
+          return [] as QuoteRecord[]
+        }),
+        productsService.getAll().catch((err) => {
+          console.warn('Erro ao carregar produtos:', err)
+          return [] as ProductRecord[]
+        }),
+        ticketsService.getAll().catch((err) => {
+          console.warn('Erro ao carregar tickets:', err)
+          return [] as TicketRecord[]
+        }),
+        servicesExtraService.getAll().catch((err) => {
+          console.warn('Erro ao carregar serviços:', err)
+          return [] as ServiceRecord[]
+        }),
+        serviceOrdersService.getAll().catch((err) => {
+          console.warn('Erro ao carregar ordens de serviço:', err)
+          return [] as ServiceOrderRecord[]
+        }),
+        activitiesService.getAll().catch((err) => {
+          console.warn('Erro ao carregar atividades:', err)
+          return [] as ActivityRecord[]
+        }),
         fieldVisitsService.getAll().catch((err) => {
           console.warn('Erro ao carregar visitas a campo no dashboard:', err)
           setFieldVisitsError(true)
@@ -167,17 +192,19 @@ export default function IndexPage() {
 
       // Sincronização em lote das propostas existentes com o pipeline comercial
       // Idempotente: atualiza deals vinculados ou cria os faltantes sem alterar os cálculos
-      try {
-        quoteDealSyncService
-          .syncAllQuotes(quotesRes)
-          .then((syncResult) => {
-            if (syncResult && syncResult.syncedCount > 0) {
-              dealsService.getAll().then((freshDeals) => setDeals(freshDeals))
-            }
-          })
-          .catch((e) => console.warn('Erro sync em background:', e))
-      } catch (syncBatchErr) {
-        console.warn('Erro ao disparar sync em background:', syncBatchErr)
+      if (quotesRes.length > 0) {
+        try {
+          quoteDealSyncService
+            .syncAllQuotes(quotesRes)
+            .then((syncResult) => {
+              if (syncResult && syncResult.syncedCount > 0) {
+                dealsService.getAll().then((freshDeals) => setDeals(freshDeals))
+              }
+            })
+            .catch((e) => console.warn('Erro sync em background:', e))
+        } catch (syncBatchErr) {
+          console.warn('Erro ao disparar sync em background:', syncBatchErr)
+        }
       }
     } catch (err: any) {
       console.error('Erro ao carregar dados:', err)

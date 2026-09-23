@@ -13,10 +13,13 @@ export interface FieldVisitRecord {
   contact_person?: string
   client_role?: string
   client_contact?: string
+  client_email?: string
   work_area?: string
   work_type?: string
   work_type_other?: string
   general_notes?: string
+  free_description?: string
+  action_plan?: any
   equipment?: EquipmentItem[]
   status?: string
   sent_at?: string

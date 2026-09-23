@@ -5,17 +5,21 @@ import {
   Clock,
   User,
   Building2,
-  Wrench,
-  Layers,
-  Thermometer,
-  Gauge,
-  Camera,
-  MapPin,
-  CheckCircle2,
-  FileText,
   Phone,
   Briefcase,
+  MapPin,
+  FileText,
+  Wrench,
+  Thermometer,
+  Layers,
+  Camera,
+  CheckCircle2,
+  CheckSquare,
+  AlertTriangle,
+  Mail,
+  Video,
 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -23,9 +27,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import type { FieldVisitData } from '@/types/field-visit'
+import { FieldVisitData, generateActionPlan } from '@/types/field-visit'
 
 interface FieldVisitPdfDialogProps {
   open: boolean
@@ -37,45 +40,42 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
   const printRef = useRef<HTMLDivElement>(null)
 
   const handlePrint = () => {
-    document.body.classList.add('quote-printing-active')
-
-    document.querySelectorAll('[data-radix-portal]').forEach((portal) => {
-      if (portal.querySelector('#field-visit-printable-document')) {
-        portal.classList.add('print-visible-portal')
-      } else {
-        portal.classList.remove('print-visible-portal')
-      }
-    })
-
-    setTimeout(() => {
-      window.print()
-      document.body.classList.remove('quote-printing-active')
-      document.querySelectorAll('[data-radix-portal].print-visible-portal').forEach((portal) => {
-        portal.classList.remove('print-visible-portal')
-      })
-    }, 200)
+    window.print()
   }
 
-  const formattedDate = visit.date
-    ? new Date(visit.date + 'T12:00:00').toLocaleDateString('pt-BR')
-    : new Date().toLocaleDateString('pt-BR')
+  // Formatação de data
+  let formattedDate = 'Não informada'
+  if (visit.date) {
+    try {
+      const [year, month, day] = visit.date.split('-')
+      if (year && month && day) {
+        formattedDate = `${day}/${month}/${year}`
+      } else {
+        formattedDate = visit.date
+      }
+    } catch {
+      formattedDate = visit.date
+    }
+  }
 
-  const nowGeneratedString = new Date().toLocaleString('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  })
+  const nowGeneratedString = new Date().toLocaleString('pt-BR')
+
+  // Obtém ou gera o plano de ação
+  const actionPlan =
+    visit.actionPlan && visit.actionPlan.length > 0 ? visit.actionPlan : generateActionPlan(visit)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-0 overflow-hidden bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-        <DialogHeader className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-row items-center justify-between shrink-0">
+      <DialogContent className="max-w-4xl max-h-[92vh] flex flex-col p-0 overflow-hidden bg-slate-50 dark:bg-slate-900">
+        {/* Barra de Ações Superior (Não sai na impressão física) */}
+        <DialogHeader className="p-4 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-row items-center justify-between shrink-0">
           <div>
-            <DialogTitle className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <FileText className="h-5 w-5 text-teal-700 dark:text-teal-400" />
-              Resumo Técnico da Visita a Campo
+            <DialogTitle className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Printer className="h-4 w-4 text-teal-700 dark:text-teal-400" />
+              Relatório Técnico da Visita a Campo
             </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-              Visualização para impressão e exportação em formato padrão A4
+            <DialogDescription className="text-xs text-muted-foreground">
+              Formato A4 padronizado para envio ao cliente com plano de ação e anexos
             </DialogDescription>
           </div>
 
@@ -197,6 +197,12 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                       <span>Contato: {visit.clientContact}</span>
                     </div>
                   )}
+                  {visit.clientEmail && (
+                    <div className="flex items-center gap-1.5 sm:justify-end">
+                      <Mail className="h-3 w-3 text-slate-400" />
+                      <span>E-mail: {visit.clientEmail}</span>
+                    </div>
+                  )}
                   {visit.clientWorkArea && (
                     <div className="flex items-center gap-1.5 sm:justify-end">
                       <MapPin className="h-3 w-3 text-slate-400" />
@@ -211,7 +217,7 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
             <div className="p-3.5 rounded-lg border border-teal-200 bg-teal-50/40 space-y-1">
               <span className="text-[10px] uppercase font-bold text-teal-900 flex items-center gap-1.5">
                 <Wrench className="h-3.5 w-3.5 text-teal-700" />
-                Tipo de Trabalho / Objetivo da Visita
+                Tipo de Visita
               </span>
               <div className="font-semibold text-slate-900 text-xs">
                 {visit.workType || 'Não especificado'}
@@ -221,16 +227,54 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
               </div>
             </div>
 
-            {/* Observações Gerais */}
-            {visit.generalObservations && (
+            {/* Descrição Livre / Relato Técnico */}
+            {(visit.freeDescription || visit.generalObservations) && (
               <div className="space-y-1.5 border border-slate-200 rounded-lg p-3.5 bg-white">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                   <FileText className="h-3.5 w-3.5 text-teal-700" />
-                  Relato Técnico & Observações Gerais
+                  {visit.freeDescription
+                    ? 'Descrição Livre & Levantamento Técnico'
+                    : 'Relato Técnico & Observações Gerais'}
                 </span>
                 <p className="text-slate-800 whitespace-pre-wrap leading-relaxed text-[11px]">
-                  {visit.generalObservations}
+                  {visit.freeDescription || visit.generalObservations}
                 </p>
+              </div>
+            )}
+
+            {/* Anexos Gerais da Visita (Fotos) */}
+            {visit.visitAttachments && visit.visitAttachments.length > 0 && (
+              <div className="space-y-2 border border-slate-200 rounded-lg p-3.5 bg-white">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Camera className="h-3.5 w-3.5 text-teal-700" />
+                  Anexos Gerais da Instalação ({visit.visitAttachments.length})
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                  {visit.visitAttachments.map((att) => (
+                    <div
+                      key={att.id}
+                      className="rounded border border-slate-200 overflow-hidden bg-slate-50 p-1 flex flex-col"
+                    >
+                      {att.type === 'image' ? (
+                        <img
+                          src={att.dataUrl}
+                          alt={att.name || 'Foto geral'}
+                          className="w-full h-32 object-contain bg-black/5 rounded"
+                        />
+                      ) : (
+                        <div className="h-32 bg-slate-800 text-white flex flex-col items-center justify-center p-2 text-center rounded">
+                          <Video className="h-6 w-6 text-teal-400 mb-1" />
+                          <span className="text-[10px] truncate max-w-full">
+                            {att.name || 'Vídeo Anexado'}
+                          </span>
+                        </div>
+                      )}
+                      <span className="text-[9px] text-slate-600 mt-1 truncate">
+                        {att.name || 'Anexo'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -252,136 +296,234 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {visit.equipments.map((eq, idx) => (
-                    <div
-                      key={eq.id}
-                      className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs break-inside-avoid"
-                    >
-                      {/* Header do Equipamento */}
-                      <div className="bg-slate-50 border-b border-slate-200 p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="h-5 w-5 rounded-full bg-teal-700 text-white font-bold text-[10px] flex items-center justify-center">
-                            {idx + 1}
-                          </span>
-                          <span className="font-bold text-slate-900 text-xs">
-                            {eq.model || eq.manufacturer
-                              ? `${eq.manufacturer ? eq.manufacturer + ' ' : ''}${eq.model || 'Trocador'}`
-                              : `Equipamento #${idx + 1}`}
-                          </span>
-                          {eq.serialNumber && (
-                            <span className="text-[10px] font-mono text-slate-500">
-                              (Série: {eq.serialNumber})
+                  {visit.equipments.map((eq, idx) => {
+                    const eqTitle =
+                      eq.name ||
+                      (eq.model || eq.manufacturer
+                        ? `${eq.manufacturer ? eq.manufacturer + ' ' : ''}${eq.model || 'Trocador'}`
+                        : `Equipamento #${idx + 1}`)
+
+                    const allEqAttachments =
+                      eq.attachments && eq.attachments.length > 0
+                        ? eq.attachments
+                        : eq.photoDataUrl
+                          ? [
+                              {
+                                id: 'legacy',
+                                name: 'Foto da Placa',
+                                type: 'image' as const,
+                                dataUrl: eq.photoDataUrl,
+                              },
+                            ]
+                          : []
+
+                    return (
+                      <div
+                        key={eq.id}
+                        className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs break-inside-avoid"
+                      >
+                        {/* Header do Equipamento */}
+                        <div className="bg-slate-50 border-b border-slate-200 p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="h-5 w-5 rounded-full bg-teal-700 text-white font-bold text-[10px] flex items-center justify-center">
+                              {idx + 1}
                             </span>
+                            <span className="font-bold text-slate-900 text-xs">{eqTitle}</span>
+                            {eq.serialNumber && (
+                              <span className="text-[10px] font-mono text-slate-500">
+                                (Série: {eq.serialNumber})
+                              </span>
+                            )}
+                          </div>
+
+                          <Badge
+                            variant="outline"
+                            className={`text-[9px] font-bold ${
+                              eq.difficulty === 'Alto'
+                                ? 'text-rose-700 border-rose-300 bg-rose-50'
+                                : eq.difficulty === 'Baixo'
+                                  ? 'text-emerald-700 border-emerald-300 bg-emerald-50'
+                                  : 'text-amber-700 border-amber-300 bg-amber-50'
+                            }`}
+                          >
+                            Dificuldade: {eq.difficulty}
+                          </Badge>
+                        </div>
+
+                        {/* Conteúdo / Tabela de Especificações */}
+                        <div className="p-3.5 space-y-3">
+                          {(eq.manufacturer ||
+                            eq.plateCount ||
+                            eq.installedLocation ||
+                            eq.flowRate) && (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10.5px]">
+                              <div className="bg-slate-50/80 p-2 rounded border border-slate-100">
+                                <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">
+                                  Fabricante
+                                </span>
+                                <span className="font-medium text-slate-800">
+                                  {eq.manufacturer || '—'}
+                                </span>
+                              </div>
+
+                              <div className="bg-slate-50/80 p-2 rounded border border-slate-100">
+                                <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">
+                                  Qtd Placas
+                                </span>
+                                <span className="font-medium text-slate-800">
+                                  {eq.plateCount || '—'}
+                                </span>
+                              </div>
+
+                              <div className="bg-slate-50/80 p-2 rounded border border-slate-100">
+                                <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">
+                                  Local Instalado
+                                </span>
+                                <span className="font-medium text-slate-800">
+                                  {eq.installedLocation || '—'}
+                                </span>
+                              </div>
+
+                              <div className="bg-slate-50/80 p-2 rounded border border-slate-100">
+                                <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">
+                                  Vazão
+                                </span>
+                                <span className="font-medium text-slate-800">
+                                  {eq.flowRate || '—'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Linha de Fluidos & Temperaturas */}
+                          {(eq.fluid1 || eq.fluid2 || eq.inletTemp || eq.outletTemp) && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10.5px]">
+                              <div className="bg-slate-50/80 p-2 rounded border border-slate-100 flex items-center justify-between">
+                                <span className="text-slate-500 text-[9.5px] uppercase font-semibold">
+                                  Fluidos Operacionais:
+                                </span>
+                                <span className="font-medium text-slate-800 text-right">
+                                  {eq.fluid1 || '—'} / {eq.fluid2 || '—'}
+                                </span>
+                              </div>
+
+                              <div className="bg-slate-50/80 p-2 rounded border border-slate-100 flex items-center justify-between">
+                                <span className="text-slate-500 text-[9.5px] uppercase font-semibold flex items-center gap-1">
+                                  <Thermometer className="h-3 w-3 text-slate-400" />
+                                  Temperaturas (Entrada / Saída):
+                                </span>
+                                <span className="font-medium text-slate-800 text-right font-mono">
+                                  {eq.inletTemp || '—'} / {eq.outletTemp || '—'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Observações do Técnico */}
+                          {eq.technicianNotes && (
+                            <div className="p-2.5 rounded bg-amber-50/50 border border-amber-200/80 text-[10.5px]">
+                              <span className="font-bold text-amber-900 block text-[9.5px] uppercase mb-0.5">
+                                Parecer do Técnico Mecânico:
+                              </span>
+                              <p className="text-slate-800 whitespace-pre-wrap">
+                                {eq.technicianNotes}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Fotos e Vídeos do Equipamento */}
+                          {allEqAttachments.length > 0 && (
+                            <div className="pt-1">
+                              <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1 mb-1.5">
+                                <Camera className="h-3 w-3 text-teal-700" />
+                                Registros Fotográficos do Equipamento ({allEqAttachments.length})
+                              </span>
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {allEqAttachments.map((att) => (
+                                  <div
+                                    key={att.id}
+                                    className="rounded-lg overflow-hidden border border-slate-200 bg-slate-50 p-1 flex flex-col"
+                                  >
+                                    {att.type === 'image' ? (
+                                      <img
+                                        src={att.dataUrl}
+                                        alt={att.name || eqTitle}
+                                        className="h-36 w-full object-contain rounded bg-white"
+                                      />
+                                    ) : (
+                                      <div className="h-36 bg-slate-800 text-white flex flex-col items-center justify-center p-2 text-center rounded">
+                                        <Video className="h-6 w-6 text-teal-400 mb-1" />
+                                        <span className="text-[10px] truncate max-w-full">
+                                          {att.name || 'Vídeo'}
+                                        </span>
+                                      </div>
+                                    )}
+                                    <span className="text-[9px] text-slate-600 mt-1 truncate">
+                                      {att.name || 'Registro'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           )}
                         </div>
-
-                        <Badge
-                          variant="outline"
-                          className={`text-[9px] font-bold ${
-                            eq.difficulty === 'Alto'
-                              ? 'text-rose-700 border-rose-300 bg-rose-50'
-                              : eq.difficulty === 'Baixo'
-                                ? 'text-emerald-700 border-emerald-300 bg-emerald-50'
-                                : 'text-amber-700 border-amber-300 bg-amber-50'
-                          }`}
-                        >
-                          Dificuldade: {eq.difficulty}
-                        </Badge>
                       </div>
-
-                      {/* Conteúdo / Tabela de Especificações */}
-                      <div className="p-3.5 space-y-3">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10.5px]">
-                          <div className="bg-slate-50/80 p-2 rounded border border-slate-100">
-                            <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">
-                              Fabricante
-                            </span>
-                            <span className="font-medium text-slate-800">
-                              {eq.manufacturer || '—'}
-                            </span>
-                          </div>
-
-                          <div className="bg-slate-50/80 p-2 rounded border border-slate-100">
-                            <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">
-                              Qtd Placas
-                            </span>
-                            <span className="font-medium text-slate-800">
-                              {eq.plateCount || '—'}
-                            </span>
-                          </div>
-
-                          <div className="bg-slate-50/80 p-2 rounded border border-slate-100">
-                            <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">
-                              Local Instalado
-                            </span>
-                            <span className="font-medium text-slate-800">
-                              {eq.installedLocation || '—'}
-                            </span>
-                          </div>
-
-                          <div className="bg-slate-50/80 p-2 rounded border border-slate-100">
-                            <span className="text-slate-500 block text-[9.5px] uppercase font-semibold">
-                              Vazão
-                            </span>
-                            <span className="font-medium text-slate-800">{eq.flowRate || '—'}</span>
-                          </div>
-                        </div>
-
-                        {/* Linha de Fluidos & Temperaturas */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10.5px]">
-                          <div className="bg-slate-50/80 p-2 rounded border border-slate-100 flex items-center justify-between">
-                            <span className="text-slate-500 text-[9.5px] uppercase font-semibold">
-                              Fluidos Operacionais:
-                            </span>
-                            <span className="font-medium text-slate-800 text-right">
-                              {eq.fluid1 || '—'} / {eq.fluid2 || '—'}
-                            </span>
-                          </div>
-
-                          <div className="bg-slate-50/80 p-2 rounded border border-slate-100 flex items-center justify-between">
-                            <span className="text-slate-500 text-[9.5px] uppercase font-semibold flex items-center gap-1">
-                              <Thermometer className="h-3 w-3 text-slate-400" />
-                              Temperaturas (Entrada / Saída):
-                            </span>
-                            <span className="font-medium text-slate-800 text-right font-mono">
-                              {eq.inletTemp || '—'} / {eq.outletTemp || '—'}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Observações do Técnico */}
-                        {eq.technicianNotes && (
-                          <div className="p-2.5 rounded bg-amber-50/50 border border-amber-200/80 text-[10.5px]">
-                            <span className="font-bold text-amber-900 block text-[9.5px] uppercase mb-0.5">
-                              Parecer do Técnico Mecânico:
-                            </span>
-                            <p className="text-slate-800 whitespace-pre-wrap">
-                              {eq.technicianNotes}
-                            </p>
-                          </div>
-                        )}
-
-                        {/* Foto do Equipamento (se houver) */}
-                        {eq.photoDataUrl && (
-                          <div className="pt-1">
-                            <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1 mb-1.5">
-                              <Camera className="h-3 w-3 text-teal-700" />
-                              Registro Fotográfico da Placa / Equipamento
-                            </span>
-                            <div className="rounded-lg overflow-hidden border border-slate-200 max-h-56 bg-slate-100 flex items-center justify-center p-1">
-                              <img
-                                src={eq.photoDataUrl}
-                                alt={`Foto de ${eq.model || 'equipamento'}`}
-                                className="max-h-52 w-auto object-contain rounded"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
+            </div>
+
+            {/* PLANO DE AÇÃO GERADO AUTOMATICAMENTE (Regra 4: Pontos a Melhorar) */}
+            <div className="space-y-3 pt-2 break-inside-avoid">
+              <div className="flex items-center justify-between border-b border-teal-700 pb-1.5">
+                <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                  <CheckSquare className="h-4 w-4 text-teal-700" />
+                  Plano de Ação & Pontos de Atenção Recomendados
+                </h3>
+                <span className="text-[10px] text-teal-800 font-semibold">
+                  Engenharia de Aplicação Intertermal
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                {actionPlan.map((action, aIdx) => (
+                  <div
+                    key={action.id || aIdx}
+                    className="p-3 rounded-lg border border-slate-200 bg-slate-50/80 space-y-1.5 text-[11px]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="h-4 w-4 rounded-full bg-teal-100 text-teal-800 text-[10px] font-bold flex items-center justify-center">
+                          {aIdx + 1}
+                        </span>
+                        <strong className="text-slate-900 font-bold">{action.title}</strong>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] font-semibold ${
+                          action.priority === 'Alta'
+                            ? 'text-rose-700 border-rose-300 bg-rose-50'
+                            : action.priority === 'Média'
+                              ? 'text-amber-700 border-amber-300 bg-amber-50'
+                              : 'text-emerald-700 border-emerald-300 bg-emerald-50'
+                        }`}
+                      >
+                        Prioridade {action.priority}
+                      </Badge>
+                    </div>
+
+                    <p className="text-slate-700 text-[10.5px] leading-snug pl-6">
+                      {action.description}
+                    </p>
+
+                    <div className="pl-6 pt-1 flex items-start gap-1.5 text-teal-900 font-medium text-[10px]">
+                      <span className="font-bold shrink-0">Ação recomendada:</span>
+                      <span>{action.suggestedAction}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             {/* Rodapé com data de geração */}

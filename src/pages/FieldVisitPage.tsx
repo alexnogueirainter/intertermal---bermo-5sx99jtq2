@@ -25,6 +25,15 @@ import {
   Printer,
   Loader2,
   Check,
+  Video,
+  FileCode2,
+  Mail,
+  HelpCircle,
+  Eye,
+  Film,
+  Image as ImageIcon,
+  X,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,31 +58,62 @@ import {
   EquipmentItem,
   WorkTypeOption,
   DifficultyLevel,
+  MediaAttachment,
   STORAGE_KEY_CURRENT_VISIT,
   STORAGE_KEY_EMPLOYEE_NAME,
   createEmptyEquipment,
   createInitialVisitData,
   calculateDurationBetween,
-  compressImageFile,
   recordToFieldVisitData,
+  readFileAsMediaAttachment,
+  generateActionPlan,
+  generateId,
 } from '@/types/field-visit'
 
-const WORK_TYPE_OPTIONS: { label: WorkTypeOption; description: string }[] = [
+/**
+ * 6 Tipos exatos solicitados pelo usuário
+ */
+const WORK_TYPE_OPTIONS: {
+  label: WorkTypeOption
+  category: 'lean' | 'detailed'
+  badge: string
+  description: string
+}[] = [
   {
-    label: 'Manutenção preventiva ou corretiva',
-    description: 'Revisão, troca de gaxetas, abertura ou limpeza de trocadores e válvulas',
+    label: 'Projeto Novo',
+    category: 'lean',
+    badge: 'Formulário Enxuto',
+    description: 'Levantamento para novo trocador de calor ou novo processo térmico.',
   },
   {
-    label: 'Projeto novo ou readequação',
-    description: 'Levantamento de dados térmicos para novo dimensionamento ou retrofit',
+    label: 'Readequação',
+    category: 'lean',
+    badge: 'Formulário Enxuto',
+    description: 'Retrofit, aumento de capacidade ou readequação de trocador existente.',
   },
   {
-    label: 'Catalogação de equipamentos',
-    description: 'Mapeamento de parque instalado, placas de identificação e especificações',
+    label: 'Manutenção Preventiva',
+    category: 'detailed',
+    badge: 'Formulário Completo',
+    description: 'Revisão periódica, troca preventiva de gaxetas e limpeza mecânica.',
+  },
+  {
+    label: 'Manutenção Corretiva',
+    category: 'detailed',
+    badge: 'Formulário Completo',
+    description: 'Intervenção imediata, reparo de vazamento ou recuperação emergencial.',
+  },
+  {
+    label: 'Catálogo de Equipamentos',
+    category: 'detailed',
+    badge: 'Formulário Completo',
+    description: 'Mapeamento do parque de trocadores instalados e placas de identificação.',
   },
   {
     label: 'Outro',
-    description: 'Vistoria geral, acompanhamento de partida técnica ou outra atividade',
+    category: 'lean',
+    badge: 'Formulário Enxuto',
+    description: 'Vistoria geral, acompanhamento de partida técnica ou outra atividade.',
   },
 ]
 
@@ -93,6 +133,362 @@ const DIFFICULTY_OPTIONS: { level: DifficultyLevel; color: string }[] = [
     color: 'border-rose-300 hover:border-rose-500 text-rose-700 bg-rose-50/60 dark:bg-rose-950/40',
   },
 ]
+
+/**
+ * Hook reutilizável de gravação de voz com transcrição automática via Web Speech API.
+ * Garante que a transcrição NUNCA sobrescreva o texto existente (apenas append)
+ * e o campo permaneça 100% editável manualmente a qualquer momento.
+ */
+function useSpeechDictation({
+  currentText,
+  onUpdateText,
+}: {
+  currentText: string
+  onUpdateText: (newText: string) => void
+}) {
+  const [isRecording, setIsRecording] = useState(false)
+  const [speechSupported, setSpeechSupported] = useState(false)
+  const [interimTranscript, setInterimTranscript] = useState('')
+  const recognitionRef = useRef<any>(null)
+  const isRunningRef = useRef(false)
+  const baseTextRef = useRef('')
+  const finalTranscriptRef = useRef('')
+
+  useEffect(() => {
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    setSpeechSupported(!!SpeechRec)
+
+    return () => {
+      if (recognitionRef.current && isRunningRef.current) {
+        try {
+          recognitionRef.current.abort?.()
+        } catch {
+          /* intentionally ignored */
+        }
+      }
+      isRunningRef.current = false
+    }
+  }, [])
+
+  const startRecording = () => {
+    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    if (!SpeechRec || isRunningRef.current) return
+
+    try {
+      baseTextRef.current = currentText || ''
+      finalTranscriptRef.current = ''
+      setInterimTranscript('')
+
+      const instance = new SpeechRec()
+      instance.lang = 'pt-BR'
+      instance.continuous = true
+      instance.interimResults = true
+
+      instance.onresult = (event: any) => {
+        let currentInterim = ''
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const res = event.results[i]
+          const phrase = res[0]?.transcript || ''
+          if (res.isFinal) {
+            const trimmed = phrase.trim()
+            if (trimmed) {
+              finalTranscriptRef.current = finalTranscriptRef.current
+                ? `${finalTranscriptRef.current} ${trimmed}`
+                : trimmed
+            }
+          } else {
+            currentInterim += phrase
+          }
+        }
+
+        setInterimTranscript(currentInterim.trim())
+
+        const base = baseTextRef.current.trim()
+        const addedFinal = finalTranscriptRef.current.trim()
+        let combined = base
+        if (addedFinal) {
+          combined = base ? `${base} ${addedFinal}` : addedFinal
+        }
+
+        onUpdateText(combined)
+      }
+
+      instance.onerror = (err: any) => {
+        if (err.error !== 'no-speech') {
+          isRunningRef.current = false
+          setIsRecording(false)
+          setInterimTranscript('')
+        }
+      }
+
+      instance.onend = () => {
+        isRunningRef.current = false
+        setIsRecording(false)
+        setInterimTranscript('')
+      }
+
+      recognitionRef.current = instance
+      instance.start()
+      isRunningRef.current = true
+      setIsRecording(true)
+    } catch (e) {
+      console.warn('Erro ao iniciar speech recognition:', e)
+      isRunningRef.current = false
+      setIsRecording(false)
+      setInterimTranscript('')
+    }
+  }
+
+  const stopRecording = () => {
+    isRunningRef.current = false
+    setIsRecording(false)
+    setInterimTranscript('')
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+  }
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording()
+    } else {
+      startRecording()
+    }
+  }
+
+  return {
+    isRecording,
+    speechSupported,
+    interimTranscript,
+    toggleRecording,
+    stopRecording,
+  }
+}
+
+/**
+ * Componente dedicado para campo de texto livre com Gravação de Voz embutida
+ * e edição manual total.
+ */
+function VoiceDictationTextarea({
+  label,
+  sublabel,
+  value,
+  onChange,
+  placeholder,
+  rows = 4,
+}: {
+  label: string
+  sublabel?: string
+  value: string
+  onChange: (val: string) => void
+  placeholder?: string
+  rows?: number
+}) {
+  const { isRecording, speechSupported, interimTranscript, toggleRecording } = useSpeechDictation({
+    currentText: value,
+    onUpdateText: onChange,
+  })
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+            {label}
+          </label>
+          {sublabel && <p className="text-[11px] text-muted-foreground">{sublabel}</p>}
+        </div>
+
+        {speechSupported && (
+          <Button
+            type="button"
+            variant={isRecording ? 'destructive' : 'outline'}
+            size="sm"
+            onClick={toggleRecording}
+            className={`h-8 text-xs px-2.5 font-semibold transition-all ${
+              isRecording
+                ? 'animate-pulse ring-2 ring-rose-400 bg-rose-600 text-white'
+                : 'border-teal-300 dark:border-teal-800 text-teal-800 dark:text-teal-300 hover:bg-teal-50'
+            }`}
+            title={isRecording ? 'Parar gravação' : 'Gravar áudio e transcrever'}
+          >
+            {isRecording ? (
+              <>
+                <MicOff className="h-3.5 w-3.5 mr-1" />
+                Gravando...
+              </>
+            ) : (
+              <>
+                <Mic className="h-3.5 w-3.5 mr-1 text-teal-600 dark:text-teal-400" />
+                Gravar voz
+              </>
+            )}
+          </Button>
+        )}
+      </div>
+
+      {isRecording && (
+        <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
+            <span className="font-semibold">Ouvindo sua fala em português...</span>
+          </div>
+          {interimTranscript && (
+            <div className="italic text-[11px] text-rose-700 dark:text-rose-300 bg-white/70 dark:bg-slate-900/60 p-2 rounded border border-rose-200 dark:border-rose-800">
+              &ldquo;{interimTranscript}&rdquo;
+            </div>
+          )}
+        </div>
+      )}
+
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className="text-xs sm:text-sm leading-relaxed bg-slate-50/70 dark:bg-slate-950 resize-y"
+      />
+    </div>
+  )
+}
+
+/**
+ * Componente para campo de anexos com suporte a MÚLTIPLAS imagens e vídeos
+ */
+function MultiMediaAttachmentField({
+  attachments = [],
+  onAddFiles,
+  onRemoveAttachment,
+  title = 'Anexos (Fotos e Vídeos)',
+  description = 'Aceita múltiplos arquivos de foto e vídeo ao mesmo tempo.',
+  isCompressing = false,
+}: {
+  attachments?: MediaAttachment[]
+  onAddFiles: (files: FileList | null) => Promise<void>
+  onRemoveAttachment: (attachmentId: string) => void
+  title?: string
+  description?: string
+  isCompressing?: boolean
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  return (
+    <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+            <Camera className="h-4 w-4 text-teal-700 dark:text-teal-400" />
+            {title}
+          </label>
+          <p className="text-[11px] text-muted-foreground">{description}</p>
+        </div>
+        <Badge variant="secondary" className="text-[10px]">
+          {attachments.length} {attachments.length === 1 ? 'anexo' : 'anexos'}
+        </Badge>
+      </div>
+
+      {/* Grid de miniaturas existentes */}
+      {attachments.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          {attachments.map((att) => (
+            <div
+              key={att.id}
+              className="relative group rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-black/5 dark:bg-white/5 flex flex-col"
+            >
+              <div className="aspect-video w-full bg-black/80 flex items-center justify-center overflow-hidden">
+                {att.type === 'video' ? (
+                  <video src={att.dataUrl} controls className="w-full h-full object-contain" />
+                ) : (
+                  <img
+                    src={att.dataUrl}
+                    alt={att.name || 'Foto anexada'}
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </div>
+
+              <div className="p-1.5 bg-white dark:bg-slate-900 flex items-center justify-between text-[10px] text-muted-foreground border-t border-slate-200 dark:border-slate-800">
+                <span className="truncate flex items-center gap-1 max-w-[120px]">
+                  {att.type === 'video' ? (
+                    <Video className="h-3 w-3 text-teal-600 shrink-0" />
+                  ) : (
+                    <ImageIcon className="h-3 w-3 text-teal-600 shrink-0" />
+                  )}
+                  {att.name || (att.type === 'video' ? 'Vídeo' : 'Foto')}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRemoveAttachment(att.id)}
+                  className="text-rose-600 hover:text-rose-700 p-1 rounded hover:bg-rose-50"
+                  title="Remover anexo"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Botões de Upload Múltiplo */}
+      <div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          className="hidden"
+          onChange={(e) => onAddFiles(e.target.files)}
+          disabled={isCompressing}
+        />
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {/* Opção 1: Fotos e Vídeos da Galeria/Arquivos (Múltiplos) */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isCompressing}
+            className="h-10 text-xs border-teal-300 dark:border-teal-700 text-teal-800 dark:text-teal-300 hover:bg-teal-50 flex items-center justify-center gap-1.5 font-semibold"
+          >
+            {isCompressing ? (
+              <>
+                <RotateCcw className="h-3.5 w-3.5 animate-spin text-teal-600" />
+                Processando arquivos...
+              </>
+            ) : (
+              <>
+                <Upload className="h-3.5 w-3.5 text-teal-600" />
+                Anexar Fotos / Vídeos (Múltiplos)
+              </>
+            )}
+          </Button>
+
+          {/* Opção 2: Câmera Direta do Celular */}
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={(e) => onAddFiles(e.target.files)}
+              disabled={isCompressing}
+            />
+            <div className="h-10 px-3 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 flex items-center justify-center gap-1.5">
+              <Camera className="h-3.5 w-3.5 text-teal-700" />
+              Tirar Foto com a Câmera
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function FieldVisitPage() {
   const [searchParams] = useSearchParams()
@@ -118,8 +514,6 @@ export default function FieldVisitPage() {
       const savedDraft = localStorage.getItem(STORAGE_KEY_CURRENT_VISIT)
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft)
-        // Migração de compatibilidade retroativa: se existir parsed.clientName mas parsed.companyName estiver ausente,
-        // preencher companyName com o valor antigo para preservar o que já foi digitado.
         const restoredCompanyName =
           parsed.companyName !== undefined ? parsed.companyName : parsed.clientName || ''
         const restoredClientName = parsed.companyName !== undefined ? parsed.clientName || '' : ''
@@ -142,8 +536,6 @@ export default function FieldVisitPage() {
   const [isLoadingRecord, setIsLoadingRecord] = useState(false)
   useEffect(() => {
     if (!queryVisitId) return
-
-    // Se o formulário já tem esse id carregado, não precisa buscar novamente
     if (visit.backendRecordId === queryVisitId) return
 
     let isMounted = true
@@ -159,7 +551,6 @@ export default function FieldVisitPage() {
         data.lastSentAt = record.sent_at || record.created
 
         setVisit(data)
-        // Persistir imediatamente no localStorage para manter integridade
         try {
           localStorage.setItem(STORAGE_KEY_CURRENT_VISIT, JSON.stringify(data))
           if (data.employeeName) {
@@ -190,142 +581,24 @@ export default function FieldVisitPage() {
   // Mensagens e feedbacks
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved')
   const [quotaWarning, setQuotaWarning] = useState<string | null>(null)
-  const [imageCompressingId, setImageCompressingId] = useState<string | null>(null)
   const [isSendingToCrm, setIsSendingToCrm] = useState(false)
   const [isPdfDialogOpen, setIsPdfDialogOpen] = useState(false)
+  const [isCompressingGlobal, setIsCompressingGlobal] = useState(false)
 
   // Modais de confirmação
   const [isNewVisitDialogOpen, setIsNewVisitDialogOpen] = useState(false)
   const [equipmentToDelete, setEquipmentToDelete] = useState<string | null>(null)
 
-  // Envio ao CRM PocketBase
-  const handleSendToCrm = async () => {
-    // Validação mínima solicitada: nome do funcionário e/ou data
-    const trimmedEmployee = (visit.employeeName || '').trim()
-    const trimmedDate = (visit.date || '').trim()
+  // Determinar qual é o fluxo ativo:
+  // "Projeto Novo", "Readequação" ou "Outro" = fluxo enxuto (lean)
+  // "Manutenção Preventiva", "Manutenção Corretiva", "Catálogo de Equipamentos" = fluxo completo detalhado
+  const isLeanFlow =
+    visit.workType === 'Projeto Novo' ||
+    visit.workType === 'Readequação' ||
+    visit.workType === 'Outro' ||
+    visit.workType === 'Projeto novo ou readequação'
 
-    if (!trimmedEmployee && !trimmedDate) {
-      toast({
-        title: 'Dados insuficientes',
-        description:
-          'Informe ao menos o nome do funcionário ou a data da visita para enviar ao CRM.',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    setIsSendingToCrm(true)
-    const nowIso = new Date().toISOString()
-
-    // Compatibilidade no PocketBase:
-    // O campo nativo da collection field_visits é client_name.
-    // Mapeamos a empresa e/ou nome do cliente de forma que:
-    // - se ambos estiverem preenchidos: "Empresa (Contato: Nome)"
-    // - se apenas um: o que estiver preenchido
-    const companyTrimmed = (visit.companyName || '').trim()
-    const contactPersonTrimmed = (visit.clientName || '').trim()
-    let combinedClientName: string | undefined = undefined
-    if (companyTrimmed && contactPersonTrimmed) {
-      combinedClientName = `${companyTrimmed} (${contactPersonTrimmed})`
-    } else if (companyTrimmed) {
-      combinedClientName = companyTrimmed
-    } else if (contactPersonTrimmed) {
-      combinedClientName = contactPersonTrimmed
-    }
-
-    const payload: Partial<FieldVisitRecord> = {
-      employee_name: trimmedEmployee || 'Técnico Intertermal',
-      visit_date: trimmedDate || undefined,
-      start_time: visit.startTime || undefined,
-      end_time: visit.endTime || undefined,
-      duration: visit.visitDuration || undefined,
-      client_name: combinedClientName,
-      client_role: visit.clientRole?.trim() || undefined,
-      client_contact: visit.clientContact?.trim() || undefined,
-      work_area: visit.clientWorkArea?.trim() || undefined,
-      work_type: visit.workType || undefined,
-      work_type_other: visit.workTypeOther?.trim() || undefined,
-      general_notes: visit.generalObservations?.trim() || undefined,
-      equipment: visit.equipments || [],
-      status: 'enviada',
-      sent_at: nowIso,
-    }
-
-    try {
-      let savedRecord: FieldVisitRecord
-      if (visit.backendRecordId) {
-        // Reenvio: atualiza o mesmo registro no PocketBase em vez de duplicar
-        savedRecord = await fieldVisitsService.update(visit.backendRecordId, payload)
-        toast({
-          title: 'Visita atualizada no CRM!',
-          description: `Os dados da visita foram sincronizados com sucesso no sistema.`,
-        })
-      } else {
-        // Primeiro envio: cria novo registro
-        savedRecord = await fieldVisitsService.create(payload)
-        toast({
-          title: 'Visita enviada ao CRM!',
-          description: `Visita técnica gravada com sucesso no CRM Intertermal.`,
-        })
-      }
-
-      // Atualiza o rascunho local mantendo tudo editável e marcando o envio
-      setVisit((prev) => ({
-        ...prev,
-        backendRecordId: savedRecord.id,
-        crmStatus: 'enviada',
-        lastSentAt: nowIso,
-        updatedAt: nowIso,
-      }))
-    } catch (err: any) {
-      console.error('Erro ao enviar visita ao CRM:', err)
-      toast({
-        title: 'Erro ao enviar ao CRM',
-        description:
-          err.message ||
-          'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
-        variant: 'destructive',
-      })
-    } finally {
-      setIsSendingToCrm(false)
-    }
-  }
-
-  // Reconhecimento de Voz (Speech Recognition)
-  const [isRecording, setIsRecording] = useState(false)
-  const [speechSupported, setSpeechSupported] = useState(false)
-  const [interimTranscript, setInterimTranscript] = useState('')
-  const recognitionRef = useRef<any>(null)
-  const isRunningRef = useRef(false)
-  const baseTextRef = useRef('')
-  const finalTranscriptRef = useRef('')
-
-  // Sincronizar o suporte da Web Speech API
-  useEffect(() => {
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (SpeechRec) {
-      setSpeechSupported(true)
-    } else {
-      setSpeechSupported(false)
-    }
-
-    return () => {
-      if (recognitionRef.current && isRunningRef.current) {
-        try {
-          if (typeof recognitionRef.current.abort === 'function') {
-            recognitionRef.current.abort()
-          } else if (typeof recognitionRef.current.stop === 'function') {
-            recognitionRef.current.stop()
-          }
-        } catch {
-          // ignore
-        }
-      }
-      isRunningRef.current = false
-    }
-  }, [])
-
-  // Auto-save com debounce de 400ms
+  // Auto-save com debounce de 400ms (Regra geral: salvar automaticamente cada campo preenchido)
   useEffect(() => {
     setSaveStatus('saving')
     const timer = setTimeout(() => {
@@ -342,7 +615,6 @@ export default function FieldVisitPage() {
         setQuotaWarning(null)
       } catch (err: any) {
         console.error('Erro ao salvar no localStorage:', err)
-        // Se exceder a cota (ex: fotos grandes demais)
         if (
           err.name === 'QuotaExceededError' ||
           err.code === 22 ||
@@ -350,7 +622,7 @@ export default function FieldVisitPage() {
           err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
         ) {
           setQuotaWarning(
-            'Atenção: O limite de armazenamento local foi atingido devido a fotos em alta resolução. Seus textos continuam na tela, mas recomendamos remover algumas fotos para garantir a persistência completa.',
+            'Atenção: O limite de armazenamento local foi atingido devido a múltiplos vídeos ou fotos em alta resolução. Seus textos continuam preservados na tela, mas recomendamos enviar ao CRM.',
           )
         } else {
           setQuotaWarning(
@@ -411,107 +683,47 @@ export default function FieldVisitPage() {
     }))
   }
 
-  // Microfone toggle (robusto, sem duplicação de texto)
-  const toggleRecording = () => {
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRec) return
-
-    if (isRunningRef.current) {
-      // Parar gravação
-      isRunningRef.current = false
-      setIsRecording(false)
-      setInterimTranscript('')
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop()
-        } catch (e) {
-          console.warn('Erro ao parar reconhecimento de voz:', e)
-        }
-      }
-      return
-    }
-
-    // Iniciar gravação limpa
+  // Handlers para anexos gerais da visita (fluxo enxuto)
+  const handleAddVisitAttachments = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setIsCompressingGlobal(true)
     try {
-      // Guarda o texto existente antes da gravação começar
-      const currentObs = visit.generalObservations || ''
-      baseTextRef.current = currentObs
-      finalTranscriptRef.current = ''
-      setInterimTranscript('')
-
-      // Cria uma nova instância para evitar vazamento de estado de sessões anteriores
-      const instance = new SpeechRec()
-      instance.lang = 'pt-BR'
-      instance.continuous = true
-      instance.interimResults = true
-
-      instance.onresult = (event: any) => {
-        let currentInterim = ''
-        // event.resultIndex indica a partir de qual índice são novos resultados
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const res = event.results[i]
-          const phrase = res[0]?.transcript || ''
-          if (res.isFinal) {
-            // Apenas adiciona ao texto final UMA única vez
-            const trimmed = phrase.trim()
-            if (trimmed) {
-              finalTranscriptRef.current = finalTranscriptRef.current
-                ? `${finalTranscriptRef.current} ${trimmed}`
-                : trimmed
-            }
-          } else {
-            currentInterim += phrase
-          }
-        }
-
-        setInterimTranscript(currentInterim.trim())
-
-        // Atualiza o campo com baseText + finalTranscript consolidado
-        const base = baseTextRef.current.trim()
-        const addedFinal = finalTranscriptRef.current.trim()
-        let combined = base
-        if (addedFinal) {
-          combined = base ? `${base} ${addedFinal}` : addedFinal
-        }
-
-        setVisit((prev) => ({
-          ...prev,
-          generalObservations: combined,
-        }))
+      const newAttachments: MediaAttachment[] = []
+      for (let i = 0; i < files.length; i++) {
+        const item = await readFileAsMediaAttachment(files[i])
+        newAttachments.push(item)
       }
-
-      instance.onerror = (err: any) => {
-        console.warn('SpeechRecognition erro:', err)
-        // Erro "no-speech" é comum se o usuário demorar a falar
-        if (err.error !== 'no-speech') {
-          isRunningRef.current = false
-          setIsRecording(false)
-          setInterimTranscript('')
-        }
-      }
-
-      instance.onend = () => {
-        // Se a parada foi intencional ou se a sessão encerrou
-        isRunningRef.current = false
-        setIsRecording(false)
-        setInterimTranscript('')
-      }
-
-      recognitionRef.current = instance
-      instance.start()
-      isRunningRef.current = true
-      setIsRecording(true)
-    } catch (e) {
-      console.warn('Erro ao inicializar speech recognition:', e)
-      isRunningRef.current = false
-      setIsRecording(false)
-      setInterimTranscript('')
+      setVisit((prev) => ({
+        ...prev,
+        visitAttachments: [...(prev.visitAttachments || []), ...newAttachments],
+      }))
+      toast({
+        title: 'Anexos adicionados',
+        description: `${newAttachments.length} ${newAttachments.length === 1 ? 'arquivo anexado' : 'arquivos anexados'} com sucesso.`,
+      })
+    } catch (err: any) {
+      console.error('Erro ao processar anexos da visita:', err)
+      toast({
+        title: 'Erro ao anexar arquivo',
+        description: err.message || 'Não foi possível carregar o arquivo.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsCompressingGlobal(false)
     }
   }
 
+  const handleRemoveVisitAttachment = (attachmentId: string) => {
+    setVisit((prev) => ({
+      ...prev,
+      visitAttachments: (prev.visitAttachments || []).filter((a) => a.id !== attachmentId),
+    }))
+  }
+
   // Ações de Equipamentos
-  const handleAddEquipment = () => {
-    const newEq = createEmptyEquipment()
+  const handleAddEquipment = (customName?: string) => {
+    const nextIndex = visit.equipments.length + 1
+    const newEq = createEmptyEquipment(customName || `Equipamento ${nextIndex}`)
     setVisit((prev) => ({
       ...prev,
       equipments: [...prev.equipments, newEq],
@@ -534,34 +746,159 @@ export default function FieldVisitPage() {
     setEquipmentToDelete(null)
   }
 
-  // Foto de equipamento
-  const handlePhotoUpload = async (
-    equipmentId: string,
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
+  // Anexos múltiplos por equipamento
+  const handleAddEquipmentAttachments = async (equipmentId: string, files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setIsCompressingGlobal(true)
     try {
-      setImageCompressingId(equipmentId)
-      const compressedDataUrl = await compressImageFile(file, 1000, 0.7)
-      handleUpdateEquipment(equipmentId, { photoDataUrl: compressedDataUrl })
-      setQuotaWarning(null)
+      const newAttachments: MediaAttachment[] = []
+      for (let i = 0; i < files.length; i++) {
+        const item = await readFileAsMediaAttachment(files[i])
+        newAttachments.push(item)
+      }
+      setVisit((prev) => ({
+        ...prev,
+        equipments: prev.equipments.map((eq) => {
+          if (eq.id !== equipmentId) return eq
+          const current = eq.attachments || []
+          const updated = [...current, ...newAttachments]
+          return {
+            ...eq,
+            attachments: updated,
+            // Sincroniza também photoDataUrl para retrocompatibilidade se for imagem
+            photoDataUrl: updated.find((a) => a.type === 'image')?.dataUrl || eq.photoDataUrl,
+          }
+        }),
+      }))
+      toast({
+        title: 'Anexo adicionado ao equipamento',
+        description: `${newAttachments.length} ${newAttachments.length === 1 ? 'arquivo salvo' : 'arquivos salvos'}.`,
+      })
     } catch (err: any) {
-      console.error('Erro ao comprimir foto:', err)
-      alert('Não foi possível processar a imagem. Tente novamente.')
+      console.error('Erro ao processar anexos do equipamento:', err)
+      toast({
+        title: 'Erro ao anexar',
+        description: err.message || 'Falha ao processar arquivo.',
+        variant: 'destructive',
+      })
     } finally {
-      setImageCompressingId(null)
-      // Limpar o input para permitir refazer a mesma foto se desejar
-      event.target.value = ''
+      setIsCompressingGlobal(false)
     }
   }
 
-  const handleRemovePhoto = (equipmentId: string) => {
-    handleUpdateEquipment(equipmentId, { photoDataUrl: undefined })
+  const handleRemoveEquipmentAttachment = (equipmentId: string, attachmentId: string) => {
+    setVisit((prev) => ({
+      ...prev,
+      equipments: prev.equipments.map((eq) => {
+        if (eq.id !== equipmentId) return eq
+        const updated = (eq.attachments || []).filter((a) => a.id !== attachmentId)
+        return {
+          ...eq,
+          attachments: updated,
+          photoDataUrl: updated.find((a) => a.type === 'image')?.dataUrl,
+        }
+      }),
+    }))
   }
 
-  // Nova Visita (Limpeza total com confirmação)
+  // Envio ao CRM PocketBase (Regra 4: manter geração automática do plano de ação)
+  const handleSendToCrm = async () => {
+    const trimmedEmployee = (visit.employeeName || '').trim()
+    const trimmedDate = (visit.date || '').trim()
+
+    if (!trimmedEmployee && !trimmedDate) {
+      toast({
+        title: 'Dados insuficientes',
+        description:
+          'Informe ao menos o nome do funcionário ou a data da visita para enviar ao CRM.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsSendingToCrm(true)
+    const nowIso = new Date().toISOString()
+
+    // Gerar plano de ação automático com base nas informações coletadas
+    const autoPlan = generateActionPlan(visit)
+
+    // Formatar nome de cliente/empresa compatível
+    const companyTrimmed = (visit.companyName || '').trim()
+    const contactPersonTrimmed = (visit.clientName || '').trim()
+    let combinedClientName: string | undefined = undefined
+    if (companyTrimmed && contactPersonTrimmed) {
+      combinedClientName = `${companyTrimmed} (${contactPersonTrimmed})`
+    } else if (companyTrimmed) {
+      combinedClientName = companyTrimmed
+    } else if (contactPersonTrimmed) {
+      combinedClientName = contactPersonTrimmed
+    }
+
+    // Preparar payload salvando em campos aditivos sem sobrescrever ou perder dados
+    const payload: Partial<FieldVisitRecord> = {
+      employee_name: trimmedEmployee || 'Técnico Intertermal',
+      visit_date: trimmedDate || undefined,
+      start_time: visit.startTime || undefined,
+      end_time: visit.endTime || undefined,
+      duration: visit.visitDuration || undefined,
+      client_name: combinedClientName,
+      company_name: companyTrimmed || undefined,
+      contact_person: contactPersonTrimmed || undefined,
+      client_role: visit.clientRole?.trim() || undefined,
+      client_contact: visit.clientContact?.trim() || undefined,
+      client_email: visit.clientEmail?.trim() || undefined,
+      work_area: visit.clientWorkArea?.trim() || undefined,
+      work_type: visit.workType || undefined,
+      work_type_other: visit.workTypeOther?.trim() || undefined,
+      general_notes: visit.generalObservations?.trim() || undefined,
+      free_description: visit.freeDescription?.trim() || undefined,
+      action_plan: autoPlan,
+      equipment: visit.equipments || [],
+      status: 'enviada',
+      sent_at: nowIso,
+    }
+
+    try {
+      let savedRecord: FieldVisitRecord
+      if (visit.backendRecordId) {
+        // Reenvio: atualiza o mesmo registro sem duplicar
+        savedRecord = await fieldVisitsService.update(visit.backendRecordId, payload)
+        toast({
+          title: 'Visita atualizada no CRM!',
+          description: `Os dados da visita e plano de ação foram sincronizados com sucesso.`,
+        })
+      } else {
+        // Primeiro envio: cria novo registro
+        savedRecord = await fieldVisitsService.create(payload)
+        toast({
+          title: 'Visita enviada ao CRM!',
+          description: `Visita técnica gravada com sucesso no CRM Intertermal.`,
+        })
+      }
+
+      setVisit((prev) => ({
+        ...prev,
+        actionPlan: autoPlan,
+        backendRecordId: savedRecord.id,
+        crmStatus: 'enviada',
+        lastSentAt: nowIso,
+        updatedAt: nowIso,
+      }))
+    } catch (err: any) {
+      console.error('Erro ao enviar visita ao CRM:', err)
+      toast({
+        title: 'Erro ao enviar ao CRM',
+        description:
+          err.message ||
+          'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsSendingToCrm(false)
+    }
+  }
+
+  // Nova Visita (Limpeza com confirmação, mantendo nome do funcionário)
   const handleConfirmNewVisit = () => {
     const employeeToKeep =
       visit.employeeName || localStorage.getItem(STORAGE_KEY_EMPLOYEE_NAME) || ''
@@ -695,7 +1032,7 @@ export default function FieldVisitPage() {
           </div>
         )}
 
-        {/* Indicador de carregamento caso esteja recuperando registro por id */}
+        {/* Indicador de carregamento */}
         {isLoadingRecord && (
           <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 flex items-center gap-2 text-xs text-amber-900 dark:text-amber-200 shadow-xs">
             <Loader2 className="h-4 w-4 animate-spin text-amber-600" />
@@ -824,14 +1161,12 @@ export default function FieldVisitPage() {
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
                   Data da visita
                 </label>
-                <div className="relative">
-                  <Input
-                    type="date"
-                    value={visit.date}
-                    onChange={(e) => setVisit((prev) => ({ ...prev, date: e.target.value }))}
-                    className="h-11 text-sm bg-slate-50/70 dark:bg-slate-950"
-                  />
-                </div>
+                <Input
+                  type="date"
+                  value={visit.date}
+                  onChange={(e) => setVisit((prev) => ({ ...prev, date: e.target.value }))}
+                  className="h-11 text-sm bg-slate-50/70 dark:bg-slate-950"
+                />
               </div>
 
               {/* Horário Início */}
@@ -892,14 +1227,14 @@ export default function FieldVisitPage() {
                 className="h-11 text-sm font-medium bg-white dark:bg-slate-900"
               />
               <p className="text-[11px] text-muted-foreground mt-1">
-                Calculado automaticamente entre início e término, mas você pode ajustar se
+                Calculado automaticamente entre início e término, com ajuste manual livre se
                 necessário.
               </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* 3. SEÇÃO: CLIENTE */}
+        {/* 3. SEÇÃO: CLIENTE E E-MAIL */}
         <Card className="border-slate-200 dark:border-slate-800 shadow-xs bg-white dark:bg-slate-900">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -909,7 +1244,7 @@ export default function FieldVisitPage() {
               <div>
                 <CardTitle className="text-sm font-bold">3. Cliente Industrial</CardTitle>
                 <p className="text-[11px] text-muted-foreground">
-                  Identificação da empresa, contato e setor visitado
+                  Identificação da empresa, contato e e-mail para envio do relatório
                 </p>
               </div>
             </div>
@@ -956,19 +1291,33 @@ export default function FieldVisitPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Contato (Telefone / E-mail)
+                  Telefone de Contato
                 </label>
                 <Input
                   value={visit.clientContact}
                   onChange={(e) => setVisit((prev) => ({ ...prev, clientContact: e.target.value }))}
-                  placeholder="Ex.: (16) 99876-5432 / contato@empresa.com"
+                  placeholder="Ex.: (16) 99876-5432"
                   className="h-11 text-sm bg-slate-50/70 dark:bg-slate-950"
                 />
               </div>
 
-              <div className="sm:col-span-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5 text-teal-600" />
+                  E-mail do cliente (Envio de relatório)
+                </label>
+                <Input
+                  type="email"
+                  value={visit.clientEmail || ''}
+                  onChange={(e) => setVisit((prev) => ({ ...prev, clientEmail: e.target.value }))}
+                  placeholder="Ex.: cliente@empresa.com.br"
+                  className="h-11 text-sm bg-slate-50/70 dark:bg-slate-950"
+                />
+              </div>
+
+              <div>
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Área de trabalho
+                  Área / Setor
                 </label>
                 <Input
                   value={visit.clientWorkArea}
@@ -983,7 +1332,7 @@ export default function FieldVisitPage() {
           </CardContent>
         </Card>
 
-        {/* 4. SEÇÃO: TIPO DE TRABALHO (CARDS GRANDES) */}
+        {/* 4. SEÇÃO: SELEÇÃO DOS 6 TIPOS DE VISITA (CARDS GRANDES MOBILE-FIRST) */}
         <Card className="border-slate-200 dark:border-slate-800 shadow-xs bg-white dark:bg-slate-900">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -991,25 +1340,36 @@ export default function FieldVisitPage() {
                 <Wrench className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-sm font-bold">4. Tipo de Trabalho</CardTitle>
+                <CardTitle className="text-sm font-bold">4. Tipo de Visita</CardTitle>
                 <p className="text-[11px] text-muted-foreground">
-                  Toque no card que melhor representa o objetivo da visita
+                  Escolha um dos 6 tipos abaixo. O formulário se ajusta automaticamente ao fluxo
+                  adequado.
                 </p>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {WORK_TYPE_OPTIONS.map((opt) => {
-                const isSelected = visit.workType === opt.label
+                const isSelected =
+                  visit.workType === opt.label ||
+                  (opt.label === 'Projeto Novo' &&
+                    visit.workType === 'Projeto novo ou readequação') ||
+                  (opt.label === 'Catálogo de Equipamentos' &&
+                    visit.workType === 'Catalogação de equipamentos') ||
+                  (opt.label === 'Manutenção Preventiva' &&
+                    visit.workType === 'Manutenção preventiva ou corretiva')
+
                 return (
                   <button
                     key={opt.label}
                     type="button"
-                    onClick={() => setVisit((prev) => ({ ...prev, workType: opt.label }))}
-                    className={`p-4 rounded-xl text-left border-2 transition-all flex flex-col justify-between min-h-[92px] ${
+                    onClick={() => {
+                      setVisit((prev) => ({ ...prev, workType: opt.label }))
+                    }}
+                    className={`p-4 rounded-xl text-left border-2 transition-all flex flex-col justify-between min-h-[110px] ${
                       isSelected
-                        ? 'border-teal-600 bg-teal-50/80 dark:bg-teal-950/40 shadow-sm'
+                        ? 'border-teal-600 bg-teal-50/90 dark:bg-teal-950/40 shadow-sm ring-1 ring-teal-600'
                         : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
                     }`}
                   >
@@ -1017,7 +1377,7 @@ export default function FieldVisitPage() {
                       <span
                         className={`text-sm font-bold ${
                           isSelected
-                            ? 'text-teal-900 dark:text-teal-200'
+                            ? 'text-teal-950 dark:text-teal-200'
                             : 'text-slate-800 dark:text-slate-200'
                         }`}
                       >
@@ -1027,9 +1387,22 @@ export default function FieldVisitPage() {
                         <CheckCircle2 className="h-5 w-5 text-teal-700 dark:text-teal-400 shrink-0 mt-0.5" />
                       )}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-1.5 leading-snug">
-                      {opt.description}
-                    </p>
+
+                    <div className="mt-2 space-y-1">
+                      <Badge
+                        variant="outline"
+                        className={`text-[9px] px-1.5 py-0 ${
+                          opt.category === 'lean'
+                            ? 'border-teal-300 text-teal-700 bg-teal-50/50'
+                            : 'border-blue-300 text-blue-700 bg-blue-50/50'
+                        }`}
+                      >
+                        {opt.badge}
+                      </Badge>
+                      <p className="text-[11px] text-muted-foreground leading-snug">
+                        {opt.description}
+                      </p>
+                    </div>
                   </button>
                 )
               })}
@@ -1039,12 +1412,12 @@ export default function FieldVisitPage() {
             {visit.workType === 'Outro' && (
               <div className="pt-2 animate-in fade-in slide-in-from-top-1 duration-200">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Descreva o tipo de trabalho:
+                  Especifique a atividade realizada:
                 </label>
                 <Input
                   value={visit.workTypeOther}
                   onChange={(e) => setVisit((prev) => ({ ...prev, workTypeOther: e.target.value }))}
-                  placeholder="Especifique a atividade realizada..."
+                  placeholder="Descreva o propósito da visita..."
                   className="h-11 text-sm bg-slate-50/70 dark:bg-slate-950"
                   autoFocus
                 />
@@ -1053,468 +1426,605 @@ export default function FieldVisitPage() {
           </CardContent>
         </Card>
 
-        {/* 5. SEÇÃO: OBSERVAÇÕES GERAIS + GRAVAÇÃO DE VOZ */}
-        <Card className="border-slate-200 dark:border-slate-800 shadow-xs bg-white dark:bg-slate-900">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 flex items-center justify-center">
-                  <FileText className="h-4 w-4" />
+        {/* ========================================================================= */}
+        {/* FLUXO 1: PROJETO NOVO, READEQUAÇÃO E OUTRO (ENXUTO COM VOZ E ANEXOS SEPARADOS) */}
+        {/* ========================================================================= */}
+        {isLeanFlow ? (
+          <div className="space-y-5 animate-in fade-in duration-300">
+            {/* Campo em branco para Descrição Livre com Digitação OU Gravação de Voz */}
+            <Card className="border-teal-200 dark:border-teal-900/60 shadow-xs bg-white dark:bg-slate-900">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 flex items-center justify-center">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-bold">
+                      5. Descrição Livre da Visita
+                    </CardTitle>
+                    <p className="text-[11px] text-muted-foreground">
+                      Preenchimento por digitação manual OU gravação de voz (transcrição automática,
+                      100% editável após falar)
+                    </p>
+                  </div>
                 </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <VoiceDictationTextarea
+                  label="Relato e levantamento técnico da visita:"
+                  sublabel="Fale ao microfone para transcrever ou digite normalmente."
+                  value={visit.freeDescription || visit.generalObservations || ''}
+                  onChange={(val) =>
+                    setVisit((prev) => ({
+                      ...prev,
+                      freeDescription: val,
+                      generalObservations: val, // sincroniza para manter compatibilidade
+                    }))
+                  }
+                  placeholder="Ex.: Visita na planta para levantamento de novo trocador BERMO no setor de pasteurização. Vazão desejada de 30m³/h, temperatura de entrada 85°C..."
+                  rows={6}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Anexos Gerais da Visita (Múltiplas Fotos e Vídeos) */}
+            <Card className="border-slate-200 dark:border-slate-800 shadow-xs bg-white dark:bg-slate-900">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 flex items-center justify-center">
+                    <Film className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-bold">
+                      6. Anexos Gerais da Visita (Fotos e Vídeos)
+                    </CardTitle>
+                    <p className="text-[11px] text-muted-foreground">
+                      Anexe mais de 1 foto ou vídeo das instalações, tubulações ou planta do cliente
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <MultiMediaAttachmentField
+                  title="Fotos e Vídeos Gerais"
+                  description="Aceita múltiplos arquivos de foto e vídeo. Ficam salvos no celular e são enviados ao CRM."
+                  attachments={visit.visitAttachments || []}
+                  onAddFiles={handleAddVisitAttachments}
+                  onRemoveAttachment={handleRemoveVisitAttachment}
+                  isCompressing={isCompressingGlobal}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Seções de Anexos por Equipamento Separados ("Equipamento 1", "Equipamento 2"...) */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2 pt-1">
                 <div>
-                  <CardTitle className="text-sm font-bold">
-                    5. Observações Gerais da Visita
-                  </CardTitle>
-                  <p className="text-[11px] text-muted-foreground">
-                    Relato técnico, condições da fábrica, demandas extras do cliente
+                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <Layers className="h-5 w-5 text-teal-700 dark:text-teal-400" />
+                    Anexos por Equipamento Separados
+                    <Badge variant="secondary" className="text-xs">
+                      {visit.equipments.length}
+                    </Badge>
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Cada equipamento tem sua própria seção de anexos com botão para adicionar mais
                   </p>
                 </div>
-              </div>
 
-              {/* Botão de gravação de voz */}
-              {speechSupported && (
                 <Button
                   type="button"
-                  variant={isRecording ? 'destructive' : 'outline'}
-                  size="sm"
-                  onClick={toggleRecording}
-                  className={`h-9 text-xs px-3 font-semibold transition-all ${
-                    isRecording
-                      ? 'animate-pulse ring-2 ring-rose-400'
-                      : 'border-slate-300 dark:border-slate-700'
-                  }`}
-                  title={isRecording ? 'Parar gravação de voz' : 'Falar para transcrever em texto'}
+                  onClick={() => handleAddEquipment()}
+                  className="bg-teal-700 hover:bg-teal-600 text-white font-semibold text-xs h-10 px-4 rounded-xl shadow-xs"
                 >
-                  {isRecording ? (
-                    <>
-                      <MicOff className="h-3.5 w-3.5 mr-1.5" />
-                      Gravando...
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="h-3.5 w-3.5 mr-1.5 text-teal-700 dark:text-teal-400" />
-                      Gravar voz
-                    </>
-                  )}
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar equipamento
                 </Button>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {isRecording && (
-              <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex flex-col gap-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
-                  <span className="font-semibold">Ouvindo sua fala em português...</span>
-                </div>
-                {interimTranscript && (
-                  <div className="italic text-[11px] text-rose-700 dark:text-rose-300 bg-white/70 dark:bg-slate-900/60 p-2 rounded border border-rose-200 dark:border-rose-800">
-                    &ldquo;{interimTranscript}&rdquo;
+              </div>
+
+              {visit.equipments.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 space-y-3">
+                  <div className="h-12 w-12 rounded-full bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-400 mx-auto flex items-center justify-center">
+                    <Layers className="h-6 w-6" />
                   </div>
-                )}
-              </div>
-            )}
-            <Textarea
-              value={visit.generalObservations}
-              onChange={(e) => {
-                const val = e.target.value
-                setVisit((prev) => ({ ...prev, generalObservations: val }))
-                baseTextRef.current = val
-                finalTranscriptRef.current = ''
-              }}
-              placeholder="Digite aqui ou use o botão de microfone acima para gravar seu relato técnico..."
-              rows={5}
-              className="text-sm leading-relaxed bg-slate-50/70 dark:bg-slate-950 resize-y"
-            />
-          </CardContent>
-        </Card>
-
-        {/* 6. SEÇÃO: LISTA DE EQUIPAMENTOS */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2 pt-2">
-            <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <Layers className="h-5 w-5 text-teal-700 dark:text-teal-400" />
-                Equipamentos Vistoriados
-                <Badge variant="secondary" className="text-xs">
-                  {visit.equipments.length}
-                </Badge>
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Adicione quantos trocadores ou válvulas desejar. Cada item possui bloco e foto
-                próprios.
-              </p>
-            </div>
-
-            <Button
-              type="button"
-              onClick={handleAddEquipment}
-              className="bg-teal-700 hover:bg-teal-600 text-white font-semibold text-xs h-10 px-4 rounded-xl shadow-xs"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Adicionar equipamento
-            </Button>
-          </div>
-
-          {visit.equipments.length === 0 ? (
-            <div className="p-8 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 space-y-3">
-              <div className="h-12 w-12 rounded-full bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-400 mx-auto flex items-center justify-center">
-                <Layers className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                  Nenhum equipamento adicionado ainda
-                </p>
-                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                  Toque no botão abaixo para registrar o primeiro trocador de calor ou válvula
-                  inspecionada.
-                </p>
-              </div>
-              <Button
-                type="button"
-                onClick={handleAddEquipment}
-                variant="outline"
-                className="text-xs h-9 font-semibold text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-700 hover:bg-teal-50"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Adicionar primeiro equipamento
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {visit.equipments.map((item, index) => (
-                <Card
-                  key={item.id}
-                  className="border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden"
-                >
-                  <CardHeader className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 py-3 px-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="h-6 w-6 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center">
-                          {index + 1}
-                        </span>
-                        <CardTitle className="text-sm font-bold truncate">
-                          {item.model || item.manufacturer
-                            ? `${item.manufacturer ? item.manufacturer + ' ' : ''}${item.model || 'Equipamento'}`
-                            : `Equipamento #${index + 1}`}
-                        </CardTitle>
-                      </div>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setEquipmentToDelete(item.id)}
-                        className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950 h-8 px-2 text-xs"
-                        title="Remover este equipamento"
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      Nenhum equipamento separado adicionado
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                      Deseja anexar fotos/vídeos de um equipamento específico (ex.:
+                      &quot;Equipamento 1&quot;)?
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => handleAddEquipment('Equipamento 1')}
+                    variant="outline"
+                    className="text-xs h-9 font-semibold text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-700 hover:bg-teal-50"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Adicionar Equipamento 1
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {visit.equipments.map((eq, index) => {
+                    const eqLabel = eq.name || `Equipamento ${index + 1}`
+                    return (
+                      <Card
+                        key={eq.id}
+                        className="border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden"
                       >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Remover
-                      </Button>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="p-4 space-y-4">
-                    {/* Linha 1: Modelo, Série, Fabricante */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Modelo
-                        </label>
-                        <Input
-                          value={item.model}
-                          onChange={(e) =>
-                            handleUpdateEquipment(item.id, { model: e.target.value })
-                          }
-                          placeholder="Ex.: M10-BFG, TL10-B"
-                          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Série
-                        </label>
-                        <Input
-                          value={item.serialNumber}
-                          onChange={(e) =>
-                            handleUpdateEquipment(item.id, { serialNumber: e.target.value })
-                          }
-                          placeholder="Ex.: 30105-884"
-                          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Fabricante
-                        </label>
-                        <Input
-                          value={item.manufacturer}
-                          onChange={(e) =>
-                            handleUpdateEquipment(item.id, { manufacturer: e.target.value })
-                          }
-                          placeholder="Ex.: BERMO, Alfa Laval, Sondex"
-                          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Linha 2: Quantidade de placas, Local instalado */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Quantidade de placas
-                        </label>
-                        <Input
-                          value={item.plateCount}
-                          onChange={(e) =>
-                            handleUpdateEquipment(item.id, { plateCount: e.target.value })
-                          }
-                          placeholder="Ex.: 64 placas"
-                          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Local instalado
-                        </label>
-                        <Input
-                          value={item.installedLocation}
-                          onChange={(e) =>
-                            handleUpdateEquipment(item.id, { installedLocation: e.target.value })
-                          }
-                          placeholder="Ex.: Setor de Evaporação / Mezanino 2"
-                          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Linha 3: Fluidos e Vazão */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Fluido 1 (Lado quente)
-                        </label>
-                        <Input
-                          value={item.fluid1}
-                          onChange={(e) =>
-                            handleUpdateEquipment(item.id, { fluid1: e.target.value })
-                          }
-                          placeholder="Ex.: Vapor saturated 3 bar / Caldo"
-                          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Fluido 2 (Lado frio)
-                        </label>
-                        <Input
-                          value={item.fluid2}
-                          onChange={(e) =>
-                            handleUpdateEquipment(item.id, { fluid2: e.target.value })
-                          }
-                          placeholder="Ex.: Água de resfriamento"
-                          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Vazão
-                        </label>
-                        <Input
-                          value={item.flowRate}
-                          onChange={(e) =>
-                            handleUpdateEquipment(item.id, { flowRate: e.target.value })
-                          }
-                          placeholder="Ex.: 45 m³/h ou 12.000 kg/h"
-                          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Linha 4: Temperaturas */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Temperatura de entrada
-                        </label>
-                        <Input
-                          value={item.inletTemp}
-                          onChange={(e) =>
-                            handleUpdateEquipment(item.id, { inletTemp: e.target.value })
-                          }
-                          placeholder="Ex.: 92 °C"
-                          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                          Temperatura de saída
-                        </label>
-                        <Input
-                          value={item.outletTemp}
-                          onChange={(e) =>
-                            handleUpdateEquipment(item.id, { outletTemp: e.target.value })
-                          }
-                          placeholder="Ex.: 45 °C"
-                          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Grau de dificuldade */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                        Grau de dificuldade do serviço
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {DIFFICULTY_OPTIONS.map((diff) => {
-                          const isSelected = item.difficulty === diff.level
-                          return (
-                            <button
-                              key={diff.level}
-                              type="button"
-                              onClick={() =>
-                                handleUpdateEquipment(item.id, { difficulty: diff.level })
-                              }
-                              className={`h-11 rounded-lg border-2 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                                isSelected
-                                  ? `${diff.color} ring-1 ring-offset-1`
-                                  : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900'
-                              }`}
-                            >
-                              {isSelected && <CheckCircle2 className="h-3.5 w-3.5" />}
-                              {diff.level}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-
-                    {/* FOTO DO EQUIPAMENTO (Câmera do Celular + Compressão) */}
-                    <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                          <Camera className="h-4 w-4 text-teal-700 dark:text-teal-400" />
-                          Foto da placa / equipamento
-                        </label>
-                        {item.photoDataUrl && (
-                          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                            Foto anexada (comprimida)
-                          </span>
-                        )}
-                      </div>
-
-                      {item.photoDataUrl ? (
-                        <div className="space-y-2">
-                          <div className="relative rounded-lg overflow-hidden border border-slate-300 dark:border-slate-700 bg-black max-h-64 flex items-center justify-center">
-                            <img
-                              src={item.photoDataUrl}
-                              alt={`Foto do ${item.model || 'equipamento'}`}
-                              className="w-full h-auto max-h-64 object-contain"
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                            {/* Refazer foto */}
-                            <label className="flex-1 cursor-pointer">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                capture="environment"
-                                className="hidden"
-                                onChange={(e) => handlePhotoUpload(item.id, e)}
+                        <CardHeader className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 py-3 px-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="h-6 w-6 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center">
+                                {index + 1}
+                              </span>
+                              <Input
+                                value={eq.name || `Equipamento ${index + 1}`}
+                                onChange={(e) =>
+                                  handleUpdateEquipment(eq.id, { name: e.target.value })
+                                }
+                                placeholder={`Equipamento ${index + 1}`}
+                                className="h-8 text-xs font-bold w-48 bg-white dark:bg-slate-900"
                               />
-                              <div className="h-9 px-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 flex items-center justify-center gap-1.5">
-                                <Camera className="h-3.5 w-3.5 text-teal-700" />
-                                Refazer foto
-                              </div>
-                            </label>
+                            </div>
 
-                            {/* Remover foto */}
                             <Button
                               type="button"
-                              variant="outline"
+                              variant="ghost"
                               size="sm"
-                              onClick={() => handleRemovePhoto(item.id)}
-                              className="h-9 text-xs text-rose-600 border-rose-200 hover:bg-rose-50"
+                              onClick={() => setEquipmentToDelete(eq.id)}
+                              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950 h-8 px-2 text-xs"
                             >
-                              <Trash2 className="h-3.5 w-3.5 mr-1" />
-                              Remover foto
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Remover
                             </Button>
                           </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <label className="cursor-pointer block">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              capture="environment"
-                              className="hidden"
-                              onChange={(e) => handlePhotoUpload(item.id, e)}
-                              disabled={imageCompressingId === item.id}
-                            />
-                            <div className="h-16 rounded-xl border-2 border-dashed border-teal-400/60 dark:border-teal-700/60 bg-teal-50/40 dark:bg-teal-950/20 hover:bg-teal-50 text-teal-800 dark:text-teal-300 flex flex-col items-center justify-center gap-1 transition-all">
-                              {imageCompressingId === item.id ? (
-                                <div className="flex items-center gap-2 text-xs font-medium">
-                                  <RotateCcw className="h-4 w-4 animate-spin text-teal-600" />
-                                  Comprimindo imagem para salvar...
-                                </div>
-                              ) : (
-                                <>
-                                  <div className="flex items-center gap-1.5 text-xs font-bold">
-                                    <Camera className="h-4 w-4 text-teal-700" />
-                                    Tirar foto com a câmera
-                                  </div>
-                                  <span className="text-[10px] text-muted-foreground">
-                                    Ou escolher da galeria • Reduzida automaticamente
-                                  </span>
-                                </>
-                              )}
+                        </CardHeader>
+
+                        <CardContent className="p-4 space-y-4">
+                          {/* Identificação rápida opcional */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                Identificação / Modelo do Equipamento (Opcional)
+                              </label>
+                              <Input
+                                value={eq.model}
+                                onChange={(e) =>
+                                  handleUpdateEquipment(eq.id, { model: e.target.value })
+                                }
+                                placeholder="Ex.: Trocador Pasteurizador Alfa Laval / BERMO"
+                                className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                              />
                             </div>
-                          </label>
-                        </div>
-                      )}
-                    </div>
 
-                    {/* Observações do técnico sobre o estado do equipamento */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        Observações do técnico sobre o estado do equipamento
-                      </label>
-                      <Textarea
-                        value={item.technicianNotes}
-                        onChange={(e) =>
-                          handleUpdateEquipment(item.id, { technicianNotes: e.target.value })
-                        }
-                        placeholder="Vazamento nas gaxetas, placas incrustadas, corrosão no tirante, necessidade de banho químico..."
-                        rows={3}
-                        className="text-xs bg-slate-50/70 dark:bg-slate-950 resize-y"
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                            <div>
+                              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                Local Instalado / Linha (Opcional)
+                              </label>
+                              <Input
+                                value={eq.installedLocation}
+                                onChange={(e) =>
+                                  handleUpdateEquipment(eq.id, {
+                                    installedLocation: e.target.value,
+                                  })
+                                }
+                                placeholder="Ex.: Linha 02 - Mezanino"
+                                className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                              />
+                            </div>
+                          </div>
 
-              <div className="pt-2">
+                          {/* Seção própria de anexos com suporte a fotos e vídeos múltiplos */}
+                          <MultiMediaAttachmentField
+                            title={`Anexos de ${eqLabel}`}
+                            description="Fotos da placa, detalhes mecânicos ou vídeos do funcionamento deste equipamento"
+                            attachments={eq.attachments || []}
+                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
+                            onRemoveAttachment={(attId) =>
+                              handleRemoveEquipmentAttachment(eq.id, attId)
+                            }
+                            isCompressing={isCompressingGlobal}
+                          />
+
+                          {/* Observações com Voz para este equipamento */}
+                          <VoiceDictationTextarea
+                            label={`Observações do técnico sobre ${eqLabel}`}
+                            sublabel="Digite ou grave sua fala com transcrição automática"
+                            value={eq.technicianNotes}
+                            onChange={(val) =>
+                              handleUpdateEquipment(eq.id, { technicianNotes: val })
+                            }
+                            placeholder="Descreva detalhes específicos, medidas, pontos críticos ou necessidades deste equipamento..."
+                            rows={3}
+                          />
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      onClick={() => handleAddEquipment()}
+                      variant="outline"
+                      className="w-full h-12 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-teal-600 hover:text-teal-700 font-semibold text-xs"
+                    >
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      Adicionar mais um equipamento ({`Equipamento ${visit.equipments.length + 1}`})
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* ========================================================================= */
+          /* FLUXO 2: MANUTENÇÃO PREVENTIVA, CORRETIVA E CATÁLOGO DE EQUIPAMENTOS */
+          /* (FORMULÁRIO EXISTENTE INTACTO + GRAVAÇÃO DE VOZ NAS OBSERVAÇÕES DO TÉCNICO) */
+          /* ========================================================================= */
+          <div className="space-y-5 animate-in fade-in duration-300">
+            {/* 5. SEÇÃO: OBSERVAÇÕES GERAIS + GRAVAÇÃO DE VOZ */}
+            <Card className="border-slate-200 dark:border-slate-800 shadow-xs bg-white dark:bg-slate-900">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 flex items-center justify-center">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-bold">
+                      5. Observações Gerais da Visita
+                    </CardTitle>
+                    <p className="text-[11px] text-muted-foreground">
+                      Relato técnico, condições da fábrica, demandas extras do cliente
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <VoiceDictationTextarea
+                  label="Relato técnico geral:"
+                  value={visit.generalObservations}
+                  onChange={(val) =>
+                    setVisit((prev) => ({
+                      ...prev,
+                      generalObservations: val,
+                      freeDescription: val,
+                    }))
+                  }
+                  placeholder="Digite aqui ou use o botão de microfone acima para gravar seu relato técnico..."
+                  rows={5}
+                />
+              </CardContent>
+            </Card>
+
+            {/* 6. SEÇÃO: LISTA DE EQUIPAMENTOS INTACTA COM BOTÃO DE VOZ NAS OBSERVAÇÕES */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2 pt-2">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                    <Layers className="h-5 w-5 text-teal-700 dark:text-teal-400" />
+                    Equipamentos Vistoriados
+                    <Badge variant="secondary" className="text-xs">
+                      {visit.equipments.length}
+                    </Badge>
+                  </h2>
+                  <p className="text-xs text-muted-foreground">
+                    Formulário técnico com parâmetros mecânicos, fluidos, temperaturas e anexos
+                  </p>
+                </div>
+
                 <Button
                   type="button"
-                  onClick={handleAddEquipment}
-                  variant="outline"
-                  className="w-full h-12 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-teal-600 hover:text-teal-700 font-semibold text-xs"
+                  onClick={() => handleAddEquipment()}
+                  className="bg-teal-700 hover:bg-teal-600 text-white font-semibold text-xs h-10 px-4 rounded-xl shadow-xs"
                 >
-                  <Plus className="h-4 w-4 mr-1.5" />
-                  Adicionar outro equipamento
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar equipamento
                 </Button>
               </div>
+
+              {visit.equipments.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 space-y-3">
+                  <div className="h-12 w-12 rounded-full bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-400 mx-auto flex items-center justify-center">
+                    <Layers className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                      Nenhum equipamento adicionado ainda
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                      Toque no botão abaixo para registrar o primeiro trocador de calor
+                      inspecionado.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => handleAddEquipment()}
+                    variant="outline"
+                    className="text-xs h-9 font-semibold text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-700 hover:bg-teal-50"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Adicionar primeiro equipamento
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-5">
+                  {visit.equipments.map((item, index) => (
+                    <Card
+                      key={item.id}
+                      className="border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden"
+                    >
+                      <CardHeader className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 py-3 px-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="h-6 w-6 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center">
+                              {index + 1}
+                            </span>
+                            <CardTitle className="text-sm font-bold truncate">
+                              {item.model || item.manufacturer
+                                ? `${item.manufacturer ? item.manufacturer + ' ' : ''}${item.model || 'Equipamento'}`
+                                : `Equipamento #${index + 1}`}
+                            </CardTitle>
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setEquipmentToDelete(item.id)}
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950 h-8 px-2 text-xs"
+                            title="Remover este equipamento"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Remover
+                          </Button>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="p-4 space-y-4">
+                        {/* Linha 1: Modelo, Série, Fabricante */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Modelo
+                            </label>
+                            <Input
+                              value={item.model}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, { model: e.target.value })
+                              }
+                              placeholder="Ex.: M10-BFG, TL10-B"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Série
+                            </label>
+                            <Input
+                              value={item.serialNumber}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, { serialNumber: e.target.value })
+                              }
+                              placeholder="Ex.: 30105-884"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Fabricante
+                            </label>
+                            <Input
+                              value={item.manufacturer}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, { manufacturer: e.target.value })
+                              }
+                              placeholder="Ex.: BERMO, Alfa Laval, Sondex"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Linha 2: Quantidade de placas, Local instalado */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Quantidade de placas
+                            </label>
+                            <Input
+                              value={item.plateCount}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, { plateCount: e.target.value })
+                              }
+                              placeholder="Ex.: 64 placas"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Local instalado
+                            </label>
+                            <Input
+                              value={item.installedLocation}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, {
+                                  installedLocation: e.target.value,
+                                })
+                              }
+                              placeholder="Ex.: Setor de Evaporação / Mezanino 2"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Linha 3: Fluidos e Vazão */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Fluido 1 (Lado quente)
+                            </label>
+                            <Input
+                              value={item.fluid1}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, { fluid1: e.target.value })
+                              }
+                              placeholder="Ex.: Vapor saturated 3 bar / Caldo"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Fluido 2 (Lado frio)
+                            </label>
+                            <Input
+                              value={item.fluid2}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, { fluid2: e.target.value })
+                              }
+                              placeholder="Ex.: Água de resfriamento"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Vazão
+                            </label>
+                            <Input
+                              value={item.flowRate}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, { flowRate: e.target.value })
+                              }
+                              placeholder="Ex.: 45 m³/h ou 12.000 kg/h"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Linha 4: Temperaturas */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Temperatura de entrada
+                            </label>
+                            <Input
+                              value={item.inletTemp}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, { inletTemp: e.target.value })
+                              }
+                              placeholder="Ex.: 92 °C"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Temperatura de saída
+                            </label>
+                            <Input
+                              value={item.outletTemp}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, { outletTemp: e.target.value })
+                              }
+                              placeholder="Ex.: 45 °C"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Grau de dificuldade */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                            Grau de dificuldade do serviço
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {DIFFICULTY_OPTIONS.map((diff) => {
+                              const isSelected = item.difficulty === diff.level
+                              return (
+                                <button
+                                  key={diff.level}
+                                  type="button"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, { difficulty: diff.level })
+                                  }
+                                  className={`h-11 rounded-lg border-2 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                                    isSelected
+                                      ? `${diff.color} ring-1 ring-offset-1`
+                                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900'
+                                  }`}
+                                >
+                                  {isSelected && <CheckCircle2 className="h-3.5 w-3.5" />}
+                                  {diff.level}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        </div>
+
+                        {/* ANEXOS DO EQUIPAMENTO (Múltiplas Fotos ou Vídeos) */}
+                        <MultiMediaAttachmentField
+                          title="Anexos deste equipamento (Fotos / Vídeos)"
+                          description="Foto da placa de identificação, vazamentos ou vídeo de operação"
+                          attachments={
+                            item.attachments && item.attachments.length > 0
+                              ? item.attachments
+                              : item.photoDataUrl
+                                ? [
+                                    {
+                                      id: 'legacy_photo',
+                                      name: 'Foto da Placa',
+                                      type: 'image',
+                                      dataUrl: item.photoDataUrl,
+                                    },
+                                  ]
+                                : []
+                          }
+                          onAddFiles={(files) => handleAddEquipmentAttachments(item.id, files)}
+                          onRemoveAttachment={(attId) =>
+                            handleRemoveEquipmentAttachment(item.id, attId)
+                          }
+                          isCompressing={isCompressingGlobal}
+                        />
+
+                        {/* OBSERVAÇÕES DO TÉCNICO COM GRAVAÇÃO DE VOZ E TRANSCRIÇÃO AUTOMÁTICA */}
+                        <VoiceDictationTextarea
+                          label="Observações do técnico sobre o estado do equipamento:"
+                          sublabel="Grave por voz ou digite. O texto permanece 100% editável após falar."
+                          value={item.technicianNotes}
+                          onChange={(val) =>
+                            handleUpdateEquipment(item.id, { technicianNotes: val })
+                          }
+                          placeholder="Vazamento nas gaxetas, placas incrustadas, corrosão no tirante, necessidade de banho químico..."
+                          rows={3}
+                        />
+                      </CardContent>
+                    </Card>
+                  ))}
+
+                  <div className="pt-2">
+                    <Button
+                      type="button"
+                      onClick={() => handleAddEquipment()}
+                      variant="outline"
+                      className="w-full h-12 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-teal-600 hover:text-teal-700 font-semibold text-xs"
+                    >
+                      <Plus className="h-4 w-4 mr-1.5" />
+                      Adicionar outro equipamento
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Bloco de Envio Grande no Rodapé */}
         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-teal-600/30 dark:border-teal-700/40 shadow-sm space-y-3">
@@ -1525,8 +2035,8 @@ export default function FieldVisitPage() {
                 Finalizar Atendimento & Sincronizar com o CRM
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Gera o registro oficial da visita na base de dados do Intertermal e permite gerar o
-                relatório técnico em PDF.
+                Gera o registro oficial da visita, cria o plano de ação automático com base nas
+                observações e gera o PDF completo.
               </p>
             </div>
 
@@ -1632,7 +2142,7 @@ export default function FieldVisitPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remover este equipamento?</AlertDialogTitle>
             <AlertDialogDescription>
-              Os dados e a foto deste equipamento serão excluídos do formulário desta visita.
+              Os dados e os anexos deste equipamento serão excluídos do formulário desta visita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

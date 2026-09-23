@@ -249,7 +249,11 @@ export default function ReceivedFieldVisitsPage() {
           : []
       totalEquipments += eqList.length
       eqList.forEach((eq: any) => {
-        if (eq.photoDataUrl) totalPhotos += 1
+        if (eq.attachments && Array.isArray(eq.attachments)) {
+          totalPhotos += eq.attachments.length
+        } else if (eq.photoDataUrl) {
+          totalPhotos += 1
+        }
       })
     })
 
@@ -451,16 +455,23 @@ export default function ReceivedFieldVisitsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">Todos os tipos de trabalho</SelectItem>
+                    <SelectItem value="Projeto Novo">Projeto Novo</SelectItem>
+                    <SelectItem value="Readequação">Readequação</SelectItem>
+                    <SelectItem value="Manutenção Preventiva">Manutenção Preventiva</SelectItem>
+                    <SelectItem value="Manutenção Corretiva">Manutenção Corretiva</SelectItem>
+                    <SelectItem value="Catálogo de Equipamentos">
+                      Catálogo de Equipamentos
+                    </SelectItem>
                     <SelectItem value="Manutenção preventiva ou corretiva">
-                      Manutenção preventiva ou corretiva
+                      Manutenção preventiva ou corretiva (legado)
                     </SelectItem>
                     <SelectItem value="Projeto novo ou readequação">
-                      Projeto novo ou readequação
+                      Projeto novo ou readequação (legado)
                     </SelectItem>
                     <SelectItem value="Catalogação de equipamentos">
-                      Catalogação de equipamentos
+                      Catalogação de equipamentos (legado)
                     </SelectItem>
-                    <SelectItem value="Outro">Outro objetivo</SelectItem>
+                    <SelectItem value="Outro">Outro</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -615,7 +626,12 @@ export default function ReceivedFieldVisitsPage() {
                     : null
 
                 const eqCount = data.equipments.length
-                const photoCount = data.equipments.filter((e) => !!e.photoDataUrl).length
+                const photoCount = data.equipments.reduce((acc, e) => {
+                  if (e.attachments && Array.isArray(e.attachments)) {
+                    return acc + e.attachments.length
+                  }
+                  return acc + (e.photoDataUrl ? 1 : 0)
+                }, 0)
 
                 return (
                   <Card
@@ -974,20 +990,63 @@ export default function ReceivedFieldVisitsPage() {
                   </div>
                 </div>
 
-                {/* Bloco 4: Relato Técnico e Observações Gerais */}
-                {selectedDetail.data.generalObservations ? (
+                {/* Bloco 4: Relato Técnico / Descrição Livre e Observações Gerais */}
+                {selectedDetail.data.freeDescription || selectedDetail.data.generalObservations ? (
                   <div className="p-4 rounded-xl bg-white dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2">
                     <span className="text-[10.5px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                       <FileText className="h-3.5 w-3.5 text-teal-700" />
-                      Relato Técnico do Atendimento
+                      {selectedDetail.data.freeDescription
+                        ? 'Descrição Livre & Levantamento Técnico'
+                        : 'Relato Técnico do Atendimento'}
                     </span>
                     <p className="text-xs text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-slate-800 font-sans">
-                      {selectedDetail.data.generalObservations}
+                      {selectedDetail.data.freeDescription ||
+                        selectedDetail.data.generalObservations}
                     </p>
                   </div>
                 ) : (
                   <div className="p-3 text-xs text-muted-foreground italic bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-dashed border-slate-200 dark:border-slate-800">
                     Nenhuma observação geral registrada para este atendimento.
+                  </div>
+                )}
+
+                {/* Bloco 4.1: Plano de Ação Recomendado */}
+                {selectedDetail.data.actionPlan && selectedDetail.data.actionPlan.length > 0 && (
+                  <div className="p-4 rounded-xl bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-900/60 space-y-2.5">
+                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-teal-900 dark:text-teal-300 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-teal-700" />
+                      Plano de Ação Gerado ({selectedDetail.data.actionPlan.length} ações)
+                    </span>
+                    <div className="space-y-2">
+                      {selectedDetail.data.actionPlan.map((action, aIdx) => (
+                        <div
+                          key={action.id || aIdx}
+                          className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 text-xs space-y-1"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                              {aIdx + 1}. {action.title}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={`text-[9.5px] ${
+                                action.priority === 'Alta'
+                                  ? 'text-rose-700 border-rose-300 bg-rose-50'
+                                  : 'text-amber-700 border-amber-300 bg-amber-50'
+                              }`}
+                            >
+                              {action.priority}
+                            </Badge>
+                          </div>
+                          <p className="text-slate-600 dark:text-slate-400 text-[11px]">
+                            {action.description}
+                          </p>
+                          <p className="text-teal-800 dark:text-teal-300 text-[11px] font-medium pt-0.5">
+                            <strong>Ação:</strong> {action.suggestedAction}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -1121,33 +1180,69 @@ export default function ReceivedFieldVisitsPage() {
                               </div>
                             )}
 
-                            {/* Foto Anexada com clique para ampliar */}
-                            {eq.photoDataUrl && (
+                            {/* Anexos Múltiplos (Fotos e Vídeos) do Equipamento */}
+                            {((eq.attachments && eq.attachments.length > 0) || eq.photoDataUrl) && (
                               <div className="pt-2">
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1 mb-2">
                                   <Camera className="h-3.5 w-3.5 text-teal-700" />
-                                  Registro Fotográfico da Placa / Equipamento (toque para ampliar)
+                                  Anexos e Fotos do Equipamento (toque para ampliar)
                                 </span>
 
-                                <div
-                                  onClick={() =>
-                                    setLightboxImage({
-                                      url: eq.photoDataUrl!,
-                                      title: `${eq.manufacturer ? eq.manufacturer + ' ' : ''}${eq.model || 'Equipamento'} #${idx + 1}`,
-                                      subtitle: `Série: ${eq.serialNumber || 'N/A'} • Local: ${eq.installedLocation || 'N/A'}`,
-                                    })
-                                  }
-                                  className="relative group cursor-pointer max-w-sm rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 flex items-center justify-center p-1.5 shadow-2xs hover:border-teal-500 transition-all"
-                                >
-                                  <img
-                                    src={eq.photoDataUrl}
-                                    alt={`Foto de ${eq.model || 'equipamento'}`}
-                                    className="max-h-60 w-auto object-contain rounded-lg group-hover:opacity-95 transition-opacity"
-                                  />
-                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white gap-2 text-xs font-semibold">
-                                    <Maximize2 className="h-4 w-4" />
-                                    <span>Ampliar Imagem</span>
-                                  </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                  {(eq.attachments && eq.attachments.length > 0
+                                    ? eq.attachments
+                                    : eq.photoDataUrl
+                                      ? [
+                                          {
+                                            id: 'legacy',
+                                            name: 'Foto',
+                                            type: 'image' as const,
+                                            dataUrl: eq.photoDataUrl,
+                                          },
+                                        ]
+                                      : []
+                                  ).map((att) => (
+                                    <div
+                                      key={att.id}
+                                      onClick={() => {
+                                        if (att.type === 'image') {
+                                          setLightboxImage({
+                                            url: att.dataUrl,
+                                            title: `${eq.name || eq.model || 'Equipamento'} — ${att.name || 'Foto'}`,
+                                            subtitle: `Série: ${eq.serialNumber || 'N/A'} • Local: ${eq.installedLocation || 'N/A'}`,
+                                          })
+                                        }
+                                      }}
+                                      className={`relative group rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 flex flex-col p-1 shadow-2xs transition-all ${
+                                        att.type === 'image'
+                                          ? 'cursor-pointer hover:border-teal-500'
+                                          : ''
+                                      }`}
+                                    >
+                                      {att.type === 'image' ? (
+                                        <div className="h-32 flex items-center justify-center bg-black/5 dark:bg-black/30 rounded-lg overflow-hidden">
+                                          <img
+                                            src={att.dataUrl}
+                                            alt={att.name || 'Anexo'}
+                                            className="h-full w-auto object-contain rounded"
+                                          />
+                                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white gap-1 text-[11px] font-semibold">
+                                            <Maximize2 className="h-3.5 w-3.5" />
+                                            <span>Ampliar</span>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <video
+                                          src={att.dataUrl}
+                                          controls
+                                          className="h-32 w-full object-contain rounded bg-black"
+                                        />
+                                      )}
+                                      <span className="text-[10px] text-slate-600 dark:text-slate-400 mt-1 px-1 truncate">
+                                        {att.name || (att.type === 'video' ? 'Vídeo' : 'Foto')}
+                                      </span>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             )}
