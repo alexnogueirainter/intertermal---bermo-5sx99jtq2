@@ -103,7 +103,9 @@ routerAdd('POST', '/backend/v1/field-visits/submit', (e) => {
       return e.json(403, { ok: false, error: 'not_your_visit' })
     }
 
-    existing.setAll(payload)
+    for (const k of Object.keys(payload)) {
+      existing.set(k, payload[k])
+    }
     $app.save(existing)
     saved = existing
     console.log(
@@ -117,7 +119,9 @@ routerAdd('POST', '/backend/v1/field-visits/submit', (e) => {
   } else {
     const col = $app.findCollectionByNameOrId('field_visits')
     const newVisit = new Record(col)
-    newVisit.setAll(payload)
+    for (const k of Object.keys(payload)) {
+      newVisit.set(k, payload[k])
+    }
     $app.save(newVisit)
     saved = newVisit
     console.log(
