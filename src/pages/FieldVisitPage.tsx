@@ -42,6 +42,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/hooks/use-toast'
 import { fieldVisitsService, type FieldVisitRecord } from '@/services/field-visits'
+import { sellerTokenApi, getStoredToken, getStoredDeviceId } from '@/services/field-visit-token'
 import { FieldVisitPdfDialog } from '@/components/FieldVisitPdfDialog'
 import {
   AlertDialog,
@@ -490,7 +491,15 @@ function MultiMediaAttachmentField({
   )
 }
 
-export default function FieldVisitPage() {
+export default function FieldVisitPage({
+  sellerMode = false,
+  sellerName = '',
+  initialVisitData = null,
+}: {
+  sellerMode?: boolean
+  sellerName?: string
+  initialVisitData?: FieldVisitData | null
+} = {}) {
   const [searchParams] = useSearchParams()
   const location = useLocation()
   const queryVisitId = searchParams.get('id')
@@ -508,6 +517,30 @@ export default function FieldVisitPage() {
           ...createInitialVisitData(savedEmployee),
           ...locationStateData,
         }
+      }
+
+      // Modo vendedor (link com token): dados vêm do link seguro na edição;
+      // em visita nova, começa limpo com o nome fixo do vendedor.
+      if (sellerMode) {
+        if (initialVisitData) {
+          return {
+            ...createInitialVisitData(sellerName),
+            ...initialVisitData,
+          }
+        }
+        const baseSeller = createInitialVisitData(sellerName || savedEmployee)
+        const savedDraftSeller = localStorage.getItem(STORAGE_KEY_CURRENT_VISIT)
+        if (savedDraftSeller) {
+          try {
+            const parsed = JSON.parse(savedDraftSeller)
+            return {
+              ...baseSeller,
+              ...parsed,
+              employeeName: sellerName || baseSeller.employeeName,
+            }
+          } catch (_) {}
+        }
+        return baseSeller
       }
 
       // Prioridade 2: draft do localStorage
@@ -858,6 +891,63 @@ export default function FieldVisitPage() {
       sent_at: nowIso,
     }
 
+    if (sellerMode) {
+      // Modo vendedor: envio pelo link seguro (token + aparelho autorizado), sem login.
+      const submitRes = await sellerTokenApi.submitVisit({
+        token: getStoredToken(),
+        device_id: getStoredDeviceId(),
+        visit: {
+          visit_date: trimmedDate || undefined,
+          start_time: visit.startTime || undefined,
+          end_time: visit.endTime || undefined,
+          duration: visit.visitDuration || undefined,
+          client_name: combinedClientName,
+          company_name: companyTrimmed || undefined,
+          contact_person: contactPersonTrimmed || undefined,
+          client_role: visit.clientRole?.trim() || undefined,
+          client_contact: visit.clientContact?.trim() || undefined,
+          client_email: visit.clientEmail?.trim() || undefined,
+          work_area: visit.clientWorkArea?.trim() || undefined,
+          work_type: visit.workType || undefined,
+          work_type_other: visit.workTypeOther?.trim() || undefined,
+          general_notes: visit.generalObservations?.trim() || undefined,
+          free_description: visit.freeDescription?.trim() || undefined,
+          action_plan: autoPlan,
+          equipment: visit.equipments || [],
+        },
+        edit_id: visit.backendRecordId || undefined,
+      })
+      if (!submitRes.ok) {
+        const msg =
+          submitRes.error === 'device_not_authorized'
+            ? 'Aparelho não autorizado. Fale com o Alex para liberar este celular.'
+            : submitRes.error === 'invalid_token'
+              ? 'Seu link de acesso não está mais ativo. Peça um novo link ao Alex.'
+              : 'Não foi possível enviar. Verifique sua conexão e tente novamente.'
+        toast({
+          title: 'Erro ao enviar ao CRM',
+          description: msg,
+          variant: 'destructive',
+        })
+        setIsSendingToCrm(false)
+        return
+      }
+      setVisit((prev) => ({
+        ...prev,
+        actionPlan: autoPlan,
+        backendRecordId: submitRes.visit_id || prev.backendRecordId,
+        crmStatus: 'enviada',
+        lastSentAt: nowIso,
+        updatedAt: nowIso,
+      }))
+      toast({
+        title: submitRes.edited ? 'Visita atualizada no CRM!' : 'Visita enviada ao CRM!',
+        description: 'Relatório gravado com sucesso no CRM Intertermal.',
+      })
+      setIsSendingToCrm(false)
+      return
+    }
+
     try {
       let savedRecord: FieldVisitRecord
       if (visit.backendRecordId) {
@@ -915,13 +1005,26 @@ export default function FieldVisitPage() {
       <header className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 shadow-xs">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Link
-              to="/"
-              className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-teal-50 hover:text-teal-700 transition-colors"
-              title="Voltar ao Painel Geral"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
+            {sellerMode ? (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.href = '/visita-vendedor?lista=1'
+                }}
+                className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+                title="Minhas visitas"
+              >
+                <FileText className="h-5 w-5" />
+              </button>
+            ) : (
+              <Link
+                to="/"
+                className="inline-flex items-center justify-center h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+                title="Voltar ao Painel Geral"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+            )}
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-extrabold text-sm tracking-tight text-teal-800 dark:text-teal-400">
@@ -1130,10 +1233,11 @@ export default function FieldVisitPage() {
                 Nome do funcionário
               </label>
               <Input
-                value={visit.employeeName}
+                value={sellerMode ? sellerName : visit.employeeName}
                 onChange={(e) => handleEmployeeChange(e.target.value)}
+                disabled={sellerMode}
                 placeholder="Ex.: Carlos Alberto Souza"
-                className="h-11 text-sm bg-slate-50/70 dark:bg-slate-950 focus-visible:ring-teal-600"
+                className={`h-11 text-sm bg-slate-50/70 dark:bg-slate-950 focus-visible:ring-teal-600 ${sellerMode ? 'opacity-80' : ''}`}
               />
             </div>
           </CardContent>

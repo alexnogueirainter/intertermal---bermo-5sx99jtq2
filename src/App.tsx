@@ -8,6 +8,7 @@ import NotFound from './pages/NotFound'
 import Layout from './components/Layout'
 import { PublicProposalApprovalPage } from './pages/PublicProposalApprovalPage'
 import FieldVisitPage from './pages/FieldVisitPage'
+import SellerFieldVisitPage from './pages/SellerFieldVisitPage'
 import ReceivedFieldVisitsPage from './pages/ReceivedFieldVisitsPage'
 
 // ONLY IMPORT AND RENDER WORKING PAGES, NEVER ADD PLACEHOLDER COMPONENTS OR PAGES IN THIS FILE
@@ -25,6 +26,9 @@ const App = () => (
 
         {/* Rota de Visita a Campo para técnicos no celular */}
         <Route path="/visita-a-campo" element={<FieldVisitPage />} />
+
+        {/* Rota do vendedor: visita a campo via link com token (sem login, 1 token = 1 aparelho) */}
+        <Route path="/visita-vendedor" element={<SellerFieldVisitPage />} />
 
         {/* Rota de Visitas Recebidas no escritório */}
         <Route path="/visitas-recebidas" element={<ReceivedFieldVisitsPage />} />
