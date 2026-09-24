@@ -42,7 +42,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { toast } from '@/hooks/use-toast'
 import { fieldVisitsService, type FieldVisitRecord } from '@/services/field-visits'
+import { pendingQueue } from '@/services/field-visit-queue'
 import { sellerTokenApi, getStoredToken, getStoredDeviceId } from '@/services/field-visit-token'
+import { onlyNumericPtBR } from '@/types/field-visit'
 import { FieldVisitPdfDialog } from '@/components/FieldVisitPdfDialog'
 import {
   AlertDialog,
@@ -134,6 +136,8 @@ const DIFFICULTY_OPTIONS: { level: DifficultyLevel; color: string }[] = [
     color: 'border-rose-300 hover:border-rose-500 text-rose-700 bg-rose-50/60 dark:bg-rose-950/40',
   },
 ]
+
+const FLOW_UNIT_OPTIONS = ['m³/h', 'm³/min', 'L/min', 'L/s', 'kg/h', 'kg/s', 't/h', 'GPM']
 
 /**
  * Hook reutilizável de gravação de voz com transcrição automática via Web Speech API.
@@ -613,6 +617,27 @@ export default function FieldVisitPage({
     }
   }, [queryVisitId, visit.backendRecordId])
 
+  // Reenvio automático da fila de pendentes quando a conexão volta
+  useEffect(() => {
+    const onOnline = async () => {
+      try {
+        if (pendingQueue.count() > 0) {
+          const r = await pendingQueue.retryAll()
+          if (r.sent > 0) {
+            toast({
+              title: 'Visitas pendentes enviadas!',
+              description: `${r.sent} visita(s) sincronizada(s) com o CRM.`,
+            })
+          }
+        }
+      } catch (_) {
+        // nova tentativa no próximo evento online
+      }
+    }
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [])
+
   // Mensagens e feedbacks
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved')
   const [quotaWarning, setQuotaWarning] = useState<string | null>(null)
@@ -667,9 +692,29 @@ export default function FieldVisitPage({
         }
         setSaveStatus('saved')
       }
-    }, 400)
+    }, 1000)
 
     return () => clearTimeout(timer)
+  }, [visit])
+
+  // Salvar também ao sair/minimizar a página (mobile: momento mais comum de perda)
+  useEffect(() => {
+    const saveNow = () => {
+      try {
+        localStorage.setItem(
+          STORAGE_KEY_CURRENT_VISIT,
+          JSON.stringify({ ...visit, updatedAt: new Date().toISOString() }),
+        )
+      } catch (_) {
+        // storage indisponível: segue sem travar
+      }
+    }
+    window.addEventListener('pagehide', saveNow)
+    document.addEventListener('visibilitychange', saveNow)
+    return () => {
+      window.removeEventListener('pagehide', saveNow)
+      document.removeEventListener('visibilitychange', saveNow)
+    }
   }, [visit])
 
   // Handlers de campos gerais
@@ -841,11 +886,16 @@ export default function FieldVisitPage({
     const trimmedEmployee = (visit.employeeName || '').trim()
     const trimmedDate = (visit.date || '').trim()
 
-    if (!trimmedEmployee && !trimmedDate) {
+    // Validação prévia: os 3 campos obrigatórios (nunca bloquear em silêncio)
+    const missing: string[] = []
+    if (!(visit.date || '').trim()) missing.push('Data da visita')
+    if (!((visit.companyName || '').trim() || (visit.clientName || '').trim()))
+      missing.push('Cliente/Empresa')
+    if (!visit.workType) missing.push('Tipo de visita')
+    if (missing.length > 0) {
       toast({
-        title: 'Dados insuficientes',
-        description:
-          'Informe ao menos o nome do funcionário ou a data da visita para enviar ao CRM.',
+        title: 'Faltam campos obrigatórios',
+        description: 'Preencha: ' + missing.join(', ') + '.',
         variant: 'destructive',
       })
       return
@@ -893,11 +943,20 @@ export default function FieldVisitPage({
       sent_at: nowIso,
     }
 
+    // Identificador único da visita gerado no celular (idempotência de reenvio).
+    let clientVisitId = (visit as any).clientVisitId || ''
+    if (!clientVisitId) {
+      clientVisitId =
+        'cv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10)
+      setVisit((prev) => ({ ...prev, clientVisitId }) as any)
+    }
+
     if (sellerMode) {
       // Modo vendedor: envio pelo link seguro (token + aparelho autorizado), sem login.
       const submitRes = await sellerTokenApi.submitVisit({
         token: getStoredToken(),
         device_id: getStoredDeviceId(),
+        client_visit_id: clientVisitId,
         visit: {
           visit_date: trimmedDate || undefined,
           start_time: visit.startTime || undefined,
@@ -920,15 +979,45 @@ export default function FieldVisitPage({
         edit_id: visit.backendRecordId || undefined,
       })
       if (!submitRes.ok) {
-        const msg =
-          submitRes.error === 'device_not_authorized'
-            ? 'Aparelho não autorizado. Fale com o Alex para liberar este celular.'
-            : submitRes.error === 'invalid_token'
-              ? 'Seu link de acesso não está mais ativo. Peça um novo link ao Alex.'
-              : 'Não foi possível enviar. Verifique sua conexão e tente novamente.'
+        if (submitRes.error === 'device_not_authorized' || submitRes.error === 'invalid_token') {
+          // Segurança: não entra na fila; pede ação do Alex.
+          const msg =
+            submitRes.error === 'device_not_authorized'
+              ? 'Aparelho não autorizado. Fale com o Alex para liberar este celular.'
+              : 'Seu link de acesso não está mais ativo. Peça um novo link ao Alex.'
+          toast({ title: 'Erro ao enviar ao CRM', description: msg, variant: 'destructive' })
+          setIsSendingToCrm(false)
+          return
+        }
+        // Falha de rede/servidor: salva na fila de pendentes (idempotente).
+        pendingQueue.add({
+          client_visit_id: clientVisitId,
+          visit: {
+            visit_date: trimmedDate || undefined,
+            start_time: visit.startTime || undefined,
+            end_time: visit.endTime || undefined,
+            duration: visit.visitDuration || undefined,
+            client_name: combinedClientName,
+            company_name: companyTrimmed || undefined,
+            contact_person: contactPersonTrimmed || undefined,
+            client_role: visit.clientRole?.trim() || undefined,
+            client_contact: visit.clientContact?.trim() || undefined,
+            client_email: visit.clientEmail?.trim() || undefined,
+            work_area: visit.clientWorkArea?.trim() || undefined,
+            work_type: visit.workType || undefined,
+            work_type_other: visit.workTypeOther?.trim() || undefined,
+            general_notes: visit.generalObservations?.trim() || undefined,
+            free_description: visit.freeDescription?.trim() || undefined,
+            action_plan: autoPlan,
+            equipment: visit.equipments || [],
+          },
+          edit_id: visit.backendRecordId || undefined,
+          seller_token: getStoredToken(),
+        })
+        setVisit((prev) => ({ ...prev, crmStatus: 'pendente' }) as any)
         toast({
-          title: 'Erro ao enviar ao CRM',
-          description: msg,
+          title: 'Sem conexão — visita salva em Pendentes',
+          description: 'Será enviada automaticamente quando a internet voltar.',
           variant: 'destructive',
         })
         setIsSendingToCrm(false)
@@ -2004,14 +2093,33 @@ export default function FieldVisitPage({
                             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                               Vazão
                             </label>
-                            <Input
-                              value={item.flowRate}
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, { flowRate: e.target.value })
-                              }
-                              placeholder="Ex.: 45 m³/h ou 12.000 kg/h"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
+                            <div className="flex gap-1.5">
+                              <Input
+                                value={item.flowRate}
+                                inputMode="decimal"
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, {
+                                    flowRate: onlyNumericPtBR(e.target.value),
+                                  })
+                                }
+                                placeholder="Ex.: 45,5"
+                                className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                              />
+                              <select
+                                value={item.flowUnit || 'm³/h'}
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, { flowUnit: e.target.value })
+                                }
+                                className="h-10 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 text-slate-700 dark:text-slate-300"
+                                title="Unidade da vazão"
+                              >
+                                {FLOW_UNIT_OPTIONS.map((u) => (
+                                  <option key={u} value={u}>
+                                    {u}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         </div>
 
@@ -2019,28 +2127,34 @@ export default function FieldVisitPage({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <div>
                             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Temperatura de entrada
+                              Temperatura de entrada (°C)
                             </label>
                             <Input
                               value={item.inletTemp}
+                              inputMode="decimal"
                               onChange={(e) =>
-                                handleUpdateEquipment(item.id, { inletTemp: e.target.value })
+                                handleUpdateEquipment(item.id, {
+                                  inletTemp: onlyNumericPtBR(e.target.value),
+                                })
                               }
-                              placeholder="Ex.: 92 °C"
+                              placeholder="Ex.: 92,5"
                               className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
                             />
                           </div>
 
                           <div>
                             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Temperatura de saída
+                              Temperatura de saída (°C)
                             </label>
                             <Input
                               value={item.outletTemp}
+                              inputMode="decimal"
                               onChange={(e) =>
-                                handleUpdateEquipment(item.id, { outletTemp: e.target.value })
+                                handleUpdateEquipment(item.id, {
+                                  outletTemp: onlyNumericPtBR(e.target.value),
+                                })
                               }
-                              placeholder="Ex.: 45 °C"
+                              placeholder="Ex.: 45,0"
                               className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
                             />
                           </div>

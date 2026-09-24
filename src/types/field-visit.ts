@@ -39,6 +39,7 @@ export interface EquipmentItem {
   inletTemp: string
   outletTemp: string
   flowRate: string
+  flowUnit?: string // unidade da vazão: m³/h, L/min, kg/h etc. (padrão m³/h)
   installedLocation: string
   difficulty: DifficultyLevel
   photoDataUrl?: string // retrocompatibilidade com 1 foto legada
@@ -79,12 +80,24 @@ export interface FieldVisitData {
   updatedAt: string
   // Dados de sincronização com o CRM PocketBase
   backendRecordId?: string
-  crmStatus?: 'rascunho' | 'enviada'
+  crmStatus?: 'rascunho' | 'enviada' | 'pendente'
   lastSentAt?: string
 }
 
 export const STORAGE_KEY_CURRENT_VISIT = 'intertermal_field_visit_draft_v1'
 export const STORAGE_KEY_EMPLOYEE_NAME = 'intertermal_field_visit_employee_name_v1'
+
+/** Aceita apenas dígitos e vírgula (padrão pt-BR). */
+export function onlyNumericPtBR(value: string): string {
+  return (value || '').replace(/[^0-9,]/g, '')
+}
+
+/** Converte "1.234,56" ou "12,5" para "1234.5" (formato internacional para cálculo). */
+export function numericToInternational(value: string): string {
+  const raw = (value || '').trim()
+  if (!raw) return ''
+  return raw.replace(/\./g, '').replace(',', '.')
+}
 
 export function generateId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {

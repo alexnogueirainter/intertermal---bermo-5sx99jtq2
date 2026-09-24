@@ -63,6 +63,7 @@ export const sellerTokenApi = {
     device_id: string
     visit: any
     edit_id?: string
+    client_visit_id?: string
   }): Promise<{
     ok: boolean
     visit_id?: string

@@ -1,10 +1,10 @@
 /**
  * Hook: Envio de visita a campo via link do vendedor (sem login).
  * Route: POST /backend/v1/field-visits/submit
- * Body: { token, device_id, visit: { ...campos do formulario }, edit_id? }
+ * Body: { token, device_id, visit: {...}, edit_id?, client_visit_id? }
  * - Valida token ativo + aparelho vinculado (nivel medio).
- * - Cria visita nova OU atualiza APENAS visita enviada pelo MESMO token.
- * - Marca a visita com o nome do vendedor do token (fonte da verdade).
+ * - IDEMPOTENTE: reenvio com mesmo client_visit_id atualiza em vez de duplicar.
+ * - Edicao apenas da propria visita (seller_token = token).
  * - Loga IP e horario de cada envio (rastreabilidade).
  */
 routerAdd('POST', '/backend/v1/field-visits/submit', (e) => {
@@ -12,7 +12,8 @@ routerAdd('POST', '/backend/v1/field-visits/submit', (e) => {
   const token = String(body.token || '').trim()
   const deviceId = String(body.device_id || '')
   const visit = body.visit || {}
-  const editId = String(body.edit_id || '').trim()
+  let editId = String(body.edit_id || '').trim()
+  const clientVisitId = String(body.client_visit_id || '').trim()
 
   if (!token) return e.json(400, { ok: false, error: 'missing_token' })
 
@@ -42,7 +43,6 @@ routerAdd('POST', '/backend/v1/field-visits/submit', (e) => {
   }
 
   if (!boundDevice && deviceId) {
-    // Primeiro uso direto no submit (vendedor nunca passou pelo bind): vincula agora.
     rec.set('device_id', deviceId)
     rec.set('device_ip', String(e.request.remoteAddr || ''))
     rec.set(
@@ -60,7 +60,7 @@ routerAdd('POST', '/backend/v1/field-visits/submit', (e) => {
   const nowIso = new Date().toISOString()
 
   const payload = {
-    employee_name: sellerName, // fonte da verdade: token, nao o que foi digitado
+    employee_name: sellerName,
     visit_date: String(visit.visit_date || ''),
     start_time: String(visit.start_time || ''),
     end_time: String(visit.end_time || ''),
@@ -82,11 +82,31 @@ routerAdd('POST', '/backend/v1/field-visits/submit', (e) => {
     sent_at: nowIso,
     seller_name: sellerName,
     seller_token: token,
+    client_visit_id: clientVisitId,
+  }
+
+  // IDEMPOTENCIA: reenvio com mesmo client_visit_id atualiza em vez de duplicar.
+  if (!editId && clientVisitId) {
+    let dup = null
+    try {
+      dup = $app.findFirstRecordByFilter('field_visits', 'client_visit_id = {:c}', {
+        c: clientVisitId,
+      })
+    } catch (_) {
+      dup = null
+    }
+    if (dup) {
+      const dupToken = String(dup.get('seller_token') || '')
+      if (dupToken && dupToken !== token) {
+        console.warn('[visita-vendedor] reenvio com client_visit_id de outro vendedor')
+        return e.json(403, { ok: false, error: 'not_your_visit' })
+      }
+      editId = dup.id
+    }
   }
 
   let saved = null
   if (editId) {
-    // EDICAO: apenas de visita enviada pelo MESMO token (mesmo vendedor).
     let existing = null
     try {
       existing = $app.findRecordById('field_visits', editId)
@@ -122,6 +142,7 @@ routerAdd('POST', '/backend/v1/field-visits/submit', (e) => {
     for (const k of Object.keys(payload)) {
       newVisit.set(k, payload[k])
     }
+    if (clientVisitId) newVisit.set('client_visit_id', clientVisitId)
     $app.save(newVisit)
     saved = newVisit
     console.log(

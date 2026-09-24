@@ -389,7 +389,9 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                                   Vazão
                                 </span>
                                 <span className="font-medium text-slate-800">
-                                  {eq.flowRate || '—'}
+                                  {eq.flowRate
+                                    ? `${eq.flowRate}${eq.flowUnit ? ' ' + eq.flowUnit : ''}`
+                                    : '—'}
                                 </span>
                               </div>
                             </div>
