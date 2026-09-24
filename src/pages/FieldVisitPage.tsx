@@ -219,6 +219,14 @@ function useSpeechDictation({
       }
 
       instance.onerror = (err: any) => {
+        if (err.error === 'not-allowed' || err.error === 'service-not-allowed') {
+          toast({
+            title: 'Microfone bloqueado',
+            description:
+              'Permita o microfone nas configurações do navegador (ícone do cadeado na barra de endereço) e recarregue a página.',
+            variant: 'destructive',
+          })
+        }
         if (err.error !== 'no-speech') {
           isRunningRef.current = false
           setIsRecording(false)
