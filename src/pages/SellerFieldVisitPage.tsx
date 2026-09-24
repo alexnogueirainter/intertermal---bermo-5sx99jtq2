@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { toast } from '@/hooks/use-toast'
 import FieldVisitPage from './FieldVisitPage'
 import {
   sellerTokenApi,
@@ -21,6 +22,7 @@ import {
   getStoredDeviceId,
   SELLER_TOKEN_KEY,
 } from '@/services/field-visit-token'
+import { pendingQueue } from '@/services/field-visit-queue'
 import { recordToFieldVisitData, type FieldVisitData } from '@/types/field-visit'
 
 /**
@@ -87,6 +89,7 @@ export default function SellerFieldVisitPage() {
   const [loadingVisit, setLoadingVisit] = useState(false)
   const [visits, setVisits] = useState<any[]>([])
   const [loadingList, setLoadingList] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
 
   const activate = useCallback(async (token: string) => {
     const res = await sellerTokenApi.bind(token, getStoredDeviceId())
@@ -129,6 +132,7 @@ export default function SellerFieldVisitPage() {
     setLoadingList(true)
     const res = await sellerTokenApi.myVisits(getStoredToken(), getStoredDeviceId())
     if (res.ok && res.visits) setVisits(res.visits)
+    setPendingCount(pendingQueue.count())
     setLoadingList(false)
   }, [])
 
@@ -217,6 +221,34 @@ export default function SellerFieldVisitPage() {
         </header>
 
         <main className="max-w-3xl mx-auto px-4 py-4 space-y-3">
+          {pendingCount > 0 && (
+            <Card className="border-amber-300 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-950/30">
+              <CardContent className="pt-3 pb-3 flex items-center justify-between gap-2">
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  <strong>{pendingCount}</strong> visita(s) aguardando envio
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs h-8 border-amber-400 text-amber-800 dark:text-amber-300"
+                  disabled={loadingList}
+                  onClick={async () => {
+                    const r = await pendingQueue.retryAll()
+                    if (r.sent > 0) {
+                      toast({
+                        title: 'Visitas pendentes enviadas!',
+                        description: `${r.sent} visita(s) sincronizada(s) com o CRM.`,
+                      })
+                    }
+                    loadVisits()
+                  }}
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                  Tentar enviar novamente
+                </Button>
+              </CardContent>
+            </Card>
+          )}
           {loadingList ? (
             <div className="flex items-center justify-center py-16 gap-2 text-sm text-slate-500">
               <Loader2 className="h-5 w-5 animate-spin" /> Carregando...
