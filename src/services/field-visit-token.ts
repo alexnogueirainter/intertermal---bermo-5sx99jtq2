@@ -99,6 +99,18 @@ export const sellerTokenApi = {
     }
   },
 
+  async aiPlan(visit: any): Promise<{ ok: boolean; items?: any[]; message?: string }> {
+    try {
+      const res = await pb.send('/backend/v1/field-visits/ai-plan', {
+        method: 'POST',
+        body: JSON.stringify({ visit }),
+      })
+      return res as any
+    } catch (err: any) {
+      return { ok: false, message: 'Falha na análise IA. Tente novamente.' }
+    }
+  },
+
   async getVisit(
     token: string,
     deviceId: string,

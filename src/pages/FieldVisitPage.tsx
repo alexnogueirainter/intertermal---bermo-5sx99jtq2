@@ -657,6 +657,88 @@ export default function FieldVisitPage({
   const [isNewVisitDialogOpen, setIsNewVisitDialogOpen] = useState(false)
   const [equipmentToDelete, setEquipmentToDelete] = useState<string | null>(null)
 
+  // Análise IA: plano de ação sugerido a partir do que o técnico registrou
+  const [isAiLoading, setIsAiLoading] = useState(false)
+  const [aiConfirmOpen, setAiConfirmOpen] = useState(false)
+  const [aiDraft, setAiDraft] = useState<any[] | null>(null)
+  const [aiMessage, setAiMessage] = useState('')
+
+  const handleAiAnalysis = async () => {
+    const hasContent =
+      (visit.generalObservations || '').trim() ||
+      (visit.freeDescription || '').trim() ||
+      (visit.equipments || []).some((eq) => (eq.technicianNotes || '').trim())
+    if (!hasContent) {
+      toast({
+        title: 'Sem conteúdo suficiente para análise',
+        description: 'Escreva observações ou notas nos equipamentos antes de usar a Análise IA.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setIsAiLoading(true)
+    try {
+      const res = await sellerTokenApi.aiPlan({
+        work_type: visit.workType || '',
+        general_notes: visit.generalObservations || '',
+        free_description: visit.freeDescription || '',
+        equipments: (visit.equipments || []).map((eq) => ({
+          id: eq.id,
+          name: eq.name || '',
+          model: eq.model || '',
+          manufacturer: eq.manufacturer || '',
+          fluid1: eq.fluid1 || '',
+          fluid2: eq.fluid2 || '',
+          inletTemp: eq.inletTemp || '',
+          outletTemp: eq.outletTemp || '',
+          flowRate: eq.flowRate || '',
+          flowUnit: eq.flowUnit || '',
+          difficulty: eq.difficulty || '',
+          technicianNotes: eq.technicianNotes || '',
+          attachments_count: (eq.attachments || []).length,
+        })),
+      })
+      if (res.ok && res.items && res.items.length > 0) {
+        setAiDraft(res.items)
+        setAiConfirmOpen(true)
+      } else {
+        toast({
+          title: res.message || 'Análise indisponível',
+          description: 'Mantido o plano de ação automático.',
+          variant: 'destructive',
+        })
+      }
+    } catch (_) {
+      toast({
+        title: 'Falha na análise IA',
+        description: 'Mantido o plano de ação automático.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsAiLoading(false)
+    }
+  }
+
+  const handleAiConfirm = () => {
+    if (!aiDraft || aiDraft.length === 0) return
+    const mapped: any[] = aiDraft.map((it) => ({
+      id: generateId(),
+      title: it.title || 'Item do plano',
+      description: it.description || '',
+      priority: ['Alta', 'Média', 'Baixa'].includes(it.priority) ? it.priority : 'Média',
+      suggestedAction: it.suggestedAction || '',
+      source: it.equipment_id ? 'Equipamento sinalizado (com foto no relatório)' : undefined,
+      equipment_id: it.equipment_id || undefined,
+    }))
+    setVisit((prev) => ({ ...prev, actionPlan: mapped }))
+    setAiConfirmOpen(false)
+    setAiDraft(null)
+    toast({
+      title: 'Plano de ação da IA aplicado',
+      description: 'Revise e edite antes de enviar ao CRM.',
+    })
+  }
+
   // Determinar qual é o fluxo ativo:
   // "Projeto Novo", "Readequação" ou "Outro" = fluxo enxuto (lean)
   // "Manutenção Preventiva", "Manutenção Corretiva", "Catálogo de Equipamentos" = fluxo completo detalhado
@@ -1156,6 +1238,29 @@ export default function FieldVisitPage({
                 </>
               )}
             </div>
+
+            {/* Botão Análise IA */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAiAnalysis}
+              disabled={isAiLoading}
+              className="text-xs h-9 border-violet-300 dark:border-violet-800 text-violet-800 dark:text-violet-300 hover:bg-violet-50 dark:hover:bg-violet-950 font-semibold"
+              title="Gerar plano de ação com IA a partir das observações e dados registrados"
+            >
+              {isAiLoading ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                  Analisando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5 mr-1 text-violet-600" />
+                  <span className="hidden sm:inline">Análise </span>IA
+                </>
+              )}
+            </Button>
 
             {/* Botão Gerar PDF Resumo */}
             <Button
@@ -2337,6 +2442,50 @@ export default function FieldVisitPage({
 
       {/* Modal de Prévia e Impressão do PDF da Visita */}
       <FieldVisitPdfDialog open={isPdfDialogOpen} onOpenChange={setIsPdfDialogOpen} visit={visit} />
+
+      {/* Modal de confirmação da Análise IA */}
+      <AlertDialog open={aiConfirmOpen} onOpenChange={setAiConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Aplicar plano de ação da IA?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="max-h-64 overflow-y-auto space-y-2 text-sm">
+                <p className="text-amber-700 dark:text-amber-400 font-semibold">
+                  Revise antes de salvar — você poderá editar depois.
+                </p>
+                {(aiDraft || []).map((it, idx) => (
+                  <div key={idx} className="border rounded p-2 bg-slate-50 dark:bg-slate-900">
+                    <p className="font-semibold text-xs">
+                      {idx + 1}. {it.title}{' '}
+                      <span className="text-[10px] font-bold px-1 rounded bg-violet-100 text-violet-700">
+                        {it.priority}
+                      </span>
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">{it.description}</p>
+                    <p className="text-xs mt-1">
+                      <strong>Ação:</strong> {it.suggestedAction}
+                    </p>
+                    {it.equipment_id && (
+                      <p className="text-[10px] text-teal-700 mt-1">
+                        📷 Fotos do equipamento serão vinculadas no relatório
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setAiConfirmOpen(false)}>Descartar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleAiConfirm}
+              className="bg-violet-600 hover:bg-violet-700 text-white font-semibold"
+            >
+              Aplicar plano
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Modal de Confirmação: Nova Visita */}
       <AlertDialog open={isNewVisitDialogOpen} onOpenChange={setIsNewVisitDialogOpen}>
