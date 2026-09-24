@@ -70,7 +70,9 @@ routerAdd('POST', '/backend/v1/field-visits/submit', (e) => {
     contact_person: String(visit.contact_person || ''),
     client_role: String(visit.client_role || ''),
     client_contact: String(visit.client_contact || ''),
-    client_email: String(visit.client_email || ''),
+    client_email: /^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(String(visit.client_email || '').trim())
+      ? String(visit.client_email).trim()
+      : '',
     work_area: String(visit.work_area || ''),
     work_type: String(visit.work_type || ''),
     work_type_other: String(visit.work_type_other || ''),

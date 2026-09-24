@@ -223,7 +223,7 @@ function useSpeechDictation({
           toast({
             title: 'Microfone bloqueado',
             description:
-              'Permita o microfone nas configurações do navegador (ícone do cadeado na barra de endereço) e recarregue a página.',
+              'Toque no cadeado ao lado do endereço do navegador e permita o microfone. Depois toque em Gravar de novo.',
             variant: 'destructive',
           })
         }
