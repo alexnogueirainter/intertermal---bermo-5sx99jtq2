@@ -40,7 +40,44 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
   const printRef = useRef<HTMLDivElement>(null)
 
   const handlePrint = () => {
-    window.print()
+    // Fallback mobile: alguns navegadores Android/iOS falham no window.print()
+    // quando a página inteira é impressa (conteúdo em dialog com overflow).
+    // Tentativa 1: window.print() normal. Se o navegador não suportar/ignorar,
+    // o técnico usa o botão nativo "Imprimir/Salvar PDF" do próprio navegador.
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    if (!isMobile || typeof window.print === 'function') {
+      try {
+        window.print()
+        return
+      } catch (_) {
+        // segue para o fallback
+      }
+    }
+    // Fallback: abre o painel de compartilhamento/impressão nativo com o HTML do relatório
+    try {
+      const html = printRef.current?.innerHTML || ''
+      const win = window.open('', '_blank')
+      if (win) {
+        win.document.write(
+          '<html><head><title>Relatório de Visita</title>' +
+            '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+            '<style>body{font-family:system-ui,sans-serif;margin:16px}img{max-width:100%}</style>' +
+            '</head><body>' +
+            html +
+            '<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>' +
+            '</body></html>',
+        )
+        win.document.close()
+      } else {
+        alert(
+          'Não foi possível abrir a impressão. Use o menu do navegador (⋮) → "Imprimir" ou "Adicionar à fila de impressão / Salvar PDF".',
+        )
+      }
+    } catch (_) {
+      alert(
+        'Não foi possível abrir a impressão. Use o menu do navegador (⋮) → "Imprimir" ou "Salvar PDF".',
+      )
+    }
   }
 
   // Formatação de data
@@ -523,6 +560,46 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                       <span className="font-bold shrink-0">Ação recomendada:</span>
                       <span>{action.suggestedAction}</span>
                     </div>
+
+                    {/* Vínculo com equipamento sinalizado: mostra as fotos dele */}
+                    {(() => {
+                      const eqId = (action as any).equipment_id
+                      if (!eqId) return null
+                      const eq = (visit.equipments || []).find((e: any) => e.id === eqId)
+                      if (!eq) return null
+                      const atts = [
+                        ...(eq.attachments || []),
+                        ...(eq.photoDataUrl
+                          ? [
+                              {
+                                id: eq.id + '-photo',
+                                dataUrl: eq.photoDataUrl,
+                                type: 'image',
+                                name: 'Foto',
+                              },
+                            ]
+                          : []),
+                      ]
+                      if (atts.length === 0) return null
+                      return (
+                        <div className="pl-6 pt-1.5">
+                          <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1 mb-1">
+                            <Camera className="h-3 w-3 text-teal-700" />
+                            Fotos vinculadas — {eq.name || 'Equipamento'}
+                          </span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {atts.slice(0, 6).map((att: any) => (
+                              <img
+                                key={att.id}
+                                src={att.dataUrl}
+                                alt={att.name || eq.name}
+                                className="h-20 w-full object-contain rounded border border-slate-200 bg-white"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 ))}
               </div>

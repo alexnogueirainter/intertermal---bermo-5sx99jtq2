@@ -140,6 +140,12 @@ const DIFFICULTY_OPTIONS: { level: DifficultyLevel; color: string }[] = [
 const FLOW_UNIT_OPTIONS = ['m³/h', 'm³/min', 'L/min', 'L/s', 'kg/h', 'kg/s', 't/h', 'GPM']
 
 /**
+ * Fabricantes pré-definidos (regra do Alex): técnico seleciona; "Outros" abre campo editável.
+ * Dados pré-existentes NUNCA são alterados: valor que não é preset continua no campo livre.
+ */
+const MANUFACTURER_PRESETS = ['Bermo', 'Alfa Laval', 'SPX']
+
+/**
  * Hook reutilizável de gravação de voz com transcrição automática via Web Speech API.
  * Garante que a transcrição NUNCA sobrescreva o texto existente (apenas append)
  * e o campo permaneça 100% editável manualmente a qualquer momento.
@@ -154,6 +160,7 @@ function useSpeechDictation({
   const [isRecording, setIsRecording] = useState(false)
   const [speechSupported, setSpeechSupported] = useState(false)
   const [interimTranscript, setInterimTranscript] = useState('')
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
   const recognitionRef = useRef<any>(null)
   const isRunningRef = useRef(false)
   const baseTextRef = useRef('')
@@ -174,6 +181,14 @@ function useSpeechDictation({
       isRunningRef.current = false
     }
   }, [])
+
+  // Timer visual: conta segundos enquanto grava
+  useEffect(() => {
+    if (!isRecording) return
+    setRecordingSeconds(0)
+    const t = setInterval(() => setRecordingSeconds((s) => s + 1), 1000)
+    return () => clearInterval(t)
+  }, [isRecording])
 
   const startRecording = () => {
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
@@ -277,6 +292,7 @@ function useSpeechDictation({
     isRecording,
     speechSupported,
     interimTranscript,
+    recordingSeconds,
     toggleRecording,
     stopRecording,
   }
@@ -301,10 +317,11 @@ function VoiceDictationTextarea({
   placeholder?: string
   rows?: number
 }) {
-  const { isRecording, speechSupported, interimTranscript, toggleRecording } = useSpeechDictation({
-    currentText: value,
-    onUpdateText: onChange,
-  })
+  const { isRecording, speechSupported, interimTranscript, recordingSeconds, toggleRecording } =
+    useSpeechDictation({
+      currentText: value,
+      onUpdateText: onChange,
+    })
 
   return (
     <div className="space-y-2">
@@ -349,6 +366,10 @@ function VoiceDictationTextarea({
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
             <span className="font-semibold">Ouvindo sua fala em português...</span>
+            <span className="ml-auto font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/60">
+              {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:
+              {String(recordingSeconds % 60).padStart(2, '0')}
+            </span>
           </div>
           {interimTranscript && (
             <div className="italic text-[11px] text-rose-700 dark:text-rose-300 bg-white/70 dark:bg-slate-900/60 p-2 rounded border border-rose-200 dark:border-rose-800">
@@ -805,6 +826,22 @@ export default function FieldVisitPage({
       window.removeEventListener('pagehide', saveNow)
       document.removeEventListener('visibilitychange', saveNow)
     }
+  }, [visit])
+
+  // Auto-save por inatividade: se o técnico parar de digitar por 15s, salva na hora
+  // (protege contra perda quando o app do navegador é fechado sem disparar pagehide)
+  useEffect(() => {
+    const idleSave = setTimeout(() => {
+      try {
+        localStorage.setItem(
+          STORAGE_KEY_CURRENT_VISIT,
+          JSON.stringify({ ...visit, updatedAt: new Date().toISOString() }),
+        )
+      } catch (_) {
+        // storage indisponível: segue sem travar
+      }
+    }, 15000)
+    return () => clearTimeout(idleSave)
   }, [visit])
 
   // Handlers de campos gerais
@@ -2128,14 +2165,57 @@ export default function FieldVisitPage({
                             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                               Fabricante
                             </label>
-                            <Input
-                              value={item.manufacturer}
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, { manufacturer: e.target.value })
-                              }
-                              placeholder="Ex.: BERMO, Alfa Laval, Sondex"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
+                            {(() => {
+                              const isPreset =
+                                !item.manufacturer ||
+                                MANUFACTURER_PRESETS.some(
+                                  (m) =>
+                                    m.toLowerCase() === (item.manufacturer || '').toLowerCase(),
+                                )
+                              const presetValue = isPreset ? item.manufacturer || '' : 'OUTROS'
+                              return (
+                                <div className="flex gap-1.5">
+                                  <select
+                                    value={presetValue}
+                                    onChange={(e) => {
+                                      const v = e.target.value
+                                      if (v === 'OUTROS') {
+                                        // mantém o valor atual (preserva dados pré-existentes);
+                                        // se vazio, limpa para o técnico digitar
+                                        if (!item.manufacturer) {
+                                          handleUpdateEquipment(item.id, { manufacturer: '' })
+                                        }
+                                      } else {
+                                        handleUpdateEquipment(item.id, { manufacturer: v })
+                                      }
+                                    }}
+                                    className="h-10 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 text-slate-700 dark:text-slate-300 shrink-0 w-[42%]"
+                                    title="Selecione o fabricante"
+                                  >
+                                    <option value="">—</option>
+                                    {MANUFACTURER_PRESETS.map((m) => (
+                                      <option key={m} value={m}>
+                                        {m}
+                                      </option>
+                                    ))}
+                                    <option value="OUTROS">Outros</option>
+                                  </select>
+                                  {!isPreset && (
+                                    <Input
+                                      value={item.manufacturer}
+                                      onChange={(e) =>
+                                        handleUpdateEquipment(item.id, {
+                                          manufacturer: e.target.value,
+                                        })
+                                      }
+                                      placeholder="Digite o fabricante"
+                                      className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                                      autoFocus
+                                    />
+                                  )}
+                                </div>
+                              )
+                            })()}
                           </div>
                         </div>
 
