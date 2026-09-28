@@ -6,6 +6,7 @@ export interface UseSpeechRecognitionOptions {
   currentText: string
   onUpdateText: (newText: string) => void
   lang?: string
+  onAudioRecorded?: (audioBlob: Blob, audioDataUrl: string) => void
 }
 
 export interface UseSpeechRecognitionReturn {
@@ -17,9 +18,11 @@ export interface UseSpeechRecognitionReturn {
   audioDetected: boolean
   permissionDeniedPermanent: boolean
   permissionBlockedNotice: string | null
+  recordedAudioUrl: string | null
   isIos: boolean
   isAndroid: boolean
   isInAppBrowser: boolean
+  isMediaRecorderFallback: boolean
   startRecording: () => Promise<void>
   stopRecording: () => void
   toggleRecording: () => void
@@ -51,10 +54,29 @@ export function detectPlatform() {
   return { isIos, isAndroid, isInAppBrowser }
 }
 
+function getBestMimeType(): string {
+  if (typeof MediaRecorder === 'undefined') return ''
+  const types = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/mp4',
+    'audio/aac',
+    'audio/ogg;codecs=opus',
+    'audio/wav',
+  ]
+  for (const t of types) {
+    if (MediaRecorder.isTypeSupported(t)) {
+      return t
+    }
+  }
+  return ''
+}
+
 export function useSpeechRecognition({
   currentText,
   onUpdateText,
   lang = 'pt-BR',
+  onAudioRecorded,
 }: UseSpeechRecognitionOptions): UseSpeechRecognitionReturn {
   const [speechSupported, setSpeechSupported] = useState(false)
   const [state, setState] = useState<SpeechRecordingState>('idle')
@@ -63,8 +85,12 @@ export function useSpeechRecognition({
   const [audioDetected, setAudioDetected] = useState(false)
   const [permissionDeniedPermanent, setPermissionDeniedPermanent] = useState(false)
   const [permissionBlockedNotice, setPermissionBlockedNotice] = useState<string | null>(null)
+  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
+  const [isMediaRecorderFallback, setIsMediaRecorderFallback] = useState(false)
 
   const recognitionRef = useRef<any>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
   const isRunningRef = useRef(false)
   const baseTextRef = useRef('')
   const sessionFinalRef = useRef('')
@@ -72,27 +98,38 @@ export function useSpeechRecognition({
   const saveTimeoutRef = useRef<any>(null)
   const micStreamRef = useRef<MediaStream | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
-  const audioDetectedRef = useRef(false)
   const currentTextRef = useRef(currentText)
+  const onAudioRecordedRef = useRef(onAudioRecorded)
 
-  // Sempre sincroniza a ref com o valor mais recente do campo
   useEffect(() => {
     currentTextRef.current = currentText
   }, [currentText])
 
+  useEffect(() => {
+    onAudioRecordedRef.current = onAudioRecorded
+  }, [onAudioRecorded])
+
   const { isIos, isAndroid, isInAppBrowser } = detectPlatform()
 
   const defaultBlockedNotice = isInAppBrowser
-    ? "O WhatsApp e outros apps abrem links num navegador próprio que não libera o microfone. Para gravar: toque no ícone de compartilhar e escolha 'Abrir no Safari' (iPhone) ou 'Abrir no Chrome' (Android). Depois toque em Gravar voz e Permitir."
-    : 'Para gravar, o app precisa do microfone. Toque no ícone de cadeado/trava na barra de endereço do navegador e libere o microfone.'
+    ? "O WhatsApp e outros apps abrem links num navegador próprio que bloqueia o microfone por completo. Para gravar: toque no ícone de compartilhar e escolha 'Abrir no Safari' (iPhone) ou 'Abrir no Chrome' (Android). Depois toque em Gravar voz e Permitir."
+    : isIos
+      ? 'Acesso ao microfone negado ou não liberado no Safari. Toque no botão "aA" na barra de endereços > Ajustes do Site > Microfone: selecione Permitir. Depois toque em Tentar novamente.'
+      : 'Acesso ao microfone negado no navegador. Toque no ícone de cadeado/trava ao lado da URL > Permissões > libere o microfone e toque em Tentar novamente.'
 
-  // Checagem inicial de suporte a SpeechRecognition
+  // Checagem de capacidade: Web Speech API OU getUserMedia + MediaRecorder
   useEffect(() => {
-    const SpeechRec =
-      typeof window !== 'undefined'
-        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-        : null
-    setSpeechSupported(!!SpeechRec)
+    if (typeof window === 'undefined') {
+      setSpeechSupported(false)
+      return
+    }
+    const hasSpeechRec = !!(
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    )
+    const hasMediaDevices = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+    const hasMediaRecorder = typeof MediaRecorder !== 'undefined'
+    // Suportado se tiver reconhecimento nativo OU suporte a gravação de áudio
+    setSpeechSupported(hasSpeechRec || (hasMediaDevices && hasMediaRecorder))
   }, [])
 
   // Limpeza geral ao desmontar componente
@@ -110,6 +147,13 @@ export function useSpeechRecognition({
       if (recognitionRef.current && isRunningRef.current) {
         try {
           recognitionRef.current.abort?.()
+        } catch {
+          /* ignore */
+        }
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop()
         } catch {
           /* ignore */
         }
@@ -158,57 +202,7 @@ export function useSpeechRecognition({
     [onUpdateText],
   )
 
-  // Liberação de áudio e medidor de áudio
-  const setupAudioDetection = async (): Promise<boolean> => {
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        micStreamRef.current = stream
-
-        try {
-          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext
-          if (AudioContextClass) {
-            const ctx = new AudioContextClass()
-            audioContextRef.current = ctx
-            const source = ctx.createMediaStreamSource(stream)
-            const analyser = ctx.createAnalyser()
-            analyser.fftSize = 256
-            source.connect(analyser)
-            const dataArray = new Uint8Array(analyser.frequencyBinCount)
-
-            const checkAudio = () => {
-              if (!isRunningRef.current) return
-              analyser.getByteFrequencyData(dataArray)
-              let sum = 0
-              for (let i = 0; i < dataArray.length; i++) {
-                sum += dataArray[i]
-              }
-              const average = sum / dataArray.length
-              if (average > 10) {
-                audioDetectedRef.current = true
-                setAudioDetected(true)
-              }
-              requestAnimationFrame(checkAudio)
-            }
-            requestAnimationFrame(checkAudio)
-          }
-        } catch {
-          // Fallback se AudioContext não estiver disponível
-        }
-
-        return true
-      }
-    } catch (err: any) {
-      if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
-        setPermissionDeniedPermanent(true)
-        setPermissionBlockedNotice(defaultBlockedNotice)
-        return false
-      }
-    }
-    return true
-  }
-
-  const stopAudioDetection = () => {
+  const stopStreamAndAnalyser = () => {
     if (micStreamRef.current) {
       micStreamRef.current.getTracks().forEach((t) => t.stop())
       micStreamRef.current = null
@@ -222,9 +216,8 @@ export function useSpeechRecognition({
   // Finalização da transcrição ao parar ou encerrar reconhecimento
   const finalizeRecordingSession = useCallback(() => {
     isRunningRef.current = false
-    stopAudioDetection()
+    stopStreamAndAnalyser()
 
-    // Se houve transcrição acumulada nesta sessão, transição suave para 'saved'
     const hadNewText = sessionFinalRef.current.trim().length > 0
     setInterimTranscript('')
 
@@ -242,147 +235,274 @@ export function useSpeechRecognition({
     }
   }, [])
 
-  // Iniciar gravação com verificação de permissão simplificada
-  const startRecording = useCallback(async () => {
-    const SpeechRec =
-      typeof window !== 'undefined'
-        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-        : null
+  // Iniciar gravação de áudio via MediaRecorder (fallback quando Web Speech API não está disponível ou falhou)
+  const startMediaRecorderFallback = useCallback((stream: MediaStream) => {
+    try {
+      setIsMediaRecorderFallback(true)
+      recordedChunksRef.current = []
 
-    if (!SpeechRec) {
-      setSpeechSupported(false)
-      return
+      const mimeType = getBestMimeType()
+      const options = mimeType ? { mimeType } : undefined
+      const recorder = new MediaRecorder(stream, options)
+      mediaRecorderRef.current = recorder
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recordedChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onstop = () => {
+        isRunningRef.current = false
+        stopStreamAndAnalyser()
+
+        const finalMime = recorder.mimeType || mimeType || 'audio/webm'
+        const blob = new Blob(recordedChunksRef.current, { type: finalMime })
+
+        if (blob.size > 0) {
+          const url = URL.createObjectURL(blob)
+          setRecordedAudioUrl(url)
+
+          // Avisa o técnico com clareza e oferece o áudio anexado
+          setPermissionBlockedNotice(
+            'Áudio gravado com sucesso. Como este navegador (ex: Safari) não transcreve fala em texto automaticamente, o áudio foi preservado para anexo e o campo continua liberado para digitação manual.',
+          )
+
+          if (onAudioRecordedRef.current) {
+            try {
+              const reader = new FileReader()
+              reader.onloadend = () => {
+                const dataUrl = reader.result as string
+                if (dataUrl && onAudioRecordedRef.current) {
+                  onAudioRecordedRef.current(blob, dataUrl)
+                }
+              }
+              reader.readAsDataURL(blob)
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+
+        setState('idle')
+      }
+
+      recorder.start(1000)
+      isRunningRef.current = true
+      setState('recording')
+      setInterimTranscript('Gravando áudio do microfone...')
+    } catch (err: any) {
+      console.error('Falha ao iniciar MediaRecorder fallback:', err)
+      isRunningRef.current = false
+      stopStreamAndAnalyser()
+      setState('idle')
+      setPermissionBlockedNotice(
+        `Falha ao iniciar o gravador de áudio: ${err?.message || 'Erro desconhecido'}`,
+      )
     }
+  }, [])
 
+  // Iniciar gravação com pedido direto ao microfone (user gesture direto, sem queries que quebram)
+  const startRecording = useCallback(async () => {
     if (isRunningRef.current) return
 
     setPermissionBlockedNotice(null)
     setPermissionDeniedPermanent(false)
     setState('requesting')
 
-    // 1. Verificar permissão de microfone se a Permissions API existir
-    let permissionState: PermissionState | null = null
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setState('idle')
+      setPermissionDeniedPermanent(true)
+      setPermissionBlockedNotice(
+        isInAppBrowser
+          ? defaultBlockedNotice
+          : 'Seu navegador não suporta captura de microfone. Abra a página diretamente no Google Chrome ou Safari.',
+      )
+      return
+    }
+
+    // 1. Chamar getUserMedia DIRETO no fluxo do toque (sem permissions.query prévia)
+    let stream: MediaStream
     try {
-      if (navigator.permissions && navigator.permissions.query) {
-        const queryRes = await navigator.permissions.query({ name: 'microphone' as any })
-        permissionState = queryRes.state
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
+      micStreamRef.current = stream
+    } catch (err: any) {
+      console.warn('getUserMedia falhou ou foi negado:', err)
+      setState('idle')
+      const name = err?.name || ''
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setPermissionDeniedPermanent(true)
+        setPermissionBlockedNotice(defaultBlockedNotice)
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setPermissionBlockedNotice(
+          'Nenhum microfone encontrado neste aparelho. Conecte um microfone ou fone de ouvido para gravar.',
+        )
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setPermissionBlockedNotice(
+          'O microfone já está sendo usado por outro aplicativo. Feche chamadas ou outros apps e tente novamente.',
+        )
+      } else {
+        setPermissionBlockedNotice(
+          `Não foi possível acessar o microfone (${err?.message || name || 'bloqueado'}). Verifique as permissões do navegador.`,
+        )
+      }
+      return
+    }
+
+    // 2. Configurar analisador de áudio simples (sem crash se AudioContext falhar)
+    try {
+      const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext
+      if (AudioCtxClass) {
+        const ctx = new AudioCtxClass()
+        audioContextRef.current = ctx
+        const source = ctx.createMediaStreamSource(stream)
+        const analyser = ctx.createAnalyser()
+        analyser.fftSize = 256
+        source.connect(analyser)
+        const dataArray = new Uint8Array(analyser.frequencyBinCount)
+
+        const checkAudio = () => {
+          if (!isRunningRef.current) return
+          analyser.getByteFrequencyData(dataArray)
+          let sum = 0
+          for (let i = 0; i < dataArray.length; i++) {
+            sum += dataArray[i]
+          }
+          const avg = sum / dataArray.length
+          if (avg > 8) {
+            setAudioDetected(true)
+          }
+          requestAnimationFrame(checkAudio)
+        }
+        requestAnimationFrame(checkAudio)
       }
     } catch {
-      // Query pode não ser suportada (ex: Firefox ou Safari antigo)
+      // AudioContext opcional para VU meter
     }
 
-    if (permissionState === 'denied') {
-      setPermissionDeniedPermanent(true)
-      setPermissionBlockedNotice(defaultBlockedNotice)
-      setState('idle')
-      return
-    }
+    // 3. CAMINHO DUPLO: Web Speech API (Chrome/Edge/Android) ou MediaRecorder (Safari/WebView/Sem API)
+    const SpeechRec =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null
 
-    // 2. Pedido nativo automático via getUserMedia (ativa popup se ainda for 'prompt')
-    // Se o usuário clicar "Permitir", a stream é liberada e a gravação inicia imediatamente
-    const allowed = await setupAudioDetection()
-    if (!allowed) {
-      setState('idle')
-      return
-    }
+    baseTextRef.current = currentTextRef.current || ''
+    sessionFinalRef.current = ''
+    setInterimTranscript('')
+    setAudioDetected(false)
+    setRecordedAudioUrl(null)
 
-    // 3. Inicializar SpeechRecognition
-    try {
-      baseTextRef.current = currentTextRef.current || ''
-      sessionFinalRef.current = ''
-      setInterimTranscript('')
-      audioDetectedRef.current = false
-      setAudioDetected(false)
+    if (SpeechRec) {
+      try {
+        setIsMediaRecorderFallback(false)
+        const instance = new SpeechRec()
+        instance.lang = lang
+        instance.continuous = true
+        instance.interimResults = true
+        instance.maxAlternatives = 1
 
-      const instance = new SpeechRec()
-      instance.lang = lang
-      instance.continuous = true
-      instance.interimResults = true
-      instance.maxAlternatives = 1
+        instance.onstart = () => {
+          isRunningRef.current = true
+          setState('recording')
+        }
 
-      instance.onstart = () => {
-        isRunningRef.current = true
-        setState('recording')
-      }
+        instance.onresult = (event: any) => {
+          let currentInterim = ''
+          let newFinalChunk = ''
 
-      instance.onresult = (event: any) => {
-        let currentInterim = ''
-        let newFinalChunk = ''
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const res = event.results[i]
-          const phrase = res[0]?.transcript || ''
-          if (res.isFinal) {
-            const trimmed = phrase.trim()
-            if (trimmed) {
-              newFinalChunk = newFinalChunk ? `${newFinalChunk} ${trimmed}` : trimmed
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const res = event.results[i]
+            const phrase = res[0]?.transcript || ''
+            if (res.isFinal) {
+              const trimmed = phrase.trim()
+              if (trimmed) {
+                newFinalChunk = newFinalChunk ? `${newFinalChunk} ${trimmed}` : trimmed
+              }
+            } else {
+              currentInterim += phrase
             }
-          } else {
-            currentInterim += phrase
+          }
+
+          setInterimTranscript(currentInterim.trim())
+
+          if (newFinalChunk) {
+            setAudioDetected(true)
+            commitTranscript(newFinalChunk)
           }
         }
 
-        setInterimTranscript(currentInterim.trim())
+        instance.onerror = (err: any) => {
+          const errType = err?.error || ''
 
-        if (newFinalChunk) {
-          audioDetectedRef.current = true
-          setAudioDetected(true)
-          commitTranscript(newFinalChunk)
+          if (errType === 'not-allowed' || errType === 'service-not-allowed') {
+            setPermissionDeniedPermanent(true)
+            setPermissionBlockedNotice(defaultBlockedNotice)
+            isRunningRef.current = false
+            stopStreamAndAnalyser()
+            setState('idle')
+            return
+          }
+
+          if (errType === 'audio-capture') {
+            setPermissionBlockedNotice(
+              'Nenhum áudio detectado no microfone. Verifique as configurações de áudio do dispositivo.',
+            )
+            isRunningRef.current = false
+            stopStreamAndAnalyser()
+            setState('idle')
+            return
+          }
+
+          if (errType === 'network') {
+            // Se Web Speech API falhar por rede (muito comum em conexões de campo),
+            // se o MediaRecorder ainda não foi usado, avisa sem travar
+            if (sessionFinalRef.current.trim().length > 0) {
+              finalizeRecordingSession()
+            } else {
+              setPermissionBlockedNotice(
+                'Falha na conexão do serviço de reconhecimento de voz. Se o erro persistir, digite no campo ou tente novamente.',
+              )
+              finalizeRecordingSession()
+            }
+            return
+          }
+
+          if (errType !== 'no-speech') {
+            finalizeRecordingSession()
+          }
         }
+
+        instance.onend = () => {
+          if (isRunningRef.current) {
+            finalizeRecordingSession()
+          }
+        }
+
+        recognitionRef.current = instance
+        instance.start()
+      } catch (recErr: any) {
+        console.warn('SpeechRecognition falhou ao iniciar, usando fallback MediaRecorder:', recErr)
+        startMediaRecorderFallback(stream)
       }
-
-      instance.onerror = (err: any) => {
-        const errType = err?.error || ''
-
-        if (errType === 'not-allowed' || errType === 'service-not-allowed') {
-          setPermissionDeniedPermanent(true)
-          setPermissionBlockedNotice(defaultBlockedNotice)
-          isRunningRef.current = false
-          stopAudioDetection()
-          setState('idle')
-          return
-        }
-
-        if (errType === 'audio-capture') {
-          setPermissionBlockedNotice(
-            'Nenhum microfone detectado. Verifique se o aparelho possui microfone disponível.',
-          )
-          isRunningRef.current = false
-          stopAudioDetection()
-          setState('idle')
-          return
-        }
-
-        if (errType === 'network') {
-          // Erro de rede temporário na Web Speech API
-          // Preserva o texto já salvo e finaliza
-          finalizeRecordingSession()
-          return
-        }
-
-        if (errType !== 'no-speech') {
-          finalizeRecordingSession()
-        }
-      }
-
-      instance.onend = () => {
-        if (isRunningRef.current) {
-          finalizeRecordingSession()
-        }
-      }
-
-      recognitionRef.current = instance
-      instance.start()
-    } catch (e: any) {
-      isRunningRef.current = false
-      stopAudioDetection()
-      setState('idle')
-      if (e?.name === 'NotAllowedError') {
-        setPermissionDeniedPermanent(true)
-        setPermissionBlockedNotice(defaultBlockedNotice)
-      }
+    } else {
+      // Navegador sem Web Speech API (Safari iOS / Safari macOS / WebViews compatíveis)
+      startMediaRecorderFallback(stream)
     }
-  }, [commitTranscript, finalizeRecordingSession, lang])
+  }, [
+    commitTranscript,
+    defaultBlockedNotice,
+    finalizeRecordingSession,
+    isInAppBrowser,
+    isIos,
+    lang,
+    startMediaRecorderFallback,
+  ])
 
   // Parar gravação
   const stopRecording = useCallback(() => {
@@ -397,6 +517,16 @@ export function useSpeechRecognition({
         /* ignore */
       }
     }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop()
+      } catch {
+        /* ignore */
+      }
+      return
+    }
+
     finalizeRecordingSession()
   }, [finalizeRecordingSession, state])
 
@@ -414,7 +544,7 @@ export function useSpeechRecognition({
     setPermissionBlockedNotice(null)
   }, [])
 
-  // Tentar novamente a permissão
+  // Tentar novamente a permissão sem recarregar a página
   const retryPermission = useCallback(async () => {
     clearPermissionNotice()
     await startRecording()
@@ -429,9 +559,11 @@ export function useSpeechRecognition({
     audioDetected,
     permissionDeniedPermanent,
     permissionBlockedNotice,
+    recordedAudioUrl,
     isIos,
     isAndroid,
     isInAppBrowser,
+    isMediaRecorderFallback,
     startRecording,
     stopRecording,
     toggleRecording,

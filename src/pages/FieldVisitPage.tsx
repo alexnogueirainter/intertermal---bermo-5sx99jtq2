@@ -36,8 +36,14 @@ import {
   FileSpreadsheet,
   Lock,
   Volume2,
+  Copy,
+  ExternalLink,
 } from 'lucide-react'
-import { useSpeechRecognition, type SpeechRecordingState } from '@/hooks/useSpeechRecognition'
+import {
+  useSpeechRecognition,
+  detectPlatform,
+  type SpeechRecordingState,
+} from '@/hooks/useSpeechRecognition'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -179,9 +185,11 @@ function VoiceDictationTextarea({
     audioDetected,
     permissionDeniedPermanent,
     permissionBlockedNotice,
+    recordedAudioUrl,
     isIos,
     isAndroid,
     isInAppBrowser,
+    isMediaRecorderFallback,
     toggleRecording,
     clearPermissionNotice,
     retryPermission,
@@ -254,7 +262,7 @@ function VoiceDictationTextarea({
         )}
       </div>
 
-      {/* Caixa de aviso de permissão amigável com botão Tentar Novamente */}
+      {/* Caixa de aviso de permissão ou status do microfone com passo a passo e botão Tentar Novamente */}
       {permissionBlockedNotice && (
         <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs space-y-2 animate-in fade-in">
           <div className="flex items-start gap-2">
@@ -266,16 +274,16 @@ function VoiceDictationTextarea({
                     Abra no navegador do celular
                   </p>
                   <p className="text-[11px] leading-relaxed">
-                    O WhatsApp e outros apps abrem links num navegador próprio que não libera o
-                    microfone. Para gravar: toque no ícone de compartilhar e escolha &apos;Abrir no
-                    Safari&apos; (iPhone) ou &apos;Abrir no Chrome&apos; (Android). Depois toque em
-                    Gravar voz e Permitir.
+                    O WhatsApp e outros apps abrem links num navegador próprio que bloqueia o
+                    microfone por completo. Para gravar: toque no ícone de compartilhar e escolha
+                    &apos;Abrir no Safari&apos; (iPhone) ou &apos;Abrir no Chrome&apos; (Android).
+                    Depois toque em Gravar voz e Permitir.
                   </p>
                 </>
               ) : (
                 <>
                   <p className="font-semibold text-xs text-amber-950 dark:text-amber-100">
-                    Microfone bloqueado pelo navegador
+                    Aviso do Microfone
                   </p>
                   <p className="text-[11px] leading-relaxed">{permissionBlockedNotice}</p>
 
@@ -315,6 +323,13 @@ function VoiceDictationTextarea({
             </button>
           </div>
 
+          {/* Player de áudio anexado se gravado via MediaRecorder em navegador sem SpeechRecognition nativo */}
+          {recordedAudioUrl && (
+            <div className="pt-1 pb-1">
+              <audio src={recordedAudioUrl} controls className="w-full h-8" />
+            </div>
+          )}
+
           <div className="flex items-center gap-2 pt-1 border-t border-amber-200 dark:border-amber-900/60">
             <Button
               type="button"
@@ -338,7 +353,11 @@ function VoiceDictationTextarea({
         <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex flex-col gap-1.5 animate-in fade-in">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
-            <span className="font-semibold">Ouvindo sua fala em português...</span>
+            <span className="font-semibold">
+              {isMediaRecorderFallback
+                ? 'Gravando áudio do microfone...'
+                : 'Ouvindo sua fala em português...'}
+            </span>
             {audioDetected && (
               <span className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-100/80 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
                 <Volume2 className="h-3 w-3" />
@@ -1368,6 +1387,55 @@ export default function FieldVisitPage({
 
       {/* Conteúdo Principal */}
       <main className="max-w-3xl mx-auto px-4 pt-4 space-y-5">
+        {/* Aviso de Navegador Embutido (WhatsApp / Instagram / redes sociais) */}
+        {detectPlatform().isInAppBrowser && (
+          <div className="p-4 rounded-xl bg-amber-500/10 dark:bg-amber-950/50 border-2 border-amber-500/40 text-amber-950 dark:text-amber-200 text-xs space-y-2 shadow-xs animate-in fade-in">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="space-y-1 flex-1">
+                <p className="font-bold text-sm text-amber-950 dark:text-amber-100">
+                  Abra este link no Chrome ou Safari para gravar voz
+                </p>
+                <p className="text-xs leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+                  Você está visualizando a página pelo navegador interno do WhatsApp/Instagram, que
+                  bloqueia o uso do microfone por questões de segurança. Para gravar seu relato por
+                  voz:
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-amber-300/60 dark:border-amber-800/60">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  try {
+                    navigator.clipboard.writeText(window.location.href)
+                    toast({
+                      title: 'Link copiado!',
+                      description: 'Abra seu navegador Chrome ou Safari e cole o endereço.',
+                    })
+                  } catch {
+                    toast({
+                      title: 'Copie o link da barra de endereço',
+                      description: window.location.href,
+                    })
+                  }
+                }}
+                className="h-8 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-xs"
+              >
+                <Copy className="h-3.5 w-3.5 mr-1.5" />
+                Copiar link da página
+              </Button>
+
+              <span className="text-[11px] text-amber-800 dark:text-amber-300">
+                Toque nos três pontos ou no ícone de compartilhar e selecione &quot;Abrir no
+                navegador&quot;.
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Aviso de Cota de Armazenamento Excedida */}
         {quotaWarning && (
           <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-3 shadow-xs">
