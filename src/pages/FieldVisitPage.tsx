@@ -2362,11 +2362,16 @@ export default function FieldVisitPage({
                           </div>
                         </div>
 
-                        {/* Grau de dificuldade */}
+                        {/* Grau de dificuldade (Apenas condições físicas do local de instalação) */}
                         <div>
-                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
-                            Grau de dificuldade do serviço
-                          </label>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                              Grau de dificuldade do local de instalação
+                            </label>
+                            <span className="text-[10px] text-muted-foreground">
+                              Acesso, altura, espaço confinado
+                            </span>
+                          </div>
                           <div className="grid grid-cols-3 gap-2">
                             {DIFFICULTY_OPTIONS.map((diff) => {
                               const isSelected = item.difficulty === diff.level

@@ -1015,67 +1015,84 @@ export default function ReceivedFieldVisitsPage() {
                   <div className="p-4 rounded-xl bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-900/60 space-y-2.5">
                     <span className="text-[10.5px] font-bold uppercase tracking-wider text-teal-900 dark:text-teal-300 flex items-center gap-1.5">
                       <CheckCircle2 className="h-3.5 w-3.5 text-teal-700" />
-                      Plano de Ação Gerado ({selectedDetail.data.actionPlan.length} ações)
+                      Análise da IA / Plano de Ação ({selectedDetail.data.actionPlan.length} ações)
                     </span>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       {selectedDetail.data.actionPlan.map((action, aIdx) => (
                         <div
                           key={action.id || aIdx}
-                          className="p-3 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 text-xs space-y-1"
+                          className="p-3.5 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 text-xs space-y-2.5 shadow-2xs"
                         >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                          <div className="flex items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
+                            <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
                               {aIdx + 1}. {action.title}
                             </span>
                             <Badge
                               variant="outline"
-                              className={`text-[9.5px] ${
+                              className={`text-[9.5px] font-bold ${
                                 action.priority === 'Alta'
-                                  ? 'text-rose-700 border-rose-300 bg-rose-50'
-                                  : 'text-amber-700 border-amber-300 bg-amber-50'
+                                  ? 'text-rose-700 border-rose-300 bg-rose-50 dark:bg-rose-950/40'
+                                  : action.priority === 'Média'
+                                    ? 'text-amber-700 border-amber-300 bg-amber-50 dark:bg-amber-950/40'
+                                    : 'text-emerald-700 border-emerald-300 bg-emerald-50 dark:bg-emerald-950/40'
                               }`}
                             >
-                              {action.priority}
+                              Prioridade {action.priority}
                             </Badge>
                           </div>
 
-                          {action.diagnosis ? (
-                            <p className="text-slate-700 dark:text-slate-300 text-[11px]">
-                              <strong>Diagnóstico:</strong> {action.diagnosis}
+                          {/* Seção 1: Diagnóstico */}
+                          <div className="rounded-md bg-slate-50 dark:bg-slate-950/60 p-2 border border-slate-200 dark:border-slate-800 text-[11px]">
+                            <span className="font-semibold text-slate-800 dark:text-slate-200 block text-[10px] uppercase tracking-wider mb-0.5">
+                              1. Diagnóstico (constatado pelo técnico):
+                            </span>
+                            <p className="text-slate-700 dark:text-slate-300 leading-relaxed">
+                              {action.diagnosis || action.description}
                             </p>
-                          ) : (
-                            <p className="text-slate-600 dark:text-slate-400 text-[11px]">
-                              {action.description}
+                          </div>
+
+                          {/* Seção 2: Ações recomendadas */}
+                          <div className="rounded-md bg-teal-50/70 dark:bg-teal-950/40 p-2 border border-teal-200 dark:border-teal-900 text-[11px] space-y-1">
+                            <span className="font-semibold text-teal-900 dark:text-teal-200 block text-[10px] uppercase tracking-wider">
+                              2. Ações recomendadas para orçamento e reparo:
+                            </span>
+                            <p className="text-teal-950 dark:text-teal-100 font-medium leading-relaxed">
+                              {action.suggestedAction || action.description}
                             </p>
-                          )}
-
-                          <p className="text-teal-800 dark:text-teal-300 text-[11px] font-medium pt-0.5">
-                            <strong>Ação recomendada:</strong>{' '}
-                            {action.suggestedAction || action.description}
-                          </p>
-
-                          {action.technicalReference && (
-                            <p className="text-[10.5px] text-teal-700 dark:text-teal-400">
-                              <strong>Referência técnica:</strong> {action.technicalReference}
+                            <p className="text-[10px] text-teal-800 dark:text-teal-300">
+                              <span className="font-bold">Referência técnica: </span>
+                              {action.technicalReference || 'requer consulta ao fabricante'}
                             </p>
-                          )}
+                          </div>
 
-                          {action.installationConditions && (
-                            <p className="text-[10.5px] text-amber-800 dark:text-amber-300">
-                              <strong>Condições do local:</strong> {action.installationConditions}
+                          {/* Seção 3: Condições do local de instalação */}
+                          <div className="rounded-md bg-amber-50/70 dark:bg-amber-950/40 p-2 border border-amber-200 dark:border-amber-900 text-[11px]">
+                            <span className="font-semibold text-amber-900 dark:text-amber-200 block text-[10px] uppercase tracking-wider mb-0.5">
+                              3. Condições do local de instalação (acesso e grau de dificuldade):
+                            </span>
+                            <p className="text-amber-900 dark:text-amber-100 leading-relaxed">
+                              {action.installationConditions ||
+                                'Condições do local não detalhadas na visita'}
                             </p>
-                          )}
+                          </div>
 
-                          {action.pendingItems && action.pendingItems.length > 0 && (
-                            <div className="text-[10.5px] text-rose-800 dark:text-rose-300 pt-0.5">
-                              <strong>Itens pendentes:</strong>
-                              <ul className="list-disc list-inside space-y-0.5">
+                          {/* Seção 4: Itens pendentes de levantamento */}
+                          <div className="rounded-md bg-rose-50/70 dark:bg-rose-950/40 p-2 border border-rose-200 dark:border-rose-900 text-[11px]">
+                            <span className="font-semibold text-rose-900 dark:text-rose-200 block text-[10px] uppercase tracking-wider mb-0.5">
+                              4. Itens pendentes de levantamento:
+                            </span>
+                            {action.pendingItems && action.pendingItems.length > 0 ? (
+                              <ul className="list-disc list-inside space-y-0.5 text-rose-900 dark:text-rose-200">
                                 {action.pendingItems.map((pi, pIdx) => (
                                   <li key={pIdx}>{pi}</li>
                                 ))}
                               </ul>
-                            </div>
-                          )}
+                            ) : (
+                              <p className="text-[10.5px] text-muted-foreground italic">
+                                Nenhum item pendente registrado.
+                              </p>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

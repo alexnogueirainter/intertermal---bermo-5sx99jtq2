@@ -518,20 +518,20 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
               <div className="flex items-center justify-between border-b border-teal-700 pb-1.5">
                 <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
                   <CheckSquare className="h-4 w-4 text-teal-700" />
-                  Plano de Ação & Pontos de Atenção Recomendados
+                  Análise da IA — Plano de Ação e Pontos de Atenção
                 </h3>
                 <span className="text-[10px] text-teal-800 font-semibold">
-                  Engenharia de Aplicação Intertermal
+                  Engenharia de Aplicação Intertermal / Bermo
                 </span>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {actionPlan.map((action, aIdx) => (
                   <div
                     key={action.id || aIdx}
-                    className="p-3 rounded-lg border border-slate-200 bg-slate-50/80 space-y-1.5 text-[11px]"
+                    className="p-3 rounded-lg border border-slate-200 bg-slate-50/80 space-y-2 text-[11px]"
                   >
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center justify-between gap-2 border-b border-slate-200/80 pb-1.5">
                       <div className="flex items-center gap-2">
                         <span className="h-4 w-4 rounded-full bg-teal-100 text-teal-800 text-[10px] font-bold flex items-center justify-center">
                           {aIdx + 1}
@@ -553,54 +553,51 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                     </div>
 
                     {/* 1. Diagnóstico */}
-                    {action.diagnosis && (
-                      <div className="pl-6 text-[10.5px] leading-snug text-slate-700">
-                        <strong className="text-slate-900 font-semibold">Diagnóstico: </strong>
-                        <span>{action.diagnosis}</span>
-                      </div>
-                    )}
-
-                    {!action.diagnosis && (
-                      <p className="text-slate-700 text-[10.5px] leading-snug pl-6">
-                        {action.description}
-                      </p>
-                    )}
+                    <div className="pl-6 text-[10.5px] leading-snug text-slate-700">
+                      <strong className="text-slate-900 font-semibold">1. Diagnóstico: </strong>
+                      <span>{action.diagnosis || action.description}</span>
+                    </div>
 
                     {/* 2. Ação recomendada e referência do fabricante */}
-                    <div className="pl-6 pt-1 text-teal-900 font-medium text-[10px] space-y-0.5">
+                    <div className="pl-6 text-teal-900 font-medium text-[10.5px] space-y-0.5">
                       <div className="flex items-start gap-1.5">
-                        <span className="font-bold shrink-0">Ação recomendada:</span>
+                        <span className="font-bold shrink-0">2. Ações recomendadas:</span>
                         <span>{action.suggestedAction || action.description}</span>
                       </div>
-                      {action.technicalReference && (
-                        <div className="text-[9.5px] text-teal-800">
-                          <strong>Referência técnica: </strong>
-                          <span>{action.technicalReference}</span>
-                        </div>
-                      )}
+                      <div className="text-[9.5px] text-teal-800">
+                        <strong>Referência técnica: </strong>
+                        <span>{action.technicalReference || 'requer consulta ao fabricante'}</span>
+                      </div>
                     </div>
 
                     {/* 3. Condições do local de instalação */}
-                    {action.installationConditions && (
-                      <div className="pl-6 pt-1 text-[9.5px] text-amber-900">
-                        <span className="font-bold">
-                          Condições do local de instalação (acesso/dificuldade física):{' '}
-                        </span>
-                        <span>{action.installationConditions}</span>
-                      </div>
-                    )}
+                    <div className="pl-6 text-[10px] text-amber-900">
+                      <strong className="font-semibold">
+                        3. Condições do local de instalação (acesso / dificuldade física):{' '}
+                      </strong>
+                      <span>
+                        {action.installationConditions ||
+                          'Condições do local não detalhadas na visita'}
+                      </span>
+                    </div>
 
                     {/* 4. Itens pendentes de levantamento */}
-                    {action.pendingItems && action.pendingItems.length > 0 && (
-                      <div className="pl-6 pt-1 text-[9.5px] text-rose-800">
-                        <span className="font-bold">Itens pendentes de levantamento: </span>
+                    <div className="pl-6 text-[10px] text-rose-800">
+                      <strong className="font-semibold">
+                        4. Itens pendentes de levantamento:{' '}
+                      </strong>
+                      {action.pendingItems && action.pendingItems.length > 0 ? (
                         <ul className="list-disc list-inside space-y-0.5 pt-0.5">
                           {action.pendingItems.map((p, pIdx) => (
                             <li key={pIdx}>{p}</li>
                           ))}
                         </ul>
-                      </div>
-                    )}
+                      ) : (
+                        <span className="text-slate-500 italic">
+                          Nenhum item pendente registrado.
+                        </span>
+                      )}
+                    </div>
 
                     {/* Vínculo com equipamento sinalizado: mostra as fotos dele */}
                     {(() => {
