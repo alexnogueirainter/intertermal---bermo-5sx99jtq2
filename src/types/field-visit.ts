@@ -21,9 +21,10 @@ export type DifficultyLevel = 'Baixo' | 'Médio' | 'Alto'
 export interface MediaAttachment {
   id: string
   name: string
-  type: 'image' | 'video'
+  type: 'image' | 'video' | 'audio'
   dataUrl: string
   size?: number
+  createdAt?: string
 }
 
 export interface EquipmentItem {

@@ -39,11 +39,9 @@ import {
   Copy,
   ExternalLink,
 } from 'lucide-react'
-import {
-  useSpeechRecognition,
-  detectPlatform,
-  type SpeechRecordingState,
-} from '@/hooks/useSpeechRecognition'
+import { VoiceDictationField } from '@/components/VoiceDictationField'
+import { VoiceDiagnosticFooter } from '@/components/VoiceDiagnosticFooter'
+import { detectBrowserEnvironment } from '@/hooks/useVoiceRecorder'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -154,254 +152,7 @@ const FLOW_UNIT_OPTIONS = ['m³/h', 'm³/min', 'L/min', 'L/s', 'kg/h', 'kg/s', '
  */
 const MANUFACTURER_PRESETS = ['Bermo', 'Alfa Laval', 'SPX']
 
-/**
- * Componente dedicado para campo de texto livre com Gravação de Voz embutida
- * e edição manual total.
- * Mantém posição e tamanho originais do botão, enriquecendo os estados
- * (Gravando com cronômetro, Transcrevendo..., Transcrição salva).
- * Suporta permissão automática do microfone e orientações amigáveis.
- */
-function VoiceDictationTextarea({
-  label,
-  sublabel,
-  value,
-  onChange,
-  placeholder,
-  rows = 4,
-}: {
-  label: string
-  sublabel?: string
-  value: string
-  onChange: (val: string) => void
-  placeholder?: string
-  rows?: number
-}) {
-  const {
-    speechSupported,
-    isRecording,
-    state,
-    interimTranscript,
-    recordingSeconds,
-    audioDetected,
-    permissionDeniedPermanent,
-    permissionBlockedNotice,
-    recordedAudioUrl,
-    isIos,
-    isAndroid,
-    isInAppBrowser,
-    isMediaRecorderFallback,
-    toggleRecording,
-    clearPermissionNotice,
-    retryPermission,
-  } = useSpeechRecognition({
-    currentText: value,
-    onUpdateText: onChange,
-  })
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-            {label}
-          </label>
-          {sublabel && <p className="text-[11px] text-muted-foreground">{sublabel}</p>}
-        </div>
-
-        {speechSupported ? (
-          <Button
-            type="button"
-            variant={isRecording ? 'destructive' : 'outline'}
-            size="sm"
-            onClick={toggleRecording}
-            className={`h-8 text-xs px-2.5 font-semibold transition-all ${
-              isRecording
-                ? 'animate-pulse ring-2 ring-rose-400 bg-rose-600 text-white'
-                : state === 'transcribing'
-                  ? 'border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
-                  : state === 'saved'
-                    ? 'border-emerald-400 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
-                    : 'border-teal-300 dark:border-teal-800 text-teal-800 dark:text-teal-300 hover:bg-teal-50'
-            }`}
-            title={
-              isRecording
-                ? 'Parar gravação e salvar transcrição'
-                : state === 'transcribing'
-                  ? 'Transcrevendo áudio...'
-                  : state === 'saved'
-                    ? 'Transcrição salva'
-                    : 'Gravar áudio e transcrever'
-            }
-          >
-            {isRecording ? (
-              <>
-                <MicOff className="h-3.5 w-3.5 mr-1" />
-                Gravando...
-              </>
-            ) : state === 'transcribing' ? (
-              <>
-                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin text-amber-600" />
-                Transcrevendo...
-              </>
-            ) : state === 'saved' ? (
-              <>
-                <Check className="h-3.5 w-3.5 mr-1 text-emerald-600" />
-                Transcrição salva
-              </>
-            ) : (
-              <>
-                <Mic className="h-3.5 w-3.5 mr-1 text-teal-600 dark:text-teal-400" />
-                Gravar voz
-              </>
-            )}
-          </Button>
-        ) : (
-          <span className="text-[10px] text-muted-foreground italic px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded">
-            Digitação manual disponível
-          </span>
-        )}
-      </div>
-
-      {/* Caixa de aviso de permissão ou status do microfone com passo a passo e botão Tentar Novamente */}
-      {permissionBlockedNotice && (
-        <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs space-y-2 animate-in fade-in">
-          <div className="flex items-start gap-2">
-            <Lock className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
-            <div className="space-y-1 flex-1">
-              {isInAppBrowser ? (
-                <>
-                  <p className="font-semibold text-xs text-amber-950 dark:text-amber-100">
-                    Abra no navegador do celular
-                  </p>
-                  <p className="text-[11px] leading-relaxed">
-                    O WhatsApp e outros apps abrem links num navegador próprio que bloqueia o
-                    microfone por completo. Para gravar: toque no ícone de compartilhar e escolha
-                    &apos;Abrir no Safari&apos; (iPhone) ou &apos;Abrir no Chrome&apos; (Android).
-                    Depois toque em Gravar voz e Permitir.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="font-semibold text-xs text-amber-950 dark:text-amber-100">
-                    Aviso do Microfone
-                  </p>
-                  <p className="text-[11px] leading-relaxed">{permissionBlockedNotice}</p>
-
-                  {permissionDeniedPermanent && (
-                    <div className="pt-1 text-[11px] text-slate-700 dark:text-slate-300 space-y-0.5">
-                      <p className="font-semibold">Como desbloquear agora:</p>
-                      {isIos ? (
-                        <p className="text-[10.5px]">
-                          No Safari iOS: toque no botão <strong>aA</strong> na barra de endereços
-                          &gt; <strong>Ajustes do Site</strong> &gt; Microfone: selecione{' '}
-                          <strong>Permitir</strong>.
-                        </p>
-                      ) : isAndroid ? (
-                        <p className="text-[10.5px]">
-                          No Chrome Android: toque no ícone de <strong>Cadeado</strong> ou{' '}
-                          <strong>Trava</strong> ao lado da URL &gt; <strong>Permissões</strong>{' '}
-                          &gt; libere o <strong>Microfone</strong>.
-                        </p>
-                      ) : (
-                        <p className="text-[10.5px]">
-                          Toque no ícone de <strong>Cadeado / Trava</strong> ao lado do endereço do
-                          site e altere o microfone para <strong>Permitir</strong>.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={clearPermissionNotice}
-              className="text-amber-700 hover:text-amber-900 p-0.5"
-              title="Fechar aviso"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          {/* Player de áudio anexado se gravado via MediaRecorder em navegador sem SpeechRecognition nativo */}
-          {recordedAudioUrl && (
-            <div className="pt-1 pb-1">
-              <audio src={recordedAudioUrl} controls className="w-full h-8" />
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 pt-1 border-t border-amber-200 dark:border-amber-900/60">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={retryPermission}
-              className="h-7 text-xs font-semibold bg-white dark:bg-slate-900 border-amber-400 text-amber-900 dark:text-amber-200 hover:bg-amber-100"
-            >
-              <RotateCcw className="h-3 w-3 mr-1" />
-              Tentar novamente
-            </Button>
-            <span className="text-[10.5px] text-amber-800/80 dark:text-amber-300/80">
-              Não precisa recarregar a página
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Caixa de gravação ativa com cronômetro em tempo real e indicador de áudio captado */}
-      {isRecording && (
-        <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex flex-col gap-1.5 animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
-            <span className="font-semibold">
-              {isMediaRecorderFallback
-                ? 'Gravando áudio do microfone...'
-                : 'Ouvindo sua fala em português...'}
-            </span>
-            {audioDetected && (
-              <span className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-100/80 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
-                <Volume2 className="h-3 w-3" />
-                Voz captada
-              </span>
-            )}
-            <span className="ml-auto font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/60">
-              {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:
-              {String(recordingSeconds % 60).padStart(2, '0')}
-            </span>
-          </div>
-          {interimTranscript && (
-            <div className="italic text-[11px] text-rose-700 dark:text-rose-300 bg-white/70 dark:bg-slate-900/60 p-2 rounded border border-rose-200 dark:border-rose-800">
-              &ldquo;{interimTranscript}&rdquo;
-            </div>
-          )}
-          <div className="text-[10px] text-rose-600/90 dark:text-rose-400/90 flex items-center justify-between">
-            <span>Toque em &ldquo;Gravando...&rdquo; para finalizar e salvar</span>
-            <span>Múltiplas falas são somadas ao texto existente</span>
-          </div>
-        </div>
-      )}
-
-      {/* Confirmação transitória de transcrição salva */}
-      {state === 'saved' && (
-        <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span className="font-semibold text-[11px]">
-            Transcrição adicionada e salva no rascunho com sucesso! Você pode editar manualmente ou
-            gravar mais.
-          </span>
-        </div>
-      )}
-
-      <Textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={rows}
-        className="text-xs sm:text-sm leading-relaxed bg-slate-50/70 dark:bg-slate-950 resize-y"
-      />
-    </div>
-  )
-}
+// VoiceDictationField e VoiceDiagnosticFooter substituem a implementação anterior de gravação
 
 /**
  * Componente para campo de anexos com suporte a MÚLTIPLAS imagens e vídeos
@@ -1388,7 +1139,7 @@ export default function FieldVisitPage({
       {/* Conteúdo Principal */}
       <main className="max-w-3xl mx-auto px-4 pt-4 space-y-5">
         {/* Aviso de Navegador Embutido (WhatsApp / Instagram / redes sociais) */}
-        {detectPlatform().isInAppBrowser && (
+        {detectBrowserEnvironment().isInAppBrowser && (
           <div className="p-4 rounded-xl bg-amber-500/10 dark:bg-amber-950/50 border-2 border-amber-500/40 text-amber-950 dark:text-amber-200 text-xs space-y-2 shadow-xs animate-in fade-in">
             <div className="flex items-start gap-2.5">
               <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
@@ -1866,7 +1617,7 @@ export default function FieldVisitPage({
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <VoiceDictationTextarea
+                <VoiceDictationField
                   label="Relato e levantamento técnico da visita:"
                   sublabel="Fale ao microfone para transcrever ou digite normalmente."
                   value={visit.freeDescription || visit.generalObservations || ''}
@@ -1877,6 +1628,24 @@ export default function FieldVisitPage({
                       generalObservations: val, // sincroniza para manter compatibilidade
                     }))
                   }
+                  onSaveAudioAttachment={(audioFile) => {
+                    const newAtt: MediaAttachment = {
+                      id: generateId(),
+                      type: 'audio',
+                      name: audioFile.name,
+                      dataUrl: audioFile.dataUrl,
+                      size: audioFile.blob.size,
+                      createdAt: new Date().toISOString(),
+                    }
+                    setVisit((prev) => ({
+                      ...prev,
+                      visitAttachments: [...(prev.visitAttachments || []), newAtt],
+                    }))
+                    toast({
+                      title: 'Áudio anexado à visita',
+                      description: 'Gravação salva como anexo da visita com sucesso.',
+                    })
+                  }}
                   placeholder="Ex.: Visita na planta para levantamento de novo trocador BERMO no setor de pasteurização. Vazão desejada de 30m³/h, temperatura de entrada 85°C..."
                   rows={6}
                 />
@@ -2047,13 +1816,38 @@ export default function FieldVisitPage({
                           />
 
                           {/* Observações com Voz para este equipamento */}
-                          <VoiceDictationTextarea
+                          <VoiceDictationField
                             label={`Observações do técnico sobre ${eqLabel}`}
                             sublabel="Digite ou grave sua fala com transcrição automática"
                             value={eq.technicianNotes}
                             onChange={(val) =>
                               handleUpdateEquipment(eq.id, { technicianNotes: val })
                             }
+                            onSaveAudioAttachment={(audioFile) => {
+                              const newAtt: MediaAttachment = {
+                                id: generateId(),
+                                type: 'audio',
+                                name: audioFile.name,
+                                dataUrl: audioFile.dataUrl,
+                                size: audioFile.blob.size,
+                                createdAt: new Date().toISOString(),
+                              }
+                              setVisit((prev) => ({
+                                ...prev,
+                                equipments: prev.equipments.map((item) =>
+                                  item.id === eq.id
+                                    ? {
+                                        ...item,
+                                        attachments: [...(item.attachments || []), newAtt],
+                                      }
+                                    : item,
+                                ),
+                              }))
+                              toast({
+                                title: 'Áudio anexado ao equipamento',
+                                description: `Gravação salva nos anexos de ${eqLabel}.`,
+                              })
+                            }}
                             placeholder="Descreva detalhes específicos, medidas, pontos críticos ou necessidades deste equipamento..."
                             rows={3}
                           />
@@ -2101,7 +1895,7 @@ export default function FieldVisitPage({
                 </div>
               </CardHeader>
               <CardContent className="space-y-2">
-                <VoiceDictationTextarea
+                <VoiceDictationField
                   label="Relato técnico geral:"
                   value={visit.generalObservations}
                   onChange={(val) =>
@@ -2111,6 +1905,24 @@ export default function FieldVisitPage({
                       freeDescription: val,
                     }))
                   }
+                  onSaveAudioAttachment={(audioFile) => {
+                    const newAtt: MediaAttachment = {
+                      id: generateId(),
+                      type: 'audio',
+                      name: audioFile.name,
+                      dataUrl: audioFile.dataUrl,
+                      size: audioFile.blob.size,
+                      createdAt: new Date().toISOString(),
+                    }
+                    setVisit((prev) => ({
+                      ...prev,
+                      visitAttachments: [...(prev.visitAttachments || []), newAtt],
+                    }))
+                    toast({
+                      title: 'Áudio anexado à visita',
+                      description: 'Gravação salva como anexo da visita com sucesso.',
+                    })
+                  }}
                   placeholder="Digite aqui ou use o botão de microfone acima para gravar seu relato técnico..."
                   rows={5}
                 />
@@ -2484,13 +2296,38 @@ export default function FieldVisitPage({
                         />
 
                         {/* OBSERVAÇÕES DO TÉCNICO COM GRAVAÇÃO DE VOZ E TRANSCRIÇÃO AUTOMÁTICA */}
-                        <VoiceDictationTextarea
+                        <VoiceDictationField
                           label="Observações do técnico sobre o estado do equipamento:"
                           sublabel="Grave por voz ou digite. O texto permanece 100% editável após falar."
                           value={item.technicianNotes}
                           onChange={(val) =>
                             handleUpdateEquipment(item.id, { technicianNotes: val })
                           }
+                          onSaveAudioAttachment={(audioFile) => {
+                            const newAtt: MediaAttachment = {
+                              id: generateId(),
+                              type: 'audio',
+                              name: audioFile.name,
+                              dataUrl: audioFile.dataUrl,
+                              size: audioFile.blob.size,
+                              createdAt: new Date().toISOString(),
+                            }
+                            setVisit((prev) => ({
+                              ...prev,
+                              equipments: prev.equipments.map((eq) =>
+                                eq.id === item.id
+                                  ? {
+                                      ...eq,
+                                      attachments: [...(eq.attachments || []), newAtt],
+                                    }
+                                  : eq,
+                              ),
+                            }))
+                            toast({
+                              title: 'Áudio anexado ao equipamento',
+                              description: 'Gravação salva como anexo do equipamento.',
+                            })
+                          }}
                           placeholder="Vazamento nas gaxetas, placas incrustadas, corrosão no tirante, necessidade de banho químico..."
                           rows={3}
                         />
@@ -2701,6 +2538,11 @@ export default function FieldVisitPage({
             Você pode fechar a tela, abrir outra aba ou reiniciar o aparelho que as informações
             continuarão salvas aqui mesmo após enviar ao CRM.
           </p>
+        </div>
+
+        {/* Diagnóstico visível temporário para validação em campo */}
+        <div className="pt-2">
+          <VoiceDiagnosticFooter />
         </div>
       </main>
 
