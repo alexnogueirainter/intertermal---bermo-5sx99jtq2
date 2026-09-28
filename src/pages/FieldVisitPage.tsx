@@ -34,7 +34,10 @@ import {
   Image as ImageIcon,
   X,
   FileSpreadsheet,
+  Lock,
+  Volume2,
 } from 'lucide-react'
+import { useSpeechRecognition, type SpeechRecordingState } from '@/hooks/useSpeechRecognition'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -146,161 +149,11 @@ const FLOW_UNIT_OPTIONS = ['m³/h', 'm³/min', 'L/min', 'L/s', 'kg/h', 'kg/s', '
 const MANUFACTURER_PRESETS = ['Bermo', 'Alfa Laval', 'SPX']
 
 /**
- * Hook reutilizável de gravação de voz com transcrição automática via Web Speech API.
- * Garante que a transcrição NUNCA sobrescreva o texto existente (apenas append)
- * e o campo permaneça 100% editável manualmente a qualquer momento.
- */
-function useSpeechDictation({
-  currentText,
-  onUpdateText,
-}: {
-  currentText: string
-  onUpdateText: (newText: string) => void
-}) {
-  const [isRecording, setIsRecording] = useState(false)
-  const [speechSupported, setSpeechSupported] = useState(false)
-  const [interimTranscript, setInterimTranscript] = useState('')
-  const [recordingSeconds, setRecordingSeconds] = useState(0)
-  const recognitionRef = useRef<any>(null)
-  const isRunningRef = useRef(false)
-  const baseTextRef = useRef('')
-  const finalTranscriptRef = useRef('')
-
-  useEffect(() => {
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    setSpeechSupported(!!SpeechRec)
-
-    return () => {
-      if (recognitionRef.current && isRunningRef.current) {
-        try {
-          recognitionRef.current.abort?.()
-        } catch {
-          /* intentionally ignored */
-        }
-      }
-      isRunningRef.current = false
-    }
-  }, [])
-
-  // Timer visual: conta segundos enquanto grava
-  useEffect(() => {
-    if (!isRecording) return
-    setRecordingSeconds(0)
-    const t = setInterval(() => setRecordingSeconds((s) => s + 1), 1000)
-    return () => clearInterval(t)
-  }, [isRecording])
-
-  const startRecording = () => {
-    const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRec || isRunningRef.current) return
-
-    try {
-      baseTextRef.current = currentText || ''
-      finalTranscriptRef.current = ''
-      setInterimTranscript('')
-
-      const instance = new SpeechRec()
-      instance.lang = 'pt-BR'
-      instance.continuous = true
-      instance.interimResults = true
-
-      instance.onresult = (event: any) => {
-        let currentInterim = ''
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const res = event.results[i]
-          const phrase = res[0]?.transcript || ''
-          if (res.isFinal) {
-            const trimmed = phrase.trim()
-            if (trimmed) {
-              finalTranscriptRef.current = finalTranscriptRef.current
-                ? `${finalTranscriptRef.current} ${trimmed}`
-                : trimmed
-            }
-          } else {
-            currentInterim += phrase
-          }
-        }
-
-        setInterimTranscript(currentInterim.trim())
-
-        const base = baseTextRef.current.trim()
-        const addedFinal = finalTranscriptRef.current.trim()
-        let combined = base
-        if (addedFinal) {
-          combined = base ? `${base} ${addedFinal}` : addedFinal
-        }
-
-        onUpdateText(combined)
-      }
-
-      instance.onerror = (err: any) => {
-        if (err.error === 'not-allowed' || err.error === 'service-not-allowed') {
-          toast({
-            title: 'Microfone bloqueado',
-            description:
-              'Toque no cadeado ao lado do endereço do navegador e permita o microfone. Depois toque em Gravar de novo.',
-            variant: 'destructive',
-          })
-        }
-        if (err.error !== 'no-speech') {
-          isRunningRef.current = false
-          setIsRecording(false)
-          setInterimTranscript('')
-        }
-      }
-
-      instance.onend = () => {
-        isRunningRef.current = false
-        setIsRecording(false)
-        setInterimTranscript('')
-      }
-
-      recognitionRef.current = instance
-      instance.start()
-      isRunningRef.current = true
-      setIsRecording(true)
-    } catch (e) {
-      console.warn('Erro ao iniciar speech recognition:', e)
-      isRunningRef.current = false
-      setIsRecording(false)
-      setInterimTranscript('')
-    }
-  }
-
-  const stopRecording = () => {
-    isRunningRef.current = false
-    setIsRecording(false)
-    setInterimTranscript('')
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop()
-      } catch {
-        /* intentionally ignored */
-      }
-    }
-  }
-
-  const toggleRecording = () => {
-    if (isRecording) {
-      stopRecording()
-    } else {
-      startRecording()
-    }
-  }
-
-  return {
-    isRecording,
-    speechSupported,
-    interimTranscript,
-    recordingSeconds,
-    toggleRecording,
-    stopRecording,
-  }
-}
-
-/**
  * Componente dedicado para campo de texto livre com Gravação de Voz embutida
  * e edição manual total.
+ * Mantém posição e tamanho originais do botão, enriquecendo os estados
+ * (Gravando com cronômetro, Transcrevendo..., Transcrição salva).
+ * Suporta permissão automática do microfone e orientações amigáveis.
  */
 function VoiceDictationTextarea({
   label,
@@ -317,11 +170,24 @@ function VoiceDictationTextarea({
   placeholder?: string
   rows?: number
 }) {
-  const { isRecording, speechSupported, interimTranscript, recordingSeconds, toggleRecording } =
-    useSpeechDictation({
-      currentText: value,
-      onUpdateText: onChange,
-    })
+  const {
+    speechSupported,
+    isRecording,
+    state,
+    interimTranscript,
+    recordingSeconds,
+    audioDetected,
+    permissionDeniedPermanent,
+    permissionBlockedNotice,
+    isIos,
+    isAndroid,
+    toggleRecording,
+    clearPermissionNotice,
+    retryPermission,
+  } = useSpeechRecognition({
+    currentText: value,
+    onUpdateText: onChange,
+  })
 
   return (
     <div className="space-y-2">
@@ -333,7 +199,7 @@ function VoiceDictationTextarea({
           {sublabel && <p className="text-[11px] text-muted-foreground">{sublabel}</p>}
         </div>
 
-        {speechSupported && (
+        {speechSupported ? (
           <Button
             type="button"
             variant={isRecording ? 'destructive' : 'outline'}
@@ -342,14 +208,36 @@ function VoiceDictationTextarea({
             className={`h-8 text-xs px-2.5 font-semibold transition-all ${
               isRecording
                 ? 'animate-pulse ring-2 ring-rose-400 bg-rose-600 text-white'
-                : 'border-teal-300 dark:border-teal-800 text-teal-800 dark:text-teal-300 hover:bg-teal-50'
+                : state === 'transcribing'
+                  ? 'border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                  : state === 'saved'
+                    ? 'border-emerald-400 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                    : 'border-teal-300 dark:border-teal-800 text-teal-800 dark:text-teal-300 hover:bg-teal-50'
             }`}
-            title={isRecording ? 'Parar gravação' : 'Gravar áudio e transcrever'}
+            title={
+              isRecording
+                ? 'Parar gravação e salvar transcrição'
+                : state === 'transcribing'
+                  ? 'Transcrevendo áudio...'
+                  : state === 'saved'
+                    ? 'Transcrição salva'
+                    : 'Gravar áudio e transcrever'
+            }
           >
             {isRecording ? (
               <>
                 <MicOff className="h-3.5 w-3.5 mr-1" />
                 Gravando...
+              </>
+            ) : state === 'transcribing' ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin text-amber-600" />
+                Transcrevendo...
+              </>
+            ) : state === 'saved' ? (
+              <>
+                <Check className="h-3.5 w-3.5 mr-1 text-emerald-600" />
+                Transcrição salva
               </>
             ) : (
               <>
@@ -358,14 +246,88 @@ function VoiceDictationTextarea({
               </>
             )}
           </Button>
+        ) : (
+          <span className="text-[10px] text-muted-foreground italic px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded">
+            Digitação manual disponível
+          </span>
         )}
       </div>
 
+      {/* Caixa de aviso de permissão amigável com botão Tentar Novamente */}
+      {permissionBlockedNotice && (
+        <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs space-y-2 animate-in fade-in">
+          <div className="flex items-start gap-2">
+            <Lock className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
+            <div className="space-y-1 flex-1">
+              <p className="font-semibold text-xs text-amber-950 dark:text-amber-100">
+                Microfone bloqueado pelo navegador
+              </p>
+              <p className="text-[11px] leading-relaxed">{permissionBlockedNotice}</p>
+
+              {permissionDeniedPermanent && (
+                <div className="pt-1 text-[11px] text-slate-700 dark:text-slate-300 space-y-0.5">
+                  <p className="font-semibold">Como desbloquear agora:</p>
+                  {isIos ? (
+                    <p className="text-[10.5px]">
+                      No Safari iOS: toque no botão <strong>aA</strong> na barra de endereços &gt;{' '}
+                      <strong>Ajustes do Site</strong> &gt; Microfone: selecione{' '}
+                      <strong>Permitir</strong>.
+                    </p>
+                  ) : isAndroid ? (
+                    <p className="text-[10.5px]">
+                      No Chrome Android: toque no ícone de <strong>Cadeado</strong> ou{' '}
+                      <strong>Trava</strong> ao lado da URL &gt; <strong>Permissões</strong> &gt;
+                      libere o <strong>Microfone</strong>.
+                    </p>
+                  ) : (
+                    <p className="text-[10.5px]">
+                      Toque no ícone de <strong>Cadeado / Trava</strong> ao lado do endereço do site
+                      e altere o microfone para <strong>Permitir</strong>.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={clearPermissionNotice}
+              className="text-amber-700 hover:text-amber-900 p-0.5"
+              title="Fechar aviso"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1 border-t border-amber-200 dark:border-amber-900/60">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={retryPermission}
+              className="h-7 text-xs font-semibold bg-white dark:bg-slate-900 border-amber-400 text-amber-900 dark:text-amber-200 hover:bg-amber-100"
+            >
+              <RotateCcw className="h-3 w-3 mr-1" />
+              Tentar novamente
+            </Button>
+            <span className="text-[10.5px] text-amber-800/80 dark:text-amber-300/80">
+              Não precisa recarregar a página
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Caixa de gravação ativa com cronômetro em tempo real e indicador de áudio captado */}
       {isRecording && (
-        <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex flex-col gap-1.5">
+        <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex flex-col gap-1.5 animate-in fade-in">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
             <span className="font-semibold">Ouvindo sua fala em português...</span>
+            {audioDetected && (
+              <span className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-100/80 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
+                <Volume2 className="h-3 w-3" />
+                Voz captada
+              </span>
+            )}
             <span className="ml-auto font-mono text-[11px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/60">
               {String(Math.floor(recordingSeconds / 60)).padStart(2, '0')}:
               {String(recordingSeconds % 60).padStart(2, '0')}
@@ -376,6 +338,21 @@ function VoiceDictationTextarea({
               &ldquo;{interimTranscript}&rdquo;
             </div>
           )}
+          <div className="text-[10px] text-rose-600/90 dark:text-rose-400/90 flex items-center justify-between">
+            <span>Toque em &ldquo;Gravando...&rdquo; para finalizar e salvar</span>
+            <span>Múltiplas falas são somadas ao texto existente</span>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmação transitória de transcrição salva */}
+      {state === 'saved' && (
+        <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+          <span className="font-semibold text-[11px]">
+            Transcrição adicionada e salva no rascunho com sucesso! Você pode editar manualmente ou
+            gravar mais.
+          </span>
         </div>
       )}
 
