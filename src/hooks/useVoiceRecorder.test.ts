@@ -346,4 +346,127 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     expect(currentValue).toContain('Trecho 1')
     expect(currentValue).toContain('Trecho 2')
   })
+
+  it('no ambiente iOS Safari: realiza 3 gravações consecutivas sem AudioContext, liberando tracks e permitindo novo ciclo a cada término', async () => {
+    // Simula UserAgent do iPhone Safari
+    const originalUserAgent = navigator.userAgent
+    Object.defineProperty(window.navigator, 'userAgent', {
+      value:
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
+      configurable: true,
+      writable: true,
+    })
+
+    const onSaveAttachment = vi.fn()
+    let currentValue = 'Anotação inicial de visita.'
+    const onChange = vi.fn((nextVal: string) => {
+      currentValue = nextVal
+    })
+
+    const { result, rerender } = renderHook(
+      ({ val }) =>
+        useVoiceRecorder({
+          value: val,
+          onChange,
+          onSaveAudioAttachment: onSaveAttachment,
+        }),
+      {
+        initialProps: { val: currentValue },
+      },
+    )
+
+    // ============================================
+    // GRAVAÇÃO 1 (iOS Safari)
+    // ============================================
+    await act(async () => {
+      await result.current.startRecording()
+    })
+
+    expect(result.current.state).toBe('recording')
+    expect(result.current.isRecording).toBe(true)
+    // No iOS, não cria SpeechRecognition para evitar colisões no WebKit
+    expect(speechInstances.length).toBe(0)
+
+    // Para a primeira gravação
+    act(() => {
+      result.current.stopRecording()
+    })
+    expect(result.current.state).toBe('transcribing')
+
+    act(() => {
+      vi.advanceTimersByTime(400)
+    })
+    expect(result.current.state).toBe('saved')
+
+    act(() => {
+      vi.advanceTimersByTime(1300)
+    })
+    expect(result.current.state).toBe('idle')
+    expect(result.current.isRecording).toBe(false)
+    expect(mockTracks[0].stop).toHaveBeenCalled()
+
+    // O áudio gravado está disponível
+    expect(result.current.recordedAudioBlob).not.toBeNull()
+    expect(result.current.errorMessage).toContain('Safari')
+
+    // ============================================
+    // GRAVAÇÃO 2 (iOS Safari - Segunda gravação no mesmo campo)
+    // ============================================
+    mockTracks[0].stop.mockClear()
+    mockTracks[1].stop.mockClear()
+
+    await act(async () => {
+      await result.current.startRecording()
+    })
+
+    expect(result.current.state).toBe('recording')
+    expect(result.current.isRecording).toBe(true)
+
+    // Para a segunda gravação
+    act(() => {
+      result.current.stopRecording()
+    })
+
+    act(() => {
+      vi.advanceTimersByTime(1700)
+    })
+    expect(result.current.state).toBe('idle')
+    expect(result.current.isRecording).toBe(false)
+    expect(mockTracks[0].stop).toHaveBeenCalled()
+
+    // ============================================
+    // GRAVAÇÃO 3 (iOS Safari - Terceira gravação no mesmo campo)
+    // ============================================
+    mockTracks[0].stop.mockClear()
+    mockTracks[1].stop.mockClear()
+
+    await act(async () => {
+      await result.current.startRecording()
+    })
+
+    expect(result.current.state).toBe('recording')
+    expect(result.current.isRecording).toBe(true)
+
+    // Para a terceira gravação
+    act(() => {
+      result.current.stopRecording()
+    })
+
+    act(() => {
+      vi.advanceTimersByTime(1700)
+    })
+    expect(result.current.state).toBe('idle')
+    expect(result.current.isRecording).toBe(false)
+    expect(mockTracks[0].stop).toHaveBeenCalled()
+
+    // O texto inicial nunca é sobrescrito
+    expect(currentValue).toBe('Anotação inicial de visita.')
+
+    // Restaura userAgent
+    Object.defineProperty(window.navigator, 'userAgent', {
+      value: originalUserAgent,
+      configurable: true,
+      writable: true,
+    })
+  })
 })

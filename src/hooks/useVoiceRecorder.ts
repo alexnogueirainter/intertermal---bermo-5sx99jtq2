@@ -198,17 +198,20 @@ if (typeof window !== 'undefined') {
   })
 }
 
-// Escolhe o melhor mime-type suportado pelo MediaRecorder
-function pickSupportedAudioMimeType(): string {
+// Escolhe o melhor mime-type suportado pelo MediaRecorder respeitando o dispositivo
+function pickSupportedAudioMimeType(isIos = false): string {
   if (typeof MediaRecorder === 'undefined') return ''
-  const candidates = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4',
-    'audio/aac',
-    'audio/ogg;codecs=opus',
-    'audio/wav',
-  ]
+  // No iOS Safari, audio/mp4 é o formato nativo mais estável e recomendado pela Apple
+  const candidates = isIos
+    ? ['audio/mp4', 'audio/aac', 'audio/webm;codecs=opus', 'audio/webm']
+    : [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/aac',
+        'audio/ogg;codecs=opus',
+        'audio/wav',
+      ]
   for (const mime of candidates) {
     try {
       if (MediaRecorder.isTypeSupported(mime)) return mime
@@ -218,7 +221,6 @@ function pickSupportedAudioMimeType(): string {
   }
   return ''
 }
-
 /**
  * Combina texto existente com novo trecho de transcrição de forma aditiva e inteligente:
  * - Nunca sobrescreve o texto digitado manualmente
@@ -321,8 +323,14 @@ export function useVoiceRecorder({
   const releaseMicrophone = useCallback(() => {
     if (streamRef.current) {
       try {
-        streamRef.current.getTracks().forEach((track) => {
-          track.stop()
+        const tracks = streamRef.current.getTracks()
+        tracks.forEach((track) => {
+          try {
+            track.stop()
+            track.enabled = false
+          } catch {
+            /* ignore */
+          }
         })
       } catch {
         /* ignore */
@@ -437,8 +445,12 @@ export function useVoiceRecorder({
     setPermissionDenied(false)
     setInterimTranscript('')
     setAudioDetected(false)
-    setRecordedAudioUrl(null)
-    setRecordedAudioBlob(null)
+    // No iOS Safari não descartamos o áudio anterior até que um novo áudio seja finalizado,
+    // garantindo que se o usuário quiser salvar como anexo o áudio anterior ele continue disponível
+    if (!detectBrowserEnvironment().isIos) {
+      setRecordedAudioUrl(null)
+      setRecordedAudioBlob(null)
+    }
     activeSessionTranscriptRef.current = ''
 
     updateGlobalDiagnostic({
@@ -532,32 +544,37 @@ export function useVoiceRecorder({
     }
 
     // 2. DETECTOR DE VOLUME / VU METER (AudioContext seguro sem travar)
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
-      if (AudioCtx) {
-        const audioCtx = new AudioCtx()
-        audioContextRef.current = audioCtx
-        const source = audioCtx.createMediaStreamSource(stream)
-        const analyser = audioCtx.createAnalyser()
-        analyser.fftSize = 256
-        source.connect(analyser)
-        const data = new Uint8Array(analyser.frequencyBinCount)
+    // No iOS Safari: AudioContext conectado ao MediaStream bloqueia e corrompe o buffer de áudio
+    // de sessões subsequentes no WebKit. Pulamos AudioContext no iOS para evitar trava de hardware.
+    const currentEnv = detectBrowserEnvironment()
+    if (!currentEnv.isIos) {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext
+        if (AudioCtx) {
+          const audioCtx = new AudioCtx()
+          audioContextRef.current = audioCtx
+          const source = audioCtx.createMediaStreamSource(stream)
+          const analyser = audioCtx.createAnalyser()
+          analyser.fftSize = 256
+          source.connect(analyser)
+          const data = new Uint8Array(analyser.frequencyBinCount)
 
-        const checkLevel = () => {
-          if (!streamRef.current || audioCtx.state === 'closed') return
-          analyser.getByteFrequencyData(data)
-          let sum = 0
-          for (let i = 0; i < data.length; i++) sum += data[i]
-          const avg = sum / data.length
-          if (avg > 8) {
-            setAudioDetected(true)
+          const checkLevel = () => {
+            if (!streamRef.current || audioCtx.state === 'closed') return
+            analyser.getByteFrequencyData(data)
+            let sum = 0
+            for (let i = 0; i < data.length; i++) sum += data[i]
+            const avg = sum / data.length
+            if (avg > 8) {
+              setAudioDetected(true)
+            }
+            requestAnimationFrame(checkLevel)
           }
           requestAnimationFrame(checkLevel)
         }
-        requestAnimationFrame(checkLevel)
+      } catch {
+        // AudioContext é opcional para VU meter visual no desktop/Android
       }
-    } catch {
-      // AudioContext é opcional para VU meter visual
     }
 
     // 3. CAPTURA COM MEDIARECORDER (Sempre gravando o áudio para garantir preservação)
@@ -573,7 +590,7 @@ export function useVoiceRecorder({
       return
     }
 
-    const mimeType = pickSupportedAudioMimeType()
+    const mimeType = pickSupportedAudioMimeType(currentEnv.isIos)
     chunksRef.current = []
     let recorder: MediaRecorder
     try {
@@ -586,6 +603,7 @@ export function useVoiceRecorder({
         mediaRecorderRef.current = recorder
       } catch (recFatalErr: any) {
         releaseMicrophone()
+        mediaRecorderRef.current = null
         const detail = `${recFatalErr?.name || 'Error'}: ${recFatalErr?.message || 'Falha ao iniciar gravador'}`
         setErrorMessage('Não foi possível inicializar o gravador de áudio no seu navegador.')
         setExactErrorDetail(detail)
@@ -596,11 +614,15 @@ export function useVoiceRecorder({
     recorder.ondataavailable = (event: BlobEvent) => {
       if (event.data && event.data.size > 0) {
         chunksRef.current.push(event.data)
+        if (currentEnv.isIos) {
+          setAudioDetected(true)
+        }
       }
     }
 
     recorder.onstop = () => {
-      const finalMime = recorder.mimeType || mimeType || 'audio/webm'
+      const finalMime =
+        recorder.mimeType || mimeType || (currentEnv.isIos ? 'audio/mp4' : 'audio/webm')
       const blob = new Blob(chunksRef.current, { type: finalMime })
       if (blob.size > 0) {
         setRecordedAudioBlob(blob)
@@ -611,18 +633,39 @@ export function useVoiceRecorder({
           /* ignore */
         }
       }
-      // Libera tracks do microfone para garantir sessão limpa
+      // Libera tracks do microfone e descarta o recorder para garantir sessão limpa
       releaseMicrophone()
+      if (mediaRecorderRef.current === recorder) {
+        mediaRecorderRef.current = null
+      }
     }
 
     // Inicia gravação com chunks a cada 1 segundo
-    recorder.start(1000)
+    // No iOS Safari, passamos timeSlice seguro
+    try {
+      recorder.start(1000)
+    } catch (startErr: any) {
+      console.warn('recorder.start(1000) falhou, tentando recorder.start():', startErr)
+      try {
+        recorder.start()
+      } catch (fatalStartErr: any) {
+        releaseMicrophone()
+        mediaRecorderRef.current = null
+        setErrorMessage('Não foi possível iniciar a gravação de áudio no Safari.')
+        setExactErrorDetail(String(fatalStartErr))
+        return
+      }
+    }
 
     // 4. CAMINHO DUPLO DE TRANSCRIÇÃO:
-    // Cria SEMPRE uma nova instância limpa de SpeechRecognition por sessão
+    // No iOS (Safari), o WebKit não suporta gravação simultânea de MediaRecorder + SpeechRecognition
+    // e o webkitSpeechRecognition no iOS frequentemente trava a segunda sessão com service-not-allowed
+    // ou bloqueio de canal. No iOS, usamos o fluxo de gravação MediaRecorder com fallback garantido,
+    // permitindo múltiplas gravações infinitas sem travar o microfone.
+    // No Desktop e Android, o fluxo original com Web Speech API contínua permanece 100% IDÊNTICO.
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
 
-    if (SpeechRec) {
+    if (SpeechRec && !currentEnv.isIos) {
       try {
         setIsMediaRecorderFallback(false)
         const recognition = new SpeechRec()
@@ -709,10 +752,12 @@ export function useVoiceRecorder({
         setIsMediaRecorderFallback(true)
       }
     } else {
-      // Navegador sem Web Speech API (ex: Safari iOS / macOS)
+      // Navegador iOS Safari ou sem Web Speech API
       setIsMediaRecorderFallback(true)
       updateGlobalDiagnostic({
-        lastAction: 'Safari/Navegador sem SpeechRecognition: gravando via MediaRecorder',
+        lastAction: currentEnv.isIos
+          ? 'iOS Safari: sessão limpa iniciada via MediaRecorder (áudio preservado)'
+          : 'Safari/Navegador sem SpeechRecognition: gravando via MediaRecorder',
       })
     }
 
@@ -752,15 +797,18 @@ export function useVoiceRecorder({
     }
 
     // 2. Para MediaRecorder e dispara onstop (que chama releaseMicrophone)
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+    const activeRecorder = mediaRecorderRef.current
+    if (activeRecorder && activeRecorder.state !== 'inactive') {
       try {
-        mediaRecorderRef.current.stop()
+        activeRecorder.stop()
       } catch {
         releaseMicrophone()
       }
     } else {
       releaseMicrophone()
     }
+    // Descartar referência para nunca reutilizar
+    mediaRecorderRef.current = null
 
     setInterimTranscript('')
 
@@ -773,6 +821,8 @@ export function useVoiceRecorder({
       clearTimeout(transitionTimeoutRef.current)
       transitionTimeoutRef.current = null
     }
+
+    const envAtStop = detectBrowserEnvironment()
 
     if (hadTranscribedText) {
       setState('transcribing')
@@ -793,10 +843,23 @@ export function useVoiceRecorder({
         setState('transcribing')
         isStoppingRef.current = false
         transitionTimeoutRef.current = setTimeout(() => {
-          setState('idle')
-          transitionTimeoutRef.current = null
+          // No iOS Safari, exibe como "saved" para sinalizar que o áudio foi captado com sucesso
+          // e o botão volta pronto para gravar novamente, com mensagem explicativa e player do áudio
+          if (envAtStop.isIos) {
+            setState('saved')
+            updateGlobalDiagnostic({
+              lastAction: 'Áudio captado com sucesso no iOS Safari. Pronto para nova gravação.',
+            })
+            transitionTimeoutRef.current = setTimeout(() => {
+              setState('idle')
+              transitionTimeoutRef.current = null
+            }, 1200)
+          } else {
+            setState('idle')
+            transitionTimeoutRef.current = null
+          }
           setErrorMessage(
-            'Transcrição de fala automática não disponível neste navegador (ex: Safari). O áudio foi gravado com sucesso: você pode ouvi-lo abaixo, salvá-lo como anexo e digitar suas observações.',
+            'Áudio gravado com sucesso! No Safari/iOS você pode ouvi-lo pelo player abaixo e salvá-lo como anexo no relatório, além de gravar novos áudios neste mesmo campo.',
           )
         }, 350)
       } else {

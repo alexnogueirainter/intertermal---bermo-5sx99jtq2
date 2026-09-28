@@ -265,8 +265,11 @@ export function VoiceDictationField({
           {/* Player do áudio gravado se disponível (ex.: gravou via fallback ou antes de erro) */}
           {recordedAudioUrl && (
             <div className="pt-1.5 space-y-1.5 border-t border-amber-200 dark:border-amber-900/60">
-              <p className="text-[10.5px] font-medium text-amber-900 dark:text-amber-200">
-                Áudio gravado pelo microfone:
+              <p className="text-[10.5px] font-medium text-amber-900 dark:text-amber-200 flex items-center justify-between">
+                <span>Áudio gravado pelo microfone:</span>
+                <span className="text-[9.5px] font-normal text-amber-800 dark:text-amber-300">
+                  Pronto para ouvir ou anexar
+                </span>
               </p>
               <audio src={recordedAudioUrl} controls className="w-full h-8" />
               {onSaveAudioAttachment && recordedAudioBlob && (
