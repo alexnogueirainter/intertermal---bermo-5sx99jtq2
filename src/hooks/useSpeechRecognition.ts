@@ -19,6 +19,7 @@ export interface UseSpeechRecognitionReturn {
   permissionBlockedNotice: string | null
   isIos: boolean
   isAndroid: boolean
+  isInAppBrowser: boolean
   startRecording: () => Promise<void>
   stopRecording: () => void
   toggleRecording: () => void
@@ -26,17 +27,28 @@ export interface UseSpeechRecognitionReturn {
   retryPermission: () => Promise<void>
 }
 
-// Detecção simples de navegador/plataforma para instruções específicas
-function detectPlatform() {
+// Detecção de navegador/plataforma e navegador embutido (WhatsApp, WebViews de redes sociais)
+export function detectPlatform() {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-    return { isIos: false, isAndroid: false }
+    return { isIos: false, isAndroid: false, isInAppBrowser: false }
   }
   const ua = navigator.userAgent || ''
   const isIos =
     /iPad|iPhone|iPod/.test(ua) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   const isAndroid = /Android/.test(ua)
-  return { isIos, isAndroid }
+
+  // Detecção de navegador embutido (WhatsApp, Instagram, Facebook In-App Browser, iOS UIWebView/WKWebView sem Safari, etc.)
+  const isWhatsApp = /WhatsApp/i.test(ua)
+  const isFacebookOrInstagram = /FB_IAB|FBAN|FBAV|Instagram/i.test(ua)
+  // No iOS, se contém AppleWebKit mas NÃO contém "Safari/", é um WebView embutido de app
+  const isIosWebView = isIos && /AppleWebKit/i.test(ua) && !/Safari\//i.test(ua)
+  // Android WebView comum: contém "Version/X.X" e "wv" ou "; wv)"
+  const isAndroidWebView = isAndroid && (/Version\/.*Chrome/i.test(ua) || /\bwv\b/i.test(ua))
+
+  const isInAppBrowser = isWhatsApp || isFacebookOrInstagram || isIosWebView || isAndroidWebView
+
+  return { isIos, isAndroid, isInAppBrowser }
 }
 
 export function useSpeechRecognition({
@@ -68,7 +80,11 @@ export function useSpeechRecognition({
     currentTextRef.current = currentText
   }, [currentText])
 
-  const { isIos, isAndroid } = detectPlatform()
+  const { isIos, isAndroid, isInAppBrowser } = detectPlatform()
+
+  const defaultBlockedNotice = isInAppBrowser
+    ? "O WhatsApp e outros apps abrem links num navegador próprio que não libera o microfone. Para gravar: toque no ícone de compartilhar e escolha 'Abrir no Safari' (iPhone) ou 'Abrir no Chrome' (Android). Depois toque em Gravar voz e Permitir."
+    : 'Para gravar, o app precisa do microfone. Toque no ícone de cadeado/trava na barra de endereço do navegador e libere o microfone.'
 
   // Checagem inicial de suporte a SpeechRecognition
   useEffect(() => {
@@ -185,9 +201,7 @@ export function useSpeechRecognition({
     } catch (err: any) {
       if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
         setPermissionDeniedPermanent(true)
-        setPermissionBlockedNotice(
-          'Para gravar, o app precisa do microfone. Toque no ícone de cadeado/trava na barra de endereço do navegador e libere o microfone.',
-        )
+        setPermissionBlockedNotice(defaultBlockedNotice)
         return false
       }
     }
@@ -259,9 +273,7 @@ export function useSpeechRecognition({
 
     if (permissionState === 'denied') {
       setPermissionDeniedPermanent(true)
-      setPermissionBlockedNotice(
-        'Para gravar, o app precisa do microfone. Toque no ícone de cadeado/trava na barra de endereço do navegador e libere o microfone.',
-      )
+      setPermissionBlockedNotice(defaultBlockedNotice)
       setState('idle')
       return
     }
@@ -324,9 +336,7 @@ export function useSpeechRecognition({
 
         if (errType === 'not-allowed' || errType === 'service-not-allowed') {
           setPermissionDeniedPermanent(true)
-          setPermissionBlockedNotice(
-            'Para gravar, o app precisa do microfone. Toque no ícone de cadeado/trava na barra de endereço do navegador e libere o microfone.',
-          )
+          setPermissionBlockedNotice(defaultBlockedNotice)
           isRunningRef.current = false
           stopAudioDetection()
           setState('idle')
@@ -369,9 +379,7 @@ export function useSpeechRecognition({
       setState('idle')
       if (e?.name === 'NotAllowedError') {
         setPermissionDeniedPermanent(true)
-        setPermissionBlockedNotice(
-          'Para gravar, o app precisa do microfone. Toque no ícone de cadeado/trava na barra de endereço do navegador e libere o microfone.',
-        )
+        setPermissionBlockedNotice(defaultBlockedNotice)
       }
     }
   }, [commitTranscript, finalizeRecordingSession, lang])
@@ -423,6 +431,7 @@ export function useSpeechRecognition({
     permissionBlockedNotice,
     isIos,
     isAndroid,
+    isInAppBrowser,
     startRecording,
     stopRecording,
     toggleRecording,

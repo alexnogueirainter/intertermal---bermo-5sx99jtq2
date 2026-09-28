@@ -181,6 +181,7 @@ function VoiceDictationTextarea({
     permissionBlockedNotice,
     isIos,
     isAndroid,
+    isInAppBrowser,
     toggleRecording,
     clearPermissionNotice,
     retryPermission,
@@ -259,33 +260,49 @@ function VoiceDictationTextarea({
           <div className="flex items-start gap-2">
             <Lock className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" />
             <div className="space-y-1 flex-1">
-              <p className="font-semibold text-xs text-amber-950 dark:text-amber-100">
-                Microfone bloqueado pelo navegador
-              </p>
-              <p className="text-[11px] leading-relaxed">{permissionBlockedNotice}</p>
+              {isInAppBrowser ? (
+                <>
+                  <p className="font-semibold text-xs text-amber-950 dark:text-amber-100">
+                    Abra no navegador do celular
+                  </p>
+                  <p className="text-[11px] leading-relaxed">
+                    O WhatsApp e outros apps abrem links num navegador próprio que não libera o
+                    microfone. Para gravar: toque no ícone de compartilhar e escolha &apos;Abrir no
+                    Safari&apos; (iPhone) ou &apos;Abrir no Chrome&apos; (Android). Depois toque em
+                    Gravar voz e Permitir.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-xs text-amber-950 dark:text-amber-100">
+                    Microfone bloqueado pelo navegador
+                  </p>
+                  <p className="text-[11px] leading-relaxed">{permissionBlockedNotice}</p>
 
-              {permissionDeniedPermanent && (
-                <div className="pt-1 text-[11px] text-slate-700 dark:text-slate-300 space-y-0.5">
-                  <p className="font-semibold">Como desbloquear agora:</p>
-                  {isIos ? (
-                    <p className="text-[10.5px]">
-                      No Safari iOS: toque no botão <strong>aA</strong> na barra de endereços &gt;{' '}
-                      <strong>Ajustes do Site</strong> &gt; Microfone: selecione{' '}
-                      <strong>Permitir</strong>.
-                    </p>
-                  ) : isAndroid ? (
-                    <p className="text-[10.5px]">
-                      No Chrome Android: toque no ícone de <strong>Cadeado</strong> ou{' '}
-                      <strong>Trava</strong> ao lado da URL &gt; <strong>Permissões</strong> &gt;
-                      libere o <strong>Microfone</strong>.
-                    </p>
-                  ) : (
-                    <p className="text-[10.5px]">
-                      Toque no ícone de <strong>Cadeado / Trava</strong> ao lado do endereço do site
-                      e altere o microfone para <strong>Permitir</strong>.
-                    </p>
+                  {permissionDeniedPermanent && (
+                    <div className="pt-1 text-[11px] text-slate-700 dark:text-slate-300 space-y-0.5">
+                      <p className="font-semibold">Como desbloquear agora:</p>
+                      {isIos ? (
+                        <p className="text-[10.5px]">
+                          No Safari iOS: toque no botão <strong>aA</strong> na barra de endereços
+                          &gt; <strong>Ajustes do Site</strong> &gt; Microfone: selecione{' '}
+                          <strong>Permitir</strong>.
+                        </p>
+                      ) : isAndroid ? (
+                        <p className="text-[10.5px]">
+                          No Chrome Android: toque no ícone de <strong>Cadeado</strong> ou{' '}
+                          <strong>Trava</strong> ao lado da URL &gt; <strong>Permissões</strong>{' '}
+                          &gt; libere o <strong>Microfone</strong>.
+                        </p>
+                      ) : (
+                        <p className="text-[10.5px]">
+                          Toque no ícone de <strong>Cadeado / Trava</strong> ao lado do endereço do
+                          site e altere o microfone para <strong>Permitir</strong>.
+                        </p>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
             <button
