@@ -277,6 +277,7 @@ export function useVoiceRecorder({
   const audioContextRef = useRef<AudioContext | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const timerRef = useRef<any>(null)
+  const transitionTimeoutRef = useRef<any>(null)
   const activeSessionTranscriptRef = useRef('')
   const isStoppingRef = useRef(false)
 
@@ -342,6 +343,7 @@ export function useVoiceRecorder({
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
+      if (transitionTimeoutRef.current) clearTimeout(transitionTimeoutRef.current)
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort()
@@ -394,7 +396,40 @@ export function useVoiceRecorder({
   // Iniciar gravação de voz (Chamada IMEDIATA no toque do usuário)
   const startRecording = useCallback(async () => {
     // Se já estiver gravando, nada a fazer aqui
-    if (state === 'recording' || isStoppingRef.current) return
+    if (state === 'recording') return
+
+    // Se houver transição pendente (ex.: 'transcribing' ou 'saved'), cancela timers
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current)
+      transitionTimeoutRef.current = null
+    }
+
+    // Se estiver em processo de parada da gravação anterior, força liberação imediata
+    isStoppingRef.current = false
+
+    // Garante que qualquer reconhecimento ou gravação anterior seja abortada e liberada
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.onend = null
+        recognitionRef.current.onerror = null
+        recognitionRef.current.onresult = null
+        recognitionRef.current.abort()
+      } catch {
+        /* ignore */
+      }
+      recognitionRef.current = null
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop()
+      } catch {
+        /* ignore */
+      }
+      mediaRecorderRef.current = null
+    }
+
+    releaseMicrophone()
 
     // Limpa erros e estados transitórios anteriores
     setErrorMessage(null)
@@ -405,7 +440,6 @@ export function useVoiceRecorder({
     setRecordedAudioUrl(null)
     setRecordedAudioBlob(null)
     activeSessionTranscriptRef.current = ''
-    isStoppingRef.current = false
 
     updateGlobalDiagnostic({
       lastAction: 'Botão Gravar acionado: chamando getUserMedia({ audio: true })',
@@ -577,6 +611,7 @@ export function useVoiceRecorder({
           /* ignore */
         }
       }
+      // Libera tracks do microfone para garantir sessão limpa
       releaseMicrophone()
     }
 
@@ -584,8 +619,7 @@ export function useVoiceRecorder({
     recorder.start(1000)
 
     // 4. CAMINHO DUPLO DE TRANSCRIÇÃO:
-    // Caminho 1: Web Speech API nativa (Chrome, Edge, Android)
-    // Caminho 2: Fallback (Safari, WebViews sem Speech API) -> MediaRecorder já está gravando
+    // Cria SEMPRE uma nova instância limpa de SpeechRecognition por sessão
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
 
     if (SpeechRec) {
@@ -636,10 +670,14 @@ export function useVoiceRecorder({
           const errType = recErr?.error || 'speech-error'
           console.warn('SpeechRecognition erro:', errType)
 
+          // Ignora 'aborted' quando o usuário mesmo parou
+          if (errType === 'aborted') {
+            return
+          }
+
           if (errType === 'not-allowed' || errType === 'service-not-allowed') {
             setPermissionDenied(true)
             setExactErrorDetail(`Web Speech API: ${errType}`)
-            // Não quebra a gravação do MediaRecorder se o microfone ainda estiver ativo
           } else if (errType === 'network') {
             // Se falhar a conexão do Google Speech, o MediaRecorder continua gravando o áudio
             setIsMediaRecorderFallback(true)
@@ -651,8 +689,12 @@ export function useVoiceRecorder({
 
         recognition.onend = () => {
           // Se ainda estiver gravando e o SpeechRecognition encerrou por silêncio natural,
-          // tenta reiniciar de forma segura se não estivermos em processo de parada
-          if (!isStoppingRef.current && streamRef.current) {
+          // reinicia com segurança apenas se a gravação ainda estiver ativa e não estivermos parando
+          if (
+            !isStoppingRef.current &&
+            streamRef.current &&
+            recognitionRef.current === recognition
+          ) {
             try {
               recognition.start()
             } catch {
@@ -686,22 +728,35 @@ export function useVoiceRecorder({
       lastAction: 'Finalizando gravação e salvando dados...',
     })
 
-    // 1. Para Web Speech API
+    // Se havia qualquer texto interim não finalizado no momento do stop, salva aditivamente
+    if (interimTranscript && interimTranscript.trim()) {
+      const leftover = interimTranscript.trim()
+      activeSessionTranscriptRef.current = activeSessionTranscriptRef.current
+        ? `${activeSessionTranscriptRef.current} ${leftover}`
+        : leftover
+      commitFinalText(leftover)
+    }
+
+    // 1. Para Web Speech API com limpeza de listeners para não auto-reiniciar no onend
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop()
+        const rec = recognitionRef.current
+        rec.onend = null
+        rec.onerror = null
+        rec.onresult = null
+        rec.stop()
       } catch {
         /* ignore */
       }
       recognitionRef.current = null
     }
 
-    // 2. Para MediaRecorder
+    // 2. Para MediaRecorder e dispara onstop (que chama releaseMicrophone)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       try {
         mediaRecorderRef.current.stop()
       } catch {
-        /* ignore */
+        releaseMicrophone()
       }
     } else {
       releaseMicrophone()
@@ -710,37 +765,46 @@ export function useVoiceRecorder({
     setInterimTranscript('')
 
     // 3. Transição visual dos estados: "Transcrevendo..." -> "Transcrição salva" -> "idle"
+    // Libera isStoppingRef.current IMEDIATAMENTE após iniciar a transição para que novo clique
+    // em startRecording() possa ocorrer a qualquer instante (gravação durante transcrevendo/salvo)
     const hadTranscribedText = activeSessionTranscriptRef.current.trim().length > 0
+
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current)
+      transitionTimeoutRef.current = null
+    }
 
     if (hadTranscribedText) {
       setState('transcribing')
-      setTimeout(() => {
+      isStoppingRef.current = false
+      transitionTimeoutRef.current = setTimeout(() => {
         setState('saved')
         updateGlobalDiagnostic({
           lastAction: 'Transcrição salva no campo com sucesso',
         })
-        setTimeout(() => {
+        transitionTimeoutRef.current = setTimeout(() => {
           setState('idle')
-          isStoppingRef.current = false
-        }, 2000)
-      }, 400)
+          transitionTimeoutRef.current = null
+        }, 1500)
+      }, 350)
     } else {
       // Se estava no fallback do MediaRecorder e nenhuma Speech API transcreveu em texto
       if (isMediaRecorderFallback) {
         setState('transcribing')
-        setTimeout(() => {
+        isStoppingRef.current = false
+        transitionTimeoutRef.current = setTimeout(() => {
           setState('idle')
-          isStoppingRef.current = false
+          transitionTimeoutRef.current = null
           setErrorMessage(
             'Transcrição de fala automática não disponível neste navegador (ex: Safari). O áudio foi gravado com sucesso: você pode ouvi-lo abaixo, salvá-lo como anexo e digitar suas observações.',
           )
-        }, 400)
+        }, 350)
       } else {
         setState('idle')
         isStoppingRef.current = false
       }
     }
-  }, [isMediaRecorderFallback, releaseMicrophone, state])
+  }, [commitFinalText, interimTranscript, isMediaRecorderFallback, releaseMicrophone, state])
 
   // Alterna entre iniciar e parar com toque único
   const toggleRecording = useCallback(() => {

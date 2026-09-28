@@ -129,27 +129,27 @@ export function VoiceDictationField({
           onClick={toggleRecording}
           className={`h-8 text-xs px-2.5 font-semibold transition-all ${
             isRecording
-              ? 'animate-pulse ring-2 ring-rose-400 bg-rose-600 text-white'
+              ? 'animate-pulse ring-2 ring-rose-400 bg-rose-600 text-white hover:bg-rose-700'
               : state === 'transcribing'
-                ? 'border-amber-300 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
+                ? 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300'
                 : state === 'saved'
-                  ? 'border-emerald-400 bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                  ? 'border-emerald-400 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300'
                   : 'border-teal-300 dark:border-teal-800 text-teal-800 dark:text-teal-300 hover:bg-teal-50'
           }`}
           title={
             isRecording
               ? 'Toque para parar e salvar a fala'
               : state === 'transcribing'
-                ? 'Transcrevendo áudio...'
+                ? 'Processando transcrição... Toque para iniciar nova gravação'
                 : state === 'saved'
-                  ? 'Transcrição salva no campo'
+                  ? 'Transcrição salva! Toque para gravar mais voz neste campo'
                   : 'Gravar voz com transcrição automática'
           }
         >
           {isRecording ? (
             <>
               <MicOff className="h-3.5 w-3.5 mr-1" />
-              Gravando...
+              Parar
             </>
           ) : state === 'transcribing' ? (
             <>
@@ -344,7 +344,7 @@ export function VoiceDictationField({
           )}
 
           <div className="text-[10px] text-rose-600/90 dark:text-rose-400/90 flex items-center justify-between">
-            <span>Toque em &ldquo;Gravando...&rdquo; para finalizar e salvar</span>
+            <span>Toque no botão &ldquo;Parar&rdquo; para finalizar e salvar</span>
             <span>Cada gravação é somada ao texto já escrito</span>
           </div>
         </div>
