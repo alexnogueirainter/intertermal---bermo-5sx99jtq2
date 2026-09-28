@@ -552,14 +552,55 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                       </Badge>
                     </div>
 
-                    <p className="text-slate-700 text-[10.5px] leading-snug pl-6">
-                      {action.description}
-                    </p>
+                    {/* 1. Diagnóstico */}
+                    {action.diagnosis && (
+                      <div className="pl-6 text-[10.5px] leading-snug text-slate-700">
+                        <strong className="text-slate-900 font-semibold">Diagnóstico: </strong>
+                        <span>{action.diagnosis}</span>
+                      </div>
+                    )}
 
-                    <div className="pl-6 pt-1 flex items-start gap-1.5 text-teal-900 font-medium text-[10px]">
-                      <span className="font-bold shrink-0">Ação recomendada:</span>
-                      <span>{action.suggestedAction}</span>
+                    {!action.diagnosis && (
+                      <p className="text-slate-700 text-[10.5px] leading-snug pl-6">
+                        {action.description}
+                      </p>
+                    )}
+
+                    {/* 2. Ação recomendada e referência do fabricante */}
+                    <div className="pl-6 pt-1 text-teal-900 font-medium text-[10px] space-y-0.5">
+                      <div className="flex items-start gap-1.5">
+                        <span className="font-bold shrink-0">Ação recomendada:</span>
+                        <span>{action.suggestedAction || action.description}</span>
+                      </div>
+                      {action.technicalReference && (
+                        <div className="text-[9.5px] text-teal-800">
+                          <strong>Referência técnica: </strong>
+                          <span>{action.technicalReference}</span>
+                        </div>
+                      )}
                     </div>
+
+                    {/* 3. Condições do local de instalação */}
+                    {action.installationConditions && (
+                      <div className="pl-6 pt-1 text-[9.5px] text-amber-900">
+                        <span className="font-bold">
+                          Condições do local de instalação (acesso/dificuldade física):{' '}
+                        </span>
+                        <span>{action.installationConditions}</span>
+                      </div>
+                    )}
+
+                    {/* 4. Itens pendentes de levantamento */}
+                    {action.pendingItems && action.pendingItems.length > 0 && (
+                      <div className="pl-6 pt-1 text-[9.5px] text-rose-800">
+                        <span className="font-bold">Itens pendentes de levantamento: </span>
+                        <ul className="list-disc list-inside space-y-0.5 pt-0.5">
+                          {action.pendingItems.map((p, pIdx) => (
+                            <li key={pIdx}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     {/* Vínculo com equipamento sinalizado: mostra as fotos dele */}
                     {(() => {

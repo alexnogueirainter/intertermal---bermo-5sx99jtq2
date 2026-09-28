@@ -1038,12 +1038,44 @@ export default function ReceivedFieldVisitsPage() {
                               {action.priority}
                             </Badge>
                           </div>
-                          <p className="text-slate-600 dark:text-slate-400 text-[11px]">
-                            {action.description}
-                          </p>
+
+                          {action.diagnosis ? (
+                            <p className="text-slate-700 dark:text-slate-300 text-[11px]">
+                              <strong>Diagnóstico:</strong> {action.diagnosis}
+                            </p>
+                          ) : (
+                            <p className="text-slate-600 dark:text-slate-400 text-[11px]">
+                              {action.description}
+                            </p>
+                          )}
+
                           <p className="text-teal-800 dark:text-teal-300 text-[11px] font-medium pt-0.5">
-                            <strong>Ação:</strong> {action.suggestedAction}
+                            <strong>Ação recomendada:</strong>{' '}
+                            {action.suggestedAction || action.description}
                           </p>
+
+                          {action.technicalReference && (
+                            <p className="text-[10.5px] text-teal-700 dark:text-teal-400">
+                              <strong>Referência técnica:</strong> {action.technicalReference}
+                            </p>
+                          )}
+
+                          {action.installationConditions && (
+                            <p className="text-[10.5px] text-amber-800 dark:text-amber-300">
+                              <strong>Condições do local:</strong> {action.installationConditions}
+                            </p>
+                          )}
+
+                          {action.pendingItems && action.pendingItems.length > 0 && (
+                            <div className="text-[10.5px] text-rose-800 dark:text-rose-300 pt-0.5">
+                              <strong>Itens pendentes:</strong>
+                              <ul className="list-disc list-inside space-y-0.5">
+                                {action.pendingItems.map((pi, pIdx) => (
+                                  <li key={pIdx}>{pi}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

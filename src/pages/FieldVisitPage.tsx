@@ -701,6 +701,7 @@ export default function FieldVisitPage({
     try {
       const res = await sellerTokenApi.aiPlan({
         work_type: visit.workType || '',
+        work_type_other: visit.workTypeOther || '',
         general_notes: visit.generalObservations || '',
         free_description: visit.freeDescription || '',
         equipments: (visit.equipments || []).map((eq) => ({
@@ -708,12 +709,15 @@ export default function FieldVisitPage({
           name: eq.name || '',
           model: eq.model || '',
           manufacturer: eq.manufacturer || '',
+          serialNumber: eq.serialNumber || '',
+          plateCount: eq.plateCount || '',
           fluid1: eq.fluid1 || '',
           fluid2: eq.fluid2 || '',
           inletTemp: eq.inletTemp || '',
           outletTemp: eq.outletTemp || '',
           flowRate: eq.flowRate || '',
           flowUnit: eq.flowUnit || '',
+          installedLocation: eq.installedLocation || '',
           difficulty: eq.difficulty || '',
           technicianNotes: eq.technicianNotes || '',
           attachments_count: (eq.attachments || []).length,
@@ -725,14 +729,14 @@ export default function FieldVisitPage({
       } else {
         toast({
           title: res.message || 'Análise indisponível',
-          description: 'Mantido o plano de ação automático.',
+          description: 'Não foi possível gerar a análise da IA com os dados atuais.',
           variant: 'destructive',
         })
       }
     } catch (_) {
       toast({
         title: 'Falha na análise IA',
-        description: 'Mantido o plano de ação automático.',
+        description: 'Tente acionar novamente.',
         variant: 'destructive',
       })
     } finally {
@@ -750,13 +754,18 @@ export default function FieldVisitPage({
       suggestedAction: it.suggestedAction || '',
       source: it.equipment_id ? 'Equipamento sinalizado (com foto no relatório)' : undefined,
       equipment_id: it.equipment_id || undefined,
+      diagnosis: it.diagnosis || undefined,
+      technicalReference: it.technicalReference || undefined,
+      installationConditions: it.installationConditions || undefined,
+      pendingItems:
+        Array.isArray(it.pendingItems) && it.pendingItems.length > 0 ? it.pendingItems : undefined,
     }))
     setVisit((prev) => ({ ...prev, actionPlan: mapped }))
     setAiConfirmOpen(false)
     setAiDraft(null)
     toast({
       title: 'Plano de ação da IA aplicado',
-      description: 'Revise e edite antes de enviar ao CRM.',
+      description: 'Plano de ação estruturado em 4 seções atualizado com sucesso.',
     })
   }
 
@@ -1008,7 +1017,7 @@ export default function FieldVisitPage({
     }))
   }
 
-  // Envio ao CRM PocketBase (Regra 4: manter geração automática do plano de ação)
+  // Envio ao CRM PocketBase
   const handleSendToCrm = async () => {
     const trimmedEmployee = (visit.employeeName || '').trim()
     const trimmedDate = (visit.date || '').trim()
@@ -1031,8 +1040,8 @@ export default function FieldVisitPage({
     setIsSendingToCrm(true)
     const nowIso = new Date().toISOString()
 
-    // Gerar plano de ação automático com base nas informações coletadas
-    const autoPlan = generateActionPlan(visit)
+    // Preserva o plano já gerado (pela IA ou existente no formulário), sem regenerar automaticamente
+    const currentPlan = visit.actionPlan && visit.actionPlan.length > 0 ? visit.actionPlan : []
 
     // Formatar nome de cliente/empresa compatível
     const companyTrimmed = (visit.companyName || '').trim()
@@ -1064,7 +1073,7 @@ export default function FieldVisitPage({
       work_type_other: visit.workTypeOther?.trim() || undefined,
       general_notes: visit.generalObservations?.trim() || undefined,
       free_description: visit.freeDescription?.trim() || undefined,
-      action_plan: autoPlan,
+      action_plan: currentPlan,
       equipment: visit.equipments || [],
       status: 'enviada',
       sent_at: nowIso,
@@ -1100,7 +1109,7 @@ export default function FieldVisitPage({
           work_type_other: visit.workTypeOther?.trim() || undefined,
           general_notes: visit.generalObservations?.trim() || undefined,
           free_description: visit.freeDescription?.trim() || undefined,
-          action_plan: autoPlan,
+          action_plan: currentPlan,
           equipment: visit.equipments || [],
         },
         edit_id: visit.backendRecordId || undefined,
@@ -1135,7 +1144,7 @@ export default function FieldVisitPage({
             work_type_other: visit.workTypeOther?.trim() || undefined,
             general_notes: visit.generalObservations?.trim() || undefined,
             free_description: visit.freeDescription?.trim() || undefined,
-            action_plan: autoPlan,
+            action_plan: currentPlan,
             equipment: visit.equipments || [],
           },
           edit_id: visit.backendRecordId || undefined,
@@ -1152,7 +1161,7 @@ export default function FieldVisitPage({
       }
       setVisit((prev) => ({
         ...prev,
-        actionPlan: autoPlan,
+        actionPlan: currentPlan,
         backendRecordId: submitRes.visit_id || prev.backendRecordId,
         crmStatus: 'enviada',
         lastSentAt: nowIso,
@@ -1186,7 +1195,7 @@ export default function FieldVisitPage({
 
       setVisit((prev) => ({
         ...prev,
-        actionPlan: autoPlan,
+        actionPlan: currentPlan,
         backendRecordId: savedRecord.id,
         crmStatus: 'enviada',
         lastSentAt: nowIso,
@@ -2439,6 +2448,114 @@ export default function FieldVisitPage({
           </div>
         )}
 
+        {/* 7. SEÇÃO: PLANO DE AÇÃO GERADO PELA IA */}
+        {visit.actionPlan && visit.actionPlan.length > 0 && (
+          <Card className="border-violet-300 dark:border-violet-800 bg-white dark:bg-slate-900 shadow-sm">
+            <CardHeader className="bg-violet-50/70 dark:bg-violet-950/40 border-b border-violet-200 dark:border-violet-800 py-3.5 px-4">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-violet-600" />
+                  <CardTitle className="text-sm font-bold text-violet-950 dark:text-violet-200">
+                    Plano de Ação para Orçamento ({visit.actionPlan.length}{' '}
+                    {visit.actionPlan.length === 1 ? 'item' : 'itens'})
+                  </CardTitle>
+                </div>
+                <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 text-[10px] font-semibold border-violet-300">
+                  Gerado por Análise da IA
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
+              <p className="text-xs text-muted-foreground">
+                Plano técnico estruturado a partir dos dados coletados na visita para subsidiar o
+                orçamento e o relatório ao cliente.
+              </p>
+              <div className="space-y-3">
+                {visit.actionPlan.map((action, aIdx) => (
+                  <div
+                    key={action.id || aIdx}
+                    className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 space-y-2.5 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="h-5 w-5 rounded-full bg-violet-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                          {aIdx + 1}
+                        </span>
+                        <strong className="text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
+                          {action.title}
+                        </strong>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`text-[9.5px] font-semibold ${
+                          action.priority === 'Alta'
+                            ? 'text-rose-700 border-rose-300 bg-rose-50'
+                            : action.priority === 'Média'
+                              ? 'text-amber-700 border-amber-300 bg-amber-50'
+                              : 'text-emerald-700 border-emerald-300 bg-emerald-50'
+                        }`}
+                      >
+                        Prioridade {action.priority}
+                      </Badge>
+                    </div>
+
+                    {/* 1. Diagnóstico */}
+                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+                      <span className="text-[10.5px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide block">
+                        1. Diagnóstico (baseado exclusivamente no registro da visita):
+                      </span>
+                      <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
+                        {action.diagnosis || action.description}
+                      </p>
+                    </div>
+
+                    {/* 2. Ações recomendadas */}
+                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+                      <span className="text-[10.5px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide block">
+                        2. Ações Recomendadas:
+                      </span>
+                      <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
+                        {action.suggestedAction || action.description}
+                      </p>
+                      {action.technicalReference && (
+                        <div className="pt-1 text-[11px] text-teal-800 dark:text-teal-300 flex items-start gap-1 font-medium">
+                          <strong className="shrink-0">Referência técnica:</strong>
+                          <span>{action.technicalReference}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* 3. Condições do local de instalação */}
+                    <div className="p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 space-y-1">
+                      <span className="text-[10.5px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wide block">
+                        3. Condições do Local de Instalação (Grau de Dificuldade Físico):
+                      </span>
+                      <p className="text-amber-800 dark:text-amber-200 text-[11px] leading-relaxed">
+                        {action.installationConditions ||
+                          'Condições do local não detalhadas na visita'}
+                      </p>
+                    </div>
+
+                    {/* 4. Itens pendentes de levantamento */}
+                    {action.pendingItems && action.pendingItems.length > 0 && (
+                      <div className="p-2.5 rounded-lg bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 space-y-1">
+                        <span className="text-[10.5px] font-bold text-rose-900 dark:text-rose-300 uppercase tracking-wide block">
+                          4. Itens Pendentes de Levantamento:
+                        </span>
+                        <ul className="list-disc list-inside text-rose-800 dark:text-rose-200 text-[11px] space-y-0.5 leading-relaxed">
+                          {action.pendingItems.map((item, pIdx) => (
+                            <li key={pIdx}>{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Bloco de Envio Grande no Rodapé */}
         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-teal-600/30 dark:border-teal-700/40 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -2448,8 +2565,8 @@ export default function FieldVisitPage({
                 Finalizar Atendimento & Sincronizar com o CRM
               </h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Gera o registro oficial da visita, cria o plano de ação automático com base nas
-                observações e gera o PDF completo.
+                Gera o registro oficial da visita, envia o plano de ação e dados levantados ao CRM e
+                gera o PDF completo.
               </p>
             </div>
 
@@ -2534,19 +2651,68 @@ export default function FieldVisitPage({
                   Revise antes de salvar — você poderá editar depois.
                 </p>
                 {(aiDraft || []).map((it, idx) => (
-                  <div key={idx} className="border rounded p-2 bg-slate-50 dark:bg-slate-900">
-                    <p className="font-semibold text-xs">
-                      {idx + 1}. {it.title}{' '}
-                      <span className="text-[10px] font-bold px-1 rounded bg-violet-100 text-violet-700">
+                  <div
+                    key={idx}
+                    className="border rounded p-2.5 bg-slate-50 dark:bg-slate-900 space-y-1.5 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-semibold text-xs text-slate-900 dark:text-slate-100">
+                        {idx + 1}. {it.title}
+                      </p>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300">
                         {it.priority}
                       </span>
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">{it.description}</p>
-                    <p className="text-xs mt-1">
-                      <strong>Ação:</strong> {it.suggestedAction}
-                    </p>
+                    </div>
+
+                    {it.diagnosis && (
+                      <div className="p-1.5 rounded bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
+                        <strong className="text-[11px] text-slate-700 dark:text-slate-300 block">
+                          1. Diagnóstico:
+                        </strong>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400">
+                          {it.diagnosis}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="p-1.5 rounded bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-1">
+                      <strong className="text-[11px] text-slate-700 dark:text-slate-300 block">
+                        2. Ações recomendadas:
+                      </strong>
+                      <p className="text-[11px] text-slate-700 dark:text-slate-300">
+                        {it.suggestedAction || it.description}
+                      </p>
+                      {it.technicalReference && (
+                        <p className="text-[10.5px] text-teal-700 dark:text-teal-400 font-medium">
+                          <strong>Referência do fabricante:</strong> {it.technicalReference}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="p-1.5 rounded bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
+                      <strong className="text-[11px] text-amber-900 dark:text-amber-300 block">
+                        3. Condições do local de instalação:
+                      </strong>
+                      <p className="text-[11px] text-amber-800 dark:text-amber-400">
+                        {it.installationConditions || 'Condições do local não detalhadas na visita'}
+                      </p>
+                    </div>
+
+                    {Array.isArray(it.pendingItems) && it.pendingItems.length > 0 && (
+                      <div className="p-1.5 rounded bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50">
+                        <strong className="text-[11px] text-rose-900 dark:text-rose-300 block">
+                          4. Itens pendentes de levantamento:
+                        </strong>
+                        <ul className="list-disc list-inside text-[10.5px] text-rose-800 dark:text-rose-400 space-y-0.5">
+                          {it.pendingItems.map((p: string, pIdx: number) => (
+                            <li key={pIdx}>{p}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
                     {it.equipment_id && (
-                      <p className="text-[10px] text-teal-700 mt-1">
+                      <p className="text-[10px] text-teal-700 dark:text-teal-400 pt-0.5">
                         📷 Fotos do equipamento serão vinculadas no relatório
                       </p>
                     )}

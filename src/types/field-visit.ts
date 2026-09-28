@@ -54,6 +54,11 @@ export interface ActionPlanItem {
   priority: 'Alta' | 'Média' | 'Baixa'
   suggestedAction: string
   source?: string // ex.: "Equipamento #1: Alfa Laval M10-BFG"
+  equipment_id?: string
+  diagnosis?: string // Diagnóstico embasado exclusivamente no registrado pelo técnico
+  technicalReference?: string // Referência técnica do fabricante ou "requer consulta ao fabricante"
+  installationConditions?: string // Condições de acesso/local e grau de dificuldade correspondente
+  pendingItems?: string[] // Itens pendentes ("Informação não levantada na visita: [qual dado falta]")
 }
 
 export interface FieldVisitData {
@@ -177,24 +182,39 @@ export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanIt
 
   // 1. Analisar tipo de visita
   if (visit.workType === 'Projeto Novo' || visit.workType === 'Projeto novo ou readequação') {
+    const missing: string[] = []
+    if (!visit.equipments || visit.equipments.length === 0) {
+      missing.push(
+        'Informação não levantada na visita: especificações preliminares dos equipamentos para o novo projeto',
+      )
+    }
     plan.push({
       id: generateId(),
       title: 'Elaboração de Proposta Técnica e Dimensionamento Térmico',
       description:
-        'Elaborar memória de cálculo e dimensionamento do trocador BERMO para novo processo.',
+        'Elaborar memória de cálculo e dimensionamento do trocador BERMO para novo processo com base no levantamento.',
       priority: 'Alta',
       suggestedAction:
         'Engenharia de aplicação Intertermal rodar simulação térmica e emitir proposta comercial detalhada.',
+      diagnosis: 'Demanda de novo projeto térmico registrada em visita a campo.',
+      technicalReference:
+        'Conforme catálogo e metodologia de cálculo de trocadores de calor de placas BERMO.',
+      installationConditions: 'Condições do local não detalhadas na visita',
+      pendingItems: missing.length > 0 ? missing : undefined,
     })
   } else if (visit.workType === 'Readequação') {
     plan.push({
       id: generateId(),
       title: 'Estudo de Readequação Térmica (Retrofit)',
       description:
-        'Avaliar adição de placas ou redimensionamento de canais para atender a nova demanda térmica.',
+        'Avaliar adição de placas ou redimensionamento de canais para atender a nova demanda operacional.',
       priority: 'Alta',
       suggestedAction:
         'Engenharia térmica analisar as temperaturas e vazões coletadas e propor pacote de readequação.',
+      diagnosis: 'Readequação de carga térmica ou troca de processo registrada em visita técnica.',
+      technicalReference:
+        'Conforme manual de procedimentos de repotenciamento do fabricante BERMO.',
+      installationConditions: 'Condições do local não detalhadas na visita',
     })
   } else if (
     visit.workType === 'Catálogo de Equipamentos' ||
@@ -204,10 +224,14 @@ export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanIt
       id: generateId(),
       title: 'Mapeamento e Ficha Técnica do Parque Instalado',
       description:
-        'Cadastrar parque de trocadores no CRM com números de série, placas e peças sobressalentes recomendadas.',
+        'Cadastrar parque de trocadores no CRM com números de série, placas e sobressalentes recomendados.',
       priority: 'Média',
       suggestedAction:
         'Registrar histórico no sistema Intertermal e manter estoque estratégico de gaxetas correspondentes.',
+      diagnosis: 'Catalogação do parque instalado de trocadores e válvulas industriais.',
+      technicalReference:
+        'Conforme diretrizes de rastreabilidade e peças sobressalentes dos fabricantes.',
+      installationConditions: 'Condições do local não detalhadas na visita',
     })
   }
 
@@ -220,10 +244,20 @@ export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanIt
         ? `${eq.manufacturer ? eq.manufacturer + ' ' : ''}${eq.model}`
         : `Equipamento #${idx + 1}`)
     const notesLower = (eq.technicianNotes || '').toLowerCase()
-    const diff = eq.difficulty
+    const diff = eq.difficulty || 'Médio'
+    const loc = eq.installedLocation
+      ? `${eq.installedLocation} (Grau de dificuldade físico: ${diff})`
+      : `Grau de dificuldade físico do local: ${diff}`
+
+    const pending: string[] = []
+    if (!eq.model) pending.push('Informação não levantada na visita: modelo do equipamento')
+    if (!eq.serialNumber)
+      pending.push('Informação não levantada na visita: número de série / plaqueta')
+    if (!eq.plateCount) pending.push('Informação não levantada na visita: quantidade de placas')
+    if (!eq.inletTemp || !eq.outletTemp)
+      pending.push('Informação não levantada na visita: temperaturas de entrada e saída')
 
     if (
-      diff === 'Alto' ||
       notesLower.includes('vazamento') ||
       notesLower.includes('vazando') ||
       notesLower.includes('trinca') ||
@@ -232,11 +266,18 @@ export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanIt
       plan.push({
         id: generateId(),
         title: `Intervenção Corretiva Urgente — ${eqLabel}`,
-        description: `Grau de dificuldade alto ou relatos de vazamento/risco operacional. Observação: "${eq.technicianNotes || 'Revisão imediata necessária'}".`,
+        description: `Relatos de vazamento ou risco operacional registrados pelo técnico: "${eq.technicianNotes || 'Revisão necessária'}".`,
         priority: 'Alta',
         suggestedAction:
-          'Programar parada imediata ou abertura preventiva para teste com líquido penetrante e troca das gaxetas.',
+          'Programar parada de linha para teste com líquido penetrante, substituição das vedações e teste hidrostático.',
         source: eqLabel,
+        equipment_id: eq.id,
+        diagnosis: `Vazamento ou anomalia mecânica informada pelo técnico (${eq.technicianNotes}).`,
+        technicalReference: eq.manufacturer
+          ? `Conforme procedimentos de desmontagem e teste de vedação do fabricante ${eq.manufacturer}`
+          : 'requer consulta ao fabricante',
+        installationConditions: loc,
+        pendingItems: pending.length > 0 ? pending : undefined,
       })
     } else if (
       notesLower.includes('gaxeta') ||
@@ -248,11 +289,18 @@ export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanIt
         id: generateId(),
         title: `Substituição de Jogo de Gaxetas — ${eqLabel}`,
         description:
-          'Constatado desgaste, ressecamento ou fim de vida útil das gaxetas de vedação.',
+          'Constatado desgaste, ressecamento ou fim de vida útil das gaxetas de vedação nas observações do técnico.',
         priority: 'Média',
         suggestedAction:
-          'Fornecer kit sobressalente de gaxetas originais BERMO (NBR / EPDM / FKM) e alinhar janela de montagem.',
+          'Fornecer kit sobressalente de gaxetas originais (NBR / EPDM / FKM) e alinhar janela de montagem com torque controlado.',
         source: eqLabel,
+        equipment_id: eq.id,
+        diagnosis: `Desgaste ou ressecamento das gaxetas registrado pelo técnico em campo: "${eq.technicianNotes}".`,
+        technicalReference: eq.manufacturer
+          ? `Conforme recomendação técnica de substituição de gaxetas do fabricante ${eq.manufacturer}`
+          : 'requer consulta ao fabricante',
+        installationConditions: loc,
+        pendingItems: pending.length > 0 ? pending : undefined,
       })
     } else if (
       notesLower.includes('incrust') ||
@@ -265,11 +313,18 @@ export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanIt
         id: generateId(),
         title: `Limpeza Química Desincrustante (CIP ou Banho) — ${eqLabel}`,
         description:
-          'Presença de incrustações ou depósitos que reduzem a eficiência de troca térmica.',
+          'Presença de incrustações ou depósitos relatados pelo técnico, reduzindo a eficiência de transferência térmica.',
         priority: 'Média',
         suggestedAction:
-          'Executar desincrustação química controlada com neutralização e passivação das placas.',
+          'Executar desincrustação química controlada com solução compatível com o metal das placas, seguida de neutralização e passivação.',
         source: eqLabel,
+        equipment_id: eq.id,
+        diagnosis: `Incrustação ou sujidade registrada nas placas: "${eq.technicianNotes}".`,
+        technicalReference: eq.manufacturer
+          ? `Conforme procedimento de higienização e compatibilidade química do fabricante ${eq.manufacturer}`
+          : 'requer consulta ao fabricante',
+        installationConditions: loc,
+        pendingItems: pending.length > 0 ? pending : undefined,
       })
     } else if (
       notesLower.includes('tirante') ||
@@ -281,11 +336,35 @@ export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanIt
         id: generateId(),
         title: `Manutenção Mecânica na Estrutura e Tirantes — ${eqLabel}`,
         description:
-          'Sinais de corrosão ou desgaste nas barras de aperto e estrutura metálica do trocador.',
+          'Sinais de oxidação ou necessidade de intervenção nos tirantes de aperto e estrutura metálica do trocador.',
         priority: 'Baixa',
         suggestedAction:
           'Realizar lubrificação técnica dos tirantes com graxa grafitada e aplicação de proteção anticorrosiva.',
         source: eqLabel,
+        equipment_id: eq.id,
+        diagnosis: `Oxidação ou desgaste nos tirantes relatado: "${eq.technicianNotes}".`,
+        technicalReference: eq.manufacturer
+          ? `Conforme recomendação de torque e conservação de tirantes do fabricante ${eq.manufacturer}`
+          : 'requer consulta ao fabricante',
+        installationConditions: loc,
+        pendingItems: pending.length > 0 ? pending : undefined,
+      })
+    } else if (eq.technicianNotes && eq.technicianNotes.trim()) {
+      plan.push({
+        id: generateId(),
+        title: `Avaliação Operacional — ${eqLabel}`,
+        description: `Observação registrada pelo técnico: "${eq.technicianNotes}".`,
+        priority: 'Média',
+        suggestedAction:
+          'Programar inspeção detalhada dos parâmetros de trabalho e alinhamento com a equipe de manutenção da planta.',
+        source: eqLabel,
+        equipment_id: eq.id,
+        diagnosis: `Condição observada pelo técnico em campo: ${eq.technicianNotes}`,
+        technicalReference: eq.manufacturer
+          ? `Conforme manual técnico de manutenção preventiva ${eq.manufacturer}`
+          : 'requer consulta ao fabricante',
+        installationConditions: loc,
+        pendingItems: pending.length > 0 ? pending : undefined,
       })
     }
   })
@@ -302,24 +381,11 @@ export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanIt
         'Identificado relato de vazamento de fluido térmico durante a vistoria em campo.',
       priority: 'Alta',
       suggestedAction:
-        'Realizar teste hidrostático e verificar torque de aperto das porcas nos tirantes.',
-    })
-  }
-
-  if (
-    textCorpus.includes('eficiência') ||
-    textCorpus.includes('aquecendo pouco') ||
-    textCorpus.includes('resfriando pouco') ||
-    textCorpus.includes('delta t')
-  ) {
-    plan.push({
-      id: generateId(),
-      title: 'Auditoria de Rendimento Térmico Operacional',
-      description:
-        'Desvio térmico identificado entre a condição de projeto e os dados operacionais medidos.',
-      priority: 'Média',
-      suggestedAction:
-        'Cruzar dados de vazão e temperaturas com a simulação BERMO para identificar perda de carga ou entupimento.',
+        'Realizar teste hidrostático e verificar torque de aperto das porcas nos tirantes conforme cota nominal.',
+      diagnosis: 'Relato de vazamento registrado nas notas gerais da visita técnica.',
+      technicalReference:
+        'Conforme procedimento padrão de estanqueidade e teste de pressão Intertermal/Bermo.',
+      installationConditions: 'Condições do local não detalhadas na visita',
     })
   }
 
@@ -329,10 +395,15 @@ export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanIt
       id: generateId(),
       title: 'Plano de Acompanhamento Técnico Preventivo',
       description:
-        'Manter rotina de inspeção periódica e monitoramento das variáveis operacionais de temperatura e pressão.',
+        'Manter rotina de inspeção periódica e monitoramento das variáveis operacionais de temperatura e perda de carga.',
       priority: 'Média',
       suggestedAction:
         'Recomenda-se nova checagem técnica dentro de 6 meses ou na próxima parada programada da planta.',
+      diagnosis:
+        'Nenhuma anomalia crítica ou defeito mecânico registrado pelo técnico durante a vistoria.',
+      technicalReference:
+        'Conforme procedimentos de inspeção preventiva para trocadores de calor de placas.',
+      installationConditions: 'Condições do local não detalhadas na visita',
     })
   }
 
