@@ -22,6 +22,8 @@ import {
   Volume2,
   X,
   FileAudio,
+  ExternalLink,
+  Layers,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -55,6 +57,7 @@ export function VoiceDictationField({
     errorMessage,
     exactErrorDetail,
     permissionDenied,
+    isInIframe,
     recordedAudioUrl,
     recordedAudioBlob,
     isMediaRecorderFallback,
@@ -62,6 +65,7 @@ export function VoiceDictationField({
     clearError,
     retryPermission,
     saveRecordedAudioAsAttachment,
+    openInNewTab,
   } = useVoiceRecorder({
     value,
     onChange,
@@ -72,6 +76,42 @@ export function VoiceDictationField({
 
   return (
     <div className="space-y-2">
+      {/* Banner destacado quando a página estiver embutida em iframe */}
+      {isInIframe && (
+        <div className="p-3 rounded-xl bg-amber-500/10 dark:bg-amber-950/40 border-2 border-amber-500/40 text-amber-950 dark:text-amber-200 text-xs space-y-2 shadow-xs animate-in fade-in">
+          <div className="flex items-start gap-2.5">
+            <Layers className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1 flex-1">
+              <p className="font-bold text-xs text-amber-950 dark:text-amber-100 flex items-center gap-1.5">
+                <span>Página aberta dentro de um quadro</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-200/70 dark:bg-amber-900/70 text-amber-900 dark:text-amber-200">
+                  iframe
+                </span>
+              </p>
+              <p className="text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+                O navegador bloqueia o microfone quando a página roda embutida em outra página.
+                Toque no botão abaixo para abrir o sistema em uma aba própria e gravar por lá.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1 border-t border-amber-300/60 dark:border-amber-800/60">
+            <Button
+              type="button"
+              size="sm"
+              onClick={openInNewTab}
+              className="h-8 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white shadow-xs"
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+              Abrir em nova aba
+            </Button>
+            <span className="text-[10.5px] text-amber-800 dark:text-amber-300">
+              Abre diretamente em tela cheia com microfone liberado
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Cabeçalho do campo com rótulo e botão de gravar na posição e tamanho atuais */}
       <div className="flex items-center justify-between gap-2">
         <div>
@@ -150,25 +190,63 @@ export function VoiceDictationField({
               )}
 
               {permissionDenied && (
-                <div className="pt-1 text-[11px] text-slate-700 dark:text-slate-300 space-y-0.5">
-                  <p className="font-semibold">Como liberar o microfone no seu aparelho:</p>
-                  {env.isIos ? (
-                    <p className="text-[10.5px]">
+                <div className="pt-1 text-[11px] text-slate-700 dark:text-slate-300 space-y-1">
+                  <p className="font-semibold">Como resolver o bloqueio do microfone:</p>
+                  {isInIframe ? (
+                    <div className="p-2 rounded bg-amber-100/70 dark:bg-amber-900/40 border border-amber-300/80 space-y-1.5">
+                      <p className="text-[10.5px] font-medium text-amber-950 dark:text-amber-100">
+                        A página está dentro de um quadro embutido (iframe). Os navegadores
+                        bloqueiam o microfone nesse modo mesmo quando as permissões do site estão
+                        ativas.
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={openInNewTab}
+                        className="h-7 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white"
+                      >
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Abrir em nova aba para gravar
+                      </Button>
+                    </div>
+                  ) : env.isIos ? (
+                    <p className="text-[10.5px] leading-relaxed">
                       No Safari iOS: toque no botão <strong>aA</strong> na barra de endereços &gt;{' '}
                       <strong>Ajustes do Site</strong> &gt; Microfone: selecione{' '}
-                      <strong>Permitir</strong>.
+                      <strong>Permitir</strong>. Em seguida verifique em Ajustes do iPhone &gt;
+                      Privacidade e Segurança &gt; Microfone.
                     </p>
                   ) : env.isAndroid ? (
-                    <p className="text-[10.5px]">
+                    <p className="text-[10.5px] leading-relaxed">
                       No Chrome Android: toque no ícone de <strong>Cadeado</strong> ou{' '}
                       <strong>Trava</strong> ao lado da URL &gt; <strong>Permissões</strong> &gt;
                       libere o <strong>Microfone</strong>.
                     </p>
                   ) : (
-                    <p className="text-[10.5px]">
-                      Toque no ícone de <strong>Cadeado / Trava</strong> ao lado do endereço do site
-                      e altere o microfone para <strong>Permitir</strong>.
-                    </p>
+                    <div className="space-y-1 text-[10.5px] leading-relaxed">
+                      <p>
+                        <strong>Passo 1 (Navegador):</strong> Toque no ícone de{' '}
+                        <strong>Cadeado / Trava</strong> ao lado do endereço (URL) e altere o
+                        microfone para <strong>Permitir</strong>.
+                      </p>
+                      <p>
+                        <strong>Passo 2 (Windows):</strong> Acesse{' '}
+                        <strong>
+                          Configurações do Windows &gt; Privacidade e segurança &gt; Microfone
+                        </strong>{' '}
+                        e certifique-se de que a opção{' '}
+                        <em>
+                          &quot;Permitir que aplicativos de área de trabalho acessem o
+                          microfone&quot;
+                        </em>{' '}
+                        está ativada (com o Google Chrome listado como permitido).
+                      </p>
+                      <p>
+                        <strong>Passo 3 (Outros programas):</strong> Feche outros apps que possam
+                        estar com o microfone em uso (ex.:{' '}
+                        <em>WhatsApp Desktop, Google Meet, Microsoft Teams, Zoom</em>).
+                      </p>
+                    </div>
                   )}
                 </div>
               )}
@@ -206,7 +284,7 @@ export function VoiceDictationField({
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-1 border-t border-amber-200 dark:border-amber-900/60">
+          <div className="flex items-center gap-2 pt-1 border-t border-amber-200 dark:border-amber-900/60 flex-wrap">
             <Button
               type="button"
               size="sm"
@@ -217,6 +295,17 @@ export function VoiceDictationField({
               <RotateCcw className="h-3 w-3 mr-1" />
               Tentar novamente
             </Button>
+            {isInIframe && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={openInNewTab}
+                className="h-7 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white"
+              >
+                <ExternalLink className="h-3 w-3 mr-1" />
+                Abrir em nova aba
+              </Button>
+            )}
             <span className="text-[10.5px] text-amber-800/80 dark:text-amber-300/80">
               Reavalia a permissão sem recarregar a página
             </span>

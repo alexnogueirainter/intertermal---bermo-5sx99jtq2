@@ -46,6 +46,7 @@ describe('detectBrowserEnvironment', () => {
     expect(typeof env.isIos).toBe('boolean')
     expect(typeof env.isAndroid).toBe('boolean')
     expect(typeof env.isInAppBrowser).toBe('boolean')
+    expect(typeof env.isInIframe).toBe('boolean')
     expect(typeof env.hasGetUserMedia).toBe('boolean')
     expect(typeof env.hasMediaRecorder).toBe('boolean')
     expect(typeof env.hasSpeechRecognition).toBe('boolean')

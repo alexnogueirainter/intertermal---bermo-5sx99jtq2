@@ -39,6 +39,7 @@ export interface VoiceDiagnosticInfo {
   isIos: boolean
   isAndroid: boolean
   isInAppBrowser: boolean
+  isInIframe: boolean
   hasGetUserMedia: boolean
   hasMediaRecorder: boolean
   hasSpeechRecognition: boolean
@@ -62,6 +63,7 @@ export interface UseVoiceRecorderReturn {
   errorMessage: string | null
   exactErrorDetail: string | null
   permissionDenied: boolean
+  isInIframe: boolean
   recordedAudioUrl: string | null
   recordedAudioBlob: Blob | null
   isMediaRecorderFallback: boolean
@@ -72,6 +74,7 @@ export interface UseVoiceRecorderReturn {
   clearError: () => void
   retryPermission: () => Promise<void>
   saveRecordedAudioAsAttachment: () => void
+  openInNewTab: () => void
 }
 
 // ---------------------------------------------------------
@@ -84,10 +87,19 @@ export function detectBrowserEnvironment() {
       isIos: false,
       isAndroid: false,
       isInAppBrowser: false,
+      isInIframe: false,
       hasGetUserMedia: false,
       hasMediaRecorder: false,
       hasSpeechRecognition: false,
     }
+  }
+
+  let isInIframe = false
+  try {
+    isInIframe = window.self !== window.top
+  } catch {
+    // Cross-origin iframe pode lançar erro ao acessar window.top
+    isInIframe = true
   }
 
   const ua = navigator.userAgent || ''
@@ -126,6 +138,7 @@ export function detectBrowserEnvironment() {
     isIos,
     isAndroid,
     isInAppBrowser,
+    isInIframe,
     hasGetUserMedia,
     hasMediaRecorder,
     hasSpeechRecognition,
@@ -138,6 +151,7 @@ let globalDiagnosticState: VoiceDiagnosticInfo = {
   isIos: false,
   isAndroid: false,
   isInAppBrowser: false,
+  isInIframe: false,
   hasGetUserMedia: false,
   hasMediaRecorder: false,
   hasSpeechRecognition: false,
@@ -175,6 +189,7 @@ if (typeof window !== 'undefined') {
     isIos: env.isIos,
     isAndroid: env.isAndroid,
     isInAppBrowser: env.isInAppBrowser,
+    isInIframe: env.isInIframe,
     hasGetUserMedia: env.hasGetUserMedia,
     hasMediaRecorder: env.hasMediaRecorder,
     hasSpeechRecognition: env.hasSpeechRecognition,
@@ -449,17 +464,21 @@ export function useVoiceRecorder({
       })
 
       if (errName === 'NotAllowedError' || errName === 'PermissionDeniedError') {
-        if (env.isInAppBrowser) {
+        if (env.isInIframe) {
+          setErrorMessage(
+            'Página aberta dentro de um quadro embutido (iframe). O navegador bloqueia o microfone por política de segurança quando a página roda embutida em outra página. Toque no botão "Abrir em nova aba" para abrir o sistema diretamente e gravar por lá.',
+          )
+        } else if (env.isInAppBrowser) {
           setErrorMessage(
             "O navegador embutido do app (WhatsApp/Instagram) bloqueia o microfone por completo. Toque nos 3 pontos ou no ícone de compartilhar e selecione 'Abrir no Chrome' ou 'Abrir no Safari'.",
           )
         } else if (env.isIos) {
           setErrorMessage(
-            'Acesso ao microfone negado no Safari iOS. Toque no botão "aA" na barra de endereços > Ajustes do Site > Microfone: selecione Permitir. Depois toque em Tentar novamente.',
+            'Acesso ao microfone negado no Safari iOS. Toque no botão "aA" na barra de endereços > Ajustes do Site > Microfone: selecione Permitir. Se persistir, verifique Ajustes do iPhone > Privacidade e Segurança > Microfone e feche outros aplicativos que possam estar em chamada.',
           )
         } else {
           setErrorMessage(
-            'Acesso ao microfone negado no navegador. Toque no ícone de Cadeado/Trava ao lado da URL > Permissões > libere o Microfone e toque em Tentar novamente.',
+            'Acesso ao microfone negado no navegador. Passo 1: Toque no ícone de Cadeado/Trava ao lado da URL > Permissões > libere o Microfone. Passo 2: No Windows, vá em Configurações do Windows > Privacidade e segurança > Microfone e ative "Permitir que aplicativos de área de trabalho acessem o microfone" (verifique se o Chrome está permitido). Passo 3: Feche outros apps que possam estar usando o microfone no momento (ex.: WhatsApp Desktop, Meet, Teams). Depois toque em "Tentar novamente".',
           )
         }
       } else if (errName === 'NotFoundError' || errName === 'DevicesNotFoundError') {
@@ -745,6 +764,15 @@ export function useVoiceRecorder({
     await startRecording()
   }, [clearError, startRecording])
 
+  // Abrir a página em nova aba (executado direto no clique do usuário)
+  const openInNewTab = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      window.open(window.location.href, '_blank')
+    }
+  }, [])
+
+  const env = detectBrowserEnvironment()
+
   return {
     state,
     isRecording: state === 'recording',
@@ -754,6 +782,7 @@ export function useVoiceRecorder({
     errorMessage,
     exactErrorDetail,
     permissionDenied,
+    isInIframe: env.isInIframe,
     recordedAudioUrl,
     recordedAudioBlob,
     isMediaRecorderFallback,
@@ -764,5 +793,6 @@ export function useVoiceRecorder({
     clearError,
     retryPermission,
     saveRecordedAudioAsAttachment,
+    openInNewTab,
   }
 }

@@ -15,7 +15,16 @@ import {
   type VoiceDiagnosticInfo,
   detectBrowserEnvironment,
 } from '@/hooks/useVoiceRecorder'
-import { Activity, ShieldCheck, ShieldAlert, Radio, AlertCircle, RefreshCw } from 'lucide-react'
+import {
+  Activity,
+  ShieldCheck,
+  ShieldAlert,
+  Radio,
+  AlertCircle,
+  RefreshCw,
+  ExternalLink,
+  Layers,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
@@ -27,6 +36,7 @@ export function VoiceDiagnosticFooter() {
       isIos: env.isIos,
       isAndroid: env.isAndroid,
       isInAppBrowser: env.isInAppBrowser,
+      isInIframe: env.isInIframe,
       hasGetUserMedia: env.hasGetUserMedia,
       hasMediaRecorder: env.hasMediaRecorder,
       hasSpeechRecognition: env.hasSpeechRecognition,
@@ -96,7 +106,7 @@ export function VoiceDiagnosticFooter() {
       </div>
 
       {/* Grid de capacidades */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
         {/* Navegador */}
         <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
           <span className="text-[10px] text-slate-400 block uppercase">Navegador</span>
@@ -104,6 +114,32 @@ export function VoiceDiagnosticFooter() {
             {diag.browserName}
             {diag.isInAppBrowser ? ' (In-App)' : ''}
           </span>
+        </div>
+
+        {/* Modo de exibição: aba própria / embutida em quadro */}
+        <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
+          <span className="text-[10px] text-slate-400 block uppercase flex items-center gap-1">
+            <Layers className="h-3 w-3 text-slate-400" />
+            Modo de exibição
+          </span>
+          {diag.isInIframe ? (
+            <div className="space-y-1">
+              <span className="font-semibold text-rose-300 block text-[10.5px] leading-tight">
+                Embutida em quadro (microfone bloqueado pelo navegador)
+              </span>
+              <button
+                type="button"
+                onClick={() => window.open(window.location.href, '_blank')}
+                className="text-[10px] text-teal-300 hover:text-teal-200 underline inline-flex items-center gap-0.5"
+              >
+                <ExternalLink className="h-2.5 w-2.5" /> Abrir em nova aba
+              </button>
+            </div>
+          ) : (
+            <span className="font-semibold text-emerald-400 block text-[10.5px]">
+              Aba própria ✓
+            </span>
+          )}
         </div>
 
         {/* Status da Permissão */}
@@ -139,7 +175,7 @@ export function VoiceDiagnosticFooter() {
         <div className="bg-slate-950/60 p-2 rounded-lg border border-slate-800">
           <span className="text-[10px] text-slate-400 block uppercase">Transcrição Nativa</span>
           <span className={diag.hasSpeechRecognition ? 'text-emerald-400' : 'text-amber-300'}>
-            {diag.hasSpeechRecognition ? 'Web Speech API ✓' : 'Fallback Gravação (Safari)'}
+            {diag.hasSpeechRecognition ? 'Web Speech API ✓' : 'Fallback Gravação'}
           </span>
         </div>
       </div>
