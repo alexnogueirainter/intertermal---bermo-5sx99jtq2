@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
+import pb from '@/lib/pocketbase/client'
 import {
   appendTranscriptSafely,
   detectBrowserEnvironment,
@@ -120,6 +121,9 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     }
     ;(window as any).SpeechRecognition = MockSpeechRecognition
     ;(window as any).webkitSpeechRecognition = MockSpeechRecognition
+
+    // Mock pb.send para transcrição de áudio via backend
+    vi.spyOn(pb, 'send').mockResolvedValue({ ok: true, text: 'Texto transcrito do áudio' })
   })
 
   afterEach(() => {
@@ -172,8 +176,8 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     rerender({ val: currentValue })
 
     // Parar gravação 1
-    act(() => {
-      result.current.stopRecording()
+    await act(async () => {
+      await result.current.stopRecording()
     })
 
     // Deve estar em transição transcribing/saved
@@ -181,7 +185,7 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
 
     // Avança tempo da transição
     act(() => {
-      vi.advanceTimersByTime(400)
+      vi.advanceTimersByTime(350)
     })
     expect(result.current.state).toBe('saved')
 
@@ -225,8 +229,8 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     rerender({ val: currentValue })
 
     // Parar gravação 2
-    act(() => {
-      result.current.stopRecording()
+    await act(async () => {
+      await result.current.stopRecording()
     })
 
     act(() => {
@@ -260,8 +264,8 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     rerender({ val: currentValue })
 
     // Parar gravação 3
-    act(() => {
-      result.current.stopRecording()
+    await act(async () => {
+      await result.current.stopRecording()
     })
 
     act(() => {
@@ -309,8 +313,8 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     rerender({ val: currentValue })
 
     // Para gravação 1 -> entra em 'transcribing'
-    act(() => {
-      result.current.stopRecording()
+    await act(async () => {
+      await result.current.stopRecording()
     })
     expect(result.current.state).toBe('transcribing')
 
@@ -334,8 +338,8 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
 
     rerender({ val: currentValue })
 
-    act(() => {
-      result.current.stopRecording()
+    await act(async () => {
+      await result.current.stopRecording()
     })
 
     act(() => {
@@ -347,7 +351,7 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     expect(currentValue).toContain('Trecho 2')
   })
 
-  it('no ambiente iOS Safari: realiza 3 gravações consecutivas sem AudioContext, liberando tracks e permitindo novo ciclo a cada término', async () => {
+  it('no ambiente iOS Safari: realiza 3 gravações consecutivas transcrevendo TEXTO para o campo e acumulando sem oferecer anexo', async () => {
     // Simula UserAgent do iPhone Safari
     const originalUserAgent = navigator.userAgent
     Object.defineProperty(window.navigator, 'userAgent', {
@@ -355,6 +359,16 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
         'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Mobile/15E148 Safari/604.1',
       configurable: true,
       writable: true,
+    })
+
+    // Mock pb.send com textos diferentes para cada chamada
+    let callCount = 0
+    vi.spyOn(pb, 'send').mockImplementation(async () => {
+      callCount++
+      return {
+        ok: true,
+        text: `Transcrição Safari #${callCount}: levantamento técnico aprovado`,
+      }
     })
 
     const onSaveAttachment = vi.fn()
@@ -384,36 +398,41 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
 
     expect(result.current.state).toBe('recording')
     expect(result.current.isRecording).toBe(true)
-    // No iOS, não cria SpeechRecognition para evitar colisões no WebKit
-    expect(speechInstances.length).toBe(0)
+    // Web Speech API em pt-BR instanciada com continuous false no iOS
+    expect(speechInstances.length).toBe(1)
+    expect(speechInstances[0].lang).toBe('pt-BR')
+    expect(speechInstances[0].continuous).toBe(false)
 
     // Para a primeira gravação
-    act(() => {
-      result.current.stopRecording()
+    await act(async () => {
+      await result.current.stopRecording()
     })
     expect(result.current.state).toBe('transcribing')
 
     act(() => {
-      vi.advanceTimersByTime(400)
+      vi.advanceTimersByTime(350)
     })
     expect(result.current.state).toBe('saved')
 
     act(() => {
-      vi.advanceTimersByTime(1300)
+      vi.advanceTimersByTime(1600)
     })
     expect(result.current.state).toBe('idle')
     expect(result.current.isRecording).toBe(false)
     expect(mockTracks[0].stop).toHaveBeenCalled()
 
-    // O áudio gravado está disponível
-    expect(result.current.recordedAudioBlob).not.toBeNull()
-    expect(result.current.errorMessage).toContain('Safari')
+    // O texto foi transcrito e inserido no campo!
+    expect(currentValue).toContain('Anotação inicial de visita.')
+    expect(currentValue).toContain('Transcrição Safari #1')
+    // Não deve oferecer anexo porque a transcrição teve sucesso!
+    expect(result.current.showAttachmentFallback).toBe(false)
 
     // ============================================
     // GRAVAÇÃO 2 (iOS Safari - Segunda gravação no mesmo campo)
     // ============================================
     mockTracks[0].stop.mockClear()
     mockTracks[1].stop.mockClear()
+    rerender({ val: currentValue })
 
     await act(async () => {
       await result.current.startRecording()
@@ -421,24 +440,32 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
 
     expect(result.current.state).toBe('recording')
     expect(result.current.isRecording).toBe(true)
+    // Nova instância limpa de speech criada
+    expect(speechInstances.length).toBe(2)
 
     // Para a segunda gravação
-    act(() => {
-      result.current.stopRecording()
+    await act(async () => {
+      await result.current.stopRecording()
     })
 
     act(() => {
-      vi.advanceTimersByTime(1700)
+      vi.advanceTimersByTime(2000)
     })
     expect(result.current.state).toBe('idle')
     expect(result.current.isRecording).toBe(false)
     expect(mockTracks[0].stop).toHaveBeenCalled()
+
+    // Texto acumulado da gravação 2
+    expect(currentValue).toContain('Transcrição Safari #1')
+    expect(currentValue).toContain('Transcrição Safari #2')
+    expect(result.current.showAttachmentFallback).toBe(false)
 
     // ============================================
     // GRAVAÇÃO 3 (iOS Safari - Terceira gravação no mesmo campo)
     // ============================================
     mockTracks[0].stop.mockClear()
     mockTracks[1].stop.mockClear()
+    rerender({ val: currentValue })
 
     await act(async () => {
       await result.current.startRecording()
@@ -446,21 +473,26 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
 
     expect(result.current.state).toBe('recording')
     expect(result.current.isRecording).toBe(true)
+    expect(speechInstances.length).toBe(3)
 
     // Para a terceira gravação
-    act(() => {
-      result.current.stopRecording()
+    await act(async () => {
+      await result.current.stopRecording()
     })
 
     act(() => {
-      vi.advanceTimersByTime(1700)
+      vi.advanceTimersByTime(2000)
     })
     expect(result.current.state).toBe('idle')
     expect(result.current.isRecording).toBe(false)
     expect(mockTracks[0].stop).toHaveBeenCalled()
 
-    // O texto inicial nunca é sobrescrito
-    expect(currentValue).toBe('Anotação inicial de visita.')
+    // Todas as 3 falas foram acumuladas no campo!
+    expect(currentValue).toContain('Anotação inicial de visita.')
+    expect(currentValue).toContain('Transcrição Safari #1')
+    expect(currentValue).toContain('Transcrição Safari #2')
+    expect(currentValue).toContain('Transcrição Safari #3')
+    expect(result.current.showAttachmentFallback).toBe(false)
 
     // Restaura userAgent
     Object.defineProperty(window.navigator, 'userAgent', {
@@ -468,5 +500,48 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
       configurable: true,
       writable: true,
     })
+  })
+
+  it('no cenário de falha total: tenta retentativa automática e só oferece anexo se todas as vias falharem, sem perder texto anterior', async () => {
+    // Simula falha total do backend (ex: offline ou erro 500)
+    let fetchAttempts = 0
+    vi.spyOn(pb, 'send').mockImplementation(async () => {
+      fetchAttempts++
+      return {
+        ok: false,
+      }
+    })
+
+    let currentValue = 'Texto já existente no campo.'
+    const onChange = vi.fn((nextVal: string) => {
+      currentValue = nextVal
+    })
+
+    const { result } = renderHook(() =>
+      useVoiceRecorder({
+        value: currentValue,
+        onChange,
+      }),
+    )
+
+    await act(async () => {
+      await result.current.startRecording()
+    })
+
+    // Para a gravação sem que o Web Speech tenha retornado texto
+    await act(async () => {
+      await result.current.stopRecording()
+    })
+
+    // Deve ter tentado 2 vezes (tentativa inicial + 1 retentativa automática)
+    expect(fetchAttempts).toBe(2)
+
+    // Apenas agora entra no fallback de anexo como último recurso
+    expect(result.current.showAttachmentFallback).toBe(true)
+    expect(result.current.errorMessage).toContain('anexo da visita')
+    expect(result.current.exactErrorDetail).toContain('Falha na transcrição')
+
+    // O texto que o usuário já tinha digitado NUNCA é perdido
+    expect(currentValue).toBe('Texto já existente no campo.')
   })
 })

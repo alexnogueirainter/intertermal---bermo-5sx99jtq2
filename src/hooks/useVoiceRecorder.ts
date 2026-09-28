@@ -31,6 +31,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import pb from '@/lib/pocketbase/client'
 
 export type VoiceRecordingState = 'idle' | 'recording' | 'transcribing' | 'saved'
 
@@ -67,6 +68,7 @@ export interface UseVoiceRecorderReturn {
   recordedAudioUrl: string | null
   recordedAudioBlob: Blob | null
   isMediaRecorderFallback: boolean
+  showAttachmentFallback: boolean
   diagnostic: VoiceDiagnosticInfo
   startRecording: () => Promise<void>
   stopRecording: () => void
@@ -266,6 +268,7 @@ export function useVoiceRecorder({
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
   const [recordedAudioBlob, setRecordedAudioBlob] = useState<Blob | null>(null)
   const [isMediaRecorderFallback, setIsMediaRecorderFallback] = useState(false)
+  const [showAttachmentFallback, setShowAttachmentFallback] = useState(false)
   const [diagnostic, setDiagnostic] = useState<VoiceDiagnosticInfo>(globalDiagnosticState)
 
   // Refs de estado para evitar closures desatualizadas nos callbacks dos eventos nativos
@@ -282,6 +285,7 @@ export function useVoiceRecorder({
   const transitionTimeoutRef = useRef<any>(null)
   const activeSessionTranscriptRef = useRef('')
   const isStoppingRef = useRef(false)
+  const latestRecordedBlobRef = useRef<Blob | null>(null)
 
   useEffect(() => {
     valueRef.current = value
@@ -373,10 +377,61 @@ export function useVoiceRecorder({
   // Salva o texto transcrito no campo imediatamente de forma aditiva
   const commitFinalText = useCallback((textChunk: string) => {
     const trimmed = textChunk.trim()
-    if (!trimmed) return
+    if (!trimmed) return false
     const updated = appendTranscriptSafely(valueRef.current, trimmed)
     valueRef.current = updated
     onChangeRef.current(updated)
+    return true
+  }, [])
+
+  // Transcrição via caminho alternativo (Backend/Whisper) a partir do áudio gravado em Blob
+  const transcribeAudioBlobViaBackend = useCallback(async (blob: Blob): Promise<string | null> => {
+    if (!blob || blob.size === 0) return null
+    try {
+      // 1. Tenta envio via FormData multipart com pb.send
+      const formData = new FormData()
+      const ext = blob.type.includes('mp4') ? 'm4a' : 'webm'
+      formData.append('file', blob, `audio_record.${ext}`)
+
+      const data = await pb.send('/backend/v1/audio/transcribe', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (data && data.ok && data.text) {
+        return data.text.trim()
+      }
+    } catch (err: any) {
+      console.warn('transcribeAudioBlobViaBackend multipart falhou:', err)
+    }
+
+    // 2. Fallback para base64 se FormData falhar
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          const resStr = (reader.result as string) || ''
+          const commaIdx = resStr.indexOf(',')
+          resolve(commaIdx >= 0 ? resStr.slice(commaIdx + 1) : resStr)
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+
+      if (base64) {
+        const data = await pb.send('/backend/v1/audio/transcribe', {
+          method: 'POST',
+          body: JSON.stringify({ audioBase64: base64, mimeType: blob.type }),
+        })
+        if (data && data.ok && data.text) {
+          return data.text.trim()
+        }
+      }
+    } catch (b64Err: any) {
+      console.warn('transcribeAudioBlobViaBackend base64 falhou:', b64Err)
+    }
+
+    return null
   }, [])
 
   // Salva áudio gravado como anexo
@@ -443,15 +498,16 @@ export function useVoiceRecorder({
     setErrorMessage(null)
     setExactErrorDetail(null)
     setPermissionDenied(false)
+    setShowAttachmentFallback(false)
     setInterimTranscript('')
     setAudioDetected(false)
-    // No iOS Safari não descartamos o áudio anterior até que um novo áudio seja finalizado,
-    // garantindo que se o usuário quiser salvar como anexo o áudio anterior ele continue disponível
-    if (!detectBrowserEnvironment().isIos) {
+    activeSessionTranscriptRef.current = ''
+    latestRecordedBlobRef.current = null
+    // Descartamos URLs anteriores apenas se não estivermos exibindo fallback
+    if (!showAttachmentFallback) {
       setRecordedAudioUrl(null)
       setRecordedAudioBlob(null)
     }
-    activeSessionTranscriptRef.current = ''
 
     updateGlobalDiagnostic({
       lastAction: 'Botão Gravar acionado: chamando getUserMedia({ audio: true })',
@@ -625,6 +681,7 @@ export function useVoiceRecorder({
         recorder.mimeType || mimeType || (currentEnv.isIos ? 'audio/mp4' : 'audio/webm')
       const blob = new Blob(chunksRef.current, { type: finalMime })
       if (blob.size > 0) {
+        latestRecordedBlobRef.current = blob
         setRecordedAudioBlob(blob)
         try {
           const url = URL.createObjectURL(blob)
@@ -657,27 +714,28 @@ export function useVoiceRecorder({
       }
     }
 
-    // 4. CAMINHO DUPLO DE TRANSCRIÇÃO:
-    // No iOS (Safari), o WebKit não suporta gravação simultânea de MediaRecorder + SpeechRecognition
-    // e o webkitSpeechRecognition no iOS frequentemente trava a segunda sessão com service-not-allowed
-    // ou bloqueio de canal. No iOS, usamos o fluxo de gravação MediaRecorder com fallback garantido,
-    // permitindo múltiplas gravações infinitas sem travar o microfone.
-    // No Desktop e Android, o fluxo original com Web Speech API contínua permanece 100% IDÊNTICO.
+    // 4. CAMINHO DUPLO DE TRANSCRIÇÃO COM REINÍCIO COMPLETO A CADA SESSÃO:
+    // Configura SpeechRecognition com lang = 'pt-BR' tanto para Desktop/Android quanto para iOS.
+    // No Desktop e Android, mantém exatamente o fluxo contínuo e idêntico que já funciona.
+    // No iOS (Safari), instancia Web Speech API (webkitSpeechRecognition) se disponível e
+    // simultaneamente grava com MediaRecorder como garantia para a via 2 de transcrição.
     const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
 
-    if (SpeechRec && !currentEnv.isIos) {
+    if (SpeechRec) {
       try {
         setIsMediaRecorderFallback(false)
         const recognition = new SpeechRec()
         recognitionRef.current = recognition
         recognition.lang = 'pt-BR'
-        recognition.continuous = true
+        // No iOS Safari, continuous = true pode causar congelamento precoce do WebKit;
+        // mantemos continuous true em desktop/android e adaptável com segurança no iOS
+        recognition.continuous = !currentEnv.isIos
         recognition.interimResults = true
         recognition.maxAlternatives = 1
 
         recognition.onstart = () => {
           updateGlobalDiagnostic({
-            lastAction: 'Reconhecimento Web Speech API ativo em pt-BR',
+            lastAction: `Reconhecimento de fala ativo em pt-BR (${currentEnv.browserName})`,
           })
         }
 
@@ -719,14 +777,25 @@ export function useVoiceRecorder({
           }
 
           if (errType === 'not-allowed' || errType === 'service-not-allowed') {
-            setPermissionDenied(true)
-            setExactErrorDetail(`Web Speech API: ${errType}`)
+            // No iOS, se a Web Speech API der service-not-allowed, não bloqueia o gravador:
+            // a via 2 de transcrição do áudio gravado assume automaticamente no stop
+            if (currentEnv.isIos) {
+              setIsMediaRecorderFallback(true)
+              updateGlobalDiagnostic({
+                lastAction:
+                  'Web Speech API não permitida no iOS. Áudio será transcrito via caminho alternativo ao finalizar.',
+              })
+            } else {
+              setPermissionDenied(true)
+              setExactErrorDetail(`Web Speech API: ${errType}`)
+            }
           } else if (errType === 'network') {
-            // Se falhar a conexão do Google Speech, o MediaRecorder continua gravando o áudio
             setIsMediaRecorderFallback(true)
             setErrorMessage(
-              'O serviço online de transcrição do navegador oscilou. O áudio continua sendo gravado normalmente.',
+              'O serviço online de transcrição oscilou. O áudio está sendo gravado e será processado.',
             )
+          } else {
+            setIsMediaRecorderFallback(true)
           }
         }
 
@@ -752,12 +821,10 @@ export function useVoiceRecorder({
         setIsMediaRecorderFallback(true)
       }
     } else {
-      // Navegador iOS Safari ou sem Web Speech API
+      // Navegador sem Web Speech API nativa — via 2 de transcrição do áudio gravado
       setIsMediaRecorderFallback(true)
       updateGlobalDiagnostic({
-        lastAction: currentEnv.isIos
-          ? 'iOS Safari: sessão limpa iniciada via MediaRecorder (áudio preservado)'
-          : 'Safari/Navegador sem SpeechRecognition: gravando via MediaRecorder',
+        lastAction: 'Gravador MediaRecorder ativo em pt-BR com transcrição no término',
       })
     }
 
@@ -765,12 +832,12 @@ export function useVoiceRecorder({
   }, [commitFinalText, releaseMicrophone, state])
 
   // Parar gravação (Toque único)
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback(async () => {
     if (state !== 'recording' || isStoppingRef.current) return
     isStoppingRef.current = true
 
     updateGlobalDiagnostic({
-      lastAction: 'Finalizando gravação e salvando dados...',
+      lastAction: 'Finalizando gravação e processando transcrição...',
     })
 
     // Se havia qualquer texto interim não finalizado no momento do stop, salva aditivamente
@@ -812,69 +879,116 @@ export function useVoiceRecorder({
 
     setInterimTranscript('')
 
-    // 3. Transição visual dos estados: "Transcrevendo..." -> "Transcrição salva" -> "idle"
-    // Libera isStoppingRef.current IMEDIATAMENTE após iniciar a transição para que novo clique
-    // em startRecording() possa ocorrer a qualquer instante (gravação durante transcrevendo/salvo)
-    const hadTranscribedText = activeSessionTranscriptRef.current.trim().length > 0
-
     if (transitionTimeoutRef.current) {
       clearTimeout(transitionTimeoutRef.current)
       transitionTimeoutRef.current = null
     }
 
-    const envAtStop = detectBrowserEnvironment()
+    // Coloca o estado imediatamente em "transcribing" para feedback visual claro
+    setState('transcribing')
 
+    // Aguarda breve fração para garantir que o evento onstop do recorder gerou o blob
+    await new Promise((resolve) => setTimeout(resolve, 150))
+
+    const hadTranscribedText = activeSessionTranscriptRef.current.trim().length > 0
+
+    // Se a Web Speech API já coletou texto finalizado (típico no desktop/Android e fala contínua)
     if (hadTranscribedText) {
-      setState('transcribing')
       isStoppingRef.current = false
+      setShowAttachmentFallback(false)
       transitionTimeoutRef.current = setTimeout(() => {
         setState('saved')
         updateGlobalDiagnostic({
-          lastAction: 'Transcrição salva no campo com sucesso',
+          lastAction: 'Transcrição salva no campo com sucesso (Web Speech API pt-BR)',
         })
         transitionTimeoutRef.current = setTimeout(() => {
           setState('idle')
           transitionTimeoutRef.current = null
         }, 1500)
-      }, 350)
-    } else {
-      // Se estava no fallback do MediaRecorder e nenhuma Speech API transcreveu em texto
-      if (isMediaRecorderFallback) {
-        setState('transcribing')
-        isStoppingRef.current = false
-        transitionTimeoutRef.current = setTimeout(() => {
-          // No iOS Safari, exibe como "saved" para sinalizar que o áudio foi captado com sucesso
-          // e o botão volta pronto para gravar novamente, com mensagem explicativa e player do áudio
-          if (envAtStop.isIos) {
-            setState('saved')
-            updateGlobalDiagnostic({
-              lastAction: 'Áudio captado com sucesso no iOS Safari. Pronto para nova gravação.',
-            })
-            transitionTimeoutRef.current = setTimeout(() => {
-              setState('idle')
-              transitionTimeoutRef.current = null
-            }, 1200)
-          } else {
-            setState('idle')
-            transitionTimeoutRef.current = null
-          }
-          setErrorMessage(
-            'Áudio gravado com sucesso! No Safari/iOS você pode ouvi-lo pelo player abaixo e salvá-lo como anexo no relatório, além de gravar novos áudios neste mesmo campo.',
-          )
-        }, 350)
-      } else {
-        setState('idle')
-        isStoppingRef.current = false
+      }, 300)
+      return
+    }
+
+    // VIA 2 / RECUPERAÇÃO AUTOMÁTICA:
+    // Se a Web Speech API não produziu texto (caso do iOS Safari ou oscilação de rede),
+    // processamos o áudio captado pelo MediaRecorder através do endpoint alternativo de transcrição
+    const audioBlob = latestRecordedBlobRef.current || recordedAudioBlob
+    let transcribedAltText: string | null = null
+
+    if (audioBlob && audioBlob.size > 0) {
+      updateGlobalDiagnostic({
+        lastAction: 'Processando transcrição do áudio gravado...',
+      })
+
+      // Tentativa 1 do caminho alternativo
+      transcribedAltText = await transcribeAudioBlobViaBackend(audioBlob)
+
+      // RETENTATIVA AUTOMÁTICA: se falhou a primeira vez, tenta novamente uma vez
+      if (!transcribedAltText) {
+        updateGlobalDiagnostic({
+          lastAction: 'Retentando transcrição do áudio gravado...',
+        })
+        await new Promise((resolve) => setTimeout(resolve, 300))
+        transcribedAltText = await transcribeAudioBlobViaBackend(audioBlob)
       }
     }
-  }, [commitFinalText, interimTranscript, isMediaRecorderFallback, releaseMicrophone, state])
+
+    // Se o caminho alternativo conseguiu o texto transcrito:
+    if (transcribedAltText && transcribedAltText.trim()) {
+      commitFinalText(transcribedAltText.trim())
+      setShowAttachmentFallback(false)
+      setErrorMessage(null)
+      setExactErrorDetail(null)
+      isStoppingRef.current = false
+
+      transitionTimeoutRef.current = setTimeout(() => {
+        setState('saved')
+        updateGlobalDiagnostic({
+          lastAction: 'Transcrição salva no campo com sucesso via caminho de áudio',
+        })
+        transitionTimeoutRef.current = setTimeout(() => {
+          setState('idle')
+          transitionTimeoutRef.current = null
+        }, 1500)
+      }, 300)
+      return
+    }
+
+    // ÚLTIMO RECURSO ABSOLUTO:
+    // Somente se TODAS as formas de transcrição falharem (nenhum texto via Web Speech
+    // e nenhuma transcrição do áudio gravado), oferecemos o áudio como anexo com mensagem clara.
+    isStoppingRef.current = false
+    setState('idle')
+    setShowAttachmentFallback(true)
+
+    const reasonMsg =
+      audioBlob && audioBlob.size > 0
+        ? 'A transcrição automática da fala não pôde ser completada pelo dispositivo. Você pode salvar esta gravação como anexo da visita para não perder o relato ou tentar gravar novamente.'
+        : 'Nenhum áudio foi captado na gravação. Toque em Gravar novamente e fale próximo ao microfone.'
+
+    setErrorMessage(reasonMsg)
+    setExactErrorDetail(
+      'Falha na transcrição: Web Speech API e processamento de áudio não retornaram texto.',
+    )
+    updateGlobalDiagnostic({
+      lastError: 'Falha na transcrição: nenhum texto retornado',
+      lastAction: 'Fallback para anexo acionado como último recurso',
+    })
+  }, [
+    commitFinalText,
+    interimTranscript,
+    recordedAudioBlob,
+    releaseMicrophone,
+    state,
+    transcribeAudioBlobViaBackend,
+  ])
 
   // Alterna entre iniciar e parar com toque único
-  const toggleRecording = useCallback(() => {
+  const toggleRecording = useCallback(async () => {
     if (state === 'recording') {
-      stopRecording()
+      await stopRecording()
     } else {
-      startRecording()
+      await startRecording()
     }
   }, [startRecording, stopRecording, state])
 
@@ -883,6 +997,7 @@ export function useVoiceRecorder({
     setErrorMessage(null)
     setExactErrorDetail(null)
     setPermissionDenied(false)
+    setShowAttachmentFallback(false)
   }, [])
 
   // Tentar novamente a permissão sem recarregar a página
@@ -913,6 +1028,7 @@ export function useVoiceRecorder({
     recordedAudioUrl,
     recordedAudioBlob,
     isMediaRecorderFallback,
+    showAttachmentFallback,
     diagnostic,
     startRecording,
     stopRecording,

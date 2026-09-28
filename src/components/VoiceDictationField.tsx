@@ -61,6 +61,7 @@ export function VoiceDictationField({
     recordedAudioUrl,
     recordedAudioBlob,
     isMediaRecorderFallback,
+    showAttachmentFallback,
     toggleRecording,
     clearError,
     retryPermission,
@@ -262,15 +263,20 @@ export function VoiceDictationField({
             </button>
           </div>
 
-          {/* Player do áudio gravado se disponível (ex.: gravou via fallback ou antes de erro) */}
-          {recordedAudioUrl && (
-            <div className="pt-1.5 space-y-1.5 border-t border-amber-200 dark:border-amber-900/60">
-              <p className="text-[10.5px] font-medium text-amber-900 dark:text-amber-200 flex items-center justify-between">
-                <span>Áudio gravado pelo microfone:</span>
-                <span className="text-[9.5px] font-normal text-amber-800 dark:text-amber-300">
-                  Pronto para ouvir ou anexar
-                </span>
-              </p>
+          {/* Player e opção de anexo APENAS como último recurso, se todas as formas de transcrição falharem */}
+          {showAttachmentFallback && recordedAudioUrl && (
+            <div className="pt-2 space-y-2 border-t border-amber-200 dark:border-amber-900/60">
+              <div className="p-2 rounded bg-amber-100/70 dark:bg-amber-900/40 border border-amber-300/80 space-y-1">
+                <p className="text-[11px] font-semibold text-amber-950 dark:text-amber-100 flex items-center gap-1.5">
+                  <FileAudio className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
+                  Áudio gravado preservado (Último recurso)
+                </p>
+                <p className="text-[10.5px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+                  A transcrição para texto não pôde ser completada automaticamente. Você pode salvar
+                  este áudio como anexo na visita para registrar o relato ou tentar gravar
+                  novamente.
+                </p>
+              </div>
               <audio src={recordedAudioUrl} controls className="w-full h-8" />
               {onSaveAudioAttachment && recordedAudioBlob && (
                 <Button
@@ -278,7 +284,7 @@ export function VoiceDictationField({
                   size="sm"
                   variant="outline"
                   onClick={saveRecordedAudioAsAttachment}
-                  className="h-7 text-xs font-semibold bg-white dark:bg-slate-900 border-amber-400 text-amber-900 dark:text-amber-200 hover:bg-amber-100"
+                  className="h-7 text-xs font-semibold bg-white dark:bg-slate-900 border-amber-400 text-amber-900 dark:text-amber-200 hover:bg-amber-100 shadow-xs"
                 >
                   <FileAudio className="h-3 w-3 mr-1" />
                   Salvar este áudio como anexo da visita
