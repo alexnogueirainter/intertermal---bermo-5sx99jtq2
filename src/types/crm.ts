@@ -12,9 +12,23 @@ export type QuoteStatus =
   | 'draft'
   | 'pending_approval'
   | 'sent'
+  | 'em_negociacao'
   | 'approved'
   | 'rejected'
   | 'expired'
+  | 'concluida'
+
+// Rótulos apenas de apresentação; os registros atuais mantêm os valores salvos.
+export const QUOTE_STATUS_LABELS: Record<string, string> = {
+  draft: 'Elaborada',
+  pending_approval: 'Em Aprovação',
+  sent: 'Enviada',
+  em_negociacao: 'Em Negociação',
+  approved: 'Aprovada',
+  rejected: 'Recusada',
+  expired: 'Expirada',
+  concluida: 'Concluída',
+}
 
 export type ServiceOrderStatus =
   | 'vistoria'

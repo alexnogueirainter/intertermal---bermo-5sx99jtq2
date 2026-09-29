@@ -171,6 +171,80 @@ export function createInitialVisitData(savedEmployeeName = ''): FieldVisitData {
  * Gera automaticamente um Plano de Ação com base nas informações levantadas,
  * dificuldades detectadas e observações do técnico mecânico.
  */
+/**
+ * Retorna o título / identificação formatada do equipamento para relatórios e exibição:
+ * Formato preferencial: "Equipamento 01 - [Fabricante] [Modelo]" (ex.: "Equipamento 01 - Alfa Laval T10-BFM").
+ * Se name customizado existir e não for apenas genérico ("Equipamento X"), preserva-o;
+ * Se os dados de fabricante/modelo estiverem preenchidos, anexa ao prefixo numérico.
+ * Se nada estiver preenchido, cai com segurança para "Equipamento 01".
+ */
+export function formatEquipmentTitle(
+  eq: Partial<EquipmentItem> | undefined | null,
+  index?: number,
+  options?: { prefix?: boolean },
+): string {
+  const numPrefix =
+    typeof index === 'number' ? `Equipamento ${String(index + 1).padStart(2, '0')}` : ''
+
+  if (!eq) {
+    return numPrefix || 'Equipamento'
+  }
+
+  // Monta a especificação técnica real: Fabricante + Modelo
+  const manufacturer = (eq.manufacturer || '').trim()
+  const model = (eq.model || '').trim()
+  let realSpec = ''
+  if (manufacturer && model) {
+    // Se o modelo já começa com o fabricante, evita duplicação (ex: "Alfa Laval Alfa Laval T10")
+    if (model.toLowerCase().startsWith(manufacturer.toLowerCase())) {
+      realSpec = model
+    } else {
+      realSpec = `${manufacturer} ${model}`
+    }
+  } else if (model) {
+    realSpec = model
+  } else if (manufacturer) {
+    realSpec = manufacturer
+  }
+
+  // Verifica se o campo name foi preenchido manualmente com algo que não seja apenas o genérico
+  const customName = (eq.name || '').trim()
+  const isGenericName =
+    !customName || /^equipamento\s*(#?\s*\d+)?$/i.test(customName) || /^\d+$/i.test(customName)
+
+  // Se o usuário digitou um nome específico diferente do padrão genérico
+  let descriptiveName = ''
+  if (!isGenericName) {
+    descriptiveName = customName
+  }
+
+  // Identificação principal do equipamento (além da numeração)
+  let identity = ''
+  if (descriptiveName && realSpec) {
+    if (descriptiveName.toLowerCase().includes(realSpec.toLowerCase())) {
+      identity = descriptiveName
+    } else {
+      identity = `${descriptiveName} (${realSpec})`
+    }
+  } else if (realSpec) {
+    identity = realSpec
+  } else if (descriptiveName) {
+    identity = descriptiveName
+  }
+
+  const includePrefix = options?.prefix !== false
+
+  if (includePrefix && numPrefix) {
+    return identity ? `${numPrefix} - ${identity}` : numPrefix
+  }
+
+  if (identity) {
+    return identity
+  }
+
+  return numPrefix || 'Equipamento'
+}
+
 export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanItem[] {
   const plan: ActionPlanItem[] = []
   const textCorpus = [
@@ -239,11 +313,7 @@ export function generateActionPlan(visit: Partial<FieldVisitData>): ActionPlanIt
   // 2. Analisar equipamentos
   const equipments = visit.equipments || []
   equipments.forEach((eq, idx) => {
-    const eqLabel =
-      eq.name ||
-      (eq.model
-        ? `${eq.manufacturer ? eq.manufacturer + ' ' : ''}${eq.model}`
-        : `Equipamento #${idx + 1}`)
+    const eqLabel = formatEquipmentTitle(eq, idx)
     const notesLower = (eq.technicianNotes || '').toLowerCase()
     const diff = eq.difficulty || 'Médio'
     const loc = eq.installedLocation
@@ -476,35 +546,48 @@ export function recordToFieldVisitData(record: any): {
   // Parse seguro do JSON de equipamentos se for string ou array
   let safeEquipments: EquipmentItem[] = []
   if (Array.isArray(record.equipment)) {
-    safeEquipments = record.equipment.map((eq: any, idx: number) => ({
-      ...eq,
-      name: eq.name || `Equipamento ${idx + 1}`,
-      attachments: Array.isArray(eq.attachments)
-        ? eq.attachments
-        : eq.photoDataUrl
-          ? [{ id: generateId(), name: 'Foto 1', type: 'image' as const, dataUrl: eq.photoDataUrl }]
-          : [],
-    }))
+    safeEquipments = record.equipment.map((eq: any, idx: number) => {
+      const numStr = String(idx + 1).padStart(2, '0')
+      return {
+        ...eq,
+        name: eq.name || `Equipamento ${numStr}`,
+        attachments: Array.isArray(eq.attachments)
+          ? eq.attachments
+          : eq.photoDataUrl
+            ? [
+                {
+                  id: generateId(),
+                  name: 'Foto 1',
+                  type: 'image' as const,
+                  dataUrl: eq.photoDataUrl,
+                },
+              ]
+            : [],
+      }
+    })
   } else if (typeof record.equipment === 'string' && record.equipment) {
     try {
       const parsed = JSON.parse(record.equipment)
       if (Array.isArray(parsed)) {
-        safeEquipments = parsed.map((eq: any, idx: number) => ({
-          ...eq,
-          name: eq.name || `Equipamento ${idx + 1}`,
-          attachments: Array.isArray(eq.attachments)
-            ? eq.attachments
-            : eq.photoDataUrl
-              ? [
-                  {
-                    id: generateId(),
-                    name: 'Foto 1',
-                    type: 'image' as const,
-                    dataUrl: eq.photoDataUrl,
-                  },
-                ]
-              : [],
-        }))
+        safeEquipments = parsed.map((eq: any, idx: number) => {
+          const numStr = String(idx + 1).padStart(2, '0')
+          return {
+            ...eq,
+            name: eq.name || `Equipamento ${numStr}`,
+            attachments: Array.isArray(eq.attachments)
+              ? eq.attachments
+              : eq.photoDataUrl
+                ? [
+                    {
+                      id: generateId(),
+                      name: 'Foto 1',
+                      type: 'image' as const,
+                      dataUrl: eq.photoDataUrl,
+                    },
+                  ]
+                : [],
+          }
+        })
       }
     } catch {
       safeEquipments = []

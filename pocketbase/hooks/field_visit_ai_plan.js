@@ -52,7 +52,10 @@ routerAdd('POST', '/backend/v1/field-visits/ai-plan', (e) => {
             : '0'),
     )
     if (parts.length > 0) {
-      eqLines.push('Equipamento #' + (i + 1) + ' [id: ' + (eq.id || '') + ']: ' + parts.join('; '))
+      const numStr = i + 1 < 10 ? '0' + (i + 1) : String(i + 1)
+      const spec = [eq.manufacturer, eq.model].filter(Boolean).join(' ')
+      const eqTag = spec ? 'Equipamento ' + numStr + ' - ' + spec : 'Equipamento ' + numStr
+      eqLines.push(eqTag + ' [id: ' + (eq.id || '') + ']: ' + parts.join('; '))
     }
   }
 

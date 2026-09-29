@@ -77,6 +77,7 @@ import {
   recordToFieldVisitData,
   readFileAsMediaAttachment,
   generateActionPlan,
+  formatEquipmentTitle,
   generateId,
 } from '@/types/field-visit'
 
@@ -703,7 +704,8 @@ export default function FieldVisitPage({
   // Ações de Equipamentos
   const handleAddEquipment = (customName?: string) => {
     const nextIndex = visit.equipments.length + 1
-    const newEq = createEmptyEquipment(customName || `Equipamento ${nextIndex}`)
+    const padStr = String(nextIndex).padStart(2, '0')
+    const newEq = createEmptyEquipment(customName || `Equipamento ${padStr}`)
     setVisit((prev) => ({
       ...prev,
       equipments: [...prev.equipments, newEq],
@@ -1681,7 +1683,7 @@ export default function FieldVisitPage({
               </CardContent>
             </Card>
 
-            {/* Seções de Anexos por Equipamento Separados ("Equipamento 1", "Equipamento 2"...) */}
+            {/* Seções de Anexos por Equipamento Separados ("Equipamento 01", "Equipamento 02"...) */}
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2 pt-1">
                 <div>
@@ -1718,23 +1720,24 @@ export default function FieldVisitPage({
                     </p>
                     <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
                       Deseja anexar fotos/vídeos de um equipamento específico (ex.:
-                      &quot;Equipamento 1&quot;)?
+                      &quot;Equipamento 01&quot;)?
                     </p>
                   </div>
                   <Button
                     type="button"
-                    onClick={() => handleAddEquipment('Equipamento 1')}
+                    onClick={() => handleAddEquipment('Equipamento 01')}
                     variant="outline"
                     className="text-xs h-9 font-semibold text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-700 hover:bg-teal-50"
                   >
                     <Plus className="h-3.5 w-3.5 mr-1" />
-                    Adicionar Equipamento 1
+                    Adicionar Equipamento 01
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
                   {visit.equipments.map((eq, index) => {
-                    const eqLabel = eq.name || `Equipamento ${index + 1}`
+                    const padStr = String(index + 1).padStart(2, '0')
+                    const eqLabel = eq.name || `Equipamento ${padStr}`
                     return (
                       <Card
                         key={eq.id}
@@ -1747,11 +1750,11 @@ export default function FieldVisitPage({
                                 {index + 1}
                               </span>
                               <Input
-                                value={eq.name || `Equipamento ${index + 1}`}
+                                value={eq.name || `Equipamento ${padStr}`}
                                 onChange={(e) =>
                                   handleUpdateEquipment(eq.id, { name: e.target.value })
                                 }
-                                placeholder={`Equipamento ${index + 1}`}
+                                placeholder={`Equipamento ${padStr}`}
                                 className="h-8 text-xs font-bold w-48 bg-white dark:bg-slate-900"
                               />
                             </div>
@@ -1864,7 +1867,8 @@ export default function FieldVisitPage({
                       className="w-full h-12 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-teal-600 hover:text-teal-700 font-semibold text-xs"
                     >
                       <Plus className="h-4 w-4 mr-1.5" />
-                      Adicionar mais um equipamento ({`Equipamento ${visit.equipments.length + 1}`})
+                      Adicionar mais um equipamento (
+                      {`Equipamento ${String(visit.equipments.length + 1).padStart(2, '0')}`})
                     </Button>
                   </div>
                 </div>
@@ -1993,9 +1997,7 @@ export default function FieldVisitPage({
                               {index + 1}
                             </span>
                             <CardTitle className="text-sm font-bold truncate">
-                              {item.model || item.manufacturer
-                                ? `${item.manufacturer ? item.manufacturer + ' ' : ''}${item.model || 'Equipamento'}`
-                                : `Equipamento #${index + 1}`}
+                              {formatEquipmentTitle(item, index)}
                             </CardTitle>
                           </div>
 

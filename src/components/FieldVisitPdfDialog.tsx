@@ -28,7 +28,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { FieldVisitData, generateActionPlan } from '@/types/field-visit'
+import { FieldVisitData, generateActionPlan, formatEquipmentTitle } from '@/types/field-visit'
 
 interface FieldVisitPdfDialogProps {
   open: boolean
@@ -334,11 +334,7 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
               ) : (
                 <div className="space-y-4">
                   {visit.equipments.map((eq, idx) => {
-                    const eqTitle =
-                      eq.name ||
-                      (eq.model || eq.manufacturer
-                        ? `${eq.manufacturer ? eq.manufacturer + ' ' : ''}${eq.model || 'Trocador'}`
-                        : `Equipamento #${idx + 1}`)
+                    const eqTitle = formatEquipmentTitle(eq, idx)
 
                     const allEqAttachments =
                       eq.attachments && eq.attachments.length > 0
@@ -362,9 +358,6 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                         {/* Header do Equipamento */}
                         <div className="bg-slate-50 border-b border-slate-200 p-3 flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="h-5 w-5 rounded-full bg-teal-700 text-white font-bold text-[10px] flex items-center justify-center">
-                              {idx + 1}
-                            </span>
                             <span className="font-bold text-slate-900 text-xs">{eqTitle}</span>
                             {eq.serialNumber && (
                               <span className="text-[10px] font-mono text-slate-500">
@@ -623,7 +616,13 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                         <div className="pl-6 pt-1.5">
                           <span className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1 mb-1">
                             <Camera className="h-3 w-3 text-teal-700" />
-                            Fotos vinculadas — {eq.name || 'Equipamento'}
+                            Fotos vinculadas —{' '}
+                            {(() => {
+                              const eqIndex = (visit.equipments || []).findIndex(
+                                (e: any) => e.id === eq.id,
+                              )
+                              return formatEquipmentTitle(eq, eqIndex >= 0 ? eqIndex : undefined)
+                            })()}
                           </span>
                           <div className="grid grid-cols-3 gap-1.5">
                             {atts.slice(0, 6).map((att: any) => (

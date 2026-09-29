@@ -52,6 +52,7 @@ import { fieldVisitsService, type FieldVisitRecord } from '@/services/field-visi
 import { FieldVisitPdfDialog } from '@/components/FieldVisitPdfDialog'
 import {
   recordToFieldVisitData,
+  formatEquipmentTitle,
   STORAGE_KEY_CURRENT_VISIT,
   STORAGE_KEY_EMPLOYEE_NAME,
   type FieldVisitData,
@@ -1129,8 +1130,7 @@ export default function ReceivedFieldVisitsPage() {
                                 {idx + 1}
                               </span>
                               <span className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
-                                {eq.manufacturer ? `${eq.manufacturer} ` : ''}
-                                {eq.model || 'Trocador de Calor'}
+                                {formatEquipmentTitle(eq, idx)}
                               </span>
                               {eq.serialNumber && (
                                 <Badge
@@ -1257,7 +1257,7 @@ export default function ReceivedFieldVisitsPage() {
                                         if (att.type === 'image') {
                                           setLightboxImage({
                                             url: att.dataUrl,
-                                            title: `${eq.name || eq.model || 'Equipamento'} — ${att.name || 'Foto'}`,
+                                            title: `${formatEquipmentTitle(eq, idx)} — ${att.name || 'Foto'}`,
                                             subtitle: `Série: ${eq.serialNumber || 'N/A'} • Local: ${eq.installedLocation || 'N/A'}`,
                                           })
                                         }

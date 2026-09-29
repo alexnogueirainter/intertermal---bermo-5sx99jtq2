@@ -40,7 +40,13 @@ export function mapQuoteStatusToDealStage(status?: string | QuoteStatus): {
   probability: number
 } {
   const s = (status || '').toLowerCase().trim()
-  if (s === 'approved' || s === 'aprovada' || s === 'aprovado') {
+  if (
+    s === 'approved' ||
+    s === 'aprovada' ||
+    s === 'aprovado' ||
+    s === 'concluida' ||
+    s === 'concluída'
+  ) {
     return { stage: 'won', probability: 100 }
   }
   if (
