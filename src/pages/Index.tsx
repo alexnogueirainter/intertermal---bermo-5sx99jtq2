@@ -30,12 +30,13 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 import { useRealtime } from '@/hooks/use-realtime'
+import { useAuth } from '@/lib/auth'
 
 // Services & Types
 import { clientsService } from '@/services/clients'
 import { dealsService } from '@/services/deals'
 import { quotesService } from '@/services/quotes'
-import { quoteDealSyncService } from '@/services/quotes-deal-sync'
+
 import {
   servicesExtraService,
   serviceOrdersService,
@@ -96,6 +97,7 @@ if (typeof globalThis !== 'undefined' && !(globalThis as any).Mail) {
 
 export default function IndexPage() {
   const { toast } = useToast()
+  const { user, signOut } = useAuth()
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
   const [isLoading, setIsLoading] = useState(true)
 
@@ -190,22 +192,9 @@ export default function IndexPage() {
       setActivities(activitiesRes)
       setFieldVisits(fieldVisitsRes)
 
-      // Sincronização em lote das propostas existentes com o pipeline comercial
-      // Idempotente: atualiza deals vinculados ou cria os faltantes sem alterar os cálculos
-      if (quotesRes.length > 0) {
-        try {
-          quoteDealSyncService
-            .syncAllQuotes(quotesRes)
-            .then((syncResult) => {
-              if (syncResult && syncResult.syncedCount > 0) {
-                dealsService.getAll().then((freshDeals) => setDeals(freshDeals))
-              }
-            })
-            .catch((e) => console.warn('Erro sync em background:', e))
-        } catch (syncBatchErr) {
-          console.warn('Erro ao disparar sync em background:', syncBatchErr)
-        }
-      }
+      // Não sincronizar propostas -> negócios em lote ao carregar o CRM.
+      // Esta rotina de leitura alterava registros persistidos e já foi removida do carregamento.
+      // Sincronizações futuras devem ser explícitas, auditáveis e protegidas contra sobrescrita.
     } catch (err: any) {
       console.error('Erro ao carregar dados:', err)
       if (!silent) {
@@ -234,23 +223,9 @@ export default function IndexPage() {
           ? prev.map((q) => (q.id === record.id ? { ...q, ...record } : q))
           : [record, ...prev]
       })
-      // Sincronizar deals ao receber nova proposta via realtime
-      quoteDealSyncService
-        .syncQuoteToDeal(record)
-        .then(() => {
-          dealsService.getAll().then((freshDeals) => setDeals(freshDeals))
-        })
-        .catch((err) => console.warn('Erro sync realtime quote create:', err))
     } else if (e.action === 'update') {
       setQuotes((prev) => prev.map((q) => (q.id === record.id ? { ...q, ...record } : q)))
       setSelectedQuote((prev) => (prev?.id === record.id ? { ...prev, ...record } : prev))
-      // Sincronizar deals ao receber atualização de proposta via realtime
-      quoteDealSyncService
-        .syncQuoteToDeal(record)
-        .then(() => {
-          dealsService.getAll().then((freshDeals) => setDeals(freshDeals))
-        })
-        .catch((err) => console.warn('Erro sync realtime quote update:', err))
     } else if (e.action === 'delete') {
       setQuotes((prev) => prev.filter((q) => q.id !== record.id))
       setSelectedQuote((prev) => (prev?.id === record.id ? null : prev))
@@ -954,21 +929,19 @@ export default function IndexPage() {
           </nav>
         </div>
 
-        {/* Footer do Usuário na Sidebar */}
+        {/* Sessão do usuário */}
         <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/50">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded-full bg-teal-800 text-white flex items-center justify-center font-bold text-xs">
-              AN
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
-                Alex Nogueia
-              </p>
-              <p className="text-[10px] text-teal-700 dark:text-teal-400 truncate">
-                Especialista BERMO
-              </p>
-            </div>
+          <div className="mb-3 min-w-0">
+            <p className="truncate text-xs font-bold text-slate-900 dark:text-slate-100">
+              {user.name || user.email || 'Usuário'}
+            </p>
+            <p className="truncate text-[10px] text-teal-700 dark:text-teal-400">
+              {user.role === 'admin' ? 'Administrador' : 'Equipe de campo'}
+            </p>
           </div>
+          <Button className="w-full" onClick={signOut} size="sm" variant="outline">
+            Sair do CRM
+          </Button>
         </div>
       </aside>
 

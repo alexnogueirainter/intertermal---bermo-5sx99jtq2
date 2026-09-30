@@ -1,6 +1,5 @@
 import { QuoteRecord } from '@/types/crm'
 import pb from '@/lib/pocketbase/client'
-import { quoteDealSyncService } from '@/services/quotes-deal-sync'
 
 const QUOTES_COLLECTION = 'quotes'
 
@@ -199,15 +198,6 @@ export async function createQuote(data: Partial<QuoteRecord>): Promise<QuoteReco
         data.payment_terms || (data.payment_conditions ? `${data.payment_conditions}` : '28 DDL'),
     }
     const created = await pb.collection(QUOTES_COLLECTION).create<QuoteRecord>(payload)
-    // Sincronizar automaticamente no pipeline comercial (deals)
-    try {
-      const syncedDeal = await quoteDealSyncService.syncQuoteToDeal(created)
-      if (syncedDeal && created.deal_id !== syncedDeal.id) {
-        created.deal_id = syncedDeal.id
-      }
-    } catch (syncErr) {
-      console.warn('Erro ao sincronizar proposta criada no pipeline:', syncErr)
-    }
     return created
   } catch (error) {
     console.warn('Erro ao criar quote no backend:', error)
@@ -254,15 +244,6 @@ export async function updateQuote(id: string, data: Partial<QuoteRecord>): Promi
         data.payment_terms || (data.payment_conditions ? `${data.payment_conditions}` : undefined),
     }
     const updated = await pb.collection(QUOTES_COLLECTION).update<QuoteRecord>(id, payload)
-    // Sincronizar automaticamente no pipeline comercial (deals)
-    try {
-      const syncedDeal = await quoteDealSyncService.syncQuoteToDeal(updated)
-      if (syncedDeal && updated.deal_id !== syncedDeal.id) {
-        updated.deal_id = syncedDeal.id
-      }
-    } catch (syncErr) {
-      console.warn('Erro ao sincronizar proposta atualizada no pipeline:', syncErr)
-    }
     return updated
   } catch (error) {
     console.warn('Erro ao atualizar quote no backend:', error)
