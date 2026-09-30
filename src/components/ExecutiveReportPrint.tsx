@@ -510,7 +510,7 @@ function ReportPage({ data }: { data: ReportData }) {
                 ? '—'
                 : `${data.proposals.rate.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%`
             }
-            note="aprovadas ÷ aprovadas + recusadas"
+            note="aprovadas ÷ (aprovadas + recusadas)"
             color={C.blue}
           />
           <Kpi
@@ -665,7 +665,7 @@ function ReportPage({ data }: { data: ReportData }) {
             <div className="executive-report-panel-heading">
               <div>
                 <h2>Cliente, campo e próxima ação</h2>
-                <p>Visitas e chamados no período selecionado</p>
+                <p>Visitas no período · chamados abertos agora</p>
               </div>
             </div>
             <div className="executive-report-service-summary">
