@@ -441,9 +441,8 @@ export default function IndexPage() {
       const created = await quotesService.create(data)
       setQuotes([created, ...quotes])
       setSelectedQuote(created)
-      // Sincronizar e recarregar os deals para refletir instantaneamente no Pipeline e Dashboard
+      // Recarregar os deals para refletir instantaneamente no Pipeline e Dashboard
       try {
-        await quoteDealSyncService.syncQuoteToDeal(created)
         const freshDeals = await dealsService.getAll()
         setDeals(freshDeals)
       } catch (dealErr) {
@@ -460,9 +459,8 @@ export default function IndexPage() {
       const updated = await quotesService.update(id, data)
       setQuotes(quotes.map((q) => (q.id === id ? updated : q)))
       if (selectedQuote?.id === id) setSelectedQuote(updated)
-      // Sincronizar e recarregar os deals para refletir instantaneamente no Pipeline e Dashboard
+      // Recarregar os deals para refletir instantaneamente no Pipeline e Dashboard
       try {
-        await quoteDealSyncService.syncQuoteToDeal(updated)
         const freshDeals = await dealsService.getAll()
         setDeals(freshDeals)
       } catch (dealErr) {
@@ -495,9 +493,8 @@ export default function IndexPage() {
       setQuotes(quotes.map((q) => (q.id === id ? updated : q)))
       if (selectedQuote?.id === id) setSelectedQuote(updated)
 
-      // Sincronizar automaticamente no pipeline comercial (deals)
+      // Recarregar os deals para refletir instantaneamente no Pipeline e Dashboard
       try {
-        await quoteDealSyncService.syncQuoteToDeal(updated)
         const freshDeals = await dealsService.getAll()
         setDeals(freshDeals)
       } catch (dealErr) {

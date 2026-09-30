@@ -121,6 +121,7 @@ export interface DealRecord {
   expected_close_date?: string
   description?: string
   notes?: string
+  loss_reason?: string
   assigned_to?: string
   created?: string
   updated?: string
@@ -261,6 +262,8 @@ export interface DealRecord {
   expected_close_date?: string
   description?: string
   notes?: string
+  loss_reason?: string
+  assigned_to?: string
   created?: string
   updated?: string
 }

@@ -81,16 +81,37 @@ export function formatDealTitleForQuote(quoteCode: string, clientName?: string):
   return `Proposta ${cleanCode} — ${cleanClient}`
 }
 
+// Trava em memória para evitar que chamadas concorrentes para a mesma proposta criem negócios duplicados
+const inFlightSync = new Map<string, Promise<DealRecord | null>>()
+
 export const quoteDealSyncService = {
   /**
    * Sincroniza uma proposta salva/alterada com a coleção `deals`.
    * Cria se não existir ou atualiza o negócio vinculado.
-   * Atualiza `quotes.deal_id` se ainda não estiver vinculado.
+   * Idempotente: deduplica chamadas simultâneas via lock em memória e busca abrangente por ID ou código.
    */
-  async syncQuoteToDeal(quote: QuoteRecord): Promise<DealRecord | null> {
+  syncQuoteToDeal(quote: QuoteRecord): Promise<DealRecord | null> {
+    if (!quote?.id) return Promise.resolve(null)
+
+    // Se já houver sincronização em andamento para este quote.id, aguarda a mesma promise
+    const key = quote.id
+    const active = inFlightSync.get(key)
+    if (active) {
+      return active
+    }
+
+    const promise = this._executeSyncQuoteToDeal(quote).finally(() => {
+      inFlightSync.delete(key)
+    })
+    inFlightSync.set(key, promise)
+    return promise
+  },
+
+  async _executeSyncQuoteToDeal(quote: QuoteRecord): Promise<DealRecord | null> {
     if (!quote?.id) return null
 
-    const quoteCode = quote.quote_number || quote.code || `PROP-${quote.id.slice(-6)}`
+    const quoteCode = (quote.quote_number || quote.code || `PROP-${quote.id.slice(-6)}`).trim()
+    const altCode = (quote.code || quote.quote_number || '').trim()
     const clientName = quote.client_name || 'Cliente'
     const clientId = quote.client_id || ''
     const dealTitle = formatDealTitleForQuote(quoteCode, clientName)
@@ -104,18 +125,50 @@ export const quoteDealSyncService = {
       // 1. Tentar buscar pelo deal_id existente na proposta
       if (quote.deal_id) {
         try {
-          existingDeal = await pb.collection('deals').getOne<DealRecord>(quote.deal_id)
+          existingDeal = await pb.collection('deals').getOne<DealRecord>(quote.deal_id, {
+            requestKey: null,
+          })
         } catch (_) {
           existingDeal = null
         }
       }
 
-      // 2. Se não encontrou por deal_id, tentar buscar negócio pelo código da proposta no título
+      // 2. Se não encontrou por deal_id (ou deal_id estava apontando para deal inexistente),
+      // buscar negócio existente pelo código da proposta no título ou notas
+      if (!existingDeal && (quoteCode || altCode)) {
+        try {
+          const codesToTry = Array.from(new Set([quoteCode, altCode].filter(Boolean)))
+          for (const code of codesToTry) {
+            if (existingDeal) break
+            const list = await pb.collection('deals').getList<DealRecord>(1, 10, {
+              filter: `title ~ "${code}" || notes ~ "${code}"`,
+              // Preferir o negócio que já foi ganho ('won'), ou o mais recentemente atualizado
+              sort: '-updated,-created',
+              requestKey: null,
+            })
+            if (list.items && list.items.length > 0) {
+              // Se existirem múltiplos deals históricos vinculados ao mesmo código,
+              // selecionar preferencialmente aquele com o id que a proposta já referenciava,
+              // ou o que já está em 'won' (se a proposta for aprovada), ou o primeiro retornado.
+              const preferred =
+                (quote.deal_id ? list.items.find((d) => d.id === quote.deal_id) : null) ||
+                (quote.status === 'approved' ? list.items.find((d) => d.stage === 'won') : null) ||
+                list.items[0]
+              existingDeal = preferred
+            }
+          }
+        } catch (searchErr) {
+          console.warn('Erro ao pesquisar deal existente por código:', searchErr)
+          existingDeal = null
+        }
+      }
+
+      // 3. Se ainda não encontrou e temos clientId, buscar se existe deal com título exato da proposta
       if (!existingDeal && quoteCode) {
         try {
-          const list = await pb.collection('deals').getList<DealRecord>(1, 1, {
+          const list = await pb.collection('deals').getList<DealRecord>(1, 5, {
             filter: `title ~ "${quoteCode}"`,
-            sort: '-created',
+            sort: '-updated',
             requestKey: null,
           })
           if (list.items && list.items.length > 0) {
@@ -127,8 +180,8 @@ export const quoteDealSyncService = {
       }
 
       if (existingDeal) {
-        // Atualizar negócio vinculado
-        const updatedDeal = await pb.collection('deals').update<DealRecord>(existingDeal.id, {
+        // Preservar loss_reason existente se o status for rejeitado e não tiver novo
+        const payloadToUpdate: Partial<DealRecord> = {
           title: dealTitle,
           client_id: clientId || existingDeal.client_id,
           client_name: clientName || existingDeal.client_name,
@@ -137,12 +190,26 @@ export const quoteDealSyncService = {
           probability,
           assigned_to: assignedTo,
           notes: `Proposta Intertermal ${quoteCode} conectada automaticamente ao pipeline comercial.`,
-        })
+        }
+
+        if (stage === 'lost') {
+          payloadToUpdate.loss_reason =
+            quote.rejected_by_client_reason ||
+            existingDeal.loss_reason ||
+            'Proposta recusada/cancelada'
+        }
+
+        // Atualizar negócio vinculado
+        const updatedDeal = await pb
+          .collection('deals')
+          .update<DealRecord>(existingDeal.id, payloadToUpdate, { requestKey: null })
 
         // Se a proposta ainda não tinha o deal_id gravado, atualiza
         if (quote.deal_id !== updatedDeal.id) {
           try {
-            await pb.collection('quotes').update(quote.id, { deal_id: updatedDeal.id })
+            await pb
+              .collection('quotes')
+              .update(quote.id, { deal_id: updatedDeal.id }, { requestKey: null })
             quote.deal_id = updatedDeal.id
           } catch (qErr) {
             console.warn('Erro ao vincular deal_id na proposta:', qErr)
@@ -151,22 +218,29 @@ export const quoteDealSyncService = {
 
         return updatedDeal
       } else {
-        // Criar novo negócio no pipeline
-        const newDeal = await pb.collection('deals').create<DealRecord>({
-          title: dealTitle,
-          client_id: clientId,
-          client_name: clientName,
-          value: dealValue,
-          stage,
-          probability,
-          priority: 'medium',
-          assigned_to: assignedTo,
-          notes: `Proposta Intertermal ${quoteCode} gerada e conectada automaticamente ao pipeline comercial.`,
-        })
+        // Criar novo negócio no pipeline apenas se NENHUM foi encontrado
+        const newDeal = await pb.collection('deals').create<DealRecord>(
+          {
+            title: dealTitle,
+            client_id: clientId,
+            client_name: clientName,
+            value: dealValue,
+            stage,
+            probability,
+            priority: 'medium',
+            assigned_to: assignedTo,
+            notes: `Proposta Intertermal ${quoteCode} gerada e conectada automaticamente ao pipeline comercial.`,
+            loss_reason:
+              stage === 'lost' ? quote.rejected_by_client_reason || 'Proposta recusada' : undefined,
+          },
+          { requestKey: null },
+        )
 
         // Vincular na proposta
         try {
-          await pb.collection('quotes').update(quote.id, { deal_id: newDeal.id })
+          await pb
+            .collection('quotes')
+            .update(quote.id, { deal_id: newDeal.id }, { requestKey: null })
           quote.deal_id = newDeal.id
         } catch (qErr) {
           console.warn('Erro ao vincular novo deal_id na proposta:', qErr)

@@ -162,9 +162,9 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
         try {
           const listDeals = $app.findRecordsByFilter(
             'deals',
-            `title ~ "${quoteNumber}"`,
-            '-created',
-            1,
+            `title ~ "${quoteNumber}" || notes ~ "${quoteNumber}"`,
+            '-updated,-created',
+            5,
             0,
           )
           if (listDeals && listDeals.length > 0) {
@@ -189,6 +189,10 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
           `Proposta #${quoteNumber} APROVADA digitalmente pelo cliente (${clientApproverName}).`,
         )
         $app.save(dealRecord)
+        if (quoteRecord.getString('deal_id') !== dealRecord.id) {
+          quoteRecord.set('deal_id', dealRecord.id)
+          $app.save(quoteRecord)
+        }
       } else {
         const dealsCol = $app.findCollectionByNameOrId('deals')
         const newDeal = new Record(dealsCol)
@@ -405,9 +409,9 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
         try {
           const listDeals = $app.findRecordsByFilter(
             'deals',
-            `title ~ "${quoteNumber}"`,
-            '-created',
-            1,
+            `title ~ "${quoteNumber}" || notes ~ "${quoteNumber}"`,
+            '-updated,-created',
+            5,
             0,
           )
           if (listDeals && listDeals.length > 0) {
@@ -426,12 +430,17 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
       if (dealRecord) {
         dealRecord.set('stage', 'lost')
         dealRecord.set('probability', 0)
+        dealRecord.set('value', dealVal)
         dealRecord.set('loss_reason', rejectReason || 'Recusada pelo cliente')
         dealRecord.set(
           'notes',
           `Proposta #${quoteNumber} recusada pelo cliente: "${rejectReason || 'Sem motivo especificado'}".`,
         )
         $app.save(dealRecord)
+        if (quoteRecord.getString('deal_id') !== dealRecord.id) {
+          quoteRecord.set('deal_id', dealRecord.id)
+          $app.save(quoteRecord)
+        }
       } else {
         const dealsCol = $app.findCollectionByNameOrId('deals')
         const newDeal = new Record(dealsCol)

@@ -201,7 +201,10 @@ export async function createQuote(data: Partial<QuoteRecord>): Promise<QuoteReco
     const created = await pb.collection(QUOTES_COLLECTION).create<QuoteRecord>(payload)
     // Sincronizar automaticamente no pipeline comercial (deals)
     try {
-      await quoteDealSyncService.syncQuoteToDeal(created)
+      const syncedDeal = await quoteDealSyncService.syncQuoteToDeal(created)
+      if (syncedDeal && created.deal_id !== syncedDeal.id) {
+        created.deal_id = syncedDeal.id
+      }
     } catch (syncErr) {
       console.warn('Erro ao sincronizar proposta criada no pipeline:', syncErr)
     }
@@ -253,7 +256,10 @@ export async function updateQuote(id: string, data: Partial<QuoteRecord>): Promi
     const updated = await pb.collection(QUOTES_COLLECTION).update<QuoteRecord>(id, payload)
     // Sincronizar automaticamente no pipeline comercial (deals)
     try {
-      await quoteDealSyncService.syncQuoteToDeal(updated)
+      const syncedDeal = await quoteDealSyncService.syncQuoteToDeal(updated)
+      if (syncedDeal && updated.deal_id !== syncedDeal.id) {
+        updated.deal_id = syncedDeal.id
+      }
     } catch (syncErr) {
       console.warn('Erro ao sincronizar proposta atualizada no pipeline:', syncErr)
     }
