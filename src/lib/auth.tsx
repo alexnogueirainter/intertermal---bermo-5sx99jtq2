@@ -116,14 +116,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const updated = await pb.collection('users').update<AuthUser>(user.id, {
+        const updated = await pb.collection('users').update(user.id, {
           oldPassword: currentPassword,
           password: newPassword,
           passwordConfirm: newPassword,
           must_change_password: false,
         })
         pb.authStore.save(pb.authStore.token, updated)
-        setUser(updated)
+        setUser(updated as unknown as AuthUser)
         return { error: null }
       } catch {
         return {
