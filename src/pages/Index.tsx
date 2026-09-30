@@ -1024,6 +1024,7 @@ export default function IndexPage() {
               serviceOrders={serviceOrders}
               fieldVisits={fieldVisits}
               fieldVisitsError={fieldVisitsError}
+              activities={activities}
               onNavigate={(tab) => setActiveTab(tab as ActiveTab)}
             />
           )}

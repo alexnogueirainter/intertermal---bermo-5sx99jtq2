@@ -24,6 +24,7 @@ import type {
   TicketRecord,
   ServiceRecord,
   ServiceOrderRecord,
+  ActivityRecord,
 } from '@/types/crm'
 import {
   DollarSign,
@@ -45,6 +46,8 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { FieldVisitRecord } from '@/services/field-visits'
+import { ExecutiveReportPrintButton } from '@/components/ExecutiveReportPrint'
+import { useToast } from '@/hooks/use-toast'
 
 interface OverviewDashboardProps {
   clients: ClientRecord[]
@@ -55,6 +58,7 @@ interface OverviewDashboardProps {
   serviceOrders?: ServiceOrderRecord[]
   fieldVisits?: FieldVisitRecord[]
   fieldVisitsError?: boolean
+  activities?: ActivityRecord[]
   onNavigate: (tab: string) => void
 }
 
@@ -67,9 +71,11 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   serviceOrders = [],
   fieldVisits = [],
   fieldVisitsError = false,
+  activities = [],
   onNavigate,
 }) => {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [dashboardTab, setDashboardTab] = React.useState<
     'overview' | 'profitability' | 'conversion'
   >('overview')
@@ -393,6 +399,38 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               />
             </div>
           )}
+          <ExecutiveReportPrintButton
+            clients={clients}
+            deals={deals}
+            quotes={filteredQuotesByPeriod}
+            tickets={tickets}
+            activities={activities}
+            serviceOrders={serviceOrders}
+            fieldVisits={fieldVisits}
+            fieldVisitsError={fieldVisitsError}
+            periodFilter={periodFilter}
+            periodLabel={
+              periodFilter === 'custom'
+                ? `${customStartDate || 'Início'} a ${customEndDate || 'hoje'}`
+                : periodFilter === 'all'
+                  ? 'Todo o período'
+                  : periodFilter === 'month'
+                    ? 'Este mês'
+                    : periodFilter === 'quarter'
+                      ? 'Este trimestre'
+                      : 'Este ano'
+            }
+            customStartDate={customStartDate}
+            customEndDate={customEndDate}
+            onPopupBlocked={() =>
+              toast({
+                title: 'Prévia bloqueada pelo navegador',
+                description:
+                  'Permita a abertura de janela para este site e clique em Gerar PDF novamente.',
+                variant: 'destructive',
+              })
+            }
+          />
         </div>
       </div>
 
