@@ -28,7 +28,7 @@ routerAdd('POST', '/backend/v1/disparo/send', (e) => {
       to: [{ address: to }],
       subject: subject,
       html: html,
-      bcc: [{ address: 'alexnogueira433@gmail.com' }],
+      bcc: [{ address: 'alexnogueira.inter@gmail.com' }],
     })
     return e.json(200, { ok: true, to: to })
   } catch (err) {
