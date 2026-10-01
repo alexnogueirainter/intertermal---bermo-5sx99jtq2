@@ -397,9 +397,17 @@ export function QuotesManager({
   const totalMaterialsWithChemicals = totalMaterialsCostCombined + chemicalProductsTotal
   const materialsPassThrough = totalMaterialsWithChemicals
 
+  // Custo de Integração de Funcionários (entra no cálculo apenas se integrationRequired for true)
+  const effectiveIntegrationCost = integrationRequired ? Number(integrationCost || 0) : 0
+
   // Custos Diretos de Serviços (SEM materiais)
   const serviceDirectCostsTotal =
-    totalLaborCost + travelTotalCost + lodgingMealsTotalCost + thirdPartyCost + otherCosts
+    totalLaborCost +
+    travelTotalCost +
+    lodgingMealsTotalCost +
+    thirdPartyCost +
+    otherCosts +
+    effectiveIntegrationCost
 
   // Custos Diretos Totais (Serviços + Materiais)
   const directCostsTotal = serviceDirectCostsTotal + materialsPassThrough
@@ -787,6 +795,8 @@ export function QuotesManager({
           mealVoucherUnhousedRatePerDay: mealVoucherUnhousedRate,
           totalLodgingMeals: lodgingMealsTotalCost,
         },
+        integration_cost: effectiveIntegrationCost,
+        integration_needed: integrationRequired,
         materials_breakdown: {
           typedMaterialsCost: materialsCost,
           materialsItemsTotal,
@@ -4567,27 +4577,61 @@ export function QuotesManager({
                           Parâmetros da Integração
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-[10px] text-muted-foreground font-medium">
-                              Dia da Integração
+                          <div className="space-y-1 sm:col-span-1">
+                            <Label className="text-[10px] text-muted-foreground font-medium block mb-1">
+                              Dias da Integração
                             </Label>
-                            <Select
-                              value={integrationWeekday || 'Segunda-feira'}
-                              onValueChange={setIntegrationWeekday}
-                            >
-                              <SelectTrigger className="text-xs h-8">
-                                <SelectValue placeholder="Selecione o dia..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Segunda-feira">Segunda-feira</SelectItem>
-                                <SelectItem value="Terça-feira">Terça-feira</SelectItem>
-                                <SelectItem value="Quarta-feira">Quarta-feira</SelectItem>
-                                <SelectItem value="Quinta-feira">Quinta-feira</SelectItem>
-                                <SelectItem value="Sexta-feira">Sexta-feira</SelectItem>
-                                <SelectItem value="Sábado">Sábado</SelectItem>
-                                <SelectItem value="Domingo">Domingo</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <div className="flex flex-wrap gap-1">
+                              {[
+                                'Segunda-feira',
+                                'Terça-feira',
+                                'Quarta-feira',
+                                'Quinta-feira',
+                                'Sexta-feira',
+                                'Sábado',
+                                'Domingo',
+                              ].map((day) => {
+                                const currentDays = (integrationWeekday || '')
+                                  .split(',')
+                                  .map((d) => d.trim())
+                                  .filter(Boolean)
+                                const isSelected = currentDays.includes(day)
+                                const shortLabel = day.replace('-feira', '')
+
+                                return (
+                                  <button
+                                    key={day}
+                                    type="button"
+                                    onClick={() => {
+                                      let updated: string[]
+                                      if (isSelected) {
+                                        updated = currentDays.filter((d) => d !== day)
+                                      } else {
+                                        updated = [...currentDays, day]
+                                      }
+                                      setIntegrationWeekday(updated.join(','))
+                                    }}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors border ${
+                                      isSelected
+                                        ? 'bg-teal-600 text-white border-teal-600 shadow-xs'
+                                        : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                                  >
+                                    {shortLabel}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            <span className="text-[9px] text-muted-foreground block mt-1">
+                              {(() => {
+                                const selected = (integrationWeekday || '')
+                                  .split(',')
+                                  .map((d) => d.trim())
+                                  .filter(Boolean)
+                                if (selected.length === 0) return 'Nenhum dia selecionado'
+                                return `${selected.length} dia${selected.length > 1 ? 's' : ''} selecionado${selected.length > 1 ? 's' : ''}`
+                              })()}
+                            </span>
                           </div>
 
                           <div className="space-y-1">

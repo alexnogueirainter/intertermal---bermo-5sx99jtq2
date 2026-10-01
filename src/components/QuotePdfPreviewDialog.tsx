@@ -357,9 +357,30 @@ export function QuotePdfPreviewDialog({
     materialsCost + materialsItemsTotal + chemicalProductsTotal,
   )
 
-  // Custo direto exclusivo da prestação de serviços (mão de obra + logística + hospedagem + terceiros + outros)
+  // Custo de Integração de funcionários
+  const effectiveIntegrationCost = quote.integration_needed
+    ? Number(quote.integration_cost ?? 532)
+    : 0
+
+  // Dias de Integração formatados para exibição
+  const rawIntegrationDays = quote.integration_day || (quote as any).integration_weekday || ''
+  const integrationDaysList = rawIntegrationDays
+    ? rawIntegrationDays
+        .split(',')
+        .map((d: string) => d.trim().replace('-feira', ''))
+        .filter(Boolean)
+    : []
+  const formattedIntegrationDays =
+    integrationDaysList.length > 0 ? integrationDaysList.join(', ') : 'Não informado'
+
+  // Custo direto exclusivo da prestação de serviços (mão de obra + logística + hospedagem + terceiros + outros + integração)
   const serviceDirectCostsTotal =
-    totalLabor + totalTravelCost + totalLodgingMeals + thirdPartyCost + otherCosts
+    totalLabor +
+    totalTravelCost +
+    totalLodgingMeals +
+    thirdPartyCost +
+    otherCosts +
+    effectiveIntegrationCost
 
   // Total de Custos Diretos Consolidado (com peças e químicos)
   const directCostsTotal =
@@ -1478,6 +1499,54 @@ export function QuotePdfPreviewDialog({
                 )}
               </div>
 
+              {/* Seção Interna: Integração de Funcionários & Permissões */}
+              {quote.integration_needed && effectiveIntegrationCost > 0 && (
+                <div className="quote-print-card space-y-2 print:space-y-1">
+                  <div className="quote-section-header flex items-center justify-between border-b border-amber-300 pb-1">
+                    <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs print:text-[10.5px] flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-amber-700" />
+                      Integração de Funcionários & Segurança
+                    </h3>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] print:text-[9px] font-mono border-amber-300 text-amber-800"
+                    >
+                      Custo Integração:{' '}
+                      {effectiveIntegrationCost.toLocaleString('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      })}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 print:gap-1.5 bg-slate-50 p-3 print:p-2 rounded-lg border border-slate-200 text-[11px] print:text-[9.5px]">
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] print:text-[8.5px] font-bold text-slate-500 uppercase block">
+                        Integração Exigida
+                      </span>
+                      <div className="font-bold text-slate-900">Sim (Requisito de Segurança)</div>
+                    </div>
+                    <div className="space-y-0.5">
+                      <span className="text-[10px] print:text-[8.5px] font-bold text-slate-500 uppercase block">
+                        Dias Previstos para Integração
+                      </span>
+                      <div className="font-bold text-slate-900">{formattedIntegrationDays}</div>
+                    </div>
+                    <div className="space-y-0.5 bg-amber-50/80 p-2 print:p-1.5 rounded border border-amber-200">
+                      <span className="text-[10px] print:text-[8.5px] font-bold text-amber-900 uppercase block">
+                        Integração de funcionários
+                      </span>
+                      <div className="font-bold text-amber-900 font-mono text-sm print:text-xs">
+                        {effectiveIntegrationCost.toLocaleString('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Seção Interna D: Custos Indiretos, Margem & Tributos */}
               <div className="quote-print-card space-y-2 print:space-y-1">
                 <div className="quote-section-header flex items-center justify-between border-b border-amber-300 pb-1">
@@ -1873,7 +1942,10 @@ export function QuotePdfPreviewDialog({
             </div>
 
             {/* ESCOPO GLOBAL E FLUIDO */}
-            {(quote.scope_of_work || specs?.scopeOfWork || effectiveWorkFluid) && (
+            {(quote.scope_of_work ||
+              specs?.scopeOfWork ||
+              effectiveWorkFluid ||
+              quote.integration_needed) && (
               <div className="quote-print-card p-3.5 print:p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5 print:space-y-1">
                 <span className="text-[10px] print:text-[10pt] font-bold uppercase tracking-wider text-slate-600 block">
                   Escopo Detalhado dos Serviços de Manutenção & Parâmetros Operacionais:
@@ -1889,6 +1961,19 @@ export function QuotePdfPreviewDialog({
                       Fluido de Trabalho:{' '}
                     </span>
                     {effectiveWorkFluid}
+                  </div>
+                )}
+                {quote.integration_needed && (
+                  <div className="text-[10.5px] print:text-[10.5pt] text-slate-700 font-sans pt-1 border-t border-slate-200 flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-slate-800">
+                      Integração de funcionários no cliente:
+                    </span>
+                    <span>Exigida</span>
+                    <span>•</span>
+                    <span className="font-semibold text-slate-800">Dias de Integração:</span>
+                    <span className="font-medium text-teal-800 dark:text-teal-600">
+                      {formattedIntegrationDays}
+                    </span>
                   </div>
                 )}
               </div>
