@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { clientsService } from '@/services/clients'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -176,7 +177,9 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
   const [city, setCity] = useState('')
   const [state, setState] = useState('')
   const [address, setAddress] = useState('')
+  const [tagsInput, setTagsInput] = useState('')
   const [notes, setNotes] = useState('')
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [contacts, setContacts] = useState<ClientContact[]>([
     {
       id: 'c-' + Date.now(),
@@ -226,6 +229,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
     setCity('')
     setState('')
     setAddress('')
+    setTagsInput('')
     setNotes('')
     setContacts([
       {
@@ -254,6 +258,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
     setCity(client.city || '')
     setState(client.state || '')
     setAddress(client.address || '')
+    setTagsInput(client.tags && Array.isArray(client.tags) ? client.tags.join(', ') : '')
     setNotes(client.notes || '')
     if (client.contacts && Array.isArray(client.contacts) && client.contacts.length > 0) {
       setContacts(client.contacts)
@@ -329,6 +334,12 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
       city: city || undefined,
       state: state || undefined,
       address: address || undefined,
+      tags: tagsInput.trim()
+        ? tagsInput
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : undefined,
       notes: notes || undefined,
       contacts: validContacts.length > 0 ? validContacts : undefined,
       assigned_to: 'Alex Nogueia',
@@ -349,10 +360,32 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
     setSegment('')
     setCity('')
     setState('')
+    setAddress('')
+    setTagsInput('')
     setNotes('')
     setContacts([])
     setEditingClientId(null)
     setIsModalOpen(false)
+  }
+
+  // Exclusão com bloqueio por vínculo: deals/quotes referenciam client_id sem cascade.
+  const linkedDeals = selectedClient ? deals.filter((d) => d.client_id === selectedClient.id) : []
+  const linkedQuotes = selectedClient ? quotes.filter((q) => q.client_id === selectedClient.id) : []
+  const hasLinkedRecords = linkedDeals.length > 0 || linkedQuotes.length > 0
+
+  const handleDeleteClient = async () => {
+    if (!selectedClient || hasLinkedRecords) return
+    try {
+      await clientsService.delete(selectedClient.id)
+      onSelectClient(null)
+      setIsDeleteConfirmOpen(false)
+      window.dispatchEvent(
+        new CustomEvent('intertermal:client-deleted', { detail: { id: selectedClient.id } }),
+      )
+    } catch (err: any) {
+      console.error('Erro ao excluir cliente:', err)
+      alert('Erro ao excluir cliente: ' + (err?.message || 'tente novamente'))
+    }
   }
 
   // Active client details & timeline 360°
@@ -600,6 +633,20 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                       className="text-xs text-indigo-600 border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-950"
                     >
                       <Edit2 className="h-3 w-3 mr-1" /> Editar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsDeleteConfirmOpen(true)}
+                      disabled={hasLinkedRecords}
+                      title={
+                        hasLinkedRecords
+                          ? 'Cliente com negócio ou orçamento vinculado — não pode ser excluído. Marque como Inativo/Churned.'
+                          : 'Excluir cadastro do cliente'
+                      }
+                      className="text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950 disabled:text-slate-400 disabled:hover:bg-transparent"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" /> Excluir
                     </Button>
                     <Button
                       variant="ghost"
@@ -1048,14 +1095,42 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                   <Label className="text-xs font-medium">Telefone Geral / Recepção</Label>
                   <Input
                     placeholder="(11) 99999-8888"
-                    value={whatsapp}
-                    onChange={(e) => {
-                      setWhatsapp(e.target.value)
-                      setPhone(e.target.value)
-                    }}
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
                     className="text-xs bg-white dark:bg-slate-950"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">WhatsApp</Label>
+                  <Input
+                    placeholder="(11) 99999-8888"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    className="text-xs bg-white dark:bg-slate-950"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs font-medium">Tags (separadas por vírgula)</Label>
+                  <Input
+                    placeholder="prioridade, contrato, trocador"
+                    value={tagsInput}
+                    onChange={(e) => setTagsInput(e.target.value)}
+                    className="text-xs bg-white dark:bg-slate-950"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs font-medium">Endereço</Label>
+                <Input
+                  placeholder="Rua, número, bairro — complemento"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="text-xs bg-white dark:bg-slate-950"
+                />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
@@ -1277,6 +1352,83 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      {/* Confirmação de exclusão — bloqueada quando há negócio/orçamento vinculado */}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-rose-600" />
+              Excluir cadastro do cliente
+            </DialogTitle>
+          </DialogHeader>
+          {hasLinkedRecords ? (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Este cliente possui vínculos ativos no sistema e{' '}
+                <strong>não pode ser excluído</strong>. Excluir quebraria o histórico comercial.
+              </p>
+              <ul className="text-xs space-y-1 list-disc pl-4">
+                <li>
+                  <strong>{linkedDeals.length}</strong> negócio(s) no Pipeline Comercial
+                </li>
+                <li>
+                  <strong>{linkedQuotes.length}</strong> orçamento(s) de serviços
+                </li>
+              </ul>
+              <p className="text-xs text-muted-foreground">
+                Alternativa: marque a conta como <strong>Inativo / Churned</strong> no cadastro — o
+                histórico é preservado.
+              </p>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                >
+                  Entendi
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-indigo-600 hover:bg-indigo-500"
+                  onClick={() => {
+                    setIsDeleteConfirmOpen(false)
+                    handleOpenEditClientModal(selectedClient)
+                  }}
+                >
+                  <Edit2 className="h-3 w-3 mr-1" /> Marcar como Inativo
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Excluir definitivamente o cadastro de <strong>{selectedClient?.name}</strong>? Esta
+                ação não pode ser desfeita.
+              </p>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-rose-600 hover:bg-rose-500"
+                  onClick={handleDeleteClient}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" /> Excluir definitivamente
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

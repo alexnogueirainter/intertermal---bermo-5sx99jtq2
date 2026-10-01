@@ -308,6 +308,14 @@ export default function IndexPage() {
     // Ouvir CustomEvent local emitido pela mesma janela
     window.addEventListener('intertermal:proposal-updated', handleProposalStatusUpdated)
 
+    // Cliente excluído na aba Clientes: remove da lista local (o registro já saiu do banco)
+    const handleClientDeleted = (evt: any) => {
+      const deletedId = evt?.detail?.id
+      if (!deletedId) return
+      setClients((prev) => prev.filter((c) => c.id !== deletedId))
+    }
+    window.addEventListener('intertermal:client-deleted', handleClientDeleted)
+
     // Ouvir BroadcastChannel para sincronização instantânea entre abas no mesmo navegador
     let bc: BroadcastChannel | null = null
     try {
@@ -331,6 +339,7 @@ export default function IndexPage() {
 
     return () => {
       window.removeEventListener('intertermal:proposal-updated', handleProposalStatusUpdated)
+      window.removeEventListener('intertermal:client-deleted', handleClientDeleted)
       window.removeEventListener('focus', handleFocus)
       if (bc) {
         bc.close()
@@ -811,7 +820,7 @@ export default function IndexPage() {
             >
               <div className="flex items-center gap-3">
                 <Users className="h-4 w-4" />
-                Clientes Industriais
+                Clientes
               </div>
               <span className="text-[11px] text-muted-foreground">{clients.length}</span>
             </button>
@@ -981,7 +990,7 @@ export default function IndexPage() {
                 {activeTab === 'quotes' && 'Orçamentos de Serviços Intertermal'}
                 {activeTab === 'catalog' && 'Catálogo de Produtos & Válvulas BERMO'}
                 {activeTab === 'deals' && 'Pipeline Comercial (Funil)'}
-                {activeTab === 'clients' && 'Gestão de Clientes Industriais'}
+                {activeTab === 'clients' && 'Gestão de Clientes'}
                 {activeTab === 'service_kanban' && 'Pipeline de Serviços Técnicos (Kanban)'}
                 {activeTab === 'equipment_history' &&
                   'Histórico de Manutenções por Cliente & Equipamento'}
