@@ -26,6 +26,19 @@ export function extractQuoteNumericValue(
   const rawFinalPrice = Number(quote.final_price)
   if (!isNaN(rawFinalPrice) && rawFinalPrice > 0) return rawFinalPrice
 
+  const sDetails = (quote as any).service_details
+  if (sDetails) {
+    const pricingFinal = Number(
+      sDetails.pricing?.final_sale_price ?? sDetails.pricing?.calculated_sale_price,
+    )
+    if (!isNaN(pricingFinal) && pricingFinal > 0) return pricingFinal
+
+    const indirectFinal = Number(
+      sDetails.indirect_costs?.finalSalePrice ?? sDetails.indirect_costs?.calculatedSalePrice,
+    )
+    if (!isNaN(indirectFinal) && indirectFinal > 0) return indirectFinal
+  }
+
   const rawSubtotal = Number(quote.subtotal)
   if (!isNaN(rawSubtotal) && rawSubtotal > 0) return rawSubtotal
 

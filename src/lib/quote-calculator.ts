@@ -237,3 +237,41 @@ export function calculateQuotePricing(input: QuoteCalculationInput): PricingCalc
     irDiffAmount,
   }
 }
+
+/**
+ * Resolução resiliente do custo unitário de integração.
+ * Prioridade:
+ * 1. quote.integration_cost se numérico (aceita 0)
+ * 2. quote.service_details?.integration_cost se numérico
+ * 3. quote.service_details?.indirect_costs?.integrationCost se numérico
+ * 4. Fallback padrão: 532.0
+ * Zero deve ser respeitado sempre.
+ */
+export function resolveIntegrationCost(quote?: any): number {
+  if (!quote) return 532.0
+
+  const isNumeric = (val: any): boolean => {
+    if (val === null || val === undefined || val === '') return false
+    const num = Number(val)
+    return !isNaN(num) && isFinite(num)
+  }
+
+  if (isNumeric(quote.integration_cost)) {
+    return Number(quote.integration_cost)
+  }
+
+  const sDetails = quote.service_details
+  if (sDetails) {
+    if (isNumeric(sDetails.integration_cost)) {
+      return Number(sDetails.integration_cost)
+    }
+    if (sDetails.indirect_costs && isNumeric(sDetails.indirect_costs.integrationCost)) {
+      return Number(sDetails.indirect_costs.integrationCost)
+    }
+    if (sDetails.indirect_costs && isNumeric(sDetails.indirect_costs.integration_cost)) {
+      return Number(sDetails.indirect_costs.integration_cost)
+    }
+  }
+
+  return 532.0
+}

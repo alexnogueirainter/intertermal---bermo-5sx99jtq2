@@ -111,6 +111,8 @@ import {
 import { getStandardServiceMethodology } from '@/data/bermo-catalog'
 import { equipmentCatalogService, EquipmentCatalogItem } from '@/services/equipment-catalog'
 import { clientsService } from '@/services/clients'
+import { resolveIntegrationCost } from '@/lib/quote-calculator'
+import { quoteDealSyncService } from '@/services/quotes-deal-sync'
 
 export interface QuotesManagerProps {
   quotes: QuoteRecord[]
@@ -797,6 +799,12 @@ export function QuotesManager({
         },
         integration_cost: effectiveIntegrationCost,
         integration_needed: integrationRequired,
+        pricing: {
+          service_sale_price: serviceSalePrice,
+          calculated_sale_price: calculatedSalePrice,
+          final_sale_price: calculatedSalePrice,
+          materials_pass_through: materialsPassThrough,
+        },
         materials_breakdown: {
           typedMaterialsCost: materialsCost,
           materialsItemsTotal,
@@ -1718,7 +1726,7 @@ export function QuotesManager({
     setIntegrationWeekday(
       quote.integration_day || (quote as any).integration_weekday || 'Segunda-feira',
     )
-    setIntegrationCost(quote.integration_cost ?? 532.0)
+    setIntegrationCost(resolveIntegrationCost(quote))
     setWorkPermitRequired(quote.work_permit_needed ?? (quote as any).work_permit_required ?? false)
 
     if (quote.materials_items && Array.isArray(quote.materials_items)) {
@@ -2171,6 +2179,13 @@ export function QuotesManager({
     try {
       if (activeQuoteId) {
         await onUpdateQuote(activeQuoteId, payload)
+        // Dispara sincronização com o deal vinculado garantindo o mesmo valor calculado
+        try {
+          const quoteToSync = { ...payload, id: activeQuoteId } as QuoteRecord
+          await quoteDealSyncService.syncQuoteToDeal(quoteToSync)
+        } catch (syncErr) {
+          console.warn('Erro ao sincronizar quote com deal após update:', syncErr)
+        }
         toast({ title: 'Alterações salvas com sucesso!' })
       } else {
         await onCreateQuote(payload)
@@ -2197,6 +2212,13 @@ export function QuotesManager({
     try {
       if (activeQuoteId) {
         await onUpdateQuote(activeQuoteId, payload)
+        // Dispara sincronização com o deal vinculado garantindo o mesmo valor calculado
+        try {
+          const quoteToSync = { ...payload, id: activeQuoteId } as QuoteRecord
+          await quoteDealSyncService.syncQuoteToDeal(quoteToSync)
+        } catch (syncErr) {
+          console.warn('Erro ao sincronizar quote com deal após salvar rascunho:', syncErr)
+        }
         toast({ title: 'Rascunho salvo com sucesso!' })
       } else {
         await onCreateQuote(payload)

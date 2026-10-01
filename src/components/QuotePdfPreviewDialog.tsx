@@ -35,6 +35,7 @@ import {
   Package,
 } from 'lucide-react'
 import { PROPOSAL_INCLUSIONS_TEXT } from '@/data/bermo-catalog'
+import { resolveIntegrationCost } from '@/lib/quote-calculator'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -358,9 +359,8 @@ export function QuotePdfPreviewDialog({
   )
 
   // Custo de Integração de funcionários
-  const effectiveIntegrationCost = quote.integration_needed
-    ? Number(quote.integration_cost ?? 532)
-    : 0
+  const rawCost = resolveIntegrationCost(quote)
+  const effectiveIntegrationCost = quote.integration_needed ? rawCost : 0
 
   // Dias de Integração formatados para exibição
   const rawIntegrationDays = quote.integration_day || (quote as any).integration_weekday || ''
@@ -431,15 +431,25 @@ export function QuotePdfPreviewDialog({
   const calculatedServiceSale = (serviceDirectCostsTotal + adminCostAmount) / serviceDivisor
 
   // Se a cotação salva já possui service_details com valores separados, prioriza-os
-  const serviceSalePrice =
+  // Aceita service_details?.pricing?.service_sale_price OU service_details?.indirect_costs?.serviceSalePrice
+  const storedServiceSalePrice =
     quote.service_details?.pricing?.service_sale_price != null
       ? Number(quote.service_details.pricing.service_sale_price)
-      : calculatedServiceSale
+      : quote.service_details?.indirect_costs?.serviceSalePrice != null
+        ? Number(quote.service_details.indirect_costs.serviceSalePrice)
+        : null
 
-  const effectivePassThrough =
+  const serviceSalePrice =
+    storedServiceSalePrice != null ? storedServiceSalePrice : calculatedServiceSale
+
+  const storedPassThrough =
     quote.service_details?.pricing?.materials_pass_through != null
       ? Number(quote.service_details.pricing.materials_pass_through)
-      : passThroughMaterials
+      : quote.service_details?.indirect_costs?.materialsPassThrough != null
+        ? Number(quote.service_details.indirect_costs.materialsPassThrough)
+        : null
+
+  const effectivePassThrough = storedPassThrough != null ? storedPassThrough : passThroughMaterials
 
   // Lista unificada de equipamentos da proposta (prioriza quote.equipments individualizado)
   let quoteEquipmentsList: any[] = []
