@@ -45,6 +45,7 @@ import {
   BarChart3,
 } from 'lucide-react'
 import { ServiceOrdersReport } from '@/components/ServiceOrdersReport'
+import { OsExecutionReportDialog } from '@/components/OsExecutionReportDialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,6 +64,7 @@ import type {
   DealRecord,
   ServiceStatus,
   ServiceType,
+  QuoteRecord,
 } from '@/types/crm'
 
 interface ServicesManagerProps {
@@ -71,6 +73,7 @@ interface ServicesManagerProps {
   clients: ClientRecord[]
   deals: DealRecord[]
   onCreateService: (data: Partial<ServiceRecord>) => void
+  quotes?: QuoteRecord[]
   onUpdateServiceOrderStatus?: (
     id: string,
     status: ServiceOrderStatus,
@@ -85,6 +88,7 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
   serviceOrders = [],
   clients,
   deals,
+  quotes = [],
   onCreateService,
   onUpdateServiceOrderStatus,
   onDeleteServiceOrder,
@@ -111,6 +115,10 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
+
+  // Modal do Relatório de Execução da OS (PDF)
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
+  const [orderForReport, setOrderForReport] = useState<ServiceOrderRecord | null>(null)
 
   const handleConfirmDeleteOS = async () => {
     if (!orderToDelete) return
@@ -273,7 +281,14 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
       </div>
 
       {activeTab === 'report' ? (
-        <ServiceOrdersReport serviceOrders={serviceOrders} clients={clients} />
+        <ServiceOrdersReport
+          serviceOrders={serviceOrders}
+          clients={clients}
+          onSelectServiceOrder={(so) => {
+            setOrderForReport(so)
+            setIsReportModalOpen(true)
+          }}
+        />
       ) : (
         <>
           {/* Filtros */}
@@ -477,6 +492,19 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                                   size="sm"
                                   variant="outline"
                                   onClick={() => {
+                                    setOrderForReport(so)
+                                    setIsReportModalOpen(true)
+                                  }}
+                                  className="h-7 px-2 text-[11px] text-teal-700 hover:bg-teal-50 border-teal-300 dark:border-teal-800"
+                                  title="Gerar / Editar Relatório de Início de Execução em PDF"
+                                >
+                                  <FileCheck2 className="h-3.5 w-3.5 mr-1 text-teal-600" />{' '}
+                                  Relatório PDF
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
                                     setSelectedOrderForApproval(so)
                                     setActionType('execute')
                                     setApprovalNotes('')
@@ -485,7 +513,7 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                                   className="h-7 px-2 text-[11px] text-blue-600 hover:bg-blue-50 border-blue-200"
                                 >
                                   <Wrench className="h-3.5 w-3.5 mr-1" /> Executar
-                                </Button>
+                                </Button>{' '}
                                 <Button
                                   size="sm"
                                   onClick={() => {
@@ -665,8 +693,15 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                     nextStatus,
                     approvalNotes,
                   )
+                  const targetOrder = selectedOrderForApproval
                   setIsApproveModalOpen(false)
                   setSelectedOrderForApproval(null)
+
+                  // Se passou para execução, abrir o Relatório de Execução em PDF
+                  if (nextStatus === 'execucao') {
+                    setOrderForReport(targetOrder)
+                    setIsReportModalOpen(true)
+                  }
                 }
               }}
               className={
@@ -961,6 +996,18 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* DIÁLOGO DO RELATÓRIO DE EXECUÇÃO DA OS (GERADOR DE PDF) */}
+      <OsExecutionReportDialog
+        open={isReportModalOpen}
+        onOpenChange={setIsReportModalOpen}
+        serviceOrder={orderForReport}
+        quote={quotes.find(
+          (q) =>
+            q.quote_number === orderForReport?.quote_number || q.id === orderForReport?.quote_id,
+        )}
+        defaultTechnicianName="Alex Nogueira (Especialista BERMO)"
+      />
     </div>
   )
 }

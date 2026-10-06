@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-01T20:46:15.148Z",
+  "generatedAt": "2026-10-06T17:38:24.239Z",
   "collections": [
     {
       "name": "users",
@@ -2431,6 +2431,117 @@
       "indexes": [
         "CREATE UNIQUE INDEX idx_fvt_token ON field_visit_tokens (token)",
         "CREATE INDEX idx_fvt_seller ON field_visit_tokens (seller_name)"
+      ]
+    },
+    {
+      "name": "os_execution_reports",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "service_order_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "service_orders"
+        },
+        {
+          "name": "order_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "quote_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "client_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "client_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "work_start_datetime",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_model",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_tag",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "exchanger_current_status",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "technician_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "materials_used",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observations",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_os_exec_rep_so ON os_execution_reports (service_order_id)",
+        "CREATE INDEX idx_os_exec_rep_number ON os_execution_reports (order_number)",
+        "CREATE INDEX idx_os_exec_rep_tech ON os_execution_reports (technician_name)"
       ]
     }
   ]

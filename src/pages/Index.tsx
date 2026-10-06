@@ -1105,6 +1105,7 @@ export default function IndexPage() {
               serviceOrders={serviceOrders}
               clients={clients}
               deals={deals}
+              quotes={quotes}
               onCreateService={handleCreateService}
               onUpdateServiceOrderStatus={handleUpdateServiceOrderStatus}
               onDeleteServiceOrder={handleDeleteServiceOrder}

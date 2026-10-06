@@ -54,7 +54,9 @@ import {
   Ban,
   Loader2,
   Eye,
+  Printer,
 } from 'lucide-react'
+import { OsExecutionReportDialog } from '@/components/OsExecutionReportDialog'
 import type {
   ServiceOrderRecord,
   ServiceOrderStatus,
@@ -189,6 +191,10 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   const [transitionNote, setTransitionNote] = useState('')
   const [draggedOrderId, setDraggedOrderId] = useState<string | null>(null)
 
+  // Modal do Relatório de Execução da OS (PDF)
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
+  const [orderForReport, setOrderForReport] = useState<ServiceOrderRecord | null>(null)
+
   // Modais de Exclusão e Cancelamento de OS
   const [orderToDelete, setOrderToDelete] = useState<ServiceOrderRecord | null>(null)
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
@@ -244,14 +250,26 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   const handleConfirmTransition = async () => {
     if (!transitionTarget) return
     const { order, targetStatus } = transitionTarget
+    const currentNorm = normalizeServiceOrderStatus(order.status)
+
     await onUpdateStatus(
       order.id,
       targetStatus,
       transitionNote || `Movido para ${targetStatus.toUpperCase()}`,
       'Alex Nogueira (Especialista BERMO)',
     )
+
+    // Se está saindo de proposta para execução, disparar/oferecer o modal de geração do Relatório de Execução em PDF
+    const isEnteringExecution =
+      (currentNorm === 'proposta' || currentNorm === 'vistoria') && targetStatus === 'execucao'
+
     setIsTransitionModalOpen(false)
     setTransitionTarget(null)
+
+    if (isEnteringExecution) {
+      setOrderForReport(order)
+      setIsReportModalOpen(true)
+    }
   }
 
   // Confirmação de Exclusão de OS
@@ -439,6 +457,23 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                               </Badge>
                             ) : null}
 
+                            {/* Botão Relatório de Execução da OS (PDF) */}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setOrderForReport(order)
+                                setIsReportModalOpen(true)
+                              }}
+                              className="h-6 w-6 text-slate-400 hover:text-teal-700 hover:bg-teal-50 dark:hover:bg-teal-950/40 transition-colors"
+                              title="Gerar / Editar Relatório de Execução (PDF)"
+                              aria-label={`Relatório de Execução OS #${order.order_number || order.id}`}
+                            >
+                              <FileCheck2 className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+                            </Button>
+
                             {/* Botão Cancelar OS */}
                             <Button
                               type="button"
@@ -611,9 +646,24 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                 className="text-xs h-20"
               />
             </div>
+
+            {/* Aviso ao mover para Execução */}
+            {transitionTarget?.targetStatus === 'execucao' && (
+              <div className="p-2.5 rounded-lg bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 text-teal-900 dark:text-teal-200 flex items-start gap-2">
+                <FileCheck2 className="h-4 w-4 text-teal-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-[11px]">Relatório de Execução em PDF</p>
+                  <p className="text-[10px] text-teal-800 dark:text-teal-300 leading-relaxed">
+                    Ao confirmar a mudança para <strong>Execução</strong>, o formulário do{' '}
+                    <strong>Relatório de Execução</strong> será aberto para relatar o início do
+                    trabalho, status do trocador, insumos internos utilizados e gerar o PDF.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
@@ -628,7 +678,14 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
               onClick={handleConfirmTransition}
               className="bg-teal-700 hover:bg-teal-600 text-white font-semibold"
             >
-              Confirmar Transição & Notificar
+              {transitionTarget?.targetStatus === 'execucao' ? (
+                <>
+                  <FileCheck2 className="h-3.5 w-3.5 mr-1" />
+                  Confirmar & Abrir Relatório PDF
+                </>
+              ) : (
+                'Confirmar Transição & Notificar'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -874,6 +931,18 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* DIÁLOGO DO RELATÓRIO DE EXECUÇÃO DA OS (GERADOR DE PDF) */}
+      <OsExecutionReportDialog
+        open={isReportModalOpen}
+        onOpenChange={setIsReportModalOpen}
+        serviceOrder={orderForReport}
+        quote={quotes.find(
+          (q) =>
+            q.quote_number === orderForReport?.quote_number || q.id === orderForReport?.quote_id,
+        )}
+        defaultTechnicianName="Alex Nogueira (Especialista BERMO)"
+      />
     </div>
   )
 }

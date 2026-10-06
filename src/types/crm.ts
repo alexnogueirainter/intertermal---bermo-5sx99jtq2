@@ -419,6 +419,34 @@ export interface QuoteRecord {
   updated?: string
 }
 
+export interface OsExecutionReportMaterialItem {
+  id?: string
+  description: string
+  quantity: number | string
+  unit?: string
+  code?: string
+  notes?: string
+}
+
+export interface OsExecutionReportRecord {
+  id: string
+  service_order_id?: string
+  order_number: string
+  quote_number?: string
+  client_id?: string
+  client_name?: string
+  work_start_datetime?: string
+  equipment_model?: string
+  equipment_tag?: string
+  exchanger_current_status?: string
+  technician_name?: string
+  materials_used?: OsExecutionReportMaterialItem[]
+  observations?: string
+  created_by?: string
+  created?: string
+  updated?: string
+}
+
 export interface ServiceOrderStatusHistoryItem {
   from_status: string
   to_status: string

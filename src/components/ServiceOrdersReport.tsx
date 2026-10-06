@@ -664,6 +664,7 @@ export const ServiceOrdersReport: React.FC<ServiceOrdersReportProps> = ({
                   <th className="py-3 px-4 text-right">Valor da OS</th>
                   <th className="py-3 px-4 text-center">Criação</th>
                   <th className="py-3 px-4 text-center">Última Movimentação</th>
+                  <th className="py-3 px-4 text-center">Relatório PDF</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -761,6 +762,21 @@ export const ServiceOrdersReport: React.FC<ServiceOrdersReportProps> = ({
                           ) : (
                             '-'
                           )}
+                        </td>
+
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (onSelectServiceOrder) onSelectServiceOrder(so)
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded border border-teal-200 dark:border-teal-800 text-teal-700 dark:text-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950/40 text-[10px] font-semibold transition-colors"
+                            title="Gerar / Ver Relatório de Execução em PDF"
+                          >
+                            <FileCheck2 className="h-3 w-3" />
+                            Relatório
+                          </button>
                         </td>
                       </tr>
                     )
