@@ -30,15 +30,32 @@ import {
   AlertCircle,
   Eye,
   FileCheck2,
+  Camera,
+  Image as ImageIcon,
+  Upload,
+  X,
 } from 'lucide-react'
 import type {
   ServiceOrderRecord,
   QuoteRecord,
   OsExecutionReportRecord,
   OsExecutionReportMaterialItem,
+  OsExecutionReportPhotoMeta,
 } from '@/types/crm'
-import { osExecutionReportsService } from '@/services/os-execution-reports'
+import { osExecutionReportsService, getReportPhotoUrl } from '@/services/os-execution-reports'
 import { generateExecutionReportPdf } from '@/lib/execution-report-pdf'
+import { compressImageForUpload } from '@/lib/image-compressor'
+
+export interface PhotoItem {
+  id: string
+  // Se for foto já persistida no PocketBase
+  isExisting?: boolean
+  savedFileName?: string
+  // Se for nova foto selecionada no cliente
+  file?: File
+  previewUrl: string
+  caption: string
+}
 
 interface OsExecutionReportDialogProps {
   open: boolean
@@ -71,6 +88,9 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
   const [technicianName, setTechnicianName] = useState<string>('')
   const [materials, setMaterials] = useState<OsExecutionReportMaterialItem[]>([])
   const [observations, setObservations] = useState<string>('')
+  const [photos, setPhotos] = useState<PhotoItem[]>([])
+  const [removedExistingPhotoNames, setRemovedExistingPhotoNames] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Estados de controle
   const [isSaving, setIsSaving] = useState(false)
@@ -88,27 +108,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
 
     // Tentar carregar dados existentes se fornecidos
     if (existingReport) {
-      setReportId(existingReport.id)
-      setWorkStartDatetime(existingReport.work_start_datetime || '')
-      setEquipmentModel(
-        existingReport.equipment_model ||
-          serviceOrder.equipment_model ||
-          (serviceOrder.equipment_info?.model as string) ||
-          'Trocador de Calor BERMO',
-      )
-      setEquipmentTag(
-        existingReport.equipment_tag || (serviceOrder.equipment_info?.tag as string) || '',
-      )
-      setExchangerCurrentStatus(existingReport.exchanger_current_status || '')
-      setTechnicianName(
-        existingReport.technician_name || serviceOrder.assigned_to || defaultTechnicianName,
-      )
-      setMaterials(
-        Array.isArray(existingReport.materials_used) && existingReport.materials_used.length > 0
-          ? existingReport.materials_used
-          : [],
-      )
-      setObservations(existingReport.observations || '')
+      loadReportData(existingReport)
       return
     }
 
@@ -119,26 +119,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
       .then((records) => {
         if (!isMounted) return
         if (records.length > 0) {
-          const rec = records[0]
-          setReportId(rec.id)
-          setWorkStartDatetime(rec.work_start_datetime || '')
-          setEquipmentModel(
-            rec.equipment_model ||
-              serviceOrder.equipment_model ||
-              (serviceOrder.equipment_info?.model as string) ||
-              'Trocador de Calor BERMO',
-          )
-          setEquipmentTag(rec.equipment_tag || (serviceOrder.equipment_info?.tag as string) || '')
-          setExchangerCurrentStatus(rec.exchanger_current_status || '')
-          setTechnicianName(
-            rec.technician_name || serviceOrder.assigned_to || defaultTechnicianName,
-          )
-          setMaterials(
-            Array.isArray(rec.materials_used) && rec.materials_used.length > 0
-              ? rec.materials_used
-              : buildDefaultMaterials(serviceOrder, quote),
-          )
-          setObservations(rec.observations || '')
+          loadReportData(records[0])
         } else {
           // Valores iniciais padrão
           initDefaults(serviceOrder, quote)
@@ -152,6 +133,46 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
       isMounted = false
     }
   }, [open, serviceOrder, existingReport, defaultTechnicianName])
+
+  const loadReportData = (rec: OsExecutionReportRecord) => {
+    setReportId(rec.id)
+    setWorkStartDatetime(rec.work_start_datetime || '')
+    setEquipmentModel(
+      rec.equipment_model ||
+        serviceOrder?.equipment_model ||
+        (serviceOrder?.equipment_info?.model as string) ||
+        'Trocador de Calor BERMO',
+    )
+    setEquipmentTag(rec.equipment_tag || (serviceOrder?.equipment_info?.tag as string) || '')
+    setExchangerCurrentStatus(rec.exchanger_current_status || '')
+    setTechnicianName(rec.technician_name || serviceOrder?.assigned_to || defaultTechnicianName)
+    setMaterials(
+      Array.isArray(rec.materials_used) && rec.materials_used.length > 0
+        ? rec.materials_used
+        : buildDefaultMaterials(serviceOrder!, quote),
+    )
+    setObservations(rec.observations || '')
+    setRemovedExistingPhotoNames([])
+
+    // Carregar fotos salvas
+    if (Array.isArray(rec.photos) && rec.photos.length > 0) {
+      const metaList = Array.isArray(rec.photos_meta) ? rec.photos_meta : []
+      const loadedPhotos: PhotoItem[] = rec.photos.map((fileName, idx) => {
+        const meta = metaList.find((m) => m.fileName === fileName)
+        const url = getReportPhotoUrl(rec, fileName)
+        return {
+          id: `saved-${idx}-${fileName}`,
+          isExisting: true,
+          savedFileName: fileName,
+          previewUrl: url,
+          caption: meta?.caption || '',
+        }
+      })
+      setPhotos(loadedPhotos)
+    } else {
+      setPhotos([])
+    }
+  }
 
   // Inicializa valores padrões baseados na OS e na cotação
   const initDefaults = (so: ServiceOrderRecord, q?: QuoteRecord | null) => {
@@ -178,6 +199,8 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
 
     setTechnicianName(so.assigned_to || defaultTechnicianName)
     setMaterials(buildDefaultMaterials(so, q))
+    setPhotos([])
+    setRemovedExistingPhotoNames([])
     setObservations(
       'Trabalho de campo iniciado com conformidade de segurança e EPIs completos. Vistoria visual preliminar realizada.',
     )
@@ -268,7 +291,76 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
     setMaterials((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // Salvar no backend (PocketBase collection: os_execution_reports)
+  // Manipulação de Fotos
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const selectedFiles = Array.from(files)
+    const maxAllowed = 12
+    const currentCount = photos.length
+    const remainingSlots = Math.max(0, maxAllowed - currentCount)
+
+    if (remainingSlots <= 0) {
+      setErrorMessage(`Limite máximo de ${maxAllowed} fotos atingido.`)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    const filesToProcess = selectedFiles.slice(0, remainingSlots)
+
+    // Processar e comprimir imagens no cliente
+    const newItems: PhotoItem[] = []
+    for (let i = 0; i < filesToProcess.length; i++) {
+      const originalFile = filesToProcess[i]
+      try {
+        const compressed = await compressImageForUpload(originalFile, 1600, 0.8)
+        const previewUrl = URL.createObjectURL(compressed)
+        newItems.push({
+          id: `new-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 7)}`,
+          isExisting: false,
+          file: compressed,
+          previewUrl,
+          caption: '',
+        })
+      } catch {
+        const previewUrl = URL.createObjectURL(originalFile)
+        newItems.push({
+          id: `new-${Date.now()}-${i}`,
+          isExisting: false,
+          file: originalFile,
+          previewUrl,
+          caption: '',
+        })
+      }
+    }
+
+    setPhotos((prev) => [...prev, ...newItems])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleUpdatePhotoCaption = (index: number, caption: string) => {
+    setPhotos((prev) => {
+      const copy = [...prev]
+      copy[index] = { ...copy[index], caption }
+      return copy
+    })
+  }
+
+  const handleRemovePhoto = (index: number) => {
+    setPhotos((prev) => {
+      const item = prev[index]
+      if (item.isExisting && item.savedFileName) {
+        setRemovedExistingPhotoNames((r) => [...r, item.savedFileName!])
+      }
+      if (!item.isExisting && item.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(item.previewUrl)
+      }
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  // Salvar no backend (PocketBase collection: os_execution_reports com suporte a FormData e Fotos)
   const handleSaveReport = async (): Promise<OsExecutionReportRecord | null> => {
     if (!serviceOrder) return null
     setIsSaving(true)
@@ -276,7 +368,22 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
     setSaveSuccess(false)
 
     try {
-      const payload: Partial<OsExecutionReportRecord> = {
+      const newFiles = photos.filter((p) => !p.isExisting && p.file).map((p) => p.file!)
+      const hasNewFiles = newFiles.length > 0
+      const hasDeletions = removedExistingPhotoNames.length > 0
+
+      // Monta metadados de legendas
+      const photosMeta: OsExecutionReportPhotoMeta[] = []
+      photos.forEach((p, idx) => {
+        const fileName = p.isExisting ? p.savedFileName || '' : p.file?.name || ''
+        photosMeta.push({
+          fileName,
+          caption: p.caption || '',
+          sort: idx,
+        })
+      })
+
+      const baseFields: Record<string, any> = {
         service_order_id: serviceOrder.id,
         order_number: serviceOrder.order_number || serviceOrder.quote_number || serviceOrder.id,
         quote_number: serviceOrder.quote_number || quote?.quote_number || '',
@@ -287,18 +394,44 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
         equipment_tag: equipmentTag,
         exchanger_current_status: exchangerCurrentStatus,
         technician_name: technicianName,
-        materials_used: materials,
+        materials_used: JSON.stringify(materials),
         observations: observations,
         created_by: technicianName,
+        photos_meta: JSON.stringify(photosMeta),
       }
 
       let saved: OsExecutionReportRecord
+
+      // Sempre usar FormData se houver arquivos novos ou remoção de fotos ou criação/atualização
+      const formData = new FormData()
+      Object.entries(baseFields).forEach(([k, v]) => {
+        if (v !== undefined && v !== null) {
+          formData.append(k, String(v))
+        }
+      })
+
+      // Se há novos arquivos, adiciona via FormData
+      newFiles.forEach((file) => {
+        formData.append('photos', file)
+      })
+
+      // No PocketBase, para remover arquivos específicos de um campo file múltiplo no update:
+      // envia 'photos-' com o nome do arquivo a remover
+      if (reportId && hasDeletions) {
+        removedExistingPhotoNames.forEach((name) => {
+          formData.append('photos-', name)
+        })
+      }
+
       if (reportId) {
-        saved = await osExecutionReportsService.update(reportId, payload)
+        saved = await osExecutionReportsService.update(reportId, formData)
       } else {
-        saved = await osExecutionReportsService.create(payload)
+        saved = await osExecutionReportsService.create(formData)
         setReportId(saved.id)
       }
+
+      // Atualiza lista interna de fotos com o estado do banco
+      loadReportData(saved)
 
       setSaveSuccess(true)
       if (onReportSaved) {
@@ -658,6 +791,105 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                 </div>
               </div>
 
+              {/* Seção Nova: Fotos do Trocador de Calor */}
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Camera className="h-4 w-4 text-teal-600" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                      Fotos do Trocador de Calor ({photos.length}/12)
+                    </h3>
+                  </div>
+
+                  <div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      multiple
+                      className="hidden"
+                      onChange={handleFileInputChange}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={photos.length >= 12}
+                      className="text-[11px] h-7 px-2.5 text-teal-700 dark:text-teal-400 border-teal-300 dark:border-teal-800 hover:bg-teal-50 dark:hover:bg-teal-950/40"
+                    >
+                      <Upload className="h-3 w-3 mr-1" /> Adicionar Fotos
+                    </Button>
+                  </div>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  Anexe fotos do estado inicial, placas, gaxetas, conexões ou vazamentos do
+                  trocador. As fotos aparecem imediatamente na prévia e no PDF final (máx. 12
+                  fotos).
+                </p>
+
+                {photos.length === 0 ? (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-teal-400 dark:hover:border-teal-600 rounded-xl p-6 text-center cursor-pointer transition-colors bg-slate-50/50 dark:bg-slate-950/30 group"
+                  >
+                    <div className="mx-auto w-10 h-10 rounded-full bg-teal-50 dark:bg-teal-950/60 flex items-center justify-center text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform mb-2">
+                      <ImageIcon className="h-5 w-5" />
+                    </div>
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                      Nenhuma foto adicionada
+                    </span>
+                    <span className="text-[11px] text-muted-foreground block mt-0.5">
+                      Clique aqui para selecionar fotos do dispositivo (JPG, PNG ou WEBP)
+                    </span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    {photos.map((item, index) => (
+                      <div
+                        key={item.id}
+                        className="group relative rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 overflow-hidden flex flex-col shadow-2xs hover:shadow-xs transition-all"
+                      >
+                        {/* Imagem / Preview */}
+                        <div className="relative aspect-4/3 w-full bg-slate-900/10 overflow-hidden">
+                          <img
+                            src={item.previewUrl}
+                            alt={item.caption || `Foto ${index + 1}`}
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                          <div className="absolute top-1.5 left-1.5 bg-black/60 backdrop-blur-xs text-white text-[10px] font-mono px-1.5 py-0.5 rounded font-bold">
+                            #{index + 1}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePhoto(index)}
+                            className="absolute top-1.5 right-1.5 p-1 rounded-full bg-rose-600/90 text-white hover:bg-rose-700 transition-colors shadow-xs"
+                            title="Remover foto"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Campo de Legenda Opcional */}
+                        <div className="p-2 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 space-y-1">
+                          <Label className="text-[10px] font-semibold text-slate-500 uppercase">
+                            Legenda / Identificação
+                          </Label>
+                          <Input
+                            placeholder="Ex: Placa 3 — before, Feixe..."
+                            value={item.caption}
+                            onChange={(e) => handleUpdatePhotoCaption(index, e.target.value)}
+                            className="text-[11px] h-7 bg-slate-50 dark:bg-slate-950"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Card 3: Insumos Internos Utilizados */}
               <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
@@ -948,6 +1180,48 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                   </div>
                 </div>
               </div>
+
+              {/* Seção Imprimível de Fotos do Trocador (se não houver fotos, a seção NÃO aparece no PDF) */}
+              {photos.length > 0 && (
+                <div className="report-print-card space-y-3">
+                  <div className="flex items-center justify-between border-b border-teal-700 pb-1.5">
+                    <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                      <Camera className="h-4 w-4 text-teal-700" />
+                      Fotos do Trocador de Calor ({photos.length})
+                    </h3>
+                    <span className="text-[10px] text-muted-foreground">
+                      Registro fotográfico técnico de campo
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-2 gap-3.5">
+                    {photos.map((item, idx) => (
+                      <div
+                        key={item.id || idx}
+                        className="report-photo-item border border-slate-200 rounded-lg p-2 bg-slate-50/70 flex flex-col space-y-1.5"
+                      >
+                        <div className="w-full aspect-4/3 bg-slate-200 rounded overflow-hidden flex items-center justify-center">
+                          <img
+                            src={item.previewUrl}
+                            alt={item.caption || `Foto do Trocador ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                            crossOrigin="anonymous"
+                          />
+                        </div>
+                        {item.caption ? (
+                          <div className="text-[10px] font-medium text-slate-700 text-center leading-tight pt-0.5 px-1">
+                            {item.caption}
+                          </div>
+                        ) : (
+                          <div className="text-[9px] text-slate-400 text-center italic pt-0.5">
+                            Foto #{idx + 1}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Tabela de Insumos Utilizados */}
               <div className="report-print-card space-y-2">

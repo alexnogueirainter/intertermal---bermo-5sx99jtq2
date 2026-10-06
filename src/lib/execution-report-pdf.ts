@@ -48,6 +48,7 @@ export async function generateExecutionReportPdf(
         '.report-print-card',
         '.report-print-header',
         '.report-print-keep',
+        '.report-photo-item',
         'h1',
         'h2',
         'h3',

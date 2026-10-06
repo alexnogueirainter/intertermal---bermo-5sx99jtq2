@@ -1,6 +1,40 @@
 import pb from '@/lib/pocketbase/client'
 import type { OsExecutionReportRecord } from '@/types/crm'
 
+/**
+ * Monta a URL completa do arquivo no PocketBase
+ */
+export function getReportPhotoUrl(
+  recordOrId: OsExecutionReportRecord | { id: string },
+  fileName: string,
+  thumb?: string,
+): string {
+  if (!fileName) return ''
+  // Se já for uma URL completa ou base64 ou blob
+  if (
+    fileName.startsWith('http://') ||
+    fileName.startsWith('https://') ||
+    fileName.startsWith('data:') ||
+    fileName.startsWith('blob:')
+  ) {
+    return fileName
+  }
+
+  const recordId = typeof recordOrId === 'string' ? recordOrId : recordOrId.id
+  if (!recordId) return ''
+
+  try {
+    if (typeof pb.files?.getURL === 'function') {
+      return pb.files.getURL(recordOrId as any, fileName, { thumb })
+    }
+  } catch {
+    // Fallback para URL padrão do PocketBase
+  }
+
+  const thumbParam = thumb ? `?thumb=${encodeURIComponent(thumb)}` : ''
+  return `${pb.baseUrl}/api/files/os_execution_reports/${recordId}/${fileName}${thumbParam}`
+}
+
 export const osExecutionReportsService = {
   async getAll(): Promise<OsExecutionReportRecord[]> {
     return await pb.collection('os_execution_reports').getFullList<OsExecutionReportRecord>({
@@ -41,18 +75,27 @@ export const osExecutionReportsService = {
     }
   },
 
-  async create(data: Partial<OsExecutionReportRecord>): Promise<OsExecutionReportRecord> {
+  async create(
+    data: Partial<OsExecutionReportRecord> | FormData,
+  ): Promise<OsExecutionReportRecord> {
     return await pb.collection('os_execution_reports').create<OsExecutionReportRecord>(data)
   },
 
   async update(
     id: string,
-    data: Partial<OsExecutionReportRecord>,
+    data: Partial<OsExecutionReportRecord> | FormData,
   ): Promise<OsExecutionReportRecord> {
     return await pb.collection('os_execution_reports').update<OsExecutionReportRecord>(id, data)
   },
 
   async delete(id: string): Promise<boolean> {
     return await pb.collection('os_execution_reports').delete(id)
+  },
+
+  /**
+   * Helper para construir a URL pública de uma foto salva
+   */
+  getPhotoUrl(record: OsExecutionReportRecord, fileName: string, thumb?: string): string {
+    return getReportPhotoUrl(record, fileName, thumb)
   },
 }

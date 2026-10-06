@@ -503,7 +503,8 @@
 
   /* Cartões e blocos do relatório de execução mantêm coesão */
   #os-execution-report-printable .report-print-card,
-  #os-execution-report-printable .report-print-keep {
+  #os-execution-report-printable .report-print-keep,
+  #os-execution-report-printable .report-photo-item {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }

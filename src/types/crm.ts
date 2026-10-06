@@ -428,6 +428,12 @@ export interface OsExecutionReportMaterialItem {
   notes?: string
 }
 
+export interface OsExecutionReportPhotoMeta {
+  fileName: string
+  caption?: string
+  sort?: number
+}
+
 export interface OsExecutionReportRecord {
   id: string
   service_order_id?: string
@@ -442,6 +448,8 @@ export interface OsExecutionReportRecord {
   technician_name?: string
   materials_used?: OsExecutionReportMaterialItem[]
   observations?: string
+  photos?: string[]
+  photos_meta?: OsExecutionReportPhotoMeta[]
   created_by?: string
   created?: string
   updated?: string
