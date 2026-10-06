@@ -363,9 +363,11 @@
     visibility: hidden !important;
   }
 
-  /* Mostra APENAS o portal que contém o documento da proposta a ser impresso */
+  /* Mostra APENAS o portal que contém o documento da proposta, visita ou relatório de OS a ser impresso */
   [data-radix-portal].print-visible-portal,
-  [data-radix-portal]:has(#quote-printable-document) {
+  [data-radix-portal]:has(#quote-printable-document),
+  [data-radix-portal]:has(#field-visit-printable-document),
+  [data-radix-portal]:has(#os-execution-report-printable) {
     display: block !important;
     visibility: visible !important;
     position: static !important;
@@ -379,7 +381,9 @@
 
   /* Esconde backdrop/overlay escuro */
   .print-visible-portal [data-radix-dialog-overlay],
-  [data-radix-portal]:has(#quote-printable-document) [data-radix-dialog-overlay] {
+  [data-radix-portal]:has(#quote-printable-document) [data-radix-dialog-overlay],
+  [data-radix-portal]:has(#field-visit-printable-document) [data-radix-dialog-overlay],
+  [data-radix-portal]:has(#os-execution-report-printable) [data-radix-dialog-overlay] {
     display: none !important;
     visibility: hidden !important;
   }
@@ -387,7 +391,11 @@
   /* Reset completo do container do diálogo para fluir naturalmente na página impressa sem altura limitada */
   .print-visible-portal [role='dialog'],
   [data-radix-portal]:has(#quote-printable-document) [role='dialog'],
-  [role='dialog']:has(#quote-printable-document) {
+  [role='dialog']:has(#quote-printable-document),
+  [data-radix-portal]:has(#field-visit-printable-document) [role='dialog'],
+  [role='dialog']:has(#field-visit-printable-document),
+  [data-radix-portal]:has(#os-execution-report-printable) [role='dialog'],
+  [role='dialog']:has(#os-execution-report-printable) {
     display: block !important;
     visibility: visible !important;
     position: static !important;
@@ -410,47 +418,16 @@
   body.quote-printing-active
     [data-radix-portal]:not(.print-visible-portal):not(:has(#quote-printable-document)):not(
       :has(#field-visit-printable-document)
-    ),
+    ):not(:has(#os-execution-report-printable)),
   body.quote-printing-active
     [role='dialog']:not(:has(#quote-printable-document)):not(
       :has(#field-visit-printable-document)
-    ) {
+    ):not(:has(#os-execution-report-printable)) {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;
     width: 0 !important;
     overflow: hidden !important;
-  }
-
-  [data-radix-portal]:has(#field-visit-printable-document) {
-    display: block !important;
-    visibility: visible !important;
-    position: static !important;
-    inset: auto !important;
-    transform: none !important;
-    background: transparent !important;
-  }
-
-  [data-radix-portal]:has(#field-visit-printable-document) [data-radix-dialog-overlay] {
-    display: none !important;
-  }
-
-  [data-radix-portal]:has(#field-visit-printable-document) [role='dialog'],
-  [role='dialog']:has(#field-visit-printable-document) {
-    display: block !important;
-    visibility: visible !important;
-    position: static !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
-    max-height: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: #ffffff !important;
-    transform: none !important;
-    overflow: visible !important;
   }
 
   /* Container do documento de resumo de visita a campo */
@@ -481,6 +458,77 @@
     -webkit-box-shadow: none !important;
     filter: none !important;
     text-shadow: none !important;
+  }
+
+  /* Container do relatório de início de execução de OS */
+  #os-execution-report-printable {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    text-shadow: none !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+    font-size: 10.5pt !important;
+    line-height: 1.4 !important;
+    color: #0f172a !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  #os-execution-report-printable,
+  #os-execution-report-printable *,
+  #os-execution-report-printable *::before,
+  #os-execution-report-printable *::after {
+    visibility: visible !important;
+    box-shadow: none !important;
+    -webkit-box-shadow: none !important;
+    filter: none !important;
+    -webkit-filter: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Cabeçalho do relatório de execução */
+  #os-execution-report-printable .report-print-header {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 12pt !important;
+  }
+
+  /* Cartões e blocos do relatório de execução mantêm coesão */
+  #os-execution-report-printable .report-print-card,
+  #os-execution-report-printable .report-print-keep {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* Tabelas do relatório de execução */
+  #os-execution-report-printable table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  #os-execution-report-printable thead {
+    display: table-header-group !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  #os-execution-report-printable tbody {
+    display: table-row-group !important;
+  }
+
+  #os-execution-report-printable tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   /* Container do documento comercial */

@@ -314,22 +314,24 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
     }
   }
 
-  // Gerar e Baixar PDF
+  // Gerar e Baixar PDF com os dados em tempo real da sessão
   const handleDownloadPdf = async () => {
     setIsGeneratingPdf(true)
     setErrorMessage(null)
     try {
-      // 1. Garante que está salvo primeiro
-      await handleSaveReport()
+      // 1. Tenta salvar os dados atuais em segundo plano, mas sem bloquear a emissão se falhar
+      handleSaveReport().catch((err) =>
+        console.warn('Salvamento em segundo plano antes do download do PDF:', err),
+      )
 
-      // 2. Mudar temporariamente para a aba de prévia para renderizar no DOM se não estiver
+      // 2. Mudar para a aba de prévia para acompanhamento visual
       if (activeTab !== 'preview') {
         setActiveTab('preview')
-        // Aguardar o ciclo de renderização
         await new Promise((resolve) => setTimeout(resolve, 250))
       }
 
-      const printableEl = document.getElementById('os-execution-report-printable')
+      const printableEl =
+        printableRef.current || document.getElementById('os-execution-report-printable')
       if (!printableEl) {
         throw new Error('Elemento do relatório não encontrado para gerar PDF.')
       }
@@ -349,13 +351,72 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
     }
   }
 
-  // Impressão via diálogo nativo do navegador
+  // Impressão via diálogo nativo do navegador com os dados em tempo real da sessão
   const handlePrint = async () => {
+    // 1. Salva em segundo plano de forma silenciosa para persistência
+    handleSaveReport().catch((err) =>
+      console.warn('Salvamento em segundo plano antes da impressão:', err),
+    )
+
+    // 2. Alterna para a aba de prévia para garantir feedback imediato ao usuário
     if (activeTab !== 'preview') {
       setActiveTab('preview')
       await new Promise((resolve) => setTimeout(resolve, 250))
     }
-    window.print()
+
+    // 3. Prepara classes de impressão para os seletores CSS do Radix Portal
+    document.body.classList.add('quote-printing-active')
+    document.querySelectorAll('[data-radix-portal]').forEach((portal) => {
+      if (portal.querySelector('#os-execution-report-printable')) {
+        portal.classList.add('print-visible-portal')
+      } else {
+        portal.classList.remove('print-visible-portal')
+      }
+    })
+
+    // 4. Fallback caso algum navegador mobile Android/iOS bloqueie window.print() sobre o dialog
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+    if (!isMobile || typeof window.print === 'function') {
+      setTimeout(() => {
+        try {
+          window.print()
+        } finally {
+          // Limpeza de classes após a impressão
+          document.body.classList.remove('quote-printing-active')
+          document
+            .querySelectorAll('[data-radix-portal].print-visible-portal')
+            .forEach((portal) => {
+              portal.classList.remove('print-visible-portal')
+            })
+        }
+      }, 200)
+      return
+    }
+
+    // Fallback para mobile restritivo: janela pop-up dedicada com o HTML da prévia renderizada
+    try {
+      const html = printableRef.current?.innerHTML || ''
+      const win = window.open('', '_blank')
+      if (win) {
+        win.document.write(
+          '<html><head><title>Relatório de Execução de OS</title>' +
+            '<meta name="viewport" content="width=device-width, initial-scale=1">' +
+            '<style>body{font-family:system-ui,sans-serif;margin:16px;color:#0f172a}table{width:100%;border-collapse:collapse}th,td{border:1px solid #cbd5e1;padding:8px}</style>' +
+            '</head><body>' +
+            html +
+            '<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>' +
+            '</body></html>',
+        )
+        win.document.close()
+      }
+    } catch (popupErr) {
+      console.warn('Fallback popup de impressão:', popupErr)
+    } finally {
+      document.body.classList.remove('quote-printing-active')
+      document.querySelectorAll('[data-radix-portal].print-visible-portal').forEach((portal) => {
+        portal.classList.remove('print-visible-portal')
+      })
+    }
   }
 
   if (!serviceOrder) return null
@@ -467,8 +528,9 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
 
         {/* Corpo do Dialog */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100 dark:bg-slate-950/50">
-          {activeTab === 'form' ? (
-            /* FORMULÁRIO DE PREENCHIMENTO */
+          {/* Aba de Formulário (oculta apenas na tela quando ativaTab !== 'form', e sempre oculta na impressão) */}
+          <div className={`${activeTab === 'form' ? 'block' : 'hidden'} print:hidden`}>
+            {/* FORMULÁRIO DE PREENCHIMENTO */}
             <div className="max-w-3xl mx-auto space-y-4">
               {/* Card 1: Identificação da OS e Início do Trabalho */}
               <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
@@ -750,235 +812,237 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                 </div>
               </div>
             </div>
-          ) : (
-            /* PRÉVIA DO PDF OFICIAL A4 FORMATADO NO PADRÃO INTERTERMAL / BERMO */
-            <div className="max-w-[800px] mx-auto">
-              <div
-                id="os-execution-report-printable"
-                ref={printableRef}
-                className="bg-white p-8 sm:p-12 space-y-6 text-slate-900 font-sans text-xs leading-relaxed shadow-md rounded-xl border border-slate-200 print:shadow-none print:border-none print:p-0 print:m-0 print:max-w-none"
-              >
-                {/* Cabeçalho Intertermal / BERMO */}
-                <div className="report-print-header border-b-2 border-teal-700 pb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-2xl tracking-tighter text-teal-900">
-                        INTERTERMAL
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded font-bold tracking-wider uppercase bg-teal-100 text-teal-800">
-                        Serviços & Engenharia
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-700 font-medium leading-snug">
-                      Assistência Técnica Especializada em Trocadores de Calor & Válvulas BERMO
-                    </p>
-                    <p className="text-[10px] text-slate-600 leading-relaxed">
-                      Sorocaba / SP • Fone: (11) 99407-7786 / (15) 3228-3956 •
-                      alex.nogueira@intertermal.com.br
-                    </p>
-                  </div>
+          </div>
 
-                  <div className="text-right space-y-1 p-3 rounded-lg border bg-slate-50 border-slate-200 shrink-0 min-w-[200px]">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 block">
-                      Relatório de Execução
+          {/* Aba de Prévia do PDF Oficial A4 (SEMPRE montada no DOM para impressão e html2pdf) */}
+          <div
+            className={`${
+              activeTab === 'preview' ? 'block' : 'hidden'
+            } print:block max-w-[800px] mx-auto`}
+          >
+            <div
+              id="os-execution-report-printable"
+              ref={printableRef}
+              className="bg-white p-8 sm:p-12 space-y-6 text-slate-900 font-sans text-xs leading-relaxed shadow-md rounded-xl border border-slate-200 print:shadow-none print:border-none print:p-0 print:m-0 print:max-w-none"
+            >
+              {/* Cabeçalho Intertermal / BERMO */}
+              <div className="report-print-header border-b-2 border-teal-700 pb-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-2xl tracking-tighter text-teal-900">
+                      INTERTERMAL
                     </span>
-                    <div className="font-mono text-base font-black text-teal-800">
-                      OS #{orderNum}
-                    </div>
-                    {serviceOrder.quote_number && (
-                      <div className="text-[10.5px] font-mono text-slate-600">
-                        Prop: #{serviceOrder.quote_number}
-                      </div>
-                    )}
-                    <div className="text-[10px] text-slate-500">
-                      Emitido em: {new Date().toLocaleDateString('pt-BR')}
-                    </div>
+                    <span className="text-xs px-2 py-0.5 rounded font-bold tracking-wider uppercase bg-teal-100 text-teal-800">
+                      Serviços & Engenharia
+                    </span>
                   </div>
+                  <p className="text-[11px] text-slate-700 font-medium leading-snug">
+                    Assistência Técnica Especializada em Trocadores de Calor & Válvulas BERMO
+                  </p>
+                  <p className="text-[10px] text-slate-600 leading-relaxed">
+                    Sorocaba / SP • Fone: (11) 99407-7786 / (15) 3228-3956 •
+                    alex.nogueira@intertermal.com.br
+                  </p>
                 </div>
 
-                {/* Bloco de Identificação */}
-                <div className="report-print-card grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  <div className="space-y-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 flex items-center gap-1.5">
-                      <Building2 className="h-3.5 w-3.5" />
-                      Dados do Cliente
-                    </span>
-                    <div className="font-bold text-sm text-slate-900">
-                      {serviceOrder.client_name || 'Cliente Industrial'}
+                <div className="text-right space-y-1 p-3 rounded-lg border bg-slate-50 border-slate-200 shrink-0 min-w-[200px]">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500 block">
+                    Relatório de Execução
+                  </span>
+                  <div className="font-mono text-base font-black text-teal-800">OS #{orderNum}</div>
+                  {serviceOrder.quote_number && (
+                    <div className="text-[10.5px] font-mono text-slate-600">
+                      Prop: #{serviceOrder.quote_number}
                     </div>
-                    <div className="text-[11px] text-slate-600 space-y-0.5">
-                      <div>OS: #{orderNum}</div>
-                      {serviceOrder.title && (
-                        <div className="text-slate-700 font-medium">{serviceOrder.title}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5 sm:text-right">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 flex items-center gap-1.5 sm:justify-end">
-                      <User className="h-3.5 w-3.5" />
-                      Responsável Técnico & Horário
-                    </span>
-                    <div className="font-bold text-sm text-slate-900">
-                      {technicianName || 'Alex Nogueira'}
-                    </div>
-                    <div className="text-[11px] text-slate-600 space-y-0.5">
-                      <div className="flex items-center gap-1 sm:justify-end">
-                        <Clock className="h-3 w-3 text-slate-400" />
-                        <span>
-                          Início dos Trabalhos: <strong>{formattedStart}</strong>
-                        </span>
-                      </div>
-                      <div className="text-teal-800 font-semibold text-[10px]">
-                        Status: EM EXECUÇÃO DE CAMPO
-                      </div>
-                    </div>
+                  )}
+                  <div className="text-[10px] text-slate-500">
+                    Emitido em: {new Date().toLocaleDateString('pt-BR')}
                   </div>
                 </div>
+              </div>
 
-                {/* Bloco do Trocador de Calor */}
-                <div className="report-print-card border border-slate-200 rounded-xl overflow-hidden bg-white">
-                  <div className="bg-teal-50/70 border-b border-teal-200/80 p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Wrench className="h-4 w-4 text-teal-700" />
-                      <span className="font-bold text-slate-900 text-xs uppercase tracking-wide">
-                        Equipamento Intervencionado
-                      </span>
-                    </div>
-                    {equipmentTag && (
-                      <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-teal-300 text-teal-800 font-bold">
-                        TAG: {equipmentTag}
-                      </span>
+              {/* Bloco de Identificação */}
+              <div className="report-print-card grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 flex items-center gap-1.5">
+                    <Building2 className="h-3.5 w-3.5" />
+                    Dados do Cliente
+                  </span>
+                  <div className="font-bold text-sm text-slate-900">
+                    {serviceOrder.client_name || 'Cliente Industrial'}
+                  </div>
+                  <div className="text-[11px] text-slate-600 space-y-0.5">
+                    <div>OS: #{orderNum}</div>
+                    {serviceOrder.title && (
+                      <div className="text-slate-700 font-medium">{serviceOrder.title}</div>
                     )}
                   </div>
+                </div>
 
-                  <div className="p-4 space-y-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50/80 p-3 rounded-lg border border-slate-100">
-                      <div>
-                        <span className="text-slate-500 text-[10px] uppercase font-semibold block">
-                          Modelo do Equipamento
-                        </span>
-                        <strong className="text-slate-900 text-xs">
-                          {equipmentModel || 'Trocador de Calor BERMO'}
-                        </strong>
-                      </div>
-                      <div>
-                        <span className="text-slate-500 text-[10px] uppercase font-semibold block">
-                          Fabricante de Origem
-                        </span>
-                        <span className="text-slate-800 font-medium">
-                          {serviceOrder.equipment_brand || 'BERMO / Fabricação Oficial'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <span className="text-[10px] uppercase font-bold text-slate-700 block">
-                        Status Atual do Trocador no Início dos Serviços
+                <div className="space-y-1.5 sm:text-right">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-teal-800 flex items-center gap-1.5 sm:justify-end">
+                    <User className="h-3.5 w-3.5" />
+                    Responsável Técnico & Horário
+                  </span>
+                  <div className="font-bold text-sm text-slate-900">
+                    {technicianName || 'Alex Nogueira'}
+                  </div>
+                  <div className="text-[11px] text-slate-600 space-y-0.5">
+                    <div className="flex items-center gap-1 sm:justify-end">
+                      <Clock className="h-3 w-3 text-slate-400" />
+                      <span>
+                        Início dos Trabalhos: <strong>{formattedStart}</strong>
                       </span>
-                      <p className="text-slate-800 whitespace-pre-wrap leading-relaxed text-[11px] bg-slate-50 p-3 rounded-lg border border-slate-100">
-                        {exchangerCurrentStatus ||
-                          'Equipamento inspecionado e liberado pela equipe de segurança para abertura/intervenção.'}
-                      </p>
+                    </div>
+                    <div className="text-teal-800 font-semibold text-[10px]">
+                      Status: EM EXECUÇÃO DE CAMPO
                     </div>
                   </div>
                 </div>
+              </div>
 
-                {/* Tabela de Insumos Utilizados */}
-                <div className="report-print-card space-y-2">
-                  <div className="flex items-center justify-between border-b border-teal-700 pb-1.5">
-                    <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
-                      <Package className="h-4 w-4 text-teal-700" />
-                      Insumos Internos Utilizados para a Execução ({materials.length})
-                    </h3>
-                    <span className="text-[10px] text-muted-foreground">
-                      Controle interno de estoque e aplicação
+              {/* Bloco do Trocador de Calor */}
+              <div className="report-print-card border border-slate-200 rounded-xl overflow-hidden bg-white">
+                <div className="bg-teal-50/70 border-b border-teal-200/80 p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="h-4 w-4 text-teal-700" />
+                    <span className="font-bold text-slate-900 text-xs uppercase tracking-wide">
+                      Equipamento Intervencionado
                     </span>
                   </div>
+                  {equipmentTag && (
+                    <span className="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-teal-300 text-teal-800 font-bold">
+                      TAG: {equipmentTag}
+                    </span>
+                  )}
+                </div>
 
-                  <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
-                    <thead className="bg-slate-50 text-slate-700 uppercase text-[10px] font-bold border-b border-slate-200">
-                      <tr>
-                        <th className="p-2.5 w-12 text-center">Item</th>
-                        <th className="p-2.5">Descrição do Insumo / Material</th>
-                        <th className="p-2.5 text-center w-24">Quantidade</th>
-                        <th className="p-2.5 text-center w-20">Unidade</th>
-                        <th className="p-2.5">Observações / Destinação</th>
+                <div className="p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50/80 p-3 rounded-lg border border-slate-100">
+                    <div>
+                      <span className="text-slate-500 text-[10px] uppercase font-semibold block">
+                        Modelo do Equipamento
+                      </span>
+                      <strong className="text-slate-900 text-xs">
+                        {equipmentModel || 'Trocador de Calor BERMO'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 text-[10px] uppercase font-semibold block">
+                        Fabricante de Origem
+                      </span>
+                      <span className="text-slate-800 font-medium">
+                        {serviceOrder.equipment_brand || 'BERMO / Fabricação Oficial'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-slate-700 block">
+                      Status Atual do Trocador no Início dos Serviços
+                    </span>
+                    <p className="text-slate-800 whitespace-pre-wrap leading-relaxed text-[11px] bg-slate-50 p-3 rounded-lg border border-slate-100">
+                      {exchangerCurrentStatus ||
+                        'Equipamento inspecionado e liberado pela equipe de segurança para abertura/intervenção.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tabela de Insumos Utilizados */}
+              <div className="report-print-card space-y-2">
+                <div className="flex items-center justify-between border-b border-teal-700 pb-1.5">
+                  <h3 className="font-bold text-slate-900 uppercase tracking-wider text-xs flex items-center gap-1.5">
+                    <Package className="h-4 w-4 text-teal-700" />
+                    Insumos Internos Utilizados para a Execução ({materials.length})
+                  </h3>
+                  <span className="text-[10px] text-muted-foreground">
+                    Controle interno de estoque e aplicação
+                  </span>
+                </div>
+
+                <table className="w-full text-left text-xs border border-slate-200 rounded-lg overflow-hidden">
+                  <thead className="bg-slate-50 text-slate-700 uppercase text-[10px] font-bold border-b border-slate-200">
+                    <tr>
+                      <th className="p-2.5 w-12 text-center">Item</th>
+                      <th className="p-2.5">Descrição do Insumo / Material</th>
+                      <th className="p-2.5 text-center w-24">Quantidade</th>
+                      <th className="p-2.5 text-center w-20">Unidade</th>
+                      <th className="p-2.5">Observações / Destinação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {materials.map((mat, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50/50">
+                        <td className="p-2.5 text-center font-mono text-[11px] text-slate-500">
+                          {idx + 1}
+                        </td>
+                        <td className="p-2.5 font-medium text-slate-900">
+                          {mat.description || '—'}
+                        </td>
+                        <td className="p-2.5 text-center font-mono font-bold text-slate-800">
+                          {mat.quantity}
+                        </td>
+                        <td className="p-2.5 text-center text-slate-600">{mat.unit || 'un'}</td>
+                        <td className="p-2.5 text-slate-600 text-[11px]">{mat.notes || '—'}</td>
                       </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {materials.map((mat, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/50">
-                          <td className="p-2.5 text-center font-mono text-[11px] text-slate-500">
-                            {idx + 1}
-                          </td>
-                          <td className="p-2.5 font-medium text-slate-900">
-                            {mat.description || '—'}
-                          </td>
-                          <td className="p-2.5 text-center font-mono font-bold text-slate-800">
-                            {mat.quantity}
-                          </td>
-                          <td className="p-2.5 text-center text-slate-600">{mat.unit || 'un'}</td>
-                          <td className="p-2.5 text-slate-600 text-[11px]">{mat.notes || '—'}</td>
-                        </tr>
-                      ))}
-                      {materials.length === 0 && (
-                        <tr>
-                          <td colSpan={5} className="p-4 text-center text-slate-500 italic">
-                            Nenhum insumo específico registrado.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                    ))}
+                    {materials.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-4 text-center text-slate-500 italic">
+                          Nenhum insumo específico registrado.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Observações Gerais */}
+              {observations && (
+                <div className="report-print-card space-y-1.5 border border-slate-200 rounded-xl p-4 bg-white">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-teal-700" />
+                    Observações Técnicas de Campo
+                  </span>
+                  <p className="text-slate-800 whitespace-pre-wrap leading-relaxed text-[11px]">
+                    {observations}
+                  </p>
+                </div>
+              )}
+
+              {/* Assinaturas Técnicas */}
+              <div className="report-print-card pt-8 mt-6 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-xs">
+                <div className="space-y-2">
+                  <div className="border-b border-slate-400 pb-1 h-12 flex items-end justify-center">
+                    <span className="font-semibold text-slate-800">{technicianName}</span>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold text-slate-600 block">
+                    Técnico Responsável INTERTERMAL / BERMO
+                  </span>
                 </div>
 
-                {/* Observações Gerais */}
-                {observations && (
-                  <div className="report-print-card space-y-1.5 border border-slate-200 rounded-xl p-4 bg-white">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <FileText className="h-3.5 w-3.5 text-teal-700" />
-                      Observações Técnicas de Campo
-                    </span>
-                    <p className="text-slate-800 whitespace-pre-wrap leading-relaxed text-[11px]">
-                      {observations}
-                    </p>
-                  </div>
-                )}
-
-                {/* Assinaturas Técnicas */}
-                <div className="report-print-card pt-8 mt-6 border-t border-slate-200 grid grid-cols-2 gap-8 text-center text-xs">
-                  <div className="space-y-2">
-                    <div className="border-b border-slate-400 pb-1 h-12 flex items-end justify-center">
-                      <span className="font-semibold text-slate-800">{technicianName}</span>
-                    </div>
-                    <span className="text-[10px] uppercase font-bold text-slate-600 block">
-                      Técnico Responsável INTERTERMAL / BERMO
+                <div className="space-y-2">
+                  <div className="border-b border-slate-400 pb-1 h-12 flex items-end justify-center">
+                    <span className="font-semibold text-slate-800">
+                      {serviceOrder.client_name || 'Responsável da Fábrica'}
                     </span>
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="border-b border-slate-400 pb-1 h-12 flex items-end justify-center">
-                      <span className="font-semibold text-slate-800">
-                        {serviceOrder.client_name || 'Responsável da Fábrica'}
-                      </span>
-                    </div>
-                    <span className="text-[10px] uppercase font-bold text-slate-600 block">
-                      Acompanhamento / Validação do Cliente
-                    </span>
-                  </div>
-                </div>
-
-                {/* Rodapé Institucional */}
-                <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-500">
-                  <span>INTERTERMAL Soluções Térmicas Industriais • Registro de Campo Oficial</span>
-                  <span className="font-mono">
-                    OS #{orderNum} • {new Date().toLocaleTimeString('pt-BR')}
+                  <span className="text-[10px] uppercase font-bold text-slate-600 block">
+                    Acompanhamento / Validação do Cliente
                   </span>
                 </div>
               </div>
+
+              {/* Rodapé Institucional */}
+              <div className="pt-4 border-t border-slate-100 flex items-center justify-between text-[9px] text-slate-500">
+                <span>INTERTERMAL Soluções Térmicas Industriais • Registro de Campo Oficial</span>
+                <span className="font-mono">
+                  OS #{orderNum} • {new Date().toLocaleTimeString('pt-BR')}
+                </span>
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
