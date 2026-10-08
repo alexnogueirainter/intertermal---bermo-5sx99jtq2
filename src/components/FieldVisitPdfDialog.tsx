@@ -566,6 +566,30 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                                   </div>
                                 )}
                               </div>
+
+                              {/* Campos complementares da plaqueta / dinâmicos */}
+                              {eq.customFields && eq.customFields.length > 0 && (
+                                <div className="pt-2 border-t border-teal-200/80 mt-2">
+                                  <span className="text-[8.5px] font-bold uppercase tracking-wider text-teal-900 block mb-1">
+                                    Informações Complementares da Plaqueta
+                                  </span>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    {eq.customFields.map((cf) => (
+                                      <div
+                                        key={cf.id}
+                                        className="bg-white/80 p-1 rounded border border-teal-100"
+                                      >
+                                        <span className="text-slate-500 block text-[8px] uppercase truncate">
+                                          {cf.label}
+                                        </span>
+                                        <span className="font-medium text-slate-900 text-[9.5px]">
+                                          {cf.value}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 

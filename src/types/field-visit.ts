@@ -60,6 +60,20 @@ export interface EquipmentItem {
   manufacturingYear?: string // Ano de Fabricação (ex: "2025")
   tighteningMaxA?: string // "a" máximo em mm (ex: "66")
   tighteningMinA?: string // "a" mínimo em mm (ex: "70")
+
+  // Campos complementares/dinâmicos criados a partir da leitura da placa ou inseridos pelo técnico
+  // Preserva integralmente qualquer dado novo sem colidir com campos existentes
+  customFields?: Array<{ id: string; label: string; value: string }>
+
+  // Metadados da última leitura de plaqueta realizada pela IA
+  nameplateOcrData?: {
+    lastReadAt?: string
+    summary?: string
+    rawText?: string
+    method?: string
+    confidence?: Record<string, number>
+    evidenceAttachmentId?: string
+  }
 }
 
 export interface ActionPlanItem {
@@ -163,6 +177,7 @@ export function createEmptyEquipment(customName?: string): EquipmentItem {
     manufacturingYear: '',
     tighteningMaxA: '',
     tighteningMinA: '',
+    customFields: [],
   }
 }
 

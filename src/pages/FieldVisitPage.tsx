@@ -80,6 +80,14 @@ import {
   formatEquipmentTitle,
   generateId,
 } from '@/types/field-visit'
+import {
+  readNameplateFromImage,
+  compareAndMergeNameplateData,
+  NameplateComparisonResult,
+} from '@/services/nameplate-reader'
+import { NameplateOcrReviewDialog } from '@/components/NameplateOcrReviewDialog'
+import { EquipmentMediaAttachmentSection } from '@/components/EquipmentMediaAttachmentSection'
+import { EquipmentCustomFieldsSection } from '@/components/EquipmentCustomFieldsSection'
 
 /**
  * 6 Tipos exatos solicitados pelo usuário
@@ -449,6 +457,16 @@ export default function FieldVisitPage({
   const [aiDraft, setAiDraft] = useState<any[] | null>(null)
   const [aiMessage, setAiMessage] = useState('')
 
+  // Leitura Automática de Plaqueta por Foto (Agente Skip Cloud Nativo)
+  const [isReadingNameplate, setIsReadingNameplate] = useState(false)
+  const [readingEquipmentId, setReadingEquipmentId] = useState<string | null>(null)
+  const [activeReadingAttachmentId, setActiveReadingAttachmentId] = useState<string | null>(null)
+  const [ocrReviewOpen, setOcrReviewOpen] = useState(false)
+  const [ocrComparisonResult, setOcrComparisonResult] = useState<NameplateComparisonResult | null>(
+    null,
+  )
+  const [targetOcrEquipment, setTargetOcrEquipment] = useState<EquipmentItem | null>(null)
+
   const handleAiAnalysis = async () => {
     const hasContent =
       (visit.generalObservations || '').trim() ||
@@ -740,7 +758,7 @@ export default function FieldVisitPage({
     setEquipmentToDelete(null)
   }
 
-  // Anexos múltiplos por equipamento
+  // Anexos múltiplos por equipamento + acoplamento do fluxo de leitura automática da foto
   const handleAddEquipmentAttachments = async (equipmentId: string, files: FileList | null) => {
     if (!files || files.length === 0) return
     setIsCompressingGlobal(true)
@@ -750,6 +768,7 @@ export default function FieldVisitPage({
         const item = await readFileAsMediaAttachment(files[i])
         newAttachments.push(item)
       }
+
       setVisit((prev) => ({
         ...prev,
         equipments: prev.equipments.map((eq) => {
@@ -764,10 +783,17 @@ export default function FieldVisitPage({
           }
         }),
       }))
+
       toast({
         title: 'Anexo adicionado ao equipamento',
         description: `${newAttachments.length} ${newAttachments.length === 1 ? 'arquivo salvo' : 'arquivos salvos'}.`,
       })
+
+      // Se houver fotos entre os arquivos anexados, dispara a leitura da 1ª imagem automaticamente
+      const firstPhoto = newAttachments.find((a) => a.type === 'image' || !a.type)
+      if (firstPhoto) {
+        handleTriggerNameplateOcr(equipmentId, firstPhoto)
+      }
     } catch (err: any) {
       console.error('Erro ao processar anexos do equipamento:', err)
       toast({
@@ -778,6 +804,75 @@ export default function FieldVisitPage({
     } finally {
       setIsCompressingGlobal(false)
     }
+  }
+
+  // Acionamento da Leitura Automática de Plaqueta via Agente Skip Cloud
+  const handleTriggerNameplateOcr = async (equipmentId: string, photo: MediaAttachment) => {
+    const currentEq = visit.equipments.find((e) => e.id === equipmentId)
+    if (!currentEq) return
+
+    setIsReadingNameplate(true)
+    setReadingEquipmentId(equipmentId)
+    setActiveReadingAttachmentId(photo.id)
+
+    toast({
+      title: 'Lendo foto da plaqueta...',
+      description: 'O agente de IA está extraindo os dados técnicos visíveis.',
+    })
+
+    try {
+      const res = await readNameplateFromImage({
+        imageDataUrl: photo.dataUrl,
+        context: `Equipamento ${currentEq.name || ''} - Modelo atual: ${currentEq.model || 'vazio'}`,
+      })
+
+      if (res.ok && res.data) {
+        const comparison = compareAndMergeNameplateData(currentEq, res.data, photo.id)
+        setOcrComparisonResult(comparison)
+        setTargetOcrEquipment(currentEq)
+        setOcrReviewOpen(true)
+      } else {
+        toast({
+          title: 'Leitura não realizada',
+          description:
+            res.message ||
+            'Não foi possível identificar dados na foto. Preencha manualmente os campos.',
+        })
+      }
+    } catch (ocrErr: any) {
+      console.warn('Falha na leitura da plaqueta:', ocrErr)
+      toast({
+        title: 'Aviso de leitura da plaqueta',
+        description:
+          'Não foi possível conectar ao agente no momento. O preenchimento manual continua disponível.',
+      })
+    } finally {
+      setIsReadingNameplate(false)
+      setReadingEquipmentId(null)
+      setActiveReadingAttachmentId(null)
+    }
+  }
+
+  // Aplicação da confirmação leve de leitura da plaqueta
+  const handleApplyNameplateOcr = (mergedEq: EquipmentItem) => {
+    if (!mergedEq || !mergedEq.id) return
+    setVisit((prev) => ({
+      ...prev,
+      equipments: prev.equipments.map((eq) => (eq.id === mergedEq.id ? mergedEq : eq)),
+    }))
+    setOcrReviewOpen(false)
+    setOcrComparisonResult(null)
+    setTargetOcrEquipment(null)
+    toast({
+      title: 'Dados da plaqueta aplicados!',
+      description: 'Campos vazios preenchidos e novos campos adicionados com sucesso.',
+    })
+  }
+
+  const handleDiscardNameplateOcr = () => {
+    setOcrReviewOpen(false)
+    setOcrComparisonResult(null)
+    setTargetOcrEquipment(null)
   }
 
   const handleRemoveEquipmentAttachment = (equipmentId: string, attachmentId: string) => {
@@ -2030,15 +2125,28 @@ export default function FieldVisitPage({
                             </div>
                           </div>
 
-                          {/* Seção própria de anexos com suporte a fotos e vídeos múltiplos */}
-                          <MultiMediaAttachmentField
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={eq.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(eq.id, { customFields: fields })
+                            }
+                          />
+
+                          {/* Seção própria de anexos com suporte a fotos, vídeos e leitura OCR da plaqueta */}
+                          <EquipmentMediaAttachmentSection
                             title={`Anexos de ${eqLabel}`}
-                            description="Fotos da placa, detalhes mecânicos ou vídeos do funcionamento deste equipamento"
+                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
                             attachments={eq.attachments || []}
                             onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
                             onRemoveAttachment={(attId) =>
                               handleRemoveEquipmentAttachment(eq.id, attId)
                             }
+                            onReadNameplatePhoto={(photo) =>
+                              handleTriggerNameplateOcr(eq.id, photo)
+                            }
+                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
+                            activeReadingAttachmentId={activeReadingAttachmentId}
                             isCompressing={isCompressingGlobal}
                           />
 
@@ -2707,10 +2815,18 @@ export default function FieldVisitPage({
                           </div>
                         </div>
 
-                        {/* ANEXOS DO EQUIPAMENTO (Múltiplas Fotos ou Vídeos) */}
-                        <MultiMediaAttachmentField
+                        {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                        <EquipmentCustomFieldsSection
+                          customFields={item.customFields || []}
+                          onChange={(fields) =>
+                            handleUpdateEquipment(item.id, { customFields: fields })
+                          }
+                        />
+
+                        {/* ANEXOS DO EQUIPAMENTO (Múltiplas Fotos ou Vídeos com Leitura OCR de Plaqueta) */}
+                        <EquipmentMediaAttachmentSection
                           title="Anexos deste equipamento (Fotos / Vídeos)"
-                          description="Foto da placa de identificação, vazamentos ou vídeo de operação"
+                          description="Foto da placa (leitura automática por IA), vazamentos ou vídeo de operação"
                           attachments={
                             item.attachments && item.attachments.length > 0
                               ? item.attachments
@@ -2729,6 +2845,11 @@ export default function FieldVisitPage({
                           onRemoveAttachment={(attId) =>
                             handleRemoveEquipmentAttachment(item.id, attId)
                           }
+                          onReadNameplatePhoto={(photo) =>
+                            handleTriggerNameplateOcr(item.id, photo)
+                          }
+                          isReadingNameplate={isReadingNameplate && readingEquipmentId === item.id}
+                          activeReadingAttachmentId={activeReadingAttachmentId}
                           isCompressing={isCompressingGlobal}
                         />
 
@@ -2985,6 +3106,23 @@ export default function FieldVisitPage({
 
       {/* Modal de Prévia e Impressão do PDF da Visita */}
       <FieldVisitPdfDialog open={isPdfDialogOpen} onOpenChange={setIsPdfDialogOpen} visit={visit} />
+
+      {/* Modal de Revisão Leve da Leitura da Plaqueta (Confirmação Não-Bloqueante) */}
+      <NameplateOcrReviewDialog
+        open={ocrReviewOpen}
+        onOpenChange={setOcrReviewOpen}
+        comparisonResult={ocrComparisonResult}
+        onApply={handleApplyNameplateOcr}
+        onDiscard={handleDiscardNameplateOcr}
+        equipmentName={
+          targetOcrEquipment
+            ? formatEquipmentTitle(
+                targetOcrEquipment,
+                visit.equipments.findIndex((e) => e.id === targetOcrEquipment.id),
+              )
+            : undefined
+        }
+      />
 
       {/* Modal de confirmação da Análise IA */}
       <AlertDialog open={aiConfirmOpen} onOpenChange={setAiConfirmOpen}>
