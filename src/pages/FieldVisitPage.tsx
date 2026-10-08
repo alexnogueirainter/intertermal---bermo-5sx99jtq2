@@ -486,6 +486,18 @@ export default function FieldVisitPage({
           difficulty: eq.difficulty || '',
           technicianNotes: eq.technicianNotes || '',
           attachments_count: (eq.attachments || []).length,
+          // Dados da Plaqueta
+          tag: eq.tag || '',
+          service: eq.service || '',
+          manufacturingNumber: eq.manufacturingNumber || '',
+          designPressureBar: eq.designPressureBar || '',
+          testPressureBar: eq.testPressureBar || '',
+          designTempC: eq.designTempC || '',
+          pmtaMpa: eq.pmtaMpa || '',
+          emptyWeightKg: eq.emptyWeightKg || '',
+          manufacturingYear: eq.manufacturingYear || '',
+          tighteningMaxA: eq.tighteningMaxA || '',
+          tighteningMinA: eq.tighteningMinA || '',
         })),
       })
       if (res.ok && res.items && res.items.length > 0) {
@@ -1784,7 +1796,7 @@ export default function FieldVisitPage({
                                 onChange={(e) =>
                                   handleUpdateEquipment(eq.id, { model: e.target.value })
                                 }
-                                placeholder="Ex.: Trocador Pasteurizador Alfa Laval / BERMO"
+                                placeholder="Ex.: BP60B TRCPL1134-35HE"
                                 className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
                               />
                             </div>
@@ -1803,6 +1815,218 @@ export default function FieldVisitPage({
                                 placeholder="Ex.: Linha 02 - Mezanino"
                                 className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
                               />
+                            </div>
+                          </div>
+
+                          {/* SUB-SEÇÃO: DADOS DA PLAQUETA DE IDENTIFICAÇÃO (Plaqueta BERMO) */}
+                          <div className="rounded-xl border border-teal-200/80 dark:border-teal-900/60 bg-teal-50/30 dark:bg-teal-950/20 p-3.5 space-y-3">
+                            <div className="flex items-center justify-between gap-2 border-b border-teal-200/60 dark:border-teal-900/40 pb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="h-6 w-6 rounded-md bg-teal-700 text-white flex items-center justify-center text-xs font-bold shadow-2xs">
+                                  🏷️
+                                </span>
+                                <div>
+                                  <h4 className="text-xs font-bold text-teal-950 dark:text-teal-200 tracking-tight">
+                                    Dados da Plaqueta de Identificação (BERMO)
+                                  </h4>
+                                  <p className="text-[10.5px] text-teal-800/80 dark:text-teal-400">
+                                    Informações gravadas na plaqueta de fábrica (todos opcionais)
+                                  </p>
+                                </div>
+                              </div>
+                              <span className="text-[10px] font-medium text-teal-700 dark:text-teal-300 bg-teal-100/80 dark:bg-teal-900/60 px-2 py-0.5 rounded-full">
+                                Plaqueta de fábrica
+                              </span>
+                            </div>
+
+                            {/* Plaqueta - Linha 1: Serviço, Nº Fabricação, Tag */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  Serviço
+                                </label>
+                                <Input
+                                  value={eq.service || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, { service: e.target.value })
+                                  }
+                                  placeholder="Ex.: RESFRIAMENTO"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  Nº de Fabricação
+                                </label>
+                                <Input
+                                  value={eq.manufacturingNumber || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      manufacturingNumber: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Ex.: 639.065"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900 font-mono"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  Tag do Equipamento
+                                </label>
+                                <Input
+                                  value={eq.tag || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, { tag: e.target.value })
+                                  }
+                                  placeholder="Ex.: TC-01 / TQ-101"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Plaqueta - Linha 2: Pressões, Temperatura, PMTA */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  Pressão de Projeto (bar)
+                                </label>
+                                <Input
+                                  value={eq.designPressureBar || ''}
+                                  inputMode="decimal"
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      designPressureBar: onlyNumericPtBR(e.target.value),
+                                    })
+                                  }
+                                  placeholder="Ex.: 10,00"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  Pressão de Teste (bar)
+                                </label>
+                                <Input
+                                  value={eq.testPressureBar || ''}
+                                  inputMode="decimal"
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      testPressureBar: onlyNumericPtBR(e.target.value),
+                                    })
+                                  }
+                                  placeholder="Ex.: 13,00"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  Temp. de Projeto (°C)
+                                </label>
+                                <Input
+                                  value={eq.designTempC || ''}
+                                  inputMode="decimal"
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      designTempC: onlyNumericPtBR(e.target.value),
+                                    })
+                                  }
+                                  placeholder="Ex.: 165"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  PMTA (MPa)
+                                </label>
+                                <Input
+                                  value={eq.pmtaMpa || ''}
+                                  inputMode="decimal"
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      pmtaMpa: onlyNumericPtBR(e.target.value),
+                                    })
+                                  }
+                                  placeholder="Ex.: 1,30"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Plaqueta - Linha 3: Peso, Ano, "a" máx, "a" mín */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  Peso Vazio (kgf)
+                                </label>
+                                <Input
+                                  value={eq.emptyWeightKg || ''}
+                                  inputMode="decimal"
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      emptyWeightKg: onlyNumericPtBR(e.target.value),
+                                    })
+                                  }
+                                  placeholder="Ex.: 164,30"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  Ano de Fabricação
+                                </label>
+                                <Input
+                                  value={eq.manufacturingYear || ''}
+                                  inputMode="numeric"
+                                  maxLength={4}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      manufacturingYear: e.target.value.replace(/\D/g, ''),
+                                    })
+                                  }
+                                  placeholder="Ex.: 2025"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  &quot;a&quot; Máximo (mm)
+                                </label>
+                                <Input
+                                  value={eq.tighteningMaxA || ''}
+                                  inputMode="decimal"
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      tighteningMaxA: onlyNumericPtBR(e.target.value),
+                                    })
+                                  }
+                                  placeholder="Ex.: 66"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                  &quot;a&quot; Mínimo (mm)
+                                </label>
+                                <Input
+                                  value={eq.tighteningMinA || ''}
+                                  inputMode="decimal"
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      tighteningMinA: onlyNumericPtBR(e.target.value),
+                                    })
+                                  }
+                                  placeholder="Ex.: 70"
+                                  className="h-9 text-xs bg-white dark:bg-slate-900"
+                                />
+                              </div>
                             </div>
                           </div>
 
@@ -2016,8 +2240,8 @@ export default function FieldVisitPage({
                       </CardHeader>
 
                       <CardContent className="p-4 space-y-4">
-                        {/* Linha 1: Modelo, Série, Fabricante */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        {/* Linha 1: Modelo, Série, Fabricante, Tag */}
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
                           <div>
                             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                               Modelo
@@ -2027,7 +2251,7 @@ export default function FieldVisitPage({
                               onChange={(e) =>
                                 handleUpdateEquipment(item.id, { model: e.target.value })
                               }
-                              placeholder="Ex.: M10-BFG, TL10-B"
+                              placeholder="Ex.: BP60B TRCPL1134-35HE"
                               className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
                             />
                           </div>
@@ -2065,8 +2289,6 @@ export default function FieldVisitPage({
                                     onChange={(e) => {
                                       const v = e.target.value
                                       if (v === 'OUTROS') {
-                                        // mantém o valor atual (preserva dados pré-existentes);
-                                        // se vazio, limpa para o técnico digitar
                                         if (!item.manufacturer) {
                                           handleUpdateEquipment(item.id, { manufacturer: '' })
                                         }
@@ -2101,6 +2323,219 @@ export default function FieldVisitPage({
                                 </div>
                               )
                             })()}
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                              Tag do Equipamento (Opcional)
+                            </label>
+                            <Input
+                              value={item.tag || ''}
+                              onChange={(e) =>
+                                handleUpdateEquipment(item.id, { tag: e.target.value })
+                              }
+                              placeholder="Ex.: TQ-101 / TC-01"
+                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+                            />
+                          </div>
+                        </div>
+
+                        {/* SUB-SEÇÃO: DADOS DA PLAQUETA DE IDENTIFICAÇÃO (Plaqueta BERMO) */}
+                        <div className="rounded-xl border border-teal-200/80 dark:border-teal-900/60 bg-teal-50/30 dark:bg-teal-950/20 p-3.5 space-y-3">
+                          <div className="flex items-center justify-between gap-2 border-b border-teal-200/60 dark:border-teal-900/40 pb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="h-6 w-6 rounded-md bg-teal-700 text-white flex items-center justify-center text-xs font-bold shadow-2xs">
+                                🏷️
+                              </span>
+                              <div>
+                                <h4 className="text-xs font-bold text-teal-950 dark:text-teal-200 tracking-tight">
+                                  Dados da Plaqueta de Identificação (BERMO)
+                                </h4>
+                                <p className="text-[10.5px] text-teal-800/80 dark:text-teal-400">
+                                  Informações gravadas na plaqueta de fábrica do trocador de calor
+                                  (todos opcionais)
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-medium text-teal-700 dark:text-teal-300 bg-teal-100/80 dark:bg-teal-900/60 px-2 py-0.5 rounded-full">
+                              Referência de campo
+                            </span>
+                          </div>
+
+                          {/* Plaqueta - Linha 1: Serviço e Nº de Fabricação */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                Serviço
+                              </label>
+                              <Input
+                                value={item.service || ''}
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, { service: e.target.value })
+                                }
+                                placeholder="Ex.: RESFRIAMENTO, AQUECIMENTO, CONDENSAÇÃO"
+                                className="h-9 text-xs bg-white dark:bg-slate-900"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                Nº de Fabricação
+                              </label>
+                              <Input
+                                value={item.manufacturingNumber || ''}
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, {
+                                    manufacturingNumber: e.target.value,
+                                  })
+                                }
+                                placeholder="Ex.: 639.065"
+                                className="h-9 text-xs bg-white dark:bg-slate-900 font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Plaqueta - Linha 2: Pressão Projeto, Pressão Teste, Temp Projeto, PMTA */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                Pressão de Projeto (bar)
+                              </label>
+                              <Input
+                                value={item.designPressureBar || ''}
+                                inputMode="decimal"
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, {
+                                    designPressureBar: onlyNumericPtBR(e.target.value),
+                                  })
+                                }
+                                placeholder="Ex.: 10,00"
+                                className="h-9 text-xs bg-white dark:bg-slate-900"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                Pressão de Teste (bar)
+                              </label>
+                              <Input
+                                value={item.testPressureBar || ''}
+                                inputMode="decimal"
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, {
+                                    testPressureBar: onlyNumericPtBR(e.target.value),
+                                  })
+                                }
+                                placeholder="Ex.: 13,00"
+                                className="h-9 text-xs bg-white dark:bg-slate-900"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                Temp. de Projeto (°C)
+                              </label>
+                              <Input
+                                value={item.designTempC || ''}
+                                inputMode="decimal"
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, {
+                                    designTempC: onlyNumericPtBR(e.target.value),
+                                  })
+                                }
+                                placeholder="Ex.: 165"
+                                className="h-9 text-xs bg-white dark:bg-slate-900"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                PMTA (MPa)
+                              </label>
+                              <Input
+                                value={item.pmtaMpa || ''}
+                                inputMode="decimal"
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, {
+                                    pmtaMpa: onlyNumericPtBR(e.target.value),
+                                  })
+                                }
+                                placeholder="Ex.: 1,30"
+                                className="h-9 text-xs bg-white dark:bg-slate-900"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Plaqueta - Linha 3: Peso Vazio, Ano Fabr., "a" Máx, "a" Mín */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                Peso Vazio (kgf)
+                              </label>
+                              <Input
+                                value={item.emptyWeightKg || ''}
+                                inputMode="decimal"
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, {
+                                    emptyWeightKg: onlyNumericPtBR(e.target.value),
+                                  })
+                                }
+                                placeholder="Ex.: 164,30"
+                                className="h-9 text-xs bg-white dark:bg-slate-900"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                Ano de Fabricação
+                              </label>
+                              <Input
+                                value={item.manufacturingYear || ''}
+                                inputMode="numeric"
+                                maxLength={4}
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, {
+                                    manufacturingYear: e.target.value.replace(/\D/g, ''),
+                                  })
+                                }
+                                placeholder="Ex.: 2025"
+                                className="h-9 text-xs bg-white dark:bg-slate-900"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                &quot;a&quot; Máximo (mm)
+                              </label>
+                              <Input
+                                value={item.tighteningMaxA || ''}
+                                inputMode="decimal"
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, {
+                                    tighteningMaxA: onlyNumericPtBR(e.target.value),
+                                  })
+                                }
+                                placeholder="Ex.: 66"
+                                className="h-9 text-xs bg-white dark:bg-slate-900"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                                &quot;a&quot; Mínimo (mm)
+                              </label>
+                              <Input
+                                value={item.tighteningMinA || ''}
+                                inputMode="decimal"
+                                onChange={(e) =>
+                                  handleUpdateEquipment(item.id, {
+                                    tighteningMinA: onlyNumericPtBR(e.target.value),
+                                  })
+                                }
+                                placeholder="Ex.: 70"
+                                className="h-9 text-xs bg-white dark:bg-slate-900"
+                              />
+                            </div>
                           </div>
                         </div>
 

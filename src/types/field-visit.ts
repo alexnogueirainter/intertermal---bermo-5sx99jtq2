@@ -46,6 +46,20 @@ export interface EquipmentItem {
   photoDataUrl?: string // retrocompatibilidade com 1 foto legada
   attachments?: MediaAttachment[] // múltiplos arquivos (fotos e vídeos)
   technicianNotes: string
+
+  // Dados da Plaqueta de Identificação (Plaqueta BERMO e equivalentes industriais)
+  // Todos opcionais (a plaqueta pode estar ilegível ou ausente em campo)
+  tag?: string // Tag industrial opcional (ex: TQ-101 / TC-01)
+  service?: string // Serviço (ex: "RESFRIAMENTO", "AQUECIMENTO", "CONDENSAÇÃO")
+  manufacturingNumber?: string // Nº de Fabricação (ex: "639.065")
+  designPressureBar?: string // Pressão de Projeto em bar (ex: "10,00")
+  testPressureBar?: string // Pressão de Teste em bar (ex: "13,00")
+  designTempC?: string // Temp. de Projeto em °C (ex: "165")
+  pmtaMpa?: string // PMTA (Pressão Máxima de Trabalho Admissível) em MPa (ex: "1,30")
+  emptyWeightKg?: string // Peso Vazio em kgf (ex: "164,30")
+  manufacturingYear?: string // Ano de Fabricação (ex: "2025")
+  tighteningMaxA?: string // "a" máximo em mm (ex: "66")
+  tighteningMinA?: string // "a" mínimo em mm (ex: "70")
 }
 
 export interface ActionPlanItem {
@@ -138,6 +152,17 @@ export function createEmptyEquipment(customName?: string): EquipmentItem {
     photoDataUrl: undefined,
     attachments: [],
     technicianNotes: '',
+    // Campos da plaqueta
+    service: '',
+    manufacturingNumber: '',
+    designPressureBar: '',
+    testPressureBar: '',
+    designTempC: '',
+    pmtaMpa: '',
+    emptyWeightKg: '',
+    manufacturingYear: '',
+    tighteningMaxA: '',
+    tighteningMinA: '',
   }
 }
 

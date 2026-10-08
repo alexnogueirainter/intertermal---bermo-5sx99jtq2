@@ -451,6 +451,124 @@ export function FieldVisitPdfDialog({ open, onOpenChange, visit }: FieldVisitPdf
                             </div>
                           )}
 
+                          {/* DADOS DA PLAQUETA DE IDENTIFICAÇÃO (exibição condicional limpa, sem espaços vazios) */}
+                          {(eq.service ||
+                            eq.manufacturingNumber ||
+                            eq.designPressureBar ||
+                            eq.testPressureBar ||
+                            eq.designTempC ||
+                            eq.pmtaMpa ||
+                            eq.emptyWeightKg ||
+                            eq.manufacturingYear ||
+                            eq.tighteningMaxA ||
+                            eq.tighteningMinA ||
+                            eq.tag) && (
+                            <div className="p-2.5 rounded-lg border border-teal-200/90 bg-teal-50/40 text-[10px] space-y-1.5">
+                              <div className="flex items-center justify-between border-b border-teal-200 pb-1">
+                                <span className="font-bold text-teal-900 uppercase tracking-wider flex items-center gap-1 text-[9px]">
+                                  🏷️ Dados da Plaqueta de Identificação (BERMO)
+                                </span>
+                                {eq.manufacturingYear && (
+                                  <span className="font-semibold text-teal-800 text-[9px]">
+                                    Ano: {eq.manufacturingYear}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+                                {eq.service && (
+                                  <div>
+                                    <span className="text-slate-500 block text-[8.5px] uppercase">
+                                      Serviço
+                                    </span>
+                                    <span className="font-bold text-slate-900">{eq.service}</span>
+                                  </div>
+                                )}
+                                {eq.manufacturingNumber && (
+                                  <div>
+                                    <span className="text-slate-500 block text-[8.5px] uppercase">
+                                      Nº Fabricação
+                                    </span>
+                                    <span className="font-mono font-medium text-slate-900">
+                                      {eq.manufacturingNumber}
+                                    </span>
+                                  </div>
+                                )}
+                                {eq.tag && (
+                                  <div>
+                                    <span className="text-slate-500 block text-[8.5px] uppercase">
+                                      Tag
+                                    </span>
+                                    <span className="font-mono font-medium text-slate-900">
+                                      {eq.tag}
+                                    </span>
+                                  </div>
+                                )}
+                                {eq.designPressureBar && (
+                                  <div>
+                                    <span className="text-slate-500 block text-[8.5px] uppercase">
+                                      Pressão de Projeto
+                                    </span>
+                                    <span className="font-medium text-slate-900">
+                                      {eq.designPressureBar} bar
+                                    </span>
+                                  </div>
+                                )}
+                                {eq.testPressureBar && (
+                                  <div>
+                                    <span className="text-slate-500 block text-[8.5px] uppercase">
+                                      Pressão de Teste
+                                    </span>
+                                    <span className="font-medium text-slate-900">
+                                      {eq.testPressureBar} bar
+                                    </span>
+                                  </div>
+                                )}
+                                {eq.designTempC && (
+                                  <div>
+                                    <span className="text-slate-500 block text-[8.5px] uppercase">
+                                      Temp. de Projeto
+                                    </span>
+                                    <span className="font-medium text-slate-900">
+                                      {eq.designTempC} °C
+                                    </span>
+                                  </div>
+                                )}
+                                {eq.pmtaMpa && (
+                                  <div>
+                                    <span className="text-slate-500 block text-[8.5px] uppercase">
+                                      PMTA
+                                    </span>
+                                    <span className="font-medium text-slate-900">
+                                      {eq.pmtaMpa} MPa
+                                    </span>
+                                  </div>
+                                )}
+                                {eq.emptyWeightKg && (
+                                  <div>
+                                    <span className="text-slate-500 block text-[8.5px] uppercase">
+                                      Peso Vazio
+                                    </span>
+                                    <span className="font-medium text-slate-900">
+                                      {eq.emptyWeightKg} kgf
+                                    </span>
+                                  </div>
+                                )}
+                                {(eq.tighteningMaxA || eq.tighteningMinA) && (
+                                  <div className="col-span-2">
+                                    <span className="text-slate-500 block text-[8.5px] uppercase">
+                                      Medidas de Aperto &quot;a&quot; (Máx / Mín)
+                                    </span>
+                                    <span className="font-mono font-medium text-slate-900">
+                                      {eq.tighteningMaxA ? `${eq.tighteningMaxA} mm` : '—'} /{' '}
+                                      {eq.tighteningMinA ? `${eq.tighteningMinA} mm` : '—'}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
                           {/* Observações do Técnico */}
                           {eq.technicianNotes && (
                             <div className="p-2.5 rounded bg-amber-50/50 border border-amber-200/80 text-[10.5px]">

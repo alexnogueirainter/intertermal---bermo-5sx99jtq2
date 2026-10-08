@@ -1217,6 +1217,126 @@ export default function ReceivedFieldVisitsPage() {
                               </div>
                             </div>
 
+                            {/* DADOS DA PLAQUETA DE IDENTIFICAÇÃO (exibição sem poluição, apenas preenchidos) */}
+                            {(eq.service ||
+                              eq.manufacturingNumber ||
+                              eq.designPressureBar ||
+                              eq.testPressureBar ||
+                              eq.designTempC ||
+                              eq.pmtaMpa ||
+                              eq.emptyWeightKg ||
+                              eq.manufacturingYear ||
+                              eq.tighteningMaxA ||
+                              eq.tighteningMinA ||
+                              eq.tag) && (
+                              <div className="p-3 rounded-lg border border-teal-200/80 dark:border-teal-900/50 bg-teal-50/30 dark:bg-teal-950/20 text-xs space-y-2">
+                                <div className="flex items-center justify-between border-b border-teal-200/60 dark:border-teal-900/40 pb-1.5">
+                                  <span className="font-bold text-teal-900 dark:text-teal-300 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                                    🏷️ Plaqueta de Identificação (BERMO)
+                                  </span>
+                                  {eq.manufacturingYear && (
+                                    <span className="font-semibold text-teal-800 dark:text-teal-400 text-[10px]">
+                                      Ano: {eq.manufacturingYear}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                  {eq.service && (
+                                    <div>
+                                      <span className="text-muted-foreground block text-[9.5px] uppercase">
+                                        Serviço
+                                      </span>
+                                      <span className="font-bold text-slate-900 dark:text-slate-100">
+                                        {eq.service}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {eq.manufacturingNumber && (
+                                    <div>
+                                      <span className="text-muted-foreground block text-[9.5px] uppercase">
+                                        Nº Fabricação
+                                      </span>
+                                      <span className="font-mono font-medium text-slate-900 dark:text-slate-100">
+                                        {eq.manufacturingNumber}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {eq.tag && (
+                                    <div>
+                                      <span className="text-muted-foreground block text-[9.5px] uppercase">
+                                        Tag
+                                      </span>
+                                      <span className="font-mono font-medium text-slate-900 dark:text-slate-100">
+                                        {eq.tag}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {eq.designPressureBar && (
+                                    <div>
+                                      <span className="text-muted-foreground block text-[9.5px] uppercase">
+                                        Pressão de Projeto
+                                      </span>
+                                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                                        {eq.designPressureBar} bar
+                                      </span>
+                                    </div>
+                                  )}
+                                  {eq.testPressureBar && (
+                                    <div>
+                                      <span className="text-muted-foreground block text-[9.5px] uppercase">
+                                        Pressão de Teste
+                                      </span>
+                                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                                        {eq.testPressureBar} bar
+                                      </span>
+                                    </div>
+                                  )}
+                                  {eq.designTempC && (
+                                    <div>
+                                      <span className="text-muted-foreground block text-[9.5px] uppercase">
+                                        Temp. de Projeto
+                                      </span>
+                                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                                        {eq.designTempC} °C
+                                      </span>
+                                    </div>
+                                  )}
+                                  {eq.pmtaMpa && (
+                                    <div>
+                                      <span className="text-muted-foreground block text-[9.5px] uppercase">
+                                        PMTA
+                                      </span>
+                                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                                        {eq.pmtaMpa} MPa
+                                      </span>
+                                    </div>
+                                  )}
+                                  {eq.emptyWeightKg && (
+                                    <div>
+                                      <span className="text-muted-foreground block text-[9.5px] uppercase">
+                                        Peso Vazio
+                                      </span>
+                                      <span className="font-medium text-slate-900 dark:text-slate-100">
+                                        {eq.emptyWeightKg} kgf
+                                      </span>
+                                    </div>
+                                  )}
+                                  {(eq.tighteningMaxA || eq.tighteningMinA) && (
+                                    <div className="col-span-2">
+                                      <span className="text-muted-foreground block text-[9.5px] uppercase">
+                                        Medidas &quot;a&quot; (Máx / Mín)
+                                      </span>
+                                      <span className="font-mono font-medium text-slate-900 dark:text-slate-100">
+                                        {eq.tighteningMaxA ? `${eq.tighteningMaxA} mm` : '—'} /{' '}
+                                        {eq.tighteningMinA ? `${eq.tighteningMinA} mm` : '—'}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
                             {/* Parecer do Técnico sobre o Equipamento */}
                             {eq.technicianNotes && (
                               <div className="p-3 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 text-xs">

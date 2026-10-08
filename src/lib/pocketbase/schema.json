@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T21:12:30.718Z",
+  "generatedAt": "2026-10-08T14:32:15.592Z",
   "collections": [
     {
       "name": "users",
@@ -1985,6 +1985,30 @@
         {
           "name": "verified_by",
           "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "service_application",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pmta_mpa",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tightening_a_min_mm",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tightening_a_max_mm",
+          "type": "number",
           "required": false,
           "system": false
         }
