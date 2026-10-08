@@ -3,6 +3,28 @@
  * Route: GET /backend/v1/field-visits/get?id={id}&token={token}&device_id={device}
  * - Valida token + aparelho. Só retorna se a visita foi enviada pelo MESMO token.
  */
+routerAdd('GET', '/backend/v1/test/ping-nameplate', (e) => {
+  const gatewayUrl = $os.getenv('SKIP_AI_GATEWAY_URL') || ''
+  const gatewayKey = $os.getenv('SKIP_AI_GATEWAY_API_KEY') || ''
+  let agentOk = false
+  let agentErr = ''
+  try {
+    const agent = $ai.agent('equipment-nameplate-reader')
+    if (agent) agentOk = true
+  } catch (err) {
+    agentErr = err.message
+  }
+
+  return e.json(200, {
+    ok: true,
+    hasGatewayUrl: Boolean(gatewayUrl),
+    hasGatewayKey: Boolean(gatewayKey),
+    gatewayUrlPrefix: gatewayUrl.slice(0, 30),
+    agentOk,
+    agentErr,
+  })
+})
+
 routerAdd('GET', '/backend/v1/field-visits/get', (e) => {
   const q = e.requestInfo().query || {}
   const id = String(q['id'] || '').trim()

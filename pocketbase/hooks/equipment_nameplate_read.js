@@ -74,44 +74,32 @@ Contexto adicional: ${extraContext || 'Plaqueta fotografada em campo pelo técni
     }
   }
 
-  // 1. Tentativa via Agente Nativo Skip Cloud ('equipment-nameplate-reader')
-  try {
-    const agent = $ai.agent('equipment-nameplate-reader')
-    if (agent && contextUserId) {
-      // Prepara a mensagem. Se houver URL da imagem ou data URL
-      const userMessage = imageUrl
-        ? `${promptText}\n\n[URL da imagem: ${imageUrl}]`
-        : imageDataUrl.length < 50000
-          ? `${promptText}\n\n[Imagem base64 anexada: ${imageDataUrl.slice(0, 1000)}...]`
-          : promptText
+  // Diagnóstico e teste de vision
+  const gatewayUrl = $os.getenv('SKIP_AI_GATEWAY_URL') || ''
+  const gatewayKey = $os.getenv('SKIP_AI_GATEWAY_API_KEY') || ''
+  console.log(
+    '[read-nameplate] payload recebido. imageDataUrl len:',
+    imageDataUrl.length,
+    'imageUrl:',
+    imageUrl,
+    'gatewayUrl:',
+    Boolean(gatewayUrl),
+    'gatewayKey:',
+    Boolean(gatewayKey),
+  )
 
-      const agentRes = agent.chat({
-        user_id: contextUserId,
-        message: userMessage,
-      })
-
-      if (agentRes && agentRes.content) {
-        const parsed = parseJsonSafe(agentRes.content)
-        if (parsed && typeof parsed === 'object') {
-          extractedData = parsed
-          extractionMethod = 'native_agent'
-        }
-      }
-    }
-  } catch (errAgent) {
-    console.warn('[equipment-nameplate-reader] Agente nativo falhou:', errAgent.message)
-  }
-
-  // 2. Fallback via $ai.chat com suporte multi-modal (image_url)
-  if (!extractedData) {
+  // 1. Tentativa via Skip AI Gateway direto (chat/completions vision)
+  if (gatewayUrl && gatewayKey) {
     try {
+      let endpoint = gatewayUrl.replace(/\/+$/, '')
+      if (!endpoint.endsWith('/chat/completions')) {
+        endpoint = endpoint + '/chat/completions'
+      }
+
       const imageTarget = imageUrl || imageDataUrl
-      const messages = [
-        {
-          role: 'system',
-          content: `Você é um perito industrial em leitura de plaquetas de trocadores de calor e equipamentos industriais (BERMO, Alfa Laval, etc.).
-Analise a imagem da plaqueta e extraia com precisão máxima todos os campos legíveis.
-Retorne SEMPRE E APENAS um objeto JSON válido (sem formatação markdown, sem \`\`\`json):
+      const systemInstruction = `Você é um perito industrial em leitura e transcrição técnica de fotos de plaquetas de identificação industrial (BERMO, Alfa Laval, etc.).
+Analise detalhadamente a foto e transcreva exatamente os campos técnicos gravados.
+Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json):
 {
   "manufacturer": "BERMO",
   "model": "BP60B TRCPL1134-35HE",
@@ -131,49 +119,121 @@ Retorne SEMPRE E APENAS um objeto JSON válido (sem formatação markdown, sem \
   "fluid1": "",
   "fluid2": "",
   "extraFields": [
-    { "label": "Grupo Fabricante", "value": "A COMPANY OF THE ARMATUREN GROUP" },
-    { "label": "Razão Social Fabricante", "value": "BERMO VÁLVULAS E EQUIPAMENTOS INDUSTRIAIS LTDA" },
-    { "label": "Contato Fabricante", "value": "47 2123-4444 - www.bermo.com.br - Blumenau / SC" }
+    { "label": "Grupo Fabricante", "value": "A COMPANY OF THE ARMATUREN GROUP" }
   ],
-  "confidence": {
-    "manufacturer": 0.98,
-    "model": 0.98,
-    "manufacturingNumber": 0.99
-  },
-  "rawTextExtracted": "Texto completo transcrito da plaqueta",
-  "summary": "Plaqueta BERMO BP60B TRCPL1134-35HE, Nº 639.065, Ano 2025"
-}`,
-        },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: promptText },
-            {
-              type: 'image_url',
-              image_url: {
-                url: imageTarget,
-                detail: 'high',
-              },
-            },
-          ],
-        },
-      ]
+  "confidence": { "manufacturer": 0.95 },
+  "rawTextExtracted": "texto completo visível",
+  "summary": "Plaqueta identificada"
+}`
 
-      const reply = $ai.chat({
+      const payloadVision = {
         model: 'fast',
-        messages: messages,
+        messages: [
+          { role: 'system', content: systemInstruction },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: promptText },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: imageTarget,
+                },
+              },
+            ],
+          },
+        ],
+        temperature: 0.1,
+      }
+
+      const res = $http.send({
+        url: endpoint,
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + gatewayKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payloadVision),
+        timeout: 45,
       })
 
-      if (reply && reply.choices && reply.choices[0] && reply.choices[0].message) {
-        const textContent = reply.choices[0].message.content
+      console.log(
+        '[read-nameplate] Resposta do gateway vision HTTP:',
+        res.statusCode,
+        'body preview:',
+        typeof res.body === 'string' ? res.body.slice(0, 300) : 'not string',
+      )
+
+      if (
+        res.statusCode === 200 &&
+        res.json &&
+        res.json.choices &&
+        res.json.choices[0] &&
+        res.json.choices[0].message
+      ) {
+        const textContent = res.json.choices[0].message.content
         const parsed = parseJsonSafe(textContent)
         if (parsed && typeof parsed === 'object') {
           extractedData = parsed
-          extractionMethod = 'ai_chat_vision'
+          extractionMethod = 'gateway_vision_direct'
+        }
+      }
+    } catch (errDirect) {
+      console.warn('[read-nameplate] Falha em gateway vision direto:', errDirect.message)
+    }
+  }
+
+  // 2. Fallback via Agente Nativo Skip Cloud ('equipment-nameplate-reader')
+  if (!extractedData) {
+    try {
+      const agent = $ai.agent('equipment-nameplate-reader')
+      if (agent && contextUserId) {
+        const userMessage = imageUrl
+          ? `${promptText}\n\n[URL da imagem: ${imageUrl}]`
+          : imageDataUrl.length < 50000
+            ? `${promptText}\n\n[Imagem base64 anexada: ${imageDataUrl.slice(0, 1000)}...]`
+            : promptText
+
+        const agentRes = agent.chat({
+          user_id: contextUserId,
+          message: userMessage,
+        })
+
+        if (agentRes && agentRes.content) {
+          const parsed = parseJsonSafe(agentRes.content)
+          if (parsed && typeof parsed === 'object') {
+            extractedData = parsed
+            extractionMethod = 'native_agent'
+          }
+        }
+      }
+    } catch (errAgent) {
+      console.warn('[equipment-nameplate-reader] Agente nativo falhou:', errAgent.message)
+    }
+  }
+
+  // 3. Fallback via $ai.chat
+  if (!extractedData) {
+    try {
+      const reply = $ai.chat({
+        model: 'fast',
+        messages: [
+          { role: 'system', content: 'Você é um perito em plaquetas industriais.' },
+          {
+            role: 'user',
+            content: promptText + '\n\nFoto: ' + (imageUrl || imageDataUrl.slice(0, 500)),
+          },
+        ],
+      })
+      if (reply && reply.choices && reply.choices[0] && reply.choices[0].message) {
+        const parsed = parseJsonSafe(reply.choices[0].message.content)
+        if (parsed && typeof parsed === 'object') {
+          extractedData = parsed
+          extractionMethod = 'ai_chat_text'
         }
       }
     } catch (errChat) {
-      console.warn('[read-nameplate] Falha em $ai.chat vision:', errChat.message)
+      console.warn('[read-nameplate] Falha em $ai.chat text:', errChat.message)
     }
   }
 

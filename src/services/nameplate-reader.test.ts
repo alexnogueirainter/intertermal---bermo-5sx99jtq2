@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import pb from '@/lib/pocketbase/client'
 import { compareAndMergeNameplateData, FORM_FIELD_DEFINITIONS } from './nameplate-reader'
 import { createEmptyEquipment } from '@/types/field-visit'
 
@@ -82,6 +83,22 @@ describe('nameplate-reader: compareAndMergeNameplateData', () => {
     // tag, service, etc não foram preenchidos nem pelo técnico nem pela foto
     expect(res.unidentifiedFields.some((u) => u.fieldKey === 'service')).toBe(true)
     expect(res.unidentifiedFields.some((u) => u.fieldKey === 'tag')).toBe(true)
+  })
+
+  it('faz chamada real ao endpoint de ping/diagnóstico', async () => {
+    const backendUrl =
+      import.meta.env.VITE_POCKETBASE_URL ||
+      'https://crm-comercial-sofisticado-00224.shrd00.internal.goskip.dev'
+
+    console.log('TESTING BACKEND URL:', backendUrl)
+    const res = await fetch(`${backendUrl}/backend/v1/test/ping-nameplate`, {
+      method: 'GET',
+    })
+    const text = await res.text()
+    console.log('PING FETCH STATUS:', res.status, 'BODY:', text)
+    expect(res.status).toBe(200)
+    const json = JSON.parse(text)
+    expect(json.ok).toBe(true)
   })
 
   it('reproduz com exatidão a extração da foto de teste enviada pelo usuário (BERMO BP 60)', () => {
