@@ -27,6 +27,8 @@ export interface EquipmentMediaAttachmentSectionProps {
   isReadingNameplate?: boolean
   /** ID da foto que está sendo lida agora */
   activeReadingAttachmentId?: string | null
+  /** Status textual ou percentual do progresso (ex: "Lendo placa... 45%") */
+  readingStatusText?: string
   /** Se permite acionar a leitura de plaqueta (habilitado para equipamentos) */
   enableNameplateReader?: boolean
 }
@@ -41,6 +43,7 @@ export function EquipmentMediaAttachmentSection({
   onReadNameplatePhoto,
   isReadingNameplate = false,
   activeReadingAttachmentId = null,
+  readingStatusText = 'Lendo plaqueta...',
   enableNameplateReader = true,
 }: EquipmentMediaAttachmentSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -95,7 +98,9 @@ export function EquipmentMediaAttachmentSection({
                   {isThisReading && (
                     <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white p-2 text-center animate-in fade-in">
                       <Loader2 className="h-6 w-6 animate-spin text-teal-400 mb-1" />
-                      <span className="text-[11px] font-semibold">Lendo plaqueta...</span>
+                      <span className="text-[11px] font-semibold">
+                        {readingStatusText || 'Lendo plaqueta...'}
+                      </span>
                       <span className="text-[9px] text-slate-300">Extraindo dados técnicos</span>
                     </div>
                   )}
@@ -135,7 +140,7 @@ export function EquipmentMediaAttachmentSection({
                       {isThisReading ? (
                         <>
                           <Loader2 className="h-3 w-3 animate-spin text-teal-600" />
-                          Lendo plaqueta...
+                          {readingStatusText || 'Lendo plaqueta...'}
                         </>
                       ) : (
                         <>

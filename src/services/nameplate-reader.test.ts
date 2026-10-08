@@ -85,20 +85,45 @@ describe('nameplate-reader: compareAndMergeNameplateData', () => {
     expect(res.unidentifiedFields.some((u) => u.fieldKey === 'tag')).toBe(true)
   })
 
-  it('faz chamada real ao endpoint de ping/diagnóstico', async () => {
+  it('faz chamada real ao endpoint de leitura de plaqueta com texto OCR cliente da BERMO', async () => {
     const backendUrl =
       import.meta.env.VITE_POCKETBASE_URL ||
       'https://crm-comercial-sofisticado-00224.shrd00.internal.goskip.dev'
 
-    console.log('TESTING BACKEND URL:', backendUrl)
-    const res = await fetch(`${backendUrl}/backend/v1/test/ping-nameplate`, {
-      method: 'GET',
+    const sampleBermoOcrText = `
+      BERMO / ALFA LAVAL
+      MODEL: BP 60 B TRCPL1134-35HE
+      MANUF. NO: 639.065
+      DESIGN PRESSURE: 10/13 bar
+      TEMP: 99/-10 C
+      PMTA: 1.13 MPa
+      EMPTY WEIGHT: 265 kgf
+      YEAR: 2025
+      a max: 2.90 mm
+      a min: 2.25 mm
+      SERVICE: RESFRIAMENTO
+    `
+
+    const res = await fetch(`${backendUrl}/backend/v1/field-visits/equipment/read-nameplate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clientOcrText: sampleBermoOcrText,
+        context: 'Equipamento de teste unitário BERMO',
+      }),
     })
-    const text = await res.text()
-    console.log('PING FETCH STATUS:', res.status, 'BODY:', text)
+
     expect(res.status).toBe(200)
-    const json = JSON.parse(text)
+    const json = await res.json()
+    console.log('RESPOSTA READ-NAMEPLATE COM TEXTO OCR:', JSON.stringify(json, null, 2))
+
     expect(json.ok).toBe(true)
+    expect(json.data).toBeDefined()
+    expect(json.data.manufacturer).toMatch(/BERMO/i)
+    expect(json.data.model).toMatch(/BP\s*60/i)
+    expect(json.data.manufacturingNumber).toContain('639.065')
   })
 
   it('reproduz com exatidão a extração da foto de teste enviada pelo usuário (BERMO BP 60)', () => {

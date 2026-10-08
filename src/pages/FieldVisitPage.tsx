@@ -457,8 +457,9 @@ export default function FieldVisitPage({
   const [aiDraft, setAiDraft] = useState<any[] | null>(null)
   const [aiMessage, setAiMessage] = useState('')
 
-  // Leitura Automática de Plaqueta por Foto (Agente Skip Cloud Nativo)
+  // Leitura Automática de Plaqueta por Foto (OCR Cliente + Agente Skip Cloud)
   const [isReadingNameplate, setIsReadingNameplate] = useState(false)
+  const [nameplateReadingStatus, setNameplateReadingStatus] = useState<string>('Lendo placa...')
   const [readingEquipmentId, setReadingEquipmentId] = useState<string | null>(null)
   const [activeReadingAttachmentId, setActiveReadingAttachmentId] = useState<string | null>(null)
   const [ocrReviewOpen, setOcrReviewOpen] = useState(false)
@@ -806,23 +807,43 @@ export default function FieldVisitPage({
     }
   }
 
-  // Acionamento da Leitura Automática de Plaqueta via Agente Skip Cloud
+  // Acionamento da Leitura Automática de Plaqueta via OCR no cliente + Backend Skip Cloud
   const handleTriggerNameplateOcr = async (equipmentId: string, photo: MediaAttachment) => {
     const currentEq = visit.equipments.find((e) => e.id === equipmentId)
     if (!currentEq) return
 
     setIsReadingNameplate(true)
+    setNameplateReadingStatus('Lendo placa...')
     setReadingEquipmentId(equipmentId)
     setActiveReadingAttachmentId(photo.id)
 
-    toast({
-      title: 'Lendo foto da plaqueta...',
-      description: 'O agente de IA está extraindo os dados técnicos visíveis.',
-    })
-
     try {
+      // 1. OCR no navegador com Tesseract.js e pré-processamento via canvas
+      let ocrText = ''
+      try {
+        const { runClientOcr } = await import('@/services/client-ocr')
+        const ocrResult = await runClientOcr(photo.dataUrl, (p) => {
+          setNameplateReadingStatus(p.status || 'Lendo placa...')
+        })
+        ocrText = (ocrResult.text || '').trim()
+      } catch (ocrErr) {
+        console.warn('[FieldVisitPage] Falha no OCR do cliente:', ocrErr)
+      }
+
+      // Se o OCR não retornou texto visível suficiente
+      if (!ocrText) {
+        toast({
+          title: 'Não foi possível ler a placa',
+          description: 'Tire a foto novamente ou preencha manualmente.',
+        })
+        return
+      }
+
+      setNameplateReadingStatus('Interpretando dados técnicos...')
+
+      // 2. Envia apenas o texto transcrito ao backend (sem base64 pesada de imagem)
       const res = await readNameplateFromImage({
-        imageDataUrl: photo.dataUrl,
+        clientOcrText: ocrText,
         context: `Equipamento ${currentEq.name || ''} - Modelo atual: ${currentEq.model || 'vazio'}`,
       })
 
@@ -833,21 +854,19 @@ export default function FieldVisitPage({
         setOcrReviewOpen(true)
       } else {
         toast({
-          title: 'Leitura não realizada',
-          description:
-            res.message ||
-            'Não foi possível identificar dados na foto. Preencha manualmente os campos.',
+          title: 'Não foi possível ler a placa',
+          description: res.message || 'Tire a foto novamente ou preencha manualmente.',
         })
       }
-    } catch (ocrErr: any) {
-      console.warn('Falha na leitura da plaqueta:', ocrErr)
+    } catch (err: any) {
+      console.warn('Falha na leitura da plaqueta:', err)
       toast({
-        title: 'Aviso de leitura da plaqueta',
-        description:
-          'Não foi possível conectar ao agente no momento. O preenchimento manual continua disponível.',
+        title: 'Não foi possível ler a placa',
+        description: 'Tire a foto novamente ou preencha manualmente.',
       })
     } finally {
       setIsReadingNameplate(false)
+      setNameplateReadingStatus('Lendo placa...')
       setReadingEquipmentId(null)
       setActiveReadingAttachmentId(null)
     }
@@ -2147,6 +2166,7 @@ export default function FieldVisitPage({
                             }
                             isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
                             activeReadingAttachmentId={activeReadingAttachmentId}
+                            readingStatusText={nameplateReadingStatus}
                             isCompressing={isCompressingGlobal}
                           />
 
@@ -2850,6 +2870,7 @@ export default function FieldVisitPage({
                           }
                           isReadingNameplate={isReadingNameplate && readingEquipmentId === item.id}
                           activeReadingAttachmentId={activeReadingAttachmentId}
+                          readingStatusText={nameplateReadingStatus}
                           isCompressing={isCompressingGlobal}
                         />
 

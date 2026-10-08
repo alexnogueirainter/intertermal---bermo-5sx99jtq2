@@ -211,23 +211,38 @@ export function compareAndMergeNameplateData(
 /**
  * Chama o backend nativo para extrair os dados da plaqueta a partir da imagem
  */
-export async function readNameplateFromImage(payload: {
+export interface ReadNameplatePayload {
   imageDataUrl?: string
   imageUrl?: string
   context?: string
-}): Promise<{
+  clientOcrText?: string
+  ocrText?: string
+}
+
+export interface ReadNameplateResponse {
   ok: boolean
   data?: NameplateExtractedData
   method?: string
   message?: string
-}> {
+}
+
+export async function readNameplateFromImage(
+  payload: ReadNameplatePayload,
+): Promise<ReadNameplateResponse> {
   try {
     const res = await pb.send('/backend/v1/field-visits/equipment/read-nameplate', {
       method: 'POST',
       body: JSON.stringify({
-        image: payload.imageDataUrl,
-        imageUrl: payload.imageUrl,
+        clientOcrText: payload.clientOcrText || payload.ocrText,
+        ocrText: payload.clientOcrText || payload.ocrText,
         context: payload.context,
+        // Envia image/imageUrl apenas se não houver clientOcrText (ou se explicitamente fornecido)
+        ...(payload.clientOcrText
+          ? {}
+          : {
+              image: payload.imageDataUrl,
+              imageUrl: payload.imageUrl,
+            }),
       }),
     })
     return res as any

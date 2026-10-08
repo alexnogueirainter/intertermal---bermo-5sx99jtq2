@@ -10,7 +10,16 @@ routerAdd('POST', '/backend/v1/field-visits/equipment/read-nameplate', (e) => {
   const imageDataUrl = String(body.image || body.photoDataUrl || body.dataUrl || '').trim()
   const imageUrl = String(body.imageUrl || body.url || '').trim()
   const extraContext = String(body.context || '').trim()
-  const clientOcrText = String(body.ocrText || body.extractedText || body.rawText || '').trim()
+  const clientOcrText = String(
+    body.clientOcrText || body.ocrText || body.extractedText || body.rawText || '',
+  ).trim()
+
+  console.log(
+    '[read-nameplate] Recebido payload. clientOcrText len:',
+    clientOcrText.length,
+    'hasImage:',
+    Boolean(imageDataUrl || imageUrl),
+  )
 
   if (!imageDataUrl && !imageUrl && !clientOcrText) {
     return e.json(400, {
@@ -284,6 +293,15 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     rawTextExtracted: sanitizeStr(extractedData.rawTextExtracted),
     summary: sanitizeStr(extractedData.summary),
   }
+
+  console.log(
+    '[read-nameplate] Sucesso. Método:',
+    extractionMethod,
+    'fabricante:',
+    result.manufacturer,
+    'modelo:',
+    result.model,
+  )
 
   return e.json(200, {
     ok: true,
