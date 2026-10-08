@@ -10,12 +10,13 @@ routerAdd('POST', '/backend/v1/field-visits/equipment/read-nameplate', (e) => {
   const imageDataUrl = String(body.image || body.photoDataUrl || body.dataUrl || '').trim()
   const imageUrl = String(body.imageUrl || body.url || '').trim()
   const extraContext = String(body.context || '').trim()
+  const clientOcrText = String(body.ocrText || body.extractedText || body.rawText || '').trim()
 
-  if (!imageDataUrl && !imageUrl) {
+  if (!imageDataUrl && !imageUrl && !clientOcrText) {
     return e.json(400, {
       ok: false,
       error: 'image_required',
-      message: 'Nenhuma imagem foi fornecida para leitura da plaqueta.',
+      message: 'Nenhuma imagem ou texto de plaqueta foi fornecido para leitura.',
     })
   }
 
@@ -28,16 +29,17 @@ routerAdd('POST', '/backend/v1/field-visits/equipment/read-nameplate', (e) => {
     } catch (_) {}
   }
 
-  const promptText = `Analise detalhadamente a foto desta plaqueta de identificação industrial (trocador de calor de placas, válvulas ou equipamento BERMO/Alfa Laval).
-Transcreva todo o texto legível e retorne rigorosamente o JSON estruturado com os dados identificados.
+  const promptText = `Analise detalhadamente as informações e/ou foto da plaqueta de identificação industrial (trocador de calor de placas, válvulas ou equipamento BERMO / Alfa Laval).
+Identifique com rigor os campos técnicos gravados na plaqueta.
+NUNCA invente dados. Deixe em branco ("") o que não for identificado.
 
-Campos esperados:
-- manufacturer: nome do fabricante (ex.: BERMO, Alfa Laval, etc.)
-- model: modelo exato gravado (ex.: BP60B TRCPL1134-35HE, BP 60, etc.)
+Campos estruturados esperados:
+- manufacturer: nome do fabricante (ex.: BERMO, Alfa Laval, Sondex, Kelvion, etc.)
+- model: modelo exato gravado (ex.: BP60B TRCPL1134-35HE, BP 60, M10-B, etc.)
 - manufacturingNumber: número de fabricação gravado (ex.: 639.065)
 - serialNumber: número de série (se houver, senão igual a manufacturingNumber)
-- service: serviço indicado (ex.: RESFRIAMENTO, AQUECIMENTO, CONDENSAÇÃO)
-- tag: tag de processo se houver
+- service: serviço indicado (ex.: RESFRIAMENTO, AQUECIMENTO, CONDENSAÇÃO, PASTEURIZAÇÃO)
+- tag: tag de processo se houver (ex.: TC-01)
 - designPressureBar: pressão de projeto em bar (ex.: 10,00)
 - testPressureBar: pressão de teste em bar (ex.: 13,00)
 - designTempC: temperatura de projeto em °C (ex.: 165)
@@ -48,11 +50,11 @@ Campos esperados:
 - tighteningMinA: medida "a" mínimo em mm (ex.: 70)
 - plateCount: quantidade de placas se estiver escrita
 - fluid1 / fluid2: fluidos primário e secundário se houver
-- extraFields: array de objetos { label: "Nome do dado extra", value: "Valor" } para qualquer informação visível que não tenha campo direto acima (ex.: classe de pressão, fluido da placa, norma da placa, telefone de contato gravado, fabricante do grupo)
-- rawTextExtracted: transcrição integral do texto visível na placa
-- summary: breve resumo em 1 linha
+- extraFields: array de objetos { label: "Nome do dado extra", value: "Valor" } para qualquer informação visível adicional
+- rawTextExtracted: transcrição do texto visível
+- summary: breve resumo em 1 linha (ex.: "Plaqueta BERMO BP60B identificada")
 
-Contexto adicional: ${extraContext || 'Plaqueta fotografada em campo pelo técnico.'}`
+Contexto do equipamento: ${extraContext || 'Plaqueta fotografada em campo pelo técnico.'}`
 
   let extractedData = null
   let extractionMethod = 'unknown'
@@ -74,58 +76,27 @@ Contexto adicional: ${extraContext || 'Plaqueta fotografada em campo pelo técni
     }
   }
 
-  // Diagnóstico e teste de vision
   const gatewayUrl = $os.getenv('SKIP_AI_GATEWAY_URL') || ''
   const gatewayKey = $os.getenv('SKIP_AI_GATEWAY_API_KEY') || ''
-  console.log(
-    '[read-nameplate] payload recebido. imageDataUrl len:',
-    imageDataUrl.length,
-    'imageUrl:',
-    imageUrl,
-    'gatewayUrl:',
-    Boolean(gatewayUrl),
-    'gatewayKey:',
-    Boolean(gatewayKey),
-  )
 
-  // 1. Tentativa via Skip AI Gateway direto (chat/completions vision)
-  if (gatewayUrl && gatewayKey) {
+  // 1. Tentativa via Skip AI Gateway Vision com image_url
+  // Apenas se tiver gateway e imagem disponível
+  if (gatewayUrl && gatewayKey && (imageUrl || imageDataUrl)) {
+    // Formato suportado por provedores: OpenAI vision suporta url http(s) ou data:image/jpeg;base64,...
+    // Testa variações de payload
+    const imageTarget = imageUrl || imageDataUrl
     try {
       let endpoint = gatewayUrl.replace(/\/+$/, '')
       if (!endpoint.endsWith('/chat/completions')) {
         endpoint = endpoint + '/chat/completions'
       }
 
-      const imageTarget = imageUrl || imageDataUrl
-      const systemInstruction = `Você é um perito industrial em leitura e transcrição técnica de fotos de plaquetas de identificação industrial (BERMO, Alfa Laval, etc.).
-Analise detalhadamente a foto e transcreva exatamente os campos técnicos gravados.
-Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json):
-{
-  "manufacturer": "BERMO",
-  "model": "BP60B TRCPL1134-35HE",
-  "manufacturingNumber": "639.065",
-  "serialNumber": "639.065",
-  "service": "RESFRIAMENTO",
-  "tag": "",
-  "designPressureBar": "10,00",
-  "testPressureBar": "13,00",
-  "designTempC": "165",
-  "pmtaMpa": "1,30",
-  "emptyWeightKg": "164,30",
-  "manufacturingYear": "2025",
-  "tighteningMaxA": "66",
-  "tighteningMinA": "70",
-  "plateCount": "",
-  "fluid1": "",
-  "fluid2": "",
-  "extraFields": [
-    { "label": "Grupo Fabricante", "value": "A COMPANY OF THE ARMATUREN GROUP" }
-  ],
-  "confidence": { "manufacturer": 0.95 },
-  "rawTextExtracted": "texto completo visível",
-  "summary": "Plaqueta identificada"
-}`
+      const systemInstruction = `Você é um engenheiro perito em leitura e transcrição técnica de placas de identificação de trocadores de calor industriais (BERMO, Alfa Laval, etc.).
+Analise detalhadamente a foto da placa e extraia os dados técnicos com fidelidade total.
+Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
 
+      // OpenAI aceita image_url como objeto { url, detail }
+      // Alguns proxies exigem que detail seja 'auto', 'low' ou omitido
       const payloadVision = {
         model: 'fast',
         messages: [
@@ -138,6 +109,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json):
                 type: 'image_url',
                 image_url: {
                   url: imageTarget,
+                  detail: 'low',
                 },
               },
             ],
@@ -157,13 +129,6 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json):
         timeout: 45,
       })
 
-      console.log(
-        '[read-nameplate] Resposta do gateway vision HTTP:',
-        res.statusCode,
-        'body preview:',
-        typeof res.body === 'string' ? res.body.slice(0, 300) : 'not string',
-      )
-
       if (
         res.statusCode === 200 &&
         res.json &&
@@ -177,28 +142,52 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json):
           extractedData = parsed
           extractionMethod = 'gateway_vision_direct'
         }
+      } else {
+        console.warn(
+          '[read-nameplate] Vision endpoint retornou status:',
+          res.statusCode,
+          'json:',
+          JSON.stringify(res.json || {}),
+        )
       }
     } catch (errDirect) {
       console.warn('[read-nameplate] Falha em gateway vision direto:', errDirect.message)
     }
   }
 
-  // 2. Fallback via Agente Nativo Skip Cloud ('equipment-nameplate-reader')
+  // 2. Se houver texto pré-extraído (OCR do navegador ou contexto), processar via Agente Nativo
+  if (!extractedData && clientOcrText) {
+    try {
+      const agent = $ai.agent('equipment-nameplate-reader')
+      if (agent && contextUserId) {
+        const agentPrompt = `${promptText}\n\n--- TEXTO BRUTO DETECTADO NA PLAQUETA ---\n${clientOcrText}`
+        const agentRes = agent.chat({
+          user_id: contextUserId,
+          message: agentPrompt,
+        })
+        if (agentRes && agentRes.content) {
+          const parsed = parseJsonSafe(agentRes.content)
+          if (parsed && typeof parsed === 'object') {
+            extractedData = parsed
+            extractionMethod = 'native_agent_with_ocr'
+          }
+        }
+      }
+    } catch (errAgent) {
+      console.warn('[equipment-nameplate-reader] Agente nativo falhou com OCR:', errAgent.message)
+    }
+  }
+
+  // 3. Fallback via Agente Nativo Skip Cloud ('equipment-nameplate-reader') usando contexto do equipamento e imagem
   if (!extractedData) {
     try {
       const agent = $ai.agent('equipment-nameplate-reader')
       if (agent && contextUserId) {
-        const userMessage = imageUrl
-          ? `${promptText}\n\n[URL da imagem: ${imageUrl}]`
-          : imageDataUrl.length < 50000
-            ? `${promptText}\n\n[Imagem base64 anexada: ${imageDataUrl.slice(0, 1000)}...]`
-            : promptText
-
+        const userMessage = `${promptText}\n\n[Dados do contexto anexado: ${extraContext || 'foto da plaqueta de identificação'}]`
         const agentRes = agent.chat({
           user_id: contextUserId,
           message: userMessage,
         })
-
         if (agentRes && agentRes.content) {
           const parsed = parseJsonSafe(agentRes.content)
           if (parsed && typeof parsed === 'object') {
@@ -212,16 +201,20 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json):
     }
   }
 
-  // 3. Fallback via $ai.chat
+  // 4. Fallback via $ai.chat
   if (!extractedData) {
     try {
       const reply = $ai.chat({
         model: 'fast',
         messages: [
-          { role: 'system', content: 'Você é um perito em plaquetas industriais.' },
+          {
+            role: 'system',
+            content:
+              'Você é um perito industrial em identificação de equipamentos e placas térmicas BERMO e Alfa Laval. Retorne rigorosamente um JSON com os campos técnicos.',
+          },
           {
             role: 'user',
-            content: promptText + '\n\nFoto: ' + (imageUrl || imageDataUrl.slice(0, 500)),
+            content: promptText + (clientOcrText ? '\n\nTexto transcrito:\n' + clientOcrText : ''),
           },
         ],
       })
