@@ -73,6 +73,12 @@ export interface EquipmentItem {
     method?: string
     confidence?: Record<string, number>
     evidenceAttachmentId?: string
+    discrepancies?: Array<{
+      fieldKey: string
+      label: string
+      currentValue: string
+      plateValue: string
+    }>
   }
 }
 

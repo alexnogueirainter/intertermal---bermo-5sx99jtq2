@@ -42,9 +42,15 @@ routerAdd('POST', '/backend/v1/field-visits/equipment/read-nameplate', (e) => {
 Identifique com rigor os campos técnicos gravados na plaqueta.
 NUNCA invente dados. Deixe em branco ("") o que não for identificado.
 
+CORREÇÕES TÍPICAS DE OCR EM PLAQUETAS BERMO:
+- Junte letras espaçadas em nomes e códigos: ex. "B P 6 0 B" ou "B P 60 B" deve ser "BP 60 B" ou "BP60B".
+- Corrija pontuação com espaçamento espúrio em números de fabricação: ex. "639 . 065" deve ser "639.065".
+- Se houver pressões com barra ex. "10/13 bar" ou "10 / 13 bar", atribua 10 (ou 10,00) a designPressureBar e 13 (ou 13,00) a testPressureBar.
+- Limpe unidades de medida coladas nos valores (ex. "1.13MPa" -> 1,13; "265kgf" -> 265).
+
 Campos estruturados esperados:
 - manufacturer: nome do fabricante (ex.: BERMO, Alfa Laval, Sondex, Kelvion, etc.)
-- model: modelo exato gravado (ex.: BP60B TRCPL1134-35HE, BP 60, M10-B, etc.)
+- model: modelo exato gravado (ex.: BP 60 B TRCPL1134-35HE, BP 60, M10-B, etc.)
 - manufacturingNumber: número de fabricação gravado (ex.: 639.065)
 - serialNumber: número de série (se houver, senão igual a manufacturingNumber)
 - service: serviço indicado (ex.: RESFRIAMENTO, AQUECIMENTO, CONDENSAÇÃO, PASTEURIZAÇÃO)
@@ -52,13 +58,18 @@ Campos estruturados esperados:
 - designPressureBar: pressão de projeto em bar (ex.: 10,00)
 - testPressureBar: pressão de teste em bar (ex.: 13,00)
 - designTempC: temperatura de projeto em °C (ex.: 165)
-- pmtaMpa: PMTA em MPa (ex.: 1,30)
-- emptyWeightKg: peso vazio em kgf ou kg (ex.: 164,30)
+- pmtaMpa: PMTA em MPa (ex.: 1,13)
+- emptyWeightKg: peso vazio em kgf ou kg (ex.: 265)
 - manufacturingYear: ano de fabricação de 4 dígitos (ex.: 2025)
 - tighteningMaxA: medida "a" máximo em mm (ex.: 66)
 - tighteningMinA: medida "a" mínimo em mm (ex.: 70)
 - plateCount: quantidade de placas se estiver escrita
 - fluid1 / fluid2: fluidos primário e secundário se houver
+- thermalAreaM2: área de troca térmica se legível (ex.: 12,5 m²)
+- fabricationStandard: norma de projeto/fabricação se indicada (ex.: ASME VIII, NR-13, AD 2000)
+- connectionSize: diâmetro nominal ou tipo de conexões/bocais (ex.: DN 50, Flange 2")
+- plateMaterial: material das placas (ex.: AISI 316L, Titânio, AISI 304)
+- gasketMaterial: material das gaxetas de vedação (ex.: NBR, EPDM, FKM/Viton)
 - extraFields: array de objetos { label: "Nome do dado extra", value: "Valor" } para qualquer informação visível adicional
 - rawTextExtracted: transcrição do texto visível
 - summary: breve resumo em 1 linha (ex.: "Plaqueta BERMO BP60B identificada")
@@ -88,11 +99,8 @@ Contexto do equipamento: ${extraContext || 'Plaqueta fotografada em campo pelo t
   const gatewayUrl = $os.getenv('SKIP_AI_GATEWAY_URL') || ''
   const gatewayKey = $os.getenv('SKIP_AI_GATEWAY_API_KEY') || ''
 
-  // 1. Tentativa via Skip AI Gateway Vision com image_url
-  // Apenas se tiver gateway e imagem disponível
+  // 1. Tentativa via Skip AI Gateway Vision com image_url (quando imagem fornecida)
   if (gatewayUrl && gatewayKey && (imageUrl || imageDataUrl)) {
-    // Formato suportado por provedores: OpenAI vision suporta url http(s) ou data:image/jpeg;base64,...
-    // Testa variações de payload
     const imageTarget = imageUrl || imageDataUrl
     try {
       let endpoint = gatewayUrl.replace(/\/+$/, '')
@@ -104,8 +112,6 @@ Contexto do equipamento: ${extraContext || 'Plaqueta fotografada em campo pelo t
 Analise detalhadamente a foto da placa e extraia os dados técnicos com fidelidade total.
 Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
 
-      // OpenAI aceita image_url como objeto { url, detail }
-      // Alguns proxies exigem que detail seja 'auto', 'low' ou omitido
       const payloadVision = {
         model: 'fast',
         messages: [
@@ -164,7 +170,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     }
   }
 
-  // 2. Se houver texto pré-extraído (OCR do navegador ou contexto), processar via Agente Nativo
+  // 2. Se houver texto pré-extraído (OCR do navegador), processar via Agente Nativo
   if (!extractedData && clientOcrText) {
     try {
       const agent = $ai.agent('equipment-nameplate-reader')
@@ -187,7 +193,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     }
   }
 
-  // 3. Fallback via Agente Nativo Skip Cloud ('equipment-nameplate-reader') usando contexto do equipamento e imagem
+  // 3. Fallback via Agente Nativo Skip Cloud ('equipment-nameplate-reader') usando contexto
   if (!extractedData) {
     try {
       const agent = $ai.agent('equipment-nameplate-reader')
@@ -239,8 +245,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     }
   }
 
-  // 3. Fallback se não retornou via vision (ou se timeout):
-  // Se mesmo assim não obtiver resposta por falta de segredo ou timeout de rede
+  // Se não foi possível obter dados
   if (!extractedData) {
     return e.json(200, {
       ok: false,
@@ -255,16 +260,57 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
   // Sanitização e normalização amigável de campos para pt-BR
   const sanitizeStr = (val) => (val !== undefined && val !== null ? String(val).trim() : '')
   const normalizePtBrNumber = (val) => {
-    const s = sanitizeStr(val)
+    let s = sanitizeStr(val)
     if (!s) return ''
-    return s.replace(/[^0-9,.]/g, '')
+    // Remove unidades comuns (bar, mpa, kg, kgf, c, mm, etc.)
+    s = s.replace(/(?:bar|mpa|kgf|kg|°c|c|mm|m2|m²)/gi, '').trim()
+    // Remove qualquer caractere que não seja número, vírgula ou ponto
+    s = s.replace(/[^0-9,.]/g, '')
+    // Se tiver apenas ponto decimal (ex: 1.13), converte para vírgula pt-BR
+    if (/^\d+\.\d+$/.test(s)) {
+      s = s.replace('.', ',')
+    }
+    return s
   }
+
+  // Consolidação de extraFields com os novos campos dedicados (thermalArea, normas, materiais, etc.)
+  const extraFieldsList = Array.isArray(extractedData.extraFields)
+    ? extractedData.extraFields
+        .map((f) => ({
+          label: sanitizeStr(f.label || f.name || f.campo),
+          value: sanitizeStr(f.value || f.valor),
+        }))
+        .filter((f) => f.label && f.value)
+    : []
+
+  const addExtraFieldIfPresent = (label, val) => {
+    const cleanVal = sanitizeStr(val)
+    if (!cleanVal) return
+    const already = extraFieldsList.some((it) => it.label.toLowerCase() === label.toLowerCase())
+    if (!already) {
+      extraFieldsList.push({ label, value: cleanVal })
+    }
+  }
+
+  addExtraFieldIfPresent('Área de Troca Térmica', extractedData.thermalAreaM2)
+  addExtraFieldIfPresent('Norma de Fabricação', extractedData.fabricationStandard)
+  addExtraFieldIfPresent('Conexões / Bocais', extractedData.connectionSize)
+  addExtraFieldIfPresent('Material das Placas', extractedData.plateMaterial)
+  addExtraFieldIfPresent('Material das Gaxetas', extractedData.gasketMaterial)
+
+  // Correção determinística de espaços espúrios em modelo (ex. "B P 6 0 B" -> "BP 60 B")
+  let cleanModel = sanitizeStr(extractedData.model)
+  cleanModel = cleanModel.replace(/\bB\s+P\s+([0-9]+)\s*([A-Za-z]?)\b/gi, 'BP $1 $2').trim()
+
+  // Correção de número de fabricação espúrio (ex. "639 . 065" -> "639.065")
+  let cleanManufNo = sanitizeStr(extractedData.manufacturingNumber)
+  cleanManufNo = cleanManufNo.replace(/(\d+)\s*\.\s*(\d+)/g, '$1.$2')
 
   const result = {
     manufacturer: sanitizeStr(extractedData.manufacturer),
-    model: sanitizeStr(extractedData.model),
-    manufacturingNumber: sanitizeStr(extractedData.manufacturingNumber),
-    serialNumber: sanitizeStr(extractedData.serialNumber || extractedData.manufacturingNumber),
+    model: cleanModel,
+    manufacturingNumber: cleanManufNo,
+    serialNumber: sanitizeStr(extractedData.serialNumber || cleanManufNo),
     service: sanitizeStr(extractedData.service),
     tag: sanitizeStr(extractedData.tag),
     designPressureBar: normalizePtBrNumber(extractedData.designPressureBar),
@@ -278,19 +324,17 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     plateCount: sanitizeStr(extractedData.plateCount),
     fluid1: sanitizeStr(extractedData.fluid1),
     fluid2: sanitizeStr(extractedData.fluid2),
-    extraFields: Array.isArray(extractedData.extraFields)
-      ? extractedData.extraFields
-          .map((f) => ({
-            label: sanitizeStr(f.label || f.name || f.campo),
-            value: sanitizeStr(f.value || f.valor),
-          }))
-          .filter((f) => f.label && f.value)
-      : [],
+    thermalAreaM2: sanitizeStr(extractedData.thermalAreaM2),
+    fabricationStandard: sanitizeStr(extractedData.fabricationStandard),
+    connectionSize: sanitizeStr(extractedData.connectionSize),
+    plateMaterial: sanitizeStr(extractedData.plateMaterial),
+    gasketMaterial: sanitizeStr(extractedData.gasketMaterial),
+    extraFields: extraFieldsList,
     confidence:
       extractedData.confidence && typeof extractedData.confidence === 'object'
         ? extractedData.confidence
         : {},
-    rawTextExtracted: sanitizeStr(extractedData.rawTextExtracted),
+    rawTextExtracted: sanitizeStr(extractedData.rawTextExtracted || clientOcrText),
     summary: sanitizeStr(extractedData.summary),
   }
 
@@ -301,6 +345,10 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     result.manufacturer,
     'modelo:',
     result.model,
+    'nº:',
+    result.manufacturingNumber,
+    'extras:',
+    result.extraFields.length,
   )
 
   return e.json(200, {
