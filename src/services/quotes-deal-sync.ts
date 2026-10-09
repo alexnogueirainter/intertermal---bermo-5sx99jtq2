@@ -14,7 +14,13 @@
  */
 
 import pb from '@/lib/pocketbase/client'
-import type { DealRecord, DealStage, QuoteRecord, QuoteStatus } from '@/types/crm'
+import type {
+  DealRecord,
+  DealStage,
+  QuoteRecord,
+  QuoteStatus,
+  ServiceOrderRecord,
+} from '@/types/crm'
 
 export function extractQuoteNumericValue(
   quote: Partial<QuoteRecord> | Record<string, any>,
@@ -271,6 +277,73 @@ export const quoteDealSyncService = {
    * Sincroniza em lote todas as propostas existentes com o pipeline comercial.
    * Idempotente: não duplica negócios nem altera valores calculados das propostas.
    */
+  /**
+   * Sincroniza uma proposta salva/alterada com Deals E Service Orders vinculadas.
+   * Não cria OS se não estiver aprovada (respeita o fluxo atual).
+   * Não duplica OS: busca por quote_id, order_number ou quote_number.
+   */
+  async syncQuoteToCrm(
+    quote: QuoteRecord,
+  ): Promise<{ deal: DealRecord | null; serviceOrders: ServiceOrderRecord[] }> {
+    if (!quote?.id) return { deal: null, serviceOrders: [] }
+
+    // 1. Sincroniza com Deals (regras existentes com deduplicação)
+    const deal = await this.syncQuoteToDeal(quote)
+
+    // 2. Sincroniza com Service Orders (apenas existentes, sem criar OS desnecessária / duplicada)
+    const quoteCode = (quote.quote_number || quote.code || `PROP-${quote.id.slice(-6)}`).trim()
+    const quoteValue = extractQuoteNumericValue(quote)
+    const clientName = quote.client_name || 'Cliente'
+    const clientId = quote.client_id || ''
+    const equipModel = quote.equipment_model || 'Trocador BERMO'
+    const equipBrand = quote.equipment_brand || 'BERMO'
+    const quoteTitle = quote.title || `OS-${quoteCode}: Manutenção e Revisão de Equipamentos BERMO`
+    const technicalDetails = (quote as any).service_details || {}
+
+    const updatedSOs: ServiceOrderRecord[] = []
+
+    try {
+      // Buscar OS vinculada por quote_id ou quote_number/order_number
+      const filterConditions = [
+        `quote_id = "${quote.id}"`,
+        quoteCode ? `quote_number = "${quoteCode}"` : '',
+        quoteCode ? `order_number = "${quoteCode}"` : '',
+      ]
+        .filter(Boolean)
+        .join(' || ')
+
+      const existingOrders = await pb.collection('service_orders').getFullList<ServiceOrderRecord>({
+        filter: filterConditions,
+        requestKey: null,
+      })
+
+      for (const so of existingOrders) {
+        try {
+          const soPayload: Partial<ServiceOrderRecord> = {
+            total_value: quoteValue,
+            client_name: clientName || so.client_name,
+            client_id: clientId || so.client_id,
+            equipment_model: equipModel || so.equipment_model,
+            equipment_brand: equipBrand || so.equipment_brand,
+            title: so.title || quoteTitle,
+            technical_details: technicalDetails,
+          }
+
+          const updatedSO = await pb
+            .collection('service_orders')
+            .update<ServiceOrderRecord>(so.id, soPayload, { requestKey: null })
+          updatedSOs.push(updatedSO)
+        } catch (updateErr) {
+          console.warn(`Erro ao atualizar Service Order ${so.id}:`, updateErr)
+        }
+      }
+    } catch (soSearchErr) {
+      console.warn('Erro ao buscar service_orders vinculadas à proposta:', soSearchErr)
+    }
+
+    return { deal, serviceOrders: updatedSOs }
+  },
+
   async syncAllQuotes(
     quotesList?: QuoteRecord[],
   ): Promise<{ syncedCount: number; deals: DealRecord[] }> {

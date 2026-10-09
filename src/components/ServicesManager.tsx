@@ -46,6 +46,7 @@ import {
 } from 'lucide-react'
 import { ServiceOrdersReport } from '@/components/ServiceOrdersReport'
 import { OsExecutionReportDialog } from '@/components/OsExecutionReportDialog'
+import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -284,6 +285,7 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
         <ServiceOrdersReport
           serviceOrders={serviceOrders}
           clients={clients}
+          quotes={quotes}
           onSelectServiceOrder={(so) => {
             setOrderForReport(so)
             setIsReportModalOpen(true)
@@ -479,7 +481,7 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                                 Valor Total:
                               </span>
                               <span className="font-bold text-slate-900 dark:text-slate-100 text-sm">
-                                {(so.total_value || 0).toLocaleString('pt-BR', {
+                                {resolveServiceOrderLiveValue(so, quotes).toLocaleString('pt-BR', {
                                   style: 'currency',
                                   currency: 'BRL',
                                 })}
@@ -636,10 +638,13 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
               <p className="text-muted-foreground">
                 Valor Total:{' '}
                 <strong>
-                  {(selectedOrderForApproval?.total_value || 0).toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                  })}
+                  {resolveServiceOrderLiveValue(selectedOrderForApproval, quotes).toLocaleString(
+                    'pt-BR',
+                    {
+                      style: 'currency',
+                      currency: 'BRL',
+                    },
+                  )}
                 </strong>
               </p>
             </div>
@@ -867,13 +872,13 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Valor Total:</span>
-                  <strong className="text-emerald-700 dark:text-emerald-400 font-mono">
-                    {(orderToDelete?.total_value || orderToDelete?.final_price || 0).toLocaleString(
-                      'pt-BR',
-                      { style: 'currency', currency: 'BRL' },
-                    )}
-                  </strong>
-                </div>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    {resolveServiceOrderLiveValue(orderToDelete, quotes).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </span>
+                </div>{' '}
               </div>
 
               <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs">

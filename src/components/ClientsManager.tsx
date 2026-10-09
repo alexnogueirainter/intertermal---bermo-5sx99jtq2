@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { clientsService } from '@/services/clients'
+import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -444,7 +445,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
       kind: 'order' as const,
       id: so.id,
       title: `Ordem de Serviço #${so.order_number} (${so.status})`,
-      detail: `${so.title} • ${(so.total_value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+      detail: `${so.title} • ${resolveServiceOrderLiveValue(so, quotes).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
       date: so.created ? new Date(so.created) : new Date(),
       status: so.status,
     })),
@@ -901,7 +902,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                           <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
                             <span>🔧 {so.equipment_model || 'Trocador BERMO'}</span>
                             <span className="font-bold text-slate-900 dark:text-slate-100">
-                              {(so.total_value || so.final_price || 0).toLocaleString('pt-BR', {
+                              {resolveServiceOrderLiveValue(so, quotes).toLocaleString('pt-BR', {
                                 style: 'currency',
                                 currency: 'BRL',
                               })}

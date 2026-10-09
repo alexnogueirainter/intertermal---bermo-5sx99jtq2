@@ -57,6 +57,7 @@ import {
   Printer,
 } from 'lucide-react'
 import { OsExecutionReportDialog } from '@/components/OsExecutionReportDialog'
+import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
 import type {
   ServiceOrderRecord,
   ServiceOrderStatus,
@@ -227,7 +228,7 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
 
   const getStageTotal = (stageKey: ServiceOrderStatus) => {
     return getOrdersForStage(stageKey).reduce(
-      (sum, o) => sum + (o.total_value || o.final_price || 0),
+      (sum, o) => sum + resolveServiceOrderLiveValue(o, quotes),
       0,
     )
   }
@@ -542,7 +543,7 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                         <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
                           <span className="text-[10px] text-muted-foreground">Valor OS:</span>
                           <span className="font-bold text-xs text-slate-900 dark:text-slate-100">
-                            {(order.total_value || order.final_price || 0).toLocaleString('pt-BR', {
+                            {resolveServiceOrderLiveValue(order, quotes).toLocaleString('pt-BR', {
                               style: 'currency',
                               currency: 'BRL',
                             })}
@@ -733,14 +734,14 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Valor Total:</span>
-                  <strong className="text-emerald-700 dark:text-emerald-400 font-mono">
-                    {(orderToDelete?.total_value || orderToDelete?.final_price || 0).toLocaleString(
-                      'pt-BR',
-                      { style: 'currency', currency: 'BRL' },
-                    )}
-                  </strong>
-                </div>
+                  <span className="text-muted-foreground">Valor da OS:</span>
+                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                    {resolveServiceOrderLiveValue(orderToDelete, quotes).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                  </span>
+                </div>{' '}
               </div>
 
               {/* Alerta de Ação Permanente e Irreversível */}

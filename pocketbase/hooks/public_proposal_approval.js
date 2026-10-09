@@ -227,14 +227,44 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
       )
 
       if (existingSOs && existingSOs.length > 0) {
-        // Já existe OS vinculada, apenas atualizar para status vistoria ou proposta
+        // Já existe OS vinculada, apenas atualizar para status vistoria ou proposta e sincronizar valor consolidado
         const existingSO = existingSOs[0]
         existingSO.set('approved_by', clientApproverName + ' (Cliente - Aceite Digital)')
         existingSO.set('approved_at', nowIso)
+        const consolidatedVal =
+          quoteRecord.getFloat('total') ||
+          quoteRecord.getFloat('final_price') ||
+          quoteRecord.getFloat('subtotal') ||
+          0
+        existingSO.set('total_value', consolidatedVal)
+        existingSO.set(
+          'client_name',
+          quoteRecord.getString('client_name') || existingSO.getString('client_name'),
+        )
+        existingSO.set(
+          'client_id',
+          quoteRecord.getString('client_id') || existingSO.getString('client_id'),
+        )
+        existingSO.set(
+          'equipment_model',
+          quoteRecord.getString('equipment_model') || existingSO.getString('equipment_model'),
+        )
+        existingSO.set(
+          'equipment_brand',
+          quoteRecord.getString('equipment_brand') || existingSO.getString('equipment_brand'),
+        )
+        if (quoteRecord.get('service_details')) {
+          existingSO.set('technical_details', quoteRecord.get('service_details'))
+        }
         $app.save(existingSO)
         createdServiceOrder = existingSO
       } else {
-        // Criar NOVA OS
+        // Criar NOVA OS com valor total consolidado
+        const consolidatedVal =
+          quoteRecord.getFloat('total') ||
+          quoteRecord.getFloat('final_price') ||
+          quoteRecord.getFloat('subtotal') ||
+          0
         const soCol = $app.findCollectionByNameOrId('service_orders')
         const so = new Record(soCol)
         so.set('order_number', quoteNumber)
@@ -246,7 +276,7 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
         // Pipeline: Vistoria -> Proposta -> Execução -> Inspeção -> Fechado
         // Como a proposta foi aprovada pelo cliente, a OS inicia no fluxo
         so.set('status', 'vistoria')
-        so.set('total_value', quoteRecord.get('final_price') || quoteRecord.get('total') || 0)
+        so.set('total_value', consolidatedVal)
         so.set('priority', 'high')
         so.set(
           'assigned_to',

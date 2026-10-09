@@ -48,6 +48,7 @@ import { useNavigate } from 'react-router-dom'
 import type { FieldVisitRecord } from '@/services/field-visits'
 import { ExecutiveReportPrintButton } from '@/components/ExecutiveReportPrint'
 import { useToast } from '@/hooks/use-toast'
+import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
 
 interface OverviewDashboardProps {
   clients: ClientRecord[]
@@ -240,7 +241,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
 
   const activeServiceOrders = serviceOrders.filter((so) => isFieldServiceOrderActive(so.status))
   const activeServiceOrdersTotal = activeServiceOrders.reduce(
-    (sum, so) => sum + (Number(so.total_value ?? so.final_price) || 0),
+    (sum, so) => sum + resolveServiceOrderLiveValue(so, quotes),
     0,
   )
 
@@ -845,7 +846,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             // Unir Ordens de Serviço e Orçamentos Aprovados para análise de margem real
             const completedItems = [
               ...serviceOrders.map((so) => {
-                const finalPrice = Number(so.final_price || so.total_value || 0)
+                const finalPrice = resolveServiceOrderLiveValue(so, quotes)
                 const internalCost =
                   Number(so.internal_cost) ||
                   (so.technical_details?.service_composition?.directCostsTotal

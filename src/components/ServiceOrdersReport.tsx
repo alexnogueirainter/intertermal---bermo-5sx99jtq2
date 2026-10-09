@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { ClientRecord, QuoteRecord, ServiceOrderRecord } from '@/types/crm'
+import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
 
 interface ServiceOrdersReportProps {
   serviceOrders: ServiceOrderRecord[]
@@ -100,10 +101,8 @@ export function categorizeReportStatus(rawStatus?: string): ServiceOrderReportSt
   return 'vistoria'
 }
 
-export function getOrderNumericValue(order: ServiceOrderRecord): number {
-  if (typeof order.total_value === 'number' && !isNaN(order.total_value)) return order.total_value
-  if (typeof order.final_price === 'number' && !isNaN(order.final_price)) return order.final_price
-  return 0
+export function getOrderNumericValue(order: ServiceOrderRecord, quotes?: QuoteRecord[]): number {
+  return resolveServiceOrderLiveValue(order, quotes)
 }
 
 function formatDuration(hours: number): string {
@@ -126,6 +125,7 @@ function formatDuration(hours: number): string {
 export const ServiceOrdersReport: React.FC<ServiceOrdersReportProps> = ({
   serviceOrders,
   clients,
+  quotes,
   onSelectServiceOrder,
 }) => {
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -207,19 +207,19 @@ export const ServiceOrdersReport: React.FC<ServiceOrdersReportProps> = ({
 
     filteredOrders.forEach((so) => {
       const cat = categorizeReportStatus(so.status)
-      const val = getOrderNumericValue(so)
+      const val = getOrderNumericValue(so, quotes)
       if (counts[cat]) {
         counts[cat].count += 1
         counts[cat].value += val
       }
     })
     return counts
-  }, [filteredOrders])
+  }, [filteredOrders, quotes])
 
   const totalOrders = filteredOrders.length
   const totalValue = useMemo(() => {
-    return filteredOrders.reduce((sum, so) => sum + getOrderNumericValue(so), 0)
-  }, [filteredOrders])
+    return filteredOrders.reduce((sum, so) => sum + getOrderNumericValue(so, quotes), 0)
+  }, [filteredOrders, quotes])
 
   const inFieldOrders = useMemo(() => {
     return filteredOrders.filter((so) => {
@@ -235,16 +235,16 @@ export const ServiceOrdersReport: React.FC<ServiceOrdersReportProps> = ({
   }, [filteredOrders])
 
   const inFieldValue = useMemo(() => {
-    return inFieldOrders.reduce((sum, so) => sum + getOrderNumericValue(so), 0)
-  }, [inFieldOrders])
+    return inFieldOrders.reduce((sum, so) => sum + getOrderNumericValue(so, quotes), 0)
+  }, [inFieldOrders, quotes])
 
   const completedOrders = useMemo(() => {
     return filteredOrders.filter((so) => categorizeReportStatus(so.status) === 'fechado')
   }, [filteredOrders])
 
   const completedValue = useMemo(() => {
-    return completedOrders.reduce((sum, so) => sum + getOrderNumericValue(so), 0)
-  }, [completedOrders])
+    return completedOrders.reduce((sum, so) => sum + getOrderNumericValue(so, quotes), 0)
+  }, [completedOrders, quotes])
 
   const completionRate = totalOrders > 0 ? (completedOrders.length / totalOrders) * 100 : 0
 
@@ -679,7 +679,7 @@ export const ServiceOrdersReport: React.FC<ServiceOrdersReportProps> = ({
                     const cat = categorizeReportStatus(so.status)
                     const statusMeta = SO_REPORT_STATUSES.find((s) => s.key === cat)
                     const lastMove = getLastMovementDate(so)
-                    const val = getOrderNumericValue(so)
+                    const val = getOrderNumericValue(so, quotes)
 
                     return (
                       <tr
