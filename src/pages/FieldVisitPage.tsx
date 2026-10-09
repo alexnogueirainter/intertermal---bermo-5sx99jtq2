@@ -899,6 +899,8 @@ export default function FieldVisitPage({
             plateCount: fillOnlyIfEmpty(freshCurrentEq.plateCount, mergedEq.plateCount),
             fluid1: fillOnlyIfEmpty(freshCurrentEq.fluid1, mergedEq.fluid1),
             fluid2: fillOnlyIfEmpty(freshCurrentEq.fluid2, mergedEq.fluid2),
+            flowRate: fillOnlyIfEmpty(freshCurrentEq.flowRate, mergedEq.flowRate),
+            flowUnit: fillOnlyIfEmpty(freshCurrentEq.flowUnit, mergedEq.flowUnit),
           }
 
           // Adicionar customFields novos vindos do OCR sem duplicar labels existentes
@@ -1016,6 +1018,8 @@ export default function FieldVisitPage({
         plateCount: fillOnlyIfEmpty(currentEq.plateCount, mergedEq.plateCount),
         fluid1: fillOnlyIfEmpty(currentEq.fluid1, mergedEq.fluid1),
         fluid2: fillOnlyIfEmpty(currentEq.fluid2, mergedEq.fluid2),
+        flowRate: fillOnlyIfEmpty(currentEq.flowRate, mergedEq.flowRate),
+        flowUnit: fillOnlyIfEmpty(currentEq.flowUnit, mergedEq.flowUnit),
       }
 
       // Adicionar customFields novos vindos do OCR sem duplicar labels existentes
@@ -3152,6 +3156,18 @@ export default function FieldVisitPage({
                               placeholder="Ex.: 64 placas"
                               className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
                             />
+                            {(() => {
+                              const disc = item.nameplateOcrData?.discrepancies?.find(
+                                (d) => d.fieldKey === 'plateCount',
+                              )
+                              if (!disc) return null
+                              return (
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
+                                  {disc.currentValue}
+                                </p>
+                              )
+                            })()}
                           </div>
 
                           <div>
@@ -3185,6 +3201,18 @@ export default function FieldVisitPage({
                               placeholder="Ex.: Vapor saturated 3 bar / Caldo"
                               className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
                             />
+                            {(() => {
+                              const disc = item.nameplateOcrData?.discrepancies?.find(
+                                (d) => d.fieldKey === 'fluid1',
+                              )
+                              if (!disc) return null
+                              return (
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
+                                  {disc.currentValue}
+                                </p>
+                              )
+                            })()}
                           </div>
 
                           <div>
@@ -3199,6 +3227,18 @@ export default function FieldVisitPage({
                               placeholder="Ex.: Água de resfriamento"
                               className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
                             />
+                            {(() => {
+                              const disc = item.nameplateOcrData?.discrepancies?.find(
+                                (d) => d.fieldKey === 'fluid2',
+                              )
+                              if (!disc) return null
+                              return (
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
+                                  {disc.currentValue}
+                                </p>
+                              )
+                            })()}
                           </div>
 
                           <div>
@@ -3232,6 +3272,18 @@ export default function FieldVisitPage({
                                 ))}
                               </select>
                             </div>
+                            {(() => {
+                              const disc = item.nameplateOcrData?.discrepancies?.find(
+                                (d) => d.fieldKey === 'flowRate',
+                              )
+                              if (!disc) return null
+                              return (
+                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
+                                  {disc.currentValue}
+                                </p>
+                              )
+                            })()}
                           </div>
                         </div>
 

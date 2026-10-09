@@ -231,4 +231,151 @@ describe('nameplate-reader service & BERMO identification pipeline', () => {
     expect(customLabels).toContain('Classificação NEMA / IP')
     expect(customLabels).toContain('Classe de Pressão (CL)')
   })
+
+  it('preenche campos da seção principal quando dados vêm apenas dentro de extraFields (labels pt-BR com unidades)', () => {
+    const eq: EquipmentItem = {
+      ...baseEquipment,
+      manufacturer: '',
+      model: '',
+      manufacturingNumber: '',
+      serialNumber: '',
+      tag: '',
+      service: '',
+      manufacturingYear: '',
+      designPressureBar: '',
+      testPressureBar: '',
+      designTempC: '',
+      pmtaMpa: '',
+      emptyWeightKg: '',
+      tighteningMaxA: '',
+      tighteningMinA: '',
+      plateCount: '',
+      fluid1: '',
+      fluid2: '',
+      flowRate: '',
+      flowUnit: '',
+    }
+
+    // Payload onde as propriedades de primeiro nível estão vazias e todos os dados estão em extraFields
+    const extractedOnlyInExtra: NameplateExtractedData = {
+      extraFields: [
+        { label: 'Fabricante', value: 'BERMO VÁLVULAS' },
+        { label: 'MOD', value: 'BP 60 B' },
+        { label: 'N° FAB', value: '639.065' },
+        { label: 'TAG', value: 'TC-01' },
+        { label: 'SERVIÇO', value: 'RESFRIAMENTO' },
+        { label: 'ANO DE FABRICAÇÃO', value: '2025' },
+        { label: 'Pressão de Projeto (bar)', value: '10,00 bar' },
+        { label: 'Pressão de Teste (bar)', value: '13,00 bar' },
+        { label: 'Temp. de Projeto (°C)', value: '165 °C' },
+        { label: 'PMTA (MPa)', value: '1,13 MPa' },
+        { label: 'Peso Vazio (kgf)', value: '265 kgf' },
+        { label: 'Medida a máx (mm)', value: '66 mm' },
+        { label: 'Medida a mín (mm)', value: '70 mm' },
+        { label: 'Q (Vazão)', value: '45,5 m³/h' },
+        { label: 'Placas', value: '64' },
+        { label: 'Fluido 1', value: 'Salmoura' },
+        { label: 'Fluido 2', value: 'Água industrial' },
+        // Campos que NÃO pertencem à seção principal -> devem ir para customFields
+        { label: 'Material das Placas', value: 'AISI 316L' },
+        { label: 'Potência (kW)', value: '22 kW' },
+        { label: 'Norma de Fabricação', value: 'ASME VIII' },
+      ],
+    }
+
+    const result = compareAndMergeNameplateData(eq, extractedOnlyInExtra)
+
+    // Todos os campos da seção principal foram devidamente preenchidos
+    expect(result.mergedEquipment.manufacturer).toBe('BERMO VÁLVULAS')
+    expect(result.mergedEquipment.model).toBe('BP 60 B')
+    expect(result.mergedEquipment.manufacturingNumber).toBe('639.065')
+    // Espelhado automaticamente em serialNumber
+    expect(result.mergedEquipment.serialNumber).toBe('639.065')
+    expect(result.mergedEquipment.tag).toBe('TC-01')
+    expect(result.mergedEquipment.service).toBe('RESFRIAMENTO')
+    expect(result.mergedEquipment.manufacturingYear).toBe('2025')
+    expect(result.mergedEquipment.designPressureBar).toBe('10,00')
+    expect(result.mergedEquipment.testPressureBar).toBe('13,00')
+    expect(result.mergedEquipment.designTempC).toBe('165')
+    expect(result.mergedEquipment.pmtaMpa).toBe('1,13')
+    expect(result.mergedEquipment.emptyWeightKg).toBe('265')
+    expect(result.mergedEquipment.tighteningMaxA).toBe('66')
+    expect(result.mergedEquipment.tighteningMinA).toBe('70')
+    expect(result.mergedEquipment.flowRate).toBe('45,5')
+    expect(result.mergedEquipment.flowUnit).toBe('m³/h')
+    expect(result.mergedEquipment.plateCount).toBe('64')
+    expect(result.mergedEquipment.fluid1).toBe('Salmoura')
+    expect(result.mergedEquipment.fluid2).toBe('Água industrial')
+
+    // Apenas os campos industriais sem correspondente na seção principal viraram customFields
+    const customLabels = result.mergedEquipment.customFields?.map((c) => c.label)
+    expect(customLabels).toContain('Material das Placas')
+    expect(customLabels).toContain('Potência (kW)')
+    expect(customLabels).toContain('Norma de Fabricação')
+    // Nenhum dos campos principais deve estar em customFields
+    expect(customLabels).not.toContain('Pressão de Projeto (bar)')
+    expect(customLabels).not.toContain('PMTA (MPa)')
+    expect(customLabels).not.toContain('Medida a máx (mm)')
+    expect(customLabels).not.toContain('N° FAB')
+  })
+
+  it('espelha mutuamente manufacturingNumber e serialNumber quando apenas um deles é extraído', () => {
+    // Caso 1: Apenas serialNumber é extraído
+    const extractedSerialOnly: NameplateExtractedData = {
+      serialNumber: 'ABC-7788',
+    }
+    const res1 = compareAndMergeNameplateData(baseEquipment, extractedSerialOnly)
+    expect(res1.mergedEquipment.serialNumber).toBe('ABC-7788')
+    expect(res1.mergedEquipment.manufacturingNumber).toBe('ABC-7788')
+
+    // Caso 2: Apenas manufacturingNumber é extraído
+    const extractedManufOnly: NameplateExtractedData = {
+      manufacturingNumber: 'MN-9922',
+    }
+    const res2 = compareAndMergeNameplateData(baseEquipment, extractedManufOnly)
+    expect(res2.mergedEquipment.manufacturingNumber).toBe('MN-9922')
+    expect(res2.mergedEquipment.serialNumber).toBe('MN-9922')
+
+    // Caso 3: Via extraFields com "N° SÉRIE"
+    const extractedExtraSerial: NameplateExtractedData = {
+      extraFields: [{ label: 'N° SÉRIE', value: 'SER-4411' }],
+    }
+    const res3 = compareAndMergeNameplateData(baseEquipment, extractedExtraSerial)
+    expect(res3.mergedEquipment.serialNumber).toBe('SER-4411')
+    expect(res3.mergedEquipment.manufacturingNumber).toBe('SER-4411')
+  })
+
+  it('extrai vazão e unidade de vazão quando informados com siglas e unidades diversas', () => {
+    const extractedFlow: NameplateExtractedData = {
+      extraFields: [{ label: 'VAZÃO (m³/h)', value: '120,5 m³/h' }],
+    }
+    const res = compareAndMergeNameplateData(baseEquipment, extractedFlow)
+    expect(res.mergedEquipment.flowRate).toBe('120,5')
+    expect(res.mergedEquipment.flowUnit).toBe('m³/h')
+  })
+
+  it('mantém em customFields dados elétricos, de tubulação e normas sem regredir a seção complementar', () => {
+    const extractedExtras: NameplateExtractedData = {
+      extraFields: [
+        { label: 'KW', value: '30 kW' },
+        { label: 'Corrente (A)', value: '45 A' },
+        { label: 'Tensão (V)', value: '440 V' },
+        { label: 'DN', value: 'DN 100' },
+        { label: 'Classe de Pressão (CL)', value: 'CL 300' },
+        { label: 'NEMA', value: 'NEMA 4' },
+        { label: 'Norma Técnica', value: 'NR-13' },
+        { label: 'Material do Chassi', value: 'Aço Carbono' },
+      ],
+    }
+    const res = compareAndMergeNameplateData(baseEquipment, extractedExtras)
+    const customLabels = res.mergedEquipment.customFields?.map((c) => c.label)
+    expect(customLabels).toContain('KW')
+    expect(customLabels).toContain('Corrente (A)')
+    expect(customLabels).toContain('Tensão (V)')
+    expect(customLabels).toContain('DN')
+    expect(customLabels).toContain('Classe de Pressão (CL)')
+    expect(customLabels).toContain('NEMA')
+    expect(customLabels).toContain('Norma Técnica')
+    expect(customLabels).toContain('Material do Chassi')
+  })
 })

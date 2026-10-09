@@ -148,7 +148,7 @@ export function compareAndMergeNameplateData(
   const extractedMap: Record<string, string> = {
     manufacturer: (extracted.manufacturer || '').trim(),
     model: (extracted.model || '').trim(),
-    serialNumber: (extracted.serialNumber || extracted.manufacturingNumber || '').trim(),
+    serialNumber: (extracted.serialNumber || '').trim(),
     tag: (extracted.tag || '').trim(),
     service: (extracted.service || '').trim(),
     manufacturingNumber: (extracted.manufacturingNumber || '').trim(),
@@ -165,6 +165,201 @@ export function compareAndMergeNameplateData(
     fluid2: (extracted.fluid2 || '').trim(),
     flowRate: normalizeNameplateNumeric(extracted.flowRate),
     flowUnit: (extracted.flowUnit || '').trim(),
+  }
+
+  // Função para normalizar labels removendo acentos, pontuações, minúsculas e ignorando texto entre parênteses
+  const normalizeLabelForMatching = (label: string): string => {
+    return (label || '')
+      .replace(/\([^)]*\)/g, ' ') // remove unidades entre parênteses, ex.: (bar), (MPa), (kgf)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // remove diacríticos
+      .replace(/[^a-z0-9]/g, ' ') // mantém apenas letras e números
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  // Tenta casar um label de extraFields com um dos campos principais do formulário
+  const matchExtraFieldToKey = (
+    cleanLabel: string,
+  ): { key: keyof EquipmentItem; detectedFlowUnit?: string } | null => {
+    // 1. Fabricante
+    if (/^(fabricante|mfg|manufacturer)$/.test(cleanLabel) || cleanLabel.startsWith('fabricante')) {
+      return { key: 'manufacturer' }
+    }
+
+    // 2. Modelo
+    if (
+      /^(mod|modelo|model|type|tipo)$/.test(cleanLabel) ||
+      cleanLabel.startsWith('mod ') ||
+      cleanLabel.startsWith('modelo ')
+    ) {
+      return { key: 'model' }
+    }
+
+    // 3. Nº de Fabricação / Número de Série
+    if (
+      /^(n\s*fab|n\s*fabricacao|num\s*fab|num\s*fabricacao|numero\s*de\s*fabricacao|n\s*serie|num\s*serie|numero\s*de\s*serie|s\s*n|sn|serial|serial\s*number|fabricacao)$/.test(
+        cleanLabel,
+      ) ||
+      cleanLabel.startsWith('n fab') ||
+      cleanLabel.startsWith('no fab') ||
+      cleanLabel.startsWith('n serie') ||
+      cleanLabel.startsWith('no serie')
+    ) {
+      return { key: 'manufacturingNumber' }
+    }
+
+    // 4. TAG
+    if (/^(tag|tag\s*do\s*equipamento|equip\s*tag)$/.test(cleanLabel)) {
+      return { key: 'tag' }
+    }
+
+    // 5. Serviço / Fluido
+    if (/^(servico|service|servico\s*da\s*plaqueta)$/.test(cleanLabel)) {
+      return { key: 'service' }
+    }
+
+    // 6. Ano de Fabricação
+    if (
+      /^(ano|year|date|ano\s*fabricacao|ano\s*de\s*fabricacao|data\s*fabricacao)$/.test(cleanLabel)
+    ) {
+      return { key: 'manufacturingYear' }
+    }
+
+    // 7. Pressão de Projeto (PS / PRESSÃO PROJ / P.PROJ)
+    if (
+      /^(ps|pressao\s*proj|pressao\s*projeto|pressao\s*de\s*projeto|p\s*proj|p\s*projeto|design\s*pressure)$/.test(
+        cleanLabel,
+      )
+    ) {
+      return { key: 'designPressureBar' }
+    }
+
+    // 8. Pressão de Teste (PT / PRESSÃO TESTE / P.TESTE)
+    if (/^(pt|pressao\s*teste|pressao\s*de\s*teste|p\s*teste|test\s*pressure)$/.test(cleanLabel)) {
+      return { key: 'testPressureBar' }
+    }
+
+    // 9. Temperatura de Projeto (TS / TEMP PROJ / T.PROJ)
+    if (
+      /^(ts|temp\s*proj|temp\s*projeto|temperatura\s*proj|temperatura\s*projeto|temperatura\s*de\s*projeto|t\s*proj|t\s*projeto|design\s*temp|design\s*temperature)$/.test(
+        cleanLabel,
+      )
+    ) {
+      return { key: 'designTempC' }
+    }
+
+    // 10. PMTA / MAWP
+    if (/^(pmta|mawp|pressao\s*maxima\s*de\s*trabalho\s*admissivel)$/.test(cleanLabel)) {
+      return { key: 'pmtaMpa' }
+    }
+
+    // 11. Peso Vazio (PESO / WT / EMPTY WT)
+    if (/^(peso|wt|empty\s*wt|peso\s*vazio|peso\s*liquido|empty\s*weight)$/.test(cleanLabel)) {
+      return { key: 'emptyWeightKg' }
+    }
+
+    // 12. "a" Máximo / Aperto Máximo
+    if (
+      cleanLabel === 'a max' ||
+      cleanLabel === 'a maximo' ||
+      cleanLabel === 'aperto max' ||
+      cleanLabel === 'aperto maximo' ||
+      cleanLabel === 'medida a max' ||
+      cleanLabel === 'medida a maximo'
+    ) {
+      return { key: 'tighteningMaxA' }
+    }
+
+    // 13. "a" Mínimo / Aperto Mínimo
+    if (
+      cleanLabel === 'a min' ||
+      cleanLabel === 'a minimo' ||
+      cleanLabel === 'aperto min' ||
+      cleanLabel === 'aperto minimo' ||
+      cleanLabel === 'medida a min' ||
+      cleanLabel === 'medida a minimo'
+    ) {
+      return { key: 'tighteningMinA' }
+    }
+
+    // 14. Vazão (Q / VAZÃO / FLOW)
+    if (/^(q|vazao|flow|flow\s*rate|vazao\s*q)$/.test(cleanLabel)) {
+      return { key: 'flowRate' }
+    }
+
+    // 15. Placas (PLACAS / PLATES / QTD PLACAS)
+    if (
+      /^(placas|plates|qtd\s*placas|quantidade\s*placas|quantidade\s*de\s*placas|no\s*placas|n\s*placas)$/.test(
+        cleanLabel,
+      )
+    ) {
+      return { key: 'plateCount' }
+    }
+
+    // 16. Fluido 1
+    if (/^(fluido\s*1|fluid\s*1|fluido\s*quente|lado\s*quente)$/.test(cleanLabel)) {
+      return { key: 'fluid1' }
+    }
+
+    // 17. Fluido 2
+    if (/^(fluido\s*2|fluid\s*2|fluido\s*frio|lado\s*frio)$/.test(cleanLabel)) {
+      return { key: 'fluid2' }
+    }
+
+    return null
+  }
+
+  // Pre-processamento: Se extraFields contiver dados correspondentes aos campos da seção principal,
+  // alimenta extractedMap caso o campo esteja vazio.
+  // Itens não casados são guardados para irem a customFields.
+  const unmatchedExtraFields: Array<{ label: string; value: string }> = []
+  if (Array.isArray(extracted.extraFields) && extracted.extraFields.length > 0) {
+    for (const extra of extracted.extraFields) {
+      const origLabel = (extra.label || '').trim()
+      const origVal = (extra.value || '').trim()
+      if (!origLabel || !origVal) continue
+
+      const cleanLabel = normalizeLabelForMatching(origLabel)
+      const matched = matchExtraFieldToKey(cleanLabel)
+
+      if (matched) {
+        const key = matched.key
+        // Se for campo numérico, normaliza
+        const isNumeric = FORM_FIELD_DEFINITIONS.find((d) => d.key === key)?.isNumericPtBr
+        let parsedVal = isNumeric ? normalizeNameplateNumeric(origVal) : origVal
+        if (key === 'manufacturingYear') {
+          parsedVal = origVal.replace(/\D/g, '').slice(0, 4)
+        }
+
+        // Se o extractedMap ainda estiver vazio neste campo, preenche com o valor do extraField
+        if (!extractedMap[key as string] && parsedVal) {
+          extractedMap[key as string] = parsedVal
+        }
+
+        // Se for vazão e o extraField contiver unidade (ex: m³/h, l/h, kg/h)
+        if (key === 'flowRate' && !extractedMap.flowUnit) {
+          const unitMatch = (origLabel + ' ' + origVal).match(
+            /(m[³3]\/h|l\/h|kg\/h|gpm|m3\/s|l\/s)/i,
+          )
+          if (unitMatch) {
+            extractedMap.flowUnit = unitMatch[1].replace('3', '³')
+          }
+        }
+      } else {
+        // Código/label não casa com nenhum campo principal: permanece para customFields
+        unmatchedExtraFields.push(extra)
+      }
+    }
+  }
+
+  // Espelhamento mútuo entre manufacturingNumber e serialNumber quando um estiver vazio
+  if (!extractedMap.manufacturingNumber && extractedMap.serialNumber) {
+    extractedMap.manufacturingNumber = extractedMap.serialNumber
+  }
+  if (!extractedMap.serialNumber && extractedMap.manufacturingNumber) {
+    extractedMap.serialNumber = extractedMap.manufacturingNumber
   }
 
   // Compara cada campo padrão
@@ -206,10 +401,19 @@ export function compareAndMergeNameplateData(
     }
   }
 
-  // Processa campos extras retornados que não correspondem a campos fixos
+  // Espelhamento mútuo também no mergedEquipment pós-preenchimento:
+  // Se o usuário já tinha serialNumber mas não manufacturingNumber e a placa preencheu serialNumber,
+  // ou vice-versa, garante que se um ficou vazio e o outro preenchido pela placa, espelha.
+  if (!merged.serialNumber && merged.manufacturingNumber) {
+    merged.serialNumber = merged.manufacturingNumber
+  } else if (!merged.manufacturingNumber && merged.serialNumber) {
+    merged.manufacturingNumber = merged.serialNumber
+  }
+
+  // Processa campos extras que NÃO casaram com nenhum campo principal (KW, A, V, DN, CL, normas, materiais, etc.)
   const newCustomFields: Array<{ id: string; label: string; value: string }> = []
-  if (Array.isArray(extracted.extraFields) && extracted.extraFields.length > 0) {
-    for (const extra of extracted.extraFields) {
+  if (unmatchedExtraFields.length > 0) {
+    for (const extra of unmatchedExtraFields) {
       const extraLabel = (extra.label || '').trim()
       const extraVal = (extra.value || '').trim()
       if (!extraLabel || !extraVal) continue
