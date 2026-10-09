@@ -19,6 +19,8 @@ export interface NameplateExtractedData {
   plateCount?: string
   fluid1?: string
   fluid2?: string
+  flowRate?: string
+  flowUnit?: string
   thermalAreaM2?: string
   fabricationStandard?: string
   connectionSize?: string
@@ -84,6 +86,8 @@ export const FORM_FIELD_DEFINITIONS: Array<{
   { key: 'plateCount', label: 'Quantidade de Placas', category: 'operacional' },
   { key: 'fluid1', label: 'Fluido 1 (Lado quente)', category: 'operacional' },
   { key: 'fluid2', label: 'Fluido 2 (Lado frio)', category: 'operacional' },
+  { key: 'flowRate', label: 'Vazão (Q)', category: 'operacional', isNumericPtBr: true },
+  { key: 'flowUnit', label: 'Unidade de Vazão', category: 'operacional' },
 ]
 
 /**
@@ -159,6 +163,8 @@ export function compareAndMergeNameplateData(
     plateCount: (extracted.plateCount || '').trim(),
     fluid1: (extracted.fluid1 || '').trim(),
     fluid2: (extracted.fluid2 || '').trim(),
+    flowRate: normalizeNameplateNumeric(extracted.flowRate),
+    flowUnit: (extracted.flowUnit || '').trim(),
   }
 
   // Compara cada campo padrão

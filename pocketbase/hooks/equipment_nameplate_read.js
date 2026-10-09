@@ -38,15 +38,39 @@ routerAdd('POST', '/backend/v1/field-visits/equipment/read-nameplate', (e) => {
     } catch (_) {}
   }
 
-  const promptText = `Analise detalhadamente as informações e/ou foto da plaqueta de identificação industrial (trocador de calor de placas, válvulas ou equipamento BERMO / Alfa Laval).
+  const promptText = `Analise detalhadamente as informações e/ou foto da plaqueta de identificação industrial (trocador de calor de placas, válvulas, motores ou equipamento BERMO / Alfa Laval / WEG).
 Identifique com rigor os campos técnicos gravados na plaqueta.
 NUNCA invente dados. Deixe em branco ("") o que não for identificado.
+
+MAPEAMENTO OBRIGATÓRIO DE CÓDIGOS DE LETRAS E NÚMEROS DA PLACA:
+- TAG: tag de processo -> tag
+- MOD / MODELO / TYPE: modelo exato -> model
+- N° SÉRIE / N° FAB / S/N / SERIAL / FABRICAÇÃO: número de fabricação/série -> manufacturingNumber e serialNumber
+- ANO / DATE / YEAR: ano de fabricação de 4 dígitos -> manufacturingYear
+- PS / PRESSÃO PROJETO / DESIGN PRESS / P.PROJ: pressão de projeto em bar -> designPressureBar
+- TS / TEMP PROJETO / DESIGN TEMP / T.PROJ: temperatura de projeto em °C -> designTempC
+- PT / PRESSÃO TESTE / TEST PRESS / P.TESTE: pressão de teste em bar -> testPressureBar
+- PMTA / MAWP: Pressão Máxima de Trabalho Admissível em MPa -> pmtaMpa
+- PESO / WT / EMPTY WT / PESO VAZIO: peso vazio em kgf ou kg -> emptyWeightKg
+- "a" MÁX / "a" MÍN: medidas de aperto de tirantes em mm -> tighteningMaxA e tighteningMinA
+- Q / VAZÃO / FLOW / FLOW RATE / CAPACIDADE: vazão nominal operacional -> flowRate (ex.: 45,5) e flowUnit (ex.: m³/h)
+- FL / FLUIDO / SERVICE / SERVIÇO: fluidos ou serviço -> service ou fluid1 / fluid2
+- KW / CV / HP / POTÊNCIA: potência -> extraFields: { label: "Potência (kW)", value: "..." }
+- A / CORRENTE / AMP / IN: corrente elétrica -> extraFields: { label: "Corrente (A)", value: "..." }
+- V / TENSÃO / VOLTS: tensão elétrica -> extraFields: { label: "Tensão (V)", value: "..." }
+- NEMA / IP / CARCAÇA: classificação NEMA ou proteção IP -> extraFields: { label: "Classificação NEMA / IP", value: "..." }
+- DN / CONEXÕES / BOCAL / FLANGE: diâmetro nominal das conexões -> connectionSize (ex.: DN 50, DN 65)
+- CL / CLASSE / RATING: classe de pressão -> extraFields: { label: "Classe de Pressão (CL)", value: "..." }
+- MATERIAL PLACAS (AISI 316L, Titânio, etc.) -> plateMaterial
+- MATERIAL GAXETAS (NBR, EPDM, FKM, etc.) -> gasketMaterial
+- NORMA (ASME VIII, NR-13, etc.) -> fabricationStandard
+- ÁREA DE TROCA (m²) -> thermalAreaM2
 
 CORREÇÕES TÍPICAS DE OCR EM PLAQUETAS BERMO:
 - Junte letras espaçadas em nomes e códigos: ex. "B P 6 0 B" ou "B P 60 B" deve ser "BP 60 B" ou "BP60B".
 - Corrija pontuação com espaçamento espúrio em números de fabricação: ex. "639 . 065" deve ser "639.065".
 - Se houver pressões com barra ex. "10/13 bar" ou "10 / 13 bar", atribua 10 (ou 10,00) a designPressureBar e 13 (ou 13,00) a testPressureBar.
-- Limpe unidades de medida coladas nos valores (ex. "1.13MPa" -> 1,13; "265kgf" -> 265).
+- Limpe unidades de medida coladas nos valores (ex. "1.13MPa" -> 1,13; "265kgf" -> 265; "45m3/h" -> 45).
 
 Campos estruturados esperados:
 - manufacturer: nome do fabricante (ex.: BERMO, Alfa Laval, Sondex, Kelvion, etc.)
@@ -65,12 +89,14 @@ Campos estruturados esperados:
 - tighteningMinA: medida "a" mínimo em mm (ex.: 70)
 - plateCount: quantidade de placas se estiver escrita
 - fluid1 / fluid2: fluidos primário e secundário se houver
+- flowRate: vazão lida com código Q ou vazão (ex.: 45,5)
+- flowUnit: unidade da vazão (ex.: m³/h)
 - thermalAreaM2: área de troca térmica se legível (ex.: 12,5 m²)
 - fabricationStandard: norma de projeto/fabricação se indicada (ex.: ASME VIII, NR-13, AD 2000)
-- connectionSize: diâmetro nominal ou tipo de conexões/bocais (ex.: DN 50, Flange 2")
+- connectionSize: diâmetro nominal ou tipo de conexões/bocais (ex.: DN 50, DN 65, Flange 2")
 - plateMaterial: material das placas (ex.: AISI 316L, Titânio, AISI 304)
 - gasketMaterial: material das gaxetas de vedação (ex.: NBR, EPDM, FKM/Viton)
-- extraFields: array de objetos { label: "Nome do dado extra", value: "Valor" } para qualquer informação visível adicional
+- extraFields: array de objetos { label: "Nome do dado extra", value: "Valor" } para qualquer informação visível adicional (potência KW, corrente A, tensão V, NEMA, CL etc.)
 - rawTextExtracted: transcrição do texto visível
 - summary: breve resumo em 1 linha (ex.: "Plaqueta BERMO BP60B identificada")
 
@@ -297,6 +323,11 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
   addExtraFieldIfPresent('Conexões / Bocais', extractedData.connectionSize)
   addExtraFieldIfPresent('Material das Placas', extractedData.plateMaterial)
   addExtraFieldIfPresent('Material das Gaxetas', extractedData.gasketMaterial)
+  addExtraFieldIfPresent('Potência (kW)', extractedData.powerKw)
+  addExtraFieldIfPresent('Corrente (A)', extractedData.currentA)
+  addExtraFieldIfPresent('Tensão (V)', extractedData.voltageV)
+  addExtraFieldIfPresent('Classificação NEMA / IP', extractedData.nemaRating)
+  addExtraFieldIfPresent('Classe de Pressão (CL)', extractedData.pressureClass)
 
   // Correção determinística de espaços espúrios em modelo (ex. "B P 6 0 B" -> "BP 60 B")
   let cleanModel = sanitizeStr(extractedData.model)
@@ -324,6 +355,8 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     plateCount: sanitizeStr(extractedData.plateCount),
     fluid1: sanitizeStr(extractedData.fluid1),
     fluid2: sanitizeStr(extractedData.fluid2),
+    flowRate: normalizePtBrNumber(extractedData.flowRate),
+    flowUnit: sanitizeStr(extractedData.flowUnit),
     thermalAreaM2: sanitizeStr(extractedData.thermalAreaM2),
     fabricationStandard: sanitizeStr(extractedData.fabricationStandard),
     connectionSize: sanitizeStr(extractedData.connectionSize),

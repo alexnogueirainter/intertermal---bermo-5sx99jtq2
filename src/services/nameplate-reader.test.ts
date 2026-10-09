@@ -180,4 +180,55 @@ describe('nameplate-reader service & BERMO identification pipeline', () => {
     const areaField = result.mergedEquipment.customFields?.find((c) => c.label === 'Área Térmica')
     expect(areaField?.value).toBe('25 m²')
   })
+
+  it('mapeia códigos industriais (TAG, MOD, N° SÉRIE, ANO, PS, TS, Q, KW, A, V, FL, NEMA, DN, CL)', () => {
+    const eq: EquipmentItem = {
+      ...baseEquipment,
+      model: '',
+      manufacturingNumber: '',
+      tag: '',
+      flowRate: '',
+      flowUnit: '',
+    }
+
+    const extracted: NameplateExtractedData = {
+      tag: 'TC-101',
+      model: 'BP 60 B',
+      manufacturingNumber: '998.112',
+      manufacturingYear: '2024',
+      designPressureBar: '16,00', // PS
+      designTempC: '180', // TS
+      flowRate: '55,5', // Q
+      flowUnit: 'm³/h',
+      service: 'AQUECIMENTO DE VAPOR', // FL / SERVIÇO
+      connectionSize: 'DN 80', // DN
+      extraFields: [
+        { label: 'Potência (kW)', value: '15 kW' }, // KW
+        { label: 'Corrente (A)', value: '28 A' }, // A
+        { label: 'Tensão (V)', value: '380 V' }, // V
+        { label: 'Classificação NEMA / IP', value: 'NEMA 4X' }, // NEMA
+        { label: 'Classe de Pressão (CL)', value: 'CL 150' }, // CL
+      ],
+    }
+
+    const result = compareAndMergeNameplateData(eq, extracted)
+
+    expect(result.mergedEquipment.tag).toBe('TC-101')
+    expect(result.mergedEquipment.model).toBe('BP 60 B')
+    expect(result.mergedEquipment.manufacturingNumber).toBe('998.112')
+    expect(result.mergedEquipment.manufacturingYear).toBe('2024')
+    expect(result.mergedEquipment.designPressureBar).toBe('16,00')
+    expect(result.mergedEquipment.designTempC).toBe('180')
+    expect(result.mergedEquipment.flowRate).toBe('55,5')
+    expect(result.mergedEquipment.flowUnit).toBe('m³/h')
+    expect(result.mergedEquipment.service).toBe('AQUECIMENTO DE VAPOR')
+
+    // Custom fields criados para grandezas extras
+    const customLabels = result.mergedEquipment.customFields?.map((c) => c.label)
+    expect(customLabels).toContain('Potência (kW)')
+    expect(customLabels).toContain('Corrente (A)')
+    expect(customLabels).toContain('Tensão (V)')
+    expect(customLabels).toContain('Classificação NEMA / IP')
+    expect(customLabels).toContain('Classe de Pressão (CL)')
+  })
 })

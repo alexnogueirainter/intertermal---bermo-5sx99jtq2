@@ -127,28 +127,12 @@ export function EquipmentMediaAttachmentSection({
                     </button>
                   </div>
 
-                  {/* Ação de leitura de plaqueta para fotos */}
-                  {enableNameplateReader && isImage && onReadNameplatePhoto && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onReadNameplatePhoto(att)}
-                      disabled={isReadingNameplate || isCompressing}
-                      className="w-full h-7 text-[10.5px] border-teal-200 dark:border-teal-800 text-teal-800 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950 font-semibold gap-1"
-                    >
-                      {isThisReading ? (
-                        <>
-                          <Loader2 className="h-3 w-3 animate-spin text-teal-600" />
-                          {readingStatusText || 'Lendo plaqueta...'}
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-3 w-3 text-teal-600" />
-                          Ler dados desta plaqueta
-                        </>
-                      )}
-                    </Button>
+                  {/* Indicador de leitura em andamento na foto */}
+                  {isThisReading && (
+                    <div className="flex items-center gap-1 text-[10.5px] text-teal-700 dark:text-teal-300 font-semibold py-1">
+                      <Loader2 className="h-3 w-3 animate-spin text-teal-600" />
+                      <span>{readingStatusText || 'Lendo placa...'}</span>
+                    </div>
                   )}
                 </div>
               </div>
@@ -225,8 +209,8 @@ export function EquipmentMediaAttachmentSection({
         {/* Dica amigável para o técnico */}
         <p className="text-[10.5px] text-muted-foreground mt-2 flex items-center gap-1">
           <AlertCircle className="h-3 w-3 text-slate-400 shrink-0" />
-          Ao anexar a foto da plaqueta, o sistema analisa automaticamente os dados com IA e sugere o
-          preenchimento sem apagar nada digitado.
+          Tire a foto ou anexe o arquivo: a leitura da placa e o preenchimento automático ocorrem
+          sozinhos, sem precisar clicar em nada.
         </p>
       </div>
     </div>

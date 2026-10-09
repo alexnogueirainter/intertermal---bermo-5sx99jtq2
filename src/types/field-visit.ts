@@ -79,6 +79,7 @@ export interface EquipmentItem {
       currentValue: string
       plateValue: string
     }>
+    unidentifiedFields?: string[]
   }
 }
 
