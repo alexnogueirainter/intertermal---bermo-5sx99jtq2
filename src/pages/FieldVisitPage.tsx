@@ -848,10 +848,114 @@ export default function FieldVisitPage({
       })
 
       if (res.ok && res.data) {
+        // Disparado diretamente pelo evento da foto: aplica os dados extraídos sem diálogo bloqueante
         const comparison = compareAndMergeNameplateData(currentEq, res.data, photo.id)
-        setOcrComparisonResult(comparison)
-        setTargetOcrEquipment(currentEq)
-        setOcrReviewOpen(true)
+        const mergedEq = comparison.mergedEquipment
+
+        // Aplica diretamente ao equipamento usando setVisit((prev) => ...) reativo
+        setVisit((prev) => {
+          const freshCurrentEq = prev.equipments.find((e) => e.id === equipmentId)
+          if (!freshCurrentEq) return prev
+
+          // Helper para preencher SÓ campos vazios, preservando estritamente valores já digitados pelo técnico
+          const fillOnlyIfEmpty = (currentVal: any, incomingVal: any): string => {
+            const c =
+              currentVal !== undefined && currentVal !== null ? String(currentVal).trim() : ''
+            if (c) return String(currentVal)
+            return incomingVal !== undefined && incomingVal !== null
+              ? String(incomingVal).trim()
+              : ''
+          }
+
+          // Mesclagem segura campo a campo
+          const updatedEquipment: EquipmentItem = {
+            ...freshCurrentEq,
+            tag: fillOnlyIfEmpty(freshCurrentEq.tag, mergedEq.tag),
+            service: fillOnlyIfEmpty(freshCurrentEq.service, mergedEq.service),
+            manufacturingNumber: fillOnlyIfEmpty(
+              freshCurrentEq.manufacturingNumber,
+              mergedEq.manufacturingNumber,
+            ),
+            model: fillOnlyIfEmpty(freshCurrentEq.model, mergedEq.model),
+            manufacturer: fillOnlyIfEmpty(freshCurrentEq.manufacturer, mergedEq.manufacturer),
+            serialNumber: fillOnlyIfEmpty(freshCurrentEq.serialNumber, mergedEq.serialNumber),
+            designPressureBar: fillOnlyIfEmpty(
+              freshCurrentEq.designPressureBar,
+              mergedEq.designPressureBar,
+            ),
+            testPressureBar: fillOnlyIfEmpty(
+              freshCurrentEq.testPressureBar,
+              mergedEq.testPressureBar,
+            ),
+            designTempC: fillOnlyIfEmpty(freshCurrentEq.designTempC, mergedEq.designTempC),
+            pmtaMpa: fillOnlyIfEmpty(freshCurrentEq.pmtaMpa, mergedEq.pmtaMpa),
+            emptyWeightKg: fillOnlyIfEmpty(freshCurrentEq.emptyWeightKg, mergedEq.emptyWeightKg),
+            manufacturingYear: fillOnlyIfEmpty(
+              freshCurrentEq.manufacturingYear,
+              mergedEq.manufacturingYear,
+            ),
+            tighteningMaxA: fillOnlyIfEmpty(freshCurrentEq.tighteningMaxA, mergedEq.tighteningMaxA),
+            tighteningMinA: fillOnlyIfEmpty(freshCurrentEq.tighteningMinA, mergedEq.tighteningMinA),
+            plateCount: fillOnlyIfEmpty(freshCurrentEq.plateCount, mergedEq.plateCount),
+            fluid1: fillOnlyIfEmpty(freshCurrentEq.fluid1, mergedEq.fluid1),
+            fluid2: fillOnlyIfEmpty(freshCurrentEq.fluid2, mergedEq.fluid2),
+          }
+
+          // Adicionar customFields novos vindos do OCR sem duplicar labels existentes
+          const currentCustom = freshCurrentEq.customFields || []
+          const incomingCustom = mergedEq.customFields || []
+          const mergedCustom = [...currentCustom]
+
+          for (const inc of incomingCustom) {
+            const incLabel = (inc.label || '').trim().toLowerCase()
+            if (!incLabel) continue
+            const alreadyExists = mergedCustom.some(
+              (c) => (c.label || '').trim().toLowerCase() === incLabel,
+            )
+            if (!alreadyExists) {
+              mergedCustom.push(inc)
+            }
+          }
+          updatedEquipment.customFields = mergedCustom
+
+          // Preservar metadados da leitura, discrepâncias registradas e campos não identificados
+          updatedEquipment.nameplateOcrData = {
+            ...(freshCurrentEq.nameplateOcrData || {}),
+            ...(mergedEq.nameplateOcrData || {}),
+            discrepancies:
+              comparison.discrepancies ||
+              mergedEq.nameplateOcrData?.discrepancies ||
+              freshCurrentEq.nameplateOcrData?.discrepancies ||
+              [],
+          }
+
+          return {
+            ...prev,
+            equipments: prev.equipments.map((eq) =>
+              eq.id === equipmentId ? updatedEquipment : eq,
+            ),
+          }
+        })
+
+        // Notificação toast discreta e não-bloqueante (o técnico pode ignorar e continuar trabalhando)
+        const filledCount = comparison.autoFilled.length
+        const discCount = comparison.discrepancies.length
+
+        let descText = ''
+        if (filledCount > 0 && discCount > 0) {
+          descText = `${filledCount} ${filledCount === 1 ? 'campo preenchido' : 'campos preenchidos'}, ${discCount} ${discCount === 1 ? 'divergência a revisar' : 'divergências a revisar'}.`
+        } else if (filledCount > 0) {
+          descText = `${filledCount} ${filledCount === 1 ? 'campo preenchido automaticamente' : 'campos preenchidos automaticamente'}.`
+        } else if (discCount > 0) {
+          descText = `Campos mantidos intactos (${discCount} ${discCount === 1 ? 'divergência apontada sob o input' : 'divergências apontadas sob os inputs'}).`
+        } else {
+          descText = 'Dados da placa compatíveis com o formulário.'
+        }
+
+        toast({
+          title: 'Dados da placa aplicados',
+          description: descText,
+        })
       } else {
         toast({
           title: 'Não foi possível ler a placa',
@@ -872,7 +976,7 @@ export default function FieldVisitPage({
     }
   }
 
-  // Aplicação da confirmação leve de leitura da plaqueta
+  // Aplicação manual caso algum fluxo secundário utilize (mantido compatível)
   const handleApplyNameplateOcr = (mergedEq: EquipmentItem) => {
     if (!mergedEq || !mergedEq.id) return
     const targetId = mergedEq.id
@@ -952,7 +1056,7 @@ export default function FieldVisitPage({
     setOcrComparisonResult(null)
     setTargetOcrEquipment(null)
     toast({
-      title: 'Dados da plaqueta aplicados!',
+      title: 'Dados da placa aplicados!',
       description: 'Campos vazios preenchidos e novos campos adicionados com sucesso.',
     })
   }
