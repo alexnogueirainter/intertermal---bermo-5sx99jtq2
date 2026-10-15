@@ -27,7 +27,7 @@ export interface NameplateExtractedData {
   plateMaterial?: string
   gasketMaterial?: string
   extraFields?: Array<{ label: string; value: string }>
-  confidence?: Record<string, number>
+  confidence?: Record<string, number | 'high' | 'medium' | 'low' | string>
   rawTextExtracted?: string
   summary?: string
 }

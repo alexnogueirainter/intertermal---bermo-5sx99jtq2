@@ -39,8 +39,15 @@ routerAdd('POST', '/backend/v1/field-visits/equipment/read-nameplate', (e) => {
   }
 
   const promptText = `Analise detalhadamente as informações e/ou foto da plaqueta de identificação industrial (trocador de calor de placas, válvulas, motores ou equipamento BERMO / Alfa Laval / WEG).
-Identifique com rigor os campos técnicos gravados na plaqueta.
-NUNCA invente dados. Deixe em branco ("") o que não for identificado.
+Faça uma LEITURA MINUCIOSA, CARACTERE POR CARACTERE, DÍGITO POR DÍGITO, transcrevendo exatamente o que está na placa.
+
+REGRAS RÍGIDAS DE FIDELIDADE (TOLERÂNCIA ZERO PARA ERROS):
+1. É ESTRITAMENTE PROIBIDO inventar, deduzir, adivinhar, completar, presumir ou estimar QUALQUER dado.
+2. Se houver qualquer dúvida, caractere ilegível, reflexo de luz, desgaste, oxidação, corte ou baixa confiança: DEIXE O CAMPO EM BRANCO (""). NUNCA CHUTE valores.
+3. Para cada campo identificado, retorne no objeto "confidence" o nível de confiança da leitura:
+   - "high" (ou número >= 0.85): lido com total clareza e nitidez.
+   - "medium" (ou número 0.50 a 0.84): leitura parcial ou caractere parcialmente desgastado porém legível.
+   - Campos vazios ou com dúvida não devem constar ou devem ter valor omitido/"low".
 
 MAPEAMENTO OBRIGATÓRIO DE CÓDIGOS DE LETRAS E NÚMEROS DA PLACA:
 - TAG: tag de processo -> tag
@@ -97,6 +104,7 @@ Campos estruturados esperados:
 - plateMaterial: material das placas (ex.: AISI 316L, Titânio, AISI 304)
 - gasketMaterial: material das gaxetas de vedação (ex.: NBR, EPDM, FKM/Viton)
 - extraFields: array de objetos { label: "Nome do dado extra", value: "Valor" } para qualquer informação visível adicional (potência KW, corrente A, tensão V, NEMA, CL etc.)
+- confidence: objeto com chave de cada campo preenchido ("manufacturer", "model", "manufacturingNumber", "serialNumber", "tag", "service", "designPressureBar", "testPressureBar", "designTempC", "pmtaMpa", "emptyWeightKg", "manufacturingYear", "tighteningMaxA", "tighteningMinA", "plateCount", "flowRate", etc.) mapeado para "high" | "medium" | "low" ou score 0.0 a 1.0.
 - rawTextExtracted: transcrição do texto visível
 - summary: breve resumo em 1 linha (ex.: "Plaqueta BERMO BP60B identificada")
 
@@ -134,8 +142,9 @@ Contexto do equipamento: ${extraContext || 'Plaqueta fotografada em campo pelo t
         endpoint = endpoint + '/chat/completions'
       }
 
-      const systemInstruction = `Você é um engenheiro perito em leitura e transcrição técnica de placas de identificação de trocadores de calor industriais (BERMO, Alfa Laval, etc.).
-Analise detalhadamente a foto da placa e extraia os dados técnicos com fidelidade total.
+      const systemInstruction = `Você é um perito sênior em leitura e transcrição técnica minuciosa de placas de identificação de equipamentos industriais (BERMO, Alfa Laval, etc.).
+Faça a leitura caractere por caractere, dígito por dígito. PROIBIDO inventar, deduzir ou estimar dados. Dúvida ou ilegível -> campo em branco ("").
+Retorne avaliação de confiança ("high" | "medium" | "low") para cada campo no objeto "confidence".
 Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
 
       const payloadVision = {
@@ -251,7 +260,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
           {
             role: 'system',
             content:
-              'Você é um perito industrial em identificação de equipamentos e placas térmicas BERMO e Alfa Laval. Retorne rigorosamente um JSON com os campos técnicos.',
+              'Você é um perito industrial em identificação minuciosa de placas térmicas BERMO e Alfa Laval (leitura caractere por caractere, sem inventar dados, retornando mapa "confidence" por campo). Retorne rigorosamente um JSON com os campos técnicos.',
           },
           {
             role: 'user',

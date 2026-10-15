@@ -65,13 +65,18 @@ export interface EquipmentItem {
   // Preserva integralmente qualquer dado novo sem colidir com campos existentes
   customFields?: Array<{ id: string; label: string; value: string }>
 
+  // Necessidade de Manutenção (Novo campo da visita técnica)
+  // true = Necessita manutenção, false = Não necessita manutenção, undefined = não respondido ainda
+  needsMaintenance?: boolean
+  maintenanceNotes?: string
+
   // Metadados da última leitura de plaqueta realizada pela IA
   nameplateOcrData?: {
     lastReadAt?: string
     summary?: string
     rawText?: string
     method?: string
-    confidence?: Record<string, number>
+    confidence?: Record<string, number | 'high' | 'medium' | 'low'>
     evidenceAttachmentId?: string
     discrepancies?: Array<{
       fieldKey: string
@@ -185,6 +190,8 @@ export function createEmptyEquipment(customName?: string): EquipmentItem {
     tighteningMaxA: '',
     tighteningMinA: '',
     customFields: [],
+    needsMaintenance: undefined,
+    maintenanceNotes: '',
   }
 }
 
