@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-09T17:24:11.005Z",
+  "generatedAt": "2026-10-15T12:58:54.005Z",
   "collections": [
     {
       "name": "users",
@@ -2646,6 +2646,117 @@
       "indexes": [
         "CREATE INDEX idx_quote_history_quote ON quote_history (quote_id)",
         "CREATE INDEX idx_quote_history_created ON quote_history (created DESC)"
+      ]
+    },
+    {
+      "name": "client_surveys",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "client_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "client_name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "contact_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contact_name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "contact_email",
+          "type": "email",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "contact_role",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contact_phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "survey_url",
+          "type": "url",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "sent_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sent_by_email",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email_subject",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["sent", "error"]
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_client_surveys_client ON client_surveys (client_id)",
+        "CREATE INDEX idx_client_surveys_created ON client_surveys (created DESC)"
       ]
     }
   ]

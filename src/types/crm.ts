@@ -87,6 +87,25 @@ export interface ClientContact {
   is_primary?: boolean
 }
 
+export interface ClientSurveyRecord {
+  id: string
+  client_id: string
+  client_name: string
+  contact_id?: string
+  contact_name: string
+  contact_email: string
+  contact_role?: string
+  contact_phone?: string
+  survey_url: string
+  sent_by?: string
+  sent_by_email?: string
+  email_subject?: string
+  status: 'sent' | 'error'
+  notes?: string
+  created?: string
+  updated?: string
+}
+
 export interface ClientRecord {
   id: string
   name: string

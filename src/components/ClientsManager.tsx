@@ -59,7 +59,11 @@ import {
   History,
   Clock,
   Sparkles,
+  ClipboardCheck,
 } from 'lucide-react'
+import { ClientSurveyModal } from '@/components/ClientSurveyModal'
+import { clientSurveysService } from '@/services/client-surveys'
+import type { ClientSurveyRecord } from '@/types/crm'
 
 export interface ContactInteractionNote {
   id: string
@@ -156,6 +160,11 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
       },
     ]
   })
+
+  // Modal de Disparo de Pesquisa de Satisfação
+  const [isSurveyModalOpen, setIsSurveyModalOpen] = useState(false)
+  const [surveyClientToTarget, setSurveyClientToTarget] = useState<ClientRecord | null>(null)
+  const [clientSurveysList, setClientSurveysList] = useState<ClientSurveyRecord[]>([])
 
   // Form para nova nota de interação manual
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false)
@@ -422,6 +431,18 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
             t.client_name.toLowerCase().includes(selectedClient.name.toLowerCase())),
       )
     : []
+  // Carregar histórico de pesquisas do cliente selecionado
+  React.useEffect(() => {
+    if (!selectedClient) {
+      setClientSurveysList([])
+      return
+    }
+    clientSurveysService
+      .getByClientId(selectedClient.id)
+      .then((items) => setClientSurveysList(items))
+      .catch((err) => console.warn('Erro ao carregar pesquisas do cliente:', err))
+  }, [selectedClient?.id])
+
   const activeClientNotes = selectedClient
     ? interactionNotes.filter(
         (n) =>
@@ -433,6 +454,15 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
 
   // Timeline unificada ordenada por data (mais recente primeiro)
   const combinedTimeline = [
+    ...clientSurveysList.map((s) => ({
+      kind: 'survey' as const,
+      id: s.id,
+      title: `Pesquisa de Satisfação (${s.status === 'sent' ? 'Enviada' : 'Falha'})`,
+      detail: `Enviada para ${s.contact_name} (${s.contact_email})${s.contact_role ? ` • ${s.contact_role}` : ''}${s.notes ? ` • ${s.notes}` : ''}`,
+      date: s.created ? new Date(s.created) : new Date(),
+      status: s.status,
+      author: s.sent_by || 'Alex Nogueira',
+    })),
     ...activeClientQuotes.map((q) => ({
       kind: 'quote' as const,
       id: q.id,
@@ -564,6 +594,20 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                             <Flame className="h-3 w-3 mr-0.5 fill-amber-500" /> VIP
                           </span>
                         )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onSelectClient(client)
+                            setSurveyClientToTarget(client)
+                            setIsSurveyModalOpen(true)
+                          }}
+                          className="h-5 px-1.5 text-[10px] text-teal-700 hover:text-teal-800 hover:bg-teal-50 dark:text-teal-400 dark:hover:bg-teal-950/50 font-medium"
+                          title="Disparar Pesquisa de Satisfação"
+                        >
+                          <Send className="h-2.5 w-2.5 mr-1" /> Pesquisa
+                        </Button>
                       </div>
                       {client.company_name && (
                         <div className="text-xs text-muted-foreground">
@@ -627,6 +671,17 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSurveyClientToTarget(selectedClient)
+                        setIsSurveyModalOpen(true)
+                      }}
+                      className="text-xs bg-teal-700 hover:bg-teal-600 text-white shadow-xs font-semibold"
+                      title="Disparar Pesquisa de Satisfação por E-mail para um contato deste cliente"
+                    >
+                      <Send className="h-3 w-3 mr-1.5" /> Enviar Pesquisa
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -837,6 +892,11 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                               {item.kind === 'note' && (
                                 <Badge className="bg-slate-700 text-white text-[9px] px-1.5 py-0 flex items-center gap-1">
                                   <History className="h-3 w-3" /> Contato Comercial
+                                </Badge>
+                              )}
+                              {item.kind === 'survey' && (
+                                <Badge className="bg-teal-600 text-white text-[9px] px-1.5 py-0 flex items-center gap-1">
+                                  <ClipboardCheck className="h-3 w-3" /> Pesquisa Enviada
                                 </Badge>
                               )}
                               <span className="font-bold text-slate-900 dark:text-slate-100">
@@ -1432,6 +1492,18 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
           )}
         </DialogContent>
       </Dialog>
+      {/* Modal de Disparo de Pesquisa de Satisfação */}
+      <ClientSurveyModal
+        isOpen={isSurveyModalOpen}
+        onClose={() => {
+          setIsSurveyModalOpen(false)
+          setSurveyClientToTarget(null)
+        }}
+        client={surveyClientToTarget || selectedClient}
+        onSurveySent={(newSurvey) => {
+          setClientSurveysList((prev) => [newSurvey, ...prev.filter((s) => s.id !== newSurvey.id)])
+        }}
+      />
     </div>
   )
 }
