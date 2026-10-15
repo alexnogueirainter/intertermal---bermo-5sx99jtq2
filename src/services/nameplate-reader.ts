@@ -434,12 +434,35 @@ export function compareAndMergeNameplateData(
     }
   }
 
+  // Normaliza o mapa de confiança para garantir valores Record<string, number | 'high' | 'medium' | 'low'>
+  const normalizedConfidence: Record<string, number | 'high' | 'medium' | 'low'> = {}
+  if (extracted.confidence && typeof extracted.confidence === 'object') {
+    for (const [key, rawVal] of Object.entries(extracted.confidence)) {
+      if (typeof rawVal === 'number') {
+        normalizedConfidence[key] = rawVal
+      } else if (typeof rawVal === 'string') {
+        const lower = rawVal.trim().toLowerCase()
+        if (lower === 'high' || lower === 'medium' || lower === 'low') {
+          normalizedConfidence[key] = lower
+        } else if (!Number.isNaN(Number(lower)) && lower !== '') {
+          normalizedConfidence[key] = Number(lower)
+        } else if (lower.includes('alt') || lower.includes('clar') || lower.includes('bom')) {
+          normalizedConfidence[key] = 'high'
+        } else if (lower.includes('med') || lower.includes('parcial')) {
+          normalizedConfidence[key] = 'medium'
+        } else if (lower.includes('baix') || lower.includes('duvid') || lower.includes('ruim')) {
+          normalizedConfidence[key] = 'low'
+        }
+      }
+    }
+  }
+
   // Grava metadados da leitura e as divergências encontradas no equipamento
   merged.nameplateOcrData = {
     lastReadAt: new Date().toISOString(),
     summary: extracted.summary || '',
     rawText: extracted.rawTextExtracted || '',
-    confidence: extracted.confidence || {},
+    confidence: normalizedConfidence,
     evidenceAttachmentId: attachmentId,
     discrepancies,
   }

@@ -13,15 +13,18 @@ export interface CustomFieldItem {
 interface EquipmentCustomFieldsSectionProps {
   customFields?: CustomFieldItem[]
   onChange: (fields: CustomFieldItem[]) => void
+  confidenceMap?: Record<string, number | 'high' | 'medium' | 'low'>
 }
 
 export function EquipmentCustomFieldsSection({
   customFields = [],
   onChange,
+  confidenceMap,
 }: EquipmentCustomFieldsSectionProps) {
   const [newLabel, setNewLabel] = useState('')
   const [newValue, setNewValue] = useState('')
   const [isAdding, setIsAdding] = useState(false)
+  const [manuallyEditedIds, setManuallyEditedIds] = useState<Record<string, boolean>>({})
 
   const handleAddField = () => {
     const trimmedLabel = newLabel.trim()
@@ -43,8 +46,32 @@ export function EquipmentCustomFieldsSection({
   }
 
   const handleUpdateField = (id: string, patch: Partial<CustomFieldItem>) => {
+    setManuallyEditedIds((prev) => ({ ...prev, [id]: true }))
     const updated = customFields.map((f) => (f.id === id ? { ...f, ...patch } : f))
     onChange(updated)
+  }
+
+  const getCustomFieldConfidence = (label: string): 'high' | 'medium' | null => {
+    if (!confidenceMap) return null
+    const clean = label
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '')
+    for (const [k, v] of Object.entries(confidenceMap)) {
+      const cleanKey = k
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+      if (cleanKey === clean || cleanKey.includes(clean) || clean.includes(cleanKey)) {
+        if (v === 'high') return 'high'
+        if (v === 'medium') return 'medium'
+        if (typeof v === 'number') {
+          if (v >= 0.8) return 'high'
+          if (v >= 0.5) return 'medium'
+        }
+      }
+    }
+    return null
   }
 
   const handleRemoveField = (id: string) => {
@@ -89,13 +116,48 @@ export function EquipmentCustomFieldsSection({
               className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center gap-2"
             >
               <div className="flex-1 space-y-1">
-                <input
-                  type="text"
-                  value={field.label}
-                  onChange={(e) => handleUpdateField(field.id, { label: e.target.value })}
-                  placeholder="Nome do campo"
-                  className="w-full text-[11px] font-semibold text-slate-700 dark:text-slate-300 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none"
-                />
+                <div className="flex items-center justify-between gap-1">
+                  <input
+                    type="text"
+                    value={field.label}
+                    onChange={(e) => handleUpdateField(field.id, { label: e.target.value })}
+                    placeholder="Nome do campo"
+                    className="w-full text-[11px] font-semibold text-slate-700 dark:text-slate-300 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none"
+                  />
+                  {(() => {
+                    if (manuallyEditedIds[field.id]) {
+                      return (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded shrink-0">
+                          editado
+                        </span>
+                      )
+                    }
+                    const conf = getCustomFieldConfidence(field.label)
+                    if (conf === 'high') {
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-950/70 dark:text-emerald-300 px-1.5 py-0.5 rounded shrink-0"
+                          title="Lido com clareza da placa (alta confiança)"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                          Placa
+                        </span>
+                      )
+                    }
+                    if (conf === 'medium') {
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/70 dark:text-amber-300 px-1.5 py-0.5 rounded shrink-0"
+                          title="Leitura parcial da placa (revisar)"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                          Parcial
+                        </span>
+                      )
+                    }
+                    return null
+                  })()}
+                </div>
                 <Input
                   value={field.value}
                   onChange={(e) => handleUpdateField(field.id, { value: e.target.value })}

@@ -354,6 +354,26 @@ describe('nameplate-reader service & BERMO identification pipeline', () => {
     expect(res.mergedEquipment.flowUnit).toBe('m³/h')
   })
 
+  it('normaliza o mapa de confiança garantindo tipos válidos e preserva no nameplateOcrData', () => {
+    const extractedWithConf: NameplateExtractedData = {
+      model: 'BP 60 B',
+      confidence: {
+        model: 'high',
+        serialNumber: 'medium',
+        designPressureBar: 0.95,
+        tag: 'clara',
+        pmtaMpa: 'parcial',
+      },
+    }
+    const res = compareAndMergeNameplateData(baseEquipment, extractedWithConf)
+    expect(res.mergedEquipment.nameplateOcrData?.confidence).toBeDefined()
+    expect(res.mergedEquipment.nameplateOcrData?.confidence?.model).toBe('high')
+    expect(res.mergedEquipment.nameplateOcrData?.confidence?.serialNumber).toBe('medium')
+    expect(res.mergedEquipment.nameplateOcrData?.confidence?.designPressureBar).toBe(0.95)
+    expect(res.mergedEquipment.nameplateOcrData?.confidence?.tag).toBe('high')
+    expect(res.mergedEquipment.nameplateOcrData?.confidence?.pmtaMpa).toBe('medium')
+  })
+
   it('mantém em customFields dados elétricos, de tubulação e normas sem regredir a seção complementar', () => {
     const extractedExtras: NameplateExtractedData = {
       extraFields: [
