@@ -2600,15 +2600,13 @@ export default function FieldVisitPage({
                                   placeholder="Ex.: 70"
                                   className="h-9 text-xs bg-white dark:bg-slate-900"
                                 />
-                                {(() => {
-                                  const disc = eq.nameplateOcrData?.discrepancies?.find(
-                                    (d) => d.fieldKey === 'tighteningMinA',
+                                    </p>
                                   )
-                                  if (!disc) return null
-                                  return (
-                                    <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                      Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                      {disc.currentValue}
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+=======
                           {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
                           <EquipmentCustomFieldsSection
                             customFields={item.customFields || []}
@@ -2699,6 +2697,730 @@ export default function FieldVisitPage({
                               </div>
                             )}
                           </div>
+                          <EquipmentMediaAttachmentSection
+                            title={`Anexos de ${eqLabel}`}
+                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
+                            attachments={eq.attachments || []}
+                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
+                            onRemoveAttachment={(attId) =>
+                              handleRemoveEquipmentAttachment(eq.id, attId)
+                            }
+                            onReadNameplatePhoto={(photo) =>
+                              handleTriggerNameplateOcr(eq.id, photo)
+                            }
+                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
+                            activeReadingAttachmentId={activeReadingAttachmentId}
+                            readingStatusText={nameplateReadingStatus}
+                            isCompressing={isCompressingGlobal}
+                          />
+=======
+                          <EquipmentCustomFieldsSection
+                            customFields={eq.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(eq.id, { customFields: fields })
+                            }
+                            confidenceMap={eq.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              eq.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : eq.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {eq.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {eq.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={eq.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+=======
+=======
+                                    </p>
+                                  )
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+=======
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={item.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(item.id, { customFields: fields })
+                            }
+                            confidenceMap={item.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              item.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : item.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {item.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {item.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={item.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(item.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <EquipmentMediaAttachmentSection
+                            title={`Anexos de ${eqLabel}`}
+                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
+                            attachments={eq.attachments || []}
+                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
+                            onRemoveAttachment={(attId) =>
+                              handleRemoveEquipmentAttachment(eq.id, attId)
+                            }
+                            onReadNameplatePhoto={(photo) =>
+                              handleTriggerNameplateOcr(eq.id, photo)
+                            }
+                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
+                            activeReadingAttachmentId={activeReadingAttachmentId}
+                            readingStatusText={nameplateReadingStatus}
+                            isCompressing={isCompressingGlobal}
+                          />
+=======
+                          <EquipmentCustomFieldsSection
+                            customFields={eq.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(eq.id, { customFields: fields })
+                            }
+                            confidenceMap={eq.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              eq.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : eq.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {eq.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {eq.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={eq.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={item.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(item.id, { customFields: fields })
+                            }
+                            confidenceMap={item.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              item.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : item.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {item.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {item.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={item.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(item.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={item.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(item.id, { customFields: fields })
+                            }
+                            confidenceMap={item.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              item.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : item.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {item.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {item.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={item.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(item.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+=======
+=======
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={item.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(item.id, { customFields: fields })
+                            }
+                            confidenceMap={item.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              item.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : item.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {item.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {item.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={item.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(item.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <EquipmentMediaAttachmentSection
+                            title={`Anexos de ${eqLabel}`}
+                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
+                            attachments={eq.attachments || []}
+                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
+                            onRemoveAttachment={(attId) =>
+                              handleRemoveEquipmentAttachment(eq.id, attId)
+                            }
+                            onReadNameplatePhoto={(photo) =>
+                              handleTriggerNameplateOcr(eq.id, photo)
+                            }
+                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
+                            activeReadingAttachmentId={activeReadingAttachmentId}
+                            readingStatusText={nameplateReadingStatus}
+                            isCompressing={isCompressingGlobal}
+                          />
+=======
+                                {(() => {
+                                  const disc = eq.nameplateOcrData?.discrepancies?.find(
+                                    (d) => d.fieldKey === 'tighteningMinA',
+                                  )
+                                  if (!disc) return null
+                                  return (
+                                    <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+                                      Placa indica {disc.plateValue} — campo preenchido com{' '}
+                                      {disc.currentValue}
+                                    </p>
+                                  )
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={eq.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(eq.id, { customFields: fields })
+                            }
+                            confidenceMap={eq.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              eq.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : eq.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {eq.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {eq.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={eq.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <EquipmentMediaAttachmentSection
+                            title={`Anexos de ${eqLabel}`}
+                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
+                            attachments={eq.attachments || []}
+                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
+                            onRemoveAttachment={(attId) =>
+                              handleRemoveEquipmentAttachment(eq.id, attId)
+                            }
+                            onReadNameplatePhoto={(photo) =>
+                              handleTriggerNameplateOcr(eq.id, photo)
+                            }
+                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
+                            activeReadingAttachmentId={activeReadingAttachmentId}
+                            readingStatusText={nameplateReadingStatus}
+                            isCompressing={isCompressingGlobal}
+                          />
 =======
                                     </p>
                                   )
