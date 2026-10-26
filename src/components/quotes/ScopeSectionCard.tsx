@@ -1,3 +1,4 @@
+import { getStatusBadge } from './QuoteStatusBadge'
 import { ChemicalProductsEditor } from './ChemicalProductsEditor'
 import { EquipmentItemsEditor } from './EquipmentItemsEditor'
 import { PartsMaterialsEditor } from './PartsMaterialsEditor'
@@ -12,6 +13,7 @@ import {
   QuoteEquipmentItem,
   QuoteMaterialItem,
 } from '@/types/crm'
+import type { useToast } from '@/hooks/use-toast'
 import type { Dispatch, SetStateAction } from 'react'
 
 interface ScopeSectionCardProps {

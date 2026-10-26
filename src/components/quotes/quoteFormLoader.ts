@@ -1,4 +1,5 @@
-import { QuoteSnapshot } from '@/services/quote-history'
+import { extractQuoteSnapshot, QuoteSnapshot } from '@/services/quote-history'
+import { resolveIntegrationCost } from '@/lib/quote-calculator'
 import {
   QuoteChemicalProductItem,
   QuoteCustomMaterial,

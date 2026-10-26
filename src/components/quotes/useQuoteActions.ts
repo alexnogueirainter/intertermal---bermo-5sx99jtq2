@@ -1,4 +1,10 @@
-import { QuoteSnapshot } from '@/services/quote-history'
+import { quoteDealSyncService } from '@/services/quotes-deal-sync'
+import {
+  computeQuoteDiffs,
+  extractQuoteSnapshot,
+  quoteHistoryService,
+  QuoteSnapshot,
+} from '@/services/quote-history'
 import { QuoteRecord, QuoteStatus } from '@/types/crm'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 

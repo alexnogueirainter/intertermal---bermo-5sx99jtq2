@@ -1,3 +1,4 @@
+import { clientsService } from '@/services/clients'
 import { ClientRecord, QuoteStatus } from '@/types/crm'
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
 

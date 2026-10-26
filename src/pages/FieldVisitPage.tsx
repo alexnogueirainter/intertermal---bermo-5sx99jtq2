@@ -2600,6 +2600,15 @@ export default function FieldVisitPage({
                                   placeholder="Ex.: 70"
                                   className="h-9 text-xs bg-white dark:bg-slate-900"
                                 />
+                                {(() => {
+                                  const disc = eq.nameplateOcrData?.discrepancies?.find(
+                                    (d) => d.fieldKey === 'tighteningMinA',
+                                  )
+                                  if (!disc) return null
+                                  return (
+                                    <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+                                      Placa indica {disc.plateValue} — campo preenchido com{' '}
+                                      {disc.currentValue}
                                     </p>
                                   )
                                 })()}

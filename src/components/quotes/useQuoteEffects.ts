@@ -1,4 +1,11 @@
-import { QuoteSnapshot } from '@/services/quote-history'
+import { useEffect } from 'react'
+import { quoteDealSyncService } from '@/services/quotes-deal-sync'
+import {
+  computeQuoteDiffs,
+  extractQuoteSnapshot,
+  quoteHistoryService,
+  QuoteSnapshot,
+} from '@/services/quote-history'
 import {
   QuoteChemicalProductItem,
   QuoteCustomMaterial,
