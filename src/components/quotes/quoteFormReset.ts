@@ -1,6 +1,5 @@
 import { EquipmentSpecsExtractionResponse, EquipmentWebSearchResultItem } from '@/services/quotes'
 import { QuoteHistoryItem, QuoteSnapshot } from '@/services/quote-history'
-import { EquipmentWebSearchResultItem } from '@/services/quotes'
 import {
   QuoteChemicalProductItem,
   QuoteCustomMaterial,
