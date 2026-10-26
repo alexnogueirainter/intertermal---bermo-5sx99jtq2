@@ -1,9 +1,9 @@
+import { getStatusBadge } from './QuoteStatusBadge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { QuoteRecord, QuoteStatus } from '@/types/crm'
 import { Calculator, CheckCheck, Eye, FileText, Layers } from 'lucide-react'
-import { getStatusBadge } from './QuoteStatusBadge'
 
 interface EditorDialogHeaderProps {
   activeQuoteId: string | null

@@ -1,3 +1,4 @@
+import { buildServiceDetails } from './quoteServiceDetails'
 import {
   QuoteChemicalProductItem,
   QuoteCustomMaterial,

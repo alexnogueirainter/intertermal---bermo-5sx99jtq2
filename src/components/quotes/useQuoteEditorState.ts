@@ -1,3 +1,4 @@
+import { getStandardServiceMethodology } from '@/data/bermo-catalog'
 import { EquipmentCatalogItem } from '@/services/equipment-catalog'
 import { QuoteHistoryItem, QuoteSnapshot } from '@/services/quote-history'
 import { EquipmentWebSearchResultItem } from '@/services/quotes'
