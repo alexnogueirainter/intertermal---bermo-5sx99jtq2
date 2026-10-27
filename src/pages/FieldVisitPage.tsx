@@ -2615,7 +2615,6 @@ export default function FieldVisitPage({
                               </div>
                             </div>
                           </div>
-=======
                           {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
                           <EquipmentCustomFieldsSection
                             customFields={item.customFields || []}
@@ -2722,7 +2721,6 @@ export default function FieldVisitPage({
                             readingStatusText={nameplateReadingStatus}
                             isCompressing={isCompressingGlobal}
                           />
-=======
                           <EquipmentCustomFieldsSection
                             customFields={eq.customFields || []}
                             onChange={(fields) =>
@@ -2783,3049 +2781,2712 @@ export default function FieldVisitPage({
                                   }
                                   className={`h-8 px-3 text-xs font-bold transition-all ${
                                     eq.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {eq.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={eq.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(eq.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-=======
-=======
-                                    </p>
-                                  )
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-=======
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                          <EquipmentCustomFieldsSection
-                            customFields={item.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(item.id, { customFields: fields })
-                            }
-                            confidenceMap={item.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              item.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : item.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {item.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {item.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={item.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(item.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <EquipmentMediaAttachmentSection
-                            title={`Anexos de ${eqLabel}`}
-                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
-                            attachments={eq.attachments || []}
-                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
-                            onRemoveAttachment={(attId) =>
-                              handleRemoveEquipmentAttachment(eq.id, attId)
-                            }
-                            onReadNameplatePhoto={(photo) =>
-                              handleTriggerNameplateOcr(eq.id, photo)
-                            }
-                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
-                            activeReadingAttachmentId={activeReadingAttachmentId}
-                            readingStatusText={nameplateReadingStatus}
-                            isCompressing={isCompressingGlobal}
-                          />
-=======
-                          <EquipmentCustomFieldsSection
-                            customFields={eq.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(eq.id, { customFields: fields })
-                            }
-                            confidenceMap={eq.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              eq.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : eq.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {eq.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(eq.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    eq.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(eq.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    eq.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {eq.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={eq.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(eq.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                          <EquipmentCustomFieldsSection
-                            customFields={item.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(item.id, { customFields: fields })
-                            }
-                            confidenceMap={item.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              item.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : item.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {item.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {item.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={item.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(item.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                          <EquipmentCustomFieldsSection
-                            customFields={item.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(item.id, { customFields: fields })
-                            }
-                            confidenceMap={item.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              item.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : item.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {item.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {item.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={item.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(item.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-=======
-=======
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                          <EquipmentCustomFieldsSection
-                            customFields={item.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(item.id, { customFields: fields })
-                            }
-                            confidenceMap={item.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              item.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : item.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {item.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {item.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={item.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(item.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <EquipmentMediaAttachmentSection
-                            title={`Anexos de ${eqLabel}`}
-                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
-                            attachments={eq.attachments || []}
-                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
-                            onRemoveAttachment={(attId) =>
-                              handleRemoveEquipmentAttachment(eq.id, attId)
-                            }
-                            onReadNameplatePhoto={(photo) =>
-                              handleTriggerNameplateOcr(eq.id, photo)
-                            }
-                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
-                            activeReadingAttachmentId={activeReadingAttachmentId}
-                            readingStatusText={nameplateReadingStatus}
-                            isCompressing={isCompressingGlobal}
-                          />
-=======
-                                {(() => {
-                                  const disc = eq.nameplateOcrData?.discrepancies?.find(
-                                    (d) => d.fieldKey === 'tighteningMinA',
-                                  )
-                                  if (!disc) return null
-                                  return (
-                                    <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                      Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                      {disc.currentValue}
-                                    </p>
-                                  )
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                          <EquipmentCustomFieldsSection
-                            customFields={eq.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(eq.id, { customFields: fields })
-                            }
-                            confidenceMap={eq.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              eq.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : eq.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {eq.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(eq.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    eq.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(eq.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    eq.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {eq.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={eq.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(eq.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <EquipmentMediaAttachmentSection
-                            title={`Anexos de ${eqLabel}`}
-                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
-                            attachments={eq.attachments || []}
-                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
-                            onRemoveAttachment={(attId) =>
-                              handleRemoveEquipmentAttachment(eq.id, attId)
-                            }
-                            onReadNameplatePhoto={(photo) =>
-                              handleTriggerNameplateOcr(eq.id, photo)
-                            }
-                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
-                            activeReadingAttachmentId={activeReadingAttachmentId}
-                            readingStatusText={nameplateReadingStatus}
-                            isCompressing={isCompressingGlobal}
-                          />
-=======
-                                    </p>
-                                  )
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-=======
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                          <EquipmentCustomFieldsSection
-                            customFields={item.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(item.id, { customFields: fields })
-                            }
-                            confidenceMap={item.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              item.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : item.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {item.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {item.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={item.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(item.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <EquipmentMediaAttachmentSection
-                            title={`Anexos de ${eqLabel}`}
-                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
-                            attachments={eq.attachments || []}
-                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
-                            onRemoveAttachment={(attId) =>
-                              handleRemoveEquipmentAttachment(eq.id, attId)
-                            }
-                            onReadNameplatePhoto={(photo) =>
-                              handleTriggerNameplateOcr(eq.id, photo)
-                            }
-                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
-                            activeReadingAttachmentId={activeReadingAttachmentId}
-                            readingStatusText={nameplateReadingStatus}
-                            isCompressing={isCompressingGlobal}
-                          />
-=======
-                          <EquipmentCustomFieldsSection
-                            customFields={eq.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(eq.id, { customFields: fields })
-                            }
-                            confidenceMap={eq.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              eq.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : eq.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {eq.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(eq.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    eq.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(eq.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    eq.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {eq.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={eq.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(eq.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-=======
-=======
-                                    </p>
-                                  )
-                                })()}
-                              </div>
-                            </div>
-                          </div>
-=======
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                          <EquipmentCustomFieldsSection
-                            customFields={item.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(item.id, { customFields: fields })
-                            }
-                            confidenceMap={item.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              item.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : item.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {item.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {item.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={item.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(item.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <EquipmentMediaAttachmentSection
-                            title={`Anexos de ${eqLabel}`}
-                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
-                            attachments={eq.attachments || []}
-                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
-                            onRemoveAttachment={(attId) =>
-                              handleRemoveEquipmentAttachment(eq.id, attId)
-                            }
-                            onReadNameplatePhoto={(photo) =>
-                              handleTriggerNameplateOcr(eq.id, photo)
-                            }
-                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
-                            activeReadingAttachmentId={activeReadingAttachmentId}
-                            readingStatusText={nameplateReadingStatus}
-                            isCompressing={isCompressingGlobal}
-                          />
-=======
-                          <EquipmentCustomFieldsSection
-                            customFields={eq.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(eq.id, { customFields: fields })
-                            }
-                            confidenceMap={eq.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              eq.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : eq.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {eq.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(eq.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    eq.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(eq.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    eq.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {eq.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={eq.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(eq.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                          <EquipmentCustomFieldsSection
-                            customFields={item.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(item.id, { customFields: fields })
-                            }
-                            confidenceMap={item.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              item.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : item.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {item.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {item.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={item.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(item.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                          <EquipmentCustomFieldsSection
-                            customFields={item.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(item.id, { customFields: fields })
-                            }
-                            confidenceMap={item.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              item.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : item.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {item.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {item.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={item.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(item.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-=======
-=======
-                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                          <EquipmentCustomFieldsSection
-                            customFields={item.customFields || []}
-                            onChange={(fields) =>
-                              handleUpdateEquipment(item.id, { customFields: fields })
-                            }
-                            confidenceMap={item.nameplateOcrData?.confidence}
-                          />
-
-                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
-                          <div
-                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
-                              item.needsMaintenance === true
-                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
-                                : item.needsMaintenance === false
-                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
-                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
-                            }`}
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                              <div>
-                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                                  <span>Necessita de Manutenção?</span>
-                                  <span className="text-rose-600 font-bold">*</span>
-                                  {item.needsMaintenance === undefined && (
-                                    <span className="text-[10px] text-rose-600 font-normal">
-                                      (obrigatório responder)
-                                    </span>
-                                  )}
-                                </label>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Indique se este equipamento precisa de intervenção ou reparo
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0">
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === true
-                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
-                                  }`}
-                                >
-                                  Sim, necessita
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, {
-                                      needsMaintenance: false,
-                                      maintenanceNotes: '',
-                                    })
-                                  }
-                                  className={`h-8 px-3 text-xs font-bold transition-all ${
-                                    item.needsMaintenance === false
-                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
-                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
-                                  }`}
-                                >
-                                  Não
-                                </Button>
-                              </div>
-                            </div>
-
-                            {/* Se Sim: textarea de recomendações e identificações */}
-                            {item.needsMaintenance === true && (
-                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
-                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
-                                  O que foi identificado e recomendações do técnico:
-                                </label>
-                                <textarea
-                                  value={item.maintenanceNotes || ''}
-                                  onChange={(e) =>
-                                    handleUpdateEquipment(item.id, {
-                                      maintenanceNotes: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
-                                  rows={3}
-                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                          <EquipmentMediaAttachmentSection
-                            title={`Anexos de ${eqLabel}`}
-                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
-                            attachments={eq.attachments || []}
-                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
-                            onRemoveAttachment={(attId) =>
-                              handleRemoveEquipmentAttachment(eq.id, attId)
-                            }
-                            onReadNameplatePhoto={(photo) =>
-                              handleTriggerNameplateOcr(eq.id, photo)
-                            }
-                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
-                            activeReadingAttachmentId={activeReadingAttachmentId}
-                            readingStatusText={nameplateReadingStatus}
-                            isCompressing={isCompressingGlobal}
-                          />
-
-                          {/* Observações com Voz para este equipamento */}
-                          <VoiceDictationField
-                            label={`Observações do técnico sobre ${eqLabel}`}
-                            sublabel="Digite ou grave sua fala com transcrição automática"
-                            value={eq.technicianNotes}
-                            onChange={(val) =>
-                              handleUpdateEquipment(eq.id, { technicianNotes: val })
-                            }
-                            onSaveAudioAttachment={(audioFile) => {
-                              const newAtt: MediaAttachment = {
-                                id: generateId(),
-                                type: 'audio',
-                                name: audioFile.name,
-                                dataUrl: audioFile.dataUrl,
-                                size: audioFile.blob.size,
-                                createdAt: new Date().toISOString(),
-                              }
-                              setVisit((prev) => ({
-                                ...prev,
-                                equipments: prev.equipments.map((item) =>
-                                  item.id === eq.id
-                                    ? {
-                                        ...item,
-                                        attachments: [...(item.attachments || []), newAtt],
-                                      }
-                                    : item,
-                                ),
-                              }))
-                              toast({
-                                title: 'Áudio anexado ao equipamento',
-                                description: `Gravação salva nos anexos de ${eqLabel}.`,
-                              })
-                            }}
-                            placeholder="Descreva detalhes específicos, medidas, pontos críticos ou necessidades deste equipamento..."
-                            rows={3}
-                          />
-                        </CardContent>
-                      </Card>
-                    )
-                  })}
-
-                  <div className="pt-2">
-                    <Button
-                      type="button"
-                      onClick={() => handleAddEquipment()}
-                      variant="outline"
-                      className="w-full h-12 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-teal-600 hover:text-teal-700 font-semibold text-xs"
-                    >
-                      <Plus className="h-4 w-4 mr-1.5" />
-                      Adicionar mais um equipamento (
-                      {`Equipamento ${String(visit.equipments.length + 1).padStart(2, '0')}`})
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          /* ========================================================================= */
-          /* FLUXO 2: MANUTENÇÃO PREVENTIVA, CORRETIVA E CATÁLOGO DE EQUIPAMENTOS */
-          /* (FORMULÁRIO EXISTENTE INTACTO + GRAVAÇÃO DE VOZ NAS OBSERVAÇÕES DO TÉCNICO) */
-          /* ========================================================================= */
-          <div className="space-y-5 animate-in fade-in duration-300">
-            {/* 5. SEÇÃO: OBSERVAÇÕES GERAIS + GRAVAÇÃO DE VOZ */}
-            <Card className="border-slate-200 dark:border-slate-800 shadow-xs bg-white dark:bg-slate-900">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 flex items-center justify-center">
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-bold">
-                      5. Observações Gerais da Visita
-                    </CardTitle>
-                    <p className="text-[11px] text-muted-foreground">
-                      Relato técnico, condições da fábrica, demandas extras do cliente
-                    </p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <VoiceDictationField
-                  label="Relato técnico geral:"
-                  value={visit.generalObservations}
-                  onChange={(val) =>
-                    setVisit((prev) => ({
-                      ...prev,
-                      generalObservations: val,
-                      freeDescription: val,
-                    }))
-                  }
-                  onSaveAudioAttachment={(audioFile) => {
-                    const newAtt: MediaAttachment = {
-                      id: generateId(),
-                      type: 'audio',
-                      name: audioFile.name,
-                      dataUrl: audioFile.dataUrl,
-                      size: audioFile.blob.size,
-                      createdAt: new Date().toISOString(),
-                    }
-                    setVisit((prev) => ({
-                      ...prev,
-                      visitAttachments: [...(prev.visitAttachments || []), newAtt],
-                    }))
-                    toast({
-                      title: 'Áudio anexado à visita',
-                      description: 'Gravação salva como anexo da visita com sucesso.',
-                    })
-                  }}
-                  placeholder="Digite aqui ou use o botão de microfone acima para gravar seu relato técnico..."
-                  rows={5}
-                />
-              </CardContent>
-            </Card>
-
-            {/* 6. SEÇÃO: LISTA DE EQUIPAMENTOS INTACTA COM BOTÃO DE VOZ NAS OBSERVAÇÕES */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-2 pt-2">
-                <div>
-                  <h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <Layers className="h-5 w-5 text-teal-700 dark:text-teal-400" />
-                    Equipamentos Vistoriados
-                    <Badge variant="secondary" className="text-xs">
-                      {visit.equipments.length}
-                    </Badge>
-                  </h2>
-                  <p className="text-xs text-muted-foreground">
-                    Formulário técnico com parâmetros mecânicos, fluidos, temperaturas e anexos
-                  </p>
-                </div>
-
-                <Button
-                  type="button"
-                  onClick={() => handleAddEquipment()}
-                  className="bg-teal-700 hover:bg-teal-600 text-white font-semibold text-xs h-10 px-4 rounded-xl shadow-xs"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Adicionar equipamento
-                </Button>
-              </div>
-
-              {visit.equipments.length === 0 ? (
-                <div className="p-8 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 space-y-3">
-                  <div className="h-12 w-12 rounded-full bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-400 mx-auto flex items-center justify-center">
-                    <Layers className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-                      Nenhum equipamento adicionado ainda
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                      Toque no botão abaixo para registrar o primeiro trocador de calor
-                      inspecionado.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => handleAddEquipment()}
-                    variant="outline"
-                    className="text-xs h-9 font-semibold text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-700 hover:bg-teal-50"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Adicionar primeiro equipamento
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {visit.equipments.map((item, index) => (
-                    <Card
-                      key={item.id}
-                      className="border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden"
-                    >
-                      <CardHeader className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 py-3 px-4">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="h-6 w-6 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center">
-                              {index + 1}
-                            </span>
-                            <CardTitle className="text-sm font-bold truncate">
-                              {formatEquipmentTitle(item, index)}
-                            </CardTitle>
-                          </div>
-
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEquipmentToDelete(item.id)}
-                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950 h-8 px-2 text-xs"
-                            title="Remover este equipamento"
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Remover
-                          </Button>
-                        </div>
-                      </CardHeader>
-
-                      <CardContent className="p-4 space-y-4">
-                        {/* Linha 1: Modelo, Série, Fabricante, Tag */}
-                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Modelo
-                            </label>
-                            <Input
-                              value={item.model}
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, { model: e.target.value })
-                              }
-                              placeholder="Ex.: BP 60 B"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
-                            {(() => {
-                              const disc = item.nameplateOcrData?.discrepancies?.find(
-                                (d) => d.fieldKey === 'model',
-                              )
-                              if (!disc) return null
-                              return (
-                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                  {disc.currentValue}
-                                </p>
-                              )
-                            })()}
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Série
-                            </label>
-                            <Input
-                              value={item.serialNumber}
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, { serialNumber: e.target.value })
-                              }
-                              placeholder="Ex.: 30105-884"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
-                            {(() => {
-                              const disc = item.nameplateOcrData?.discrepancies?.find(
-                                (d) => d.fieldKey === 'serialNumber',
-                              )
-                              if (!disc) return null
-                              return (
-                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                  {disc.currentValue}
-                                </p>
-                              )
-                            })()}
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Fabricante
-                            </label>
-                            {(() => {
-                              const isPreset =
-                                !item.manufacturer ||
-                                MANUFACTURER_PRESETS.some(
-                                  (m) =>
-                                    m.toLowerCase() === (item.manufacturer || '').toLowerCase(),
-                                )
-                              const presetValue = isPreset ? item.manufacturer || '' : 'OUTROS'
-                              return (
-                                <div className="flex gap-1.5">
-                                  <select
-                                    value={presetValue}
-                                    onChange={(e) => {
-                                      const v = e.target.value
-                                      if (v === 'OUTROS') {
-                                        if (!item.manufacturer) {
-                                          handleUpdateEquipment(item.id, { manufacturer: '' })
-                                        }
-                                      } else {
-                                        handleUpdateEquipment(item.id, { manufacturer: v })
-                                      }
-                                    }}
-                                    className="h-10 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 text-slate-700 dark:text-slate-300 shrink-0 w-[42%]"
-                                    title="Selecione o fabricante"
-                                  >
-                                    <option value="">—</option>
-                                    {MANUFACTURER_PRESETS.map((m) => (
-                                      <option key={m} value={m}>
-                                        {m}
-                                      </option>
-                                    ))}
-                                    <option value="OUTROS">Outros</option>
-                                  </select>
-                                  {!isPreset && (
-                                    <Input
-                                      value={item.manufacturer}
-                                      onChange={(e) =>
-                                        handleUpdateEquipment(item.id, {
-                                          manufacturer: e.target.value,
-                                        })
-                                      }
-                                      placeholder="Digite o fabricante"
-                                      className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                                      autoFocus
-                                    />
-                                  )}
-                                </div>
-                              )
-                            })()}
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Tag do Equipamento (Opcional)
-                            </label>
-                            <Input
-                              value={item.tag || ''}
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, { tag: e.target.value })
-                              }
-                              placeholder="Ex.: TQ-101 / TC-01"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
-                            {(() => {
-                              const disc = item.nameplateOcrData?.discrepancies?.find(
-                                (d) => d.fieldKey === 'tag',
-                              )
-                              if (!disc) return null
-                              return (
-                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                  {disc.currentValue}
-                                </p>
-                              )
-                            })()}
-                          </div>
-                        </div>
-
-                        {/* SUB-SEÇÃO: DADOS DA PLAQUETA DE IDENTIFICAÇÃO (Plaqueta BERMO) */}
-                        <div className="rounded-xl border border-teal-200/80 dark:border-teal-900/60 bg-teal-50/30 dark:bg-teal-950/20 p-3.5 space-y-3">
-                          <div className="flex items-center justify-between gap-2 border-b border-teal-200/60 dark:border-teal-900/40 pb-2">
-                            <div className="flex items-center gap-2">
-                              <span className="h-6 w-6 rounded-md bg-teal-700 text-white flex items-center justify-center text-xs font-bold shadow-2xs">
-                                🏷️
-                              </span>
-                              <div>
-                                <h4 className="text-xs font-bold text-teal-950 dark:text-teal-200 tracking-tight">
-                                  Dados da Plaqueta de Identificação (BERMO)
-                                </h4>
-                                <p className="text-[10.5px] text-teal-800/80 dark:text-teal-400">
-                                  Informações gravadas na plaqueta de fábrica do trocador de calor
-                                  (todos opcionais)
-                                </p>
-                              </div>
-                            </div>
-                            <span className="text-[10px] font-medium text-teal-700 dark:text-teal-300 bg-teal-100/80 dark:bg-teal-900/60 px-2 py-0.5 rounded-full">
-                              Referência de campo
-                            </span>
-                          </div>
-
-                          {/* Plaqueta - Linha 1: Serviço e Nº de Fabricação */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Serviço
-                                </label>
-                                {renderConfidenceBadge(item, 'service', item.service)}
-                              </div>
-                              <Input
-                                value={item.service || ''}
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'service')
-                                  handleUpdateEquipment(item.id, { service: e.target.value })
-                                }}
-                                placeholder="Ex.: RESFRIAMENTO, AQUECIMENTO, CONDENSAÇÃO"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'service',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Nº de Fabricação
-                                </label>
-                                {renderConfidenceBadge(item, 'manufacturingNumber', item.manufacturingNumber)}
-                              </div>
-                              <Input
-                                value={item.manufacturingNumber || ''}
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'manufacturingNumber')
-                                  handleUpdateEquipment(item.id, {
-                                    manufacturingNumber: e.target.value,
-                                  })
-                                }}
-                                placeholder="Ex.: 639.065"
-                                className="h-9 text-xs bg-white dark:bg-slate-900 font-mono"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'manufacturingNumber',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-                          </div>
-
-                          {/* Plaqueta - Linha 2: Pressão Projeto, Pressão Teste, Temp Projeto, PMTA */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Pressão de Projeto (bar)
-                                </label>
-                                {renderConfidenceBadge(item, 'designPressureBar', item.designPressureBar)}
-                              </div>
-                              <Input
-                                value={item.designPressureBar || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'designPressureBar')
-                                  handleUpdateEquipment(item.id, {
-                                    designPressureBar: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 10,00"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'designPressureBar',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Pressão de Teste (bar)
-                                </label>
-                                {renderConfidenceBadge(item, 'testPressureBar', item.testPressureBar)}
-                              </div>
-                              <Input
-                                value={item.testPressureBar || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'testPressureBar')
-                                  handleUpdateEquipment(item.id, {
-                                    testPressureBar: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 13,00"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'testPressureBar',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Temp. de Projeto (°C)
-                                </label>
-                                {renderConfidenceBadge(item, 'designTempC', item.designTempC)}
-                              </div>
-                              <Input
-                                value={item.designTempC || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'designTempC')
-                                  handleUpdateEquipment(item.id, {
-                                    designTempC: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 165"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'designTempC',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  PMTA (MPa)
-                                </label>
-                                {renderConfidenceBadge(item, 'pmtaMpa', item.pmtaMpa)}
-                              </div>
-                              <Input
-                                value={item.pmtaMpa || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'pmtaMpa')
-                                  handleUpdateEquipment(item.id, {
-                                    pmtaMpa: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 1,30"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'pmtaMpa',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-                          </div>
-
-                          {/* Plaqueta - Linha 3: Peso Vazio, Ano Fabr., "a" Máx, "a" Mín */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Peso Vazio (kgf)
-                                </label>
-                                {renderConfidenceBadge(item, 'emptyWeightKg', item.emptyWeightKg)}
-                              </div>
-                              <Input
-                                value={item.emptyWeightKg || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'emptyWeightKg')
-                                  handleUpdateEquipment(item.id, {
-                                    emptyWeightKg: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 164,30"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'emptyWeightKg',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Ano de Fabricação
-                                </label>
-                                {renderConfidenceBadge(item, 'manufacturingYear', item.manufacturingYear)}
-                              </div>
-                              <Input
-                                value={item.manufacturingYear || ''}
-                                inputMode="numeric"
-                                maxLength={4}
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'manufacturingYear')
-                                  handleUpdateEquipment(item.id, {
-                                    manufacturingYear: e.target.value.replace(/\D/g, ''),
-                                  })
-                                }}
-                                placeholder="Ex.: 2025"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'manufacturingYear',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  &quot;a&quot; Máximo (mm)
-                                </label>
-                                {renderConfidenceBadge(item, 'tighteningMaxA', item.tighteningMaxA)}
-                              </div>
-                              <Input
-                                value={item.tighteningMaxA || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'tighteningMaxA')
-                                  handleUpdateEquipment(item.id, {
-                                    tighteningMaxA: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 66"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'tighteningMaxA',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  &quot;a&quot; Mínimo (mm)
-                                </label>
-                                {renderConfidenceBadge(item, 'tighteningMinA', item.tighteningMinA)}
-                              </div>
-                              <Input
-                                value={item.tighteningMinA || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'tighteningMinA')
-                                  handleUpdateEquipment(item.id, {
-                                    tighteningMinA: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 70"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'tighteningMinA',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-                          </div>
-=======
-                          {/* Plaqueta - Linha 1: Serviço e Nº de Fabricação */}
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Serviço
-                                </label>
-                                {renderConfidenceBadge(item, 'service', item.service)}
-                              </div>
-                              <Input
-                                value={item.service || ''}
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'service')
-                                  handleUpdateEquipment(item.id, { service: e.target.value })
-                                }}
-                                placeholder="Ex.: RESFRIAMENTO, AQUECIMENTO, CONDENSAÇÃO"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'service',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Nº de Fabricação
-                                </label>
-                                {renderConfidenceBadge(item, 'manufacturingNumber', item.manufacturingNumber)}
-                              </div>
-                              <Input
-                                value={item.manufacturingNumber || ''}
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'manufacturingNumber')
-                                  handleUpdateEquipment(item.id, {
-                                    manufacturingNumber: e.target.value,
-                                  })
-                                }}
-                                placeholder="Ex.: 639.065"
-                                className="h-9 text-xs bg-white dark:bg-slate-900 font-mono"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'manufacturingNumber',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-                          </div>
-
-                          {/* Plaqueta - Linha 2: Pressão Projeto, Pressão Teste, Temp Projeto, PMTA */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Pressão de Projeto (bar)
-                                </label>
-                                {renderConfidenceBadge(item, 'designPressureBar', item.designPressureBar)}
-                              </div>
-                              <Input
-                                value={item.designPressureBar || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'designPressureBar')
-                                  handleUpdateEquipment(item.id, {
-                                    designPressureBar: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 10,00"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'designPressureBar',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Pressão de Teste (bar)
-                                </label>
-                                {renderConfidenceBadge(item, 'testPressureBar', item.testPressureBar)}
-                              </div>
-                              <Input
-                                value={item.testPressureBar || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'testPressureBar')
-                                  handleUpdateEquipment(item.id, {
-                                    testPressureBar: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 13,00"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'testPressureBar',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Temp. de Projeto (°C)
-                                </label>
-                                {renderConfidenceBadge(item, 'designTempC', item.designTempC)}
-                              </div>
-                              <Input
-                                value={item.designTempC || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'designTempC')
-                                  handleUpdateEquipment(item.id, {
-                                    designTempC: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 165"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'designTempC',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  PMTA (MPa)
-                                </label>
-                                {renderConfidenceBadge(item, 'pmtaMpa', item.pmtaMpa)}
-                              </div>
-                              <Input
-                                value={item.pmtaMpa || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'pmtaMpa')
-                                  handleUpdateEquipment(item.id, {
-                                    pmtaMpa: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 1,30"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'pmtaMpa',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-                          </div>
-
-                          {/* Plaqueta - Linha 3: Peso Vazio, Ano Fabr., "a" Máx, "a" Mín */}
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Peso Vazio (kgf)
-                                </label>
-                                {renderConfidenceBadge(item, 'emptyWeightKg', item.emptyWeightKg)}
-                              </div>
-                              <Input
-                                value={item.emptyWeightKg || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'emptyWeightKg')
-                                  handleUpdateEquipment(item.id, {
-                                    emptyWeightKg: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 164,30"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'emptyWeightKg',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  Ano de Fabricação
-                                </label>
-                                {renderConfidenceBadge(item, 'manufacturingYear', item.manufacturingYear)}
-                              </div>
-                              <Input
-                                value={item.manufacturingYear || ''}
-                                inputMode="numeric"
-                                maxLength={4}
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'manufacturingYear')
-                                  handleUpdateEquipment(item.id, {
-                                    manufacturingYear: e.target.value.replace(/\D/g, ''),
-                                  })
-                                }}
-                                placeholder="Ex.: 2025"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'manufacturingYear',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  &quot;a&quot; Máximo (mm)
-                                </label>
-                                {renderConfidenceBadge(item, 'tighteningMaxA', item.tighteningMaxA)}
-                              </div>
-                              <Input
-                                value={item.tighteningMaxA || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'tighteningMaxA')
-                                  handleUpdateEquipment(item.id, {
-                                    tighteningMaxA: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 66"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'tighteningMaxA',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                                  &quot;a&quot; Mínimo (mm)
-                                </label>
-                                {renderConfidenceBadge(item, 'tighteningMinA', item.tighteningMinA)}
-                              </div>
-                              <Input
-                                value={item.tighteningMinA || ''}
-                                inputMode="decimal"
-                                onChange={(e) => {
-                                  markFieldAsManuallyEdited(item.id, 'tighteningMinA')
-                                  handleUpdateEquipment(item.id, {
-                                    tighteningMinA: onlyNumericPtBR(e.target.value),
-                                  })
-                                }}
-                                placeholder="Ex.: 70"
-                                className="h-9 text-xs bg-white dark:bg-slate-900"
-                              />
-                              {(() => {
-                                const disc = item.nameplateOcrData?.discrepancies?.find(
-                                  (d) => d.fieldKey === 'tighteningMinA',
-                                )
-                                if (!disc) return null
-                                return (
-                                  <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                    Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                    {disc.currentValue}
-                                  </p>
-                                )
-                              })()}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Linha 2: Quantidade de placas, Local instalado */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Quantidade de placas
-                            </label>
-                            <Input
-                              value={item.plateCount}
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, { plateCount: e.target.value })
-                              }
-                              placeholder="Ex.: 64 placas"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
-                            {(() => {
-                              const disc = item.nameplateOcrData?.discrepancies?.find(
-                                (d) => d.fieldKey === 'plateCount',
-                              )
-                              if (!disc) return null
-                              return (
-                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                  {disc.currentValue}
-                                </p>
-                              )
-                            })()}
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Local instalado
-                            </label>
-                            <Input
-                              value={item.installedLocation}
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, {
-                                  installedLocation: e.target.value,
-                                })
-                              }
-                              placeholder="Ex.: Setor de Evaporação / Mezanino 2"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Linha 3: Fluidos e Vazão */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Fluido 1 (Lado quente)
-                            </label>
-                            <Input
-                              value={item.fluid1}
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, { fluid1: e.target.value })
-                              }
-                              placeholder="Ex.: Vapor saturated 3 bar / Caldo"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
-                            {(() => {
-                              const disc = item.nameplateOcrData?.discrepancies?.find(
-                                (d) => d.fieldKey === 'fluid1',
-                              )
-                              if (!disc) return null
-                              return (
-                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                  {disc.currentValue}
-                                </p>
-                              )
-                            })()}
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Fluido 2 (Lado frio)
-                            </label>
-                            <Input
-                              value={item.fluid2}
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, { fluid2: e.target.value })
-                              }
-                              placeholder="Ex.: Água de resfriamento"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
-                            {(() => {
-                              const disc = item.nameplateOcrData?.discrepancies?.find(
-                                (d) => d.fieldKey === 'fluid2',
-                              )
-                              if (!disc) return null
-                              return (
-                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                  {disc.currentValue}
-                                </p>
-                              )
-                            })()}
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Vazão
-                            </label>
-                            <div className="flex gap-1.5">
-                              <Input
-                                value={item.flowRate}
-                                inputMode="decimal"
-                                onChange={(e) =>
-                                  handleUpdateEquipment(item.id, {
-                                    flowRate: onlyNumericPtBR(e.target.value),
-                                  })
-                                }
-                                placeholder="Ex.: 45,5"
-                                className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                              />
-                              <select
-                                value={item.flowUnit || 'm³/h'}
-                                onChange={(e) =>
-                                  handleUpdateEquipment(item.id, { flowUnit: e.target.value })
-                                }
-                                className="h-10 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 text-slate-700 dark:text-slate-300"
-                                title="Unidade da vazão"
-                              >
-                                {FLOW_UNIT_OPTIONS.map((u) => (
-                                  <option key={u} value={u}>
-                                    {u}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            {(() => {
-                              const disc = item.nameplateOcrData?.discrepancies?.find(
-                                (d) => d.fieldKey === 'flowRate',
-                              )
-                              if (!disc) return null
-                              return (
-                                <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
-                                  Placa indica {disc.plateValue} — campo preenchido com{' '}
-                                  {disc.currentValue}
-                                </p>
-                              )
-                            })()}
-                          </div>
-                        </div>
-
-                        {/* Linha 4: Temperaturas */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Temperatura de entrada (°C)
-                            </label>
-                            <Input
-                              value={item.inletTemp}
-                              inputMode="decimal"
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, {
-                                  inletTemp: onlyNumericPtBR(e.target.value),
-                                })
-                              }
-                              placeholder="Ex.: 92,5"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                              Temperatura de saída (°C)
-                            </label>
-                            <Input
-                              value={item.outletTemp}
-                              inputMode="decimal"
-                              onChange={(e) =>
-                                handleUpdateEquipment(item.id, {
-                                  outletTemp: onlyNumericPtBR(e.target.value),
-                                })
-                              }
-                              placeholder="Ex.: 45,0"
-                              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Grau de dificuldade (Apenas condições físicas do local de instalação) */}
-                        <div>
-                          <div className="flex items-center justify-between mb-1.5">
-                            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                              Grau de dificuldade do local de instalação
-                            </label>
-                            <span className="text-[10px] text-muted-foreground">
-                              Acesso, altura, espaço confinado
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {DIFFICULTY_OPTIONS.map((diff) => {
-                              const isSelected = item.difficulty === diff.level
-                              return (
-                                <button
-                                  key={diff.level}
-                                  type="button"
-                                  onClick={() =>
-                                    handleUpdateEquipment(item.id, { difficulty: diff.level })
-                                  }
-                                  className={`h-11 rounded-lg border-2 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                                    isSelected
-                                      ? `${diff.color} ring-1 ring-offset-1`
-                                      : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900'
-                                  }`}
-                                >
-                                  {isSelected && <CheckCircle2 className="h-3.5 w-3.5" />}
-                                  {diff.level}
-                                </button>
-                              )
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
-                        <EquipmentCustomFieldsSection
-                          customFields={item.customFields || []}
-                          onChange={(fields) =>
-                            handleUpdateEquipment(item.id, { customFields: fields })
-                          }
-                          confidenceMap={item.nameplateOcrData?.confidence}
-                        />
-
-                        {/* ANEXOS DO EQUIPAMENTO (Múltiplas Fotos ou Vídeos com Leitura OCR de Plaqueta) */}
-                        <EquipmentMediaAttachmentSection
-                          title="Anexos deste equipamento (Fotos / Vídeos)"
-                          description="Foto da placa (leitura automática por IA), vazamentos ou vídeo de operação"
-                          attachments={
-                            item.attachments && item.attachments.length > 0
-                              ? item.attachments
-                              : item.photoDataUrl
-                                ? [
-                                    {
-                                      id: 'legacy_photo',
-                                      name: 'Foto da Placa',
-                                      type: 'image',
-                                      dataUrl: item.photoDataUrl,
-                                    },
-                                  ]
-                                : []
-                          }
-                          onAddFiles={(files) => handleAddEquipmentAttachments(item.id, files)}
-                          onRemoveAttachment={(attId) =>
-                            handleRemoveEquipmentAttachment(item.id, attId)
-                          }
-                          onReadNameplatePhoto={(photo) =>
-                            handleTriggerNameplateOcr(item.id, photo)
-                          }
-                          isReadingNameplate={isReadingNameplate && readingEquipmentId === item.id}
-                          activeReadingAttachmentId={activeReadingAttachmentId}
-                          readingStatusText={nameplateReadingStatus}
-                          isCompressing={isCompressingGlobal}
-                        />
-
-                        {/* OBSERVAÇÕES DO TÉCNICO COM GRAVAÇÃO DE VOZ E TRANSCRIÇÃO AUTOMÁTICA */}
-                        <VoiceDictationField
-                          label="Observações do técnico sobre o estado do equipamento:"
-                          sublabel="Grave por voz ou digite. O texto permanece 100% editável após falar."
-                          value={item.technicianNotes}
-                          onChange={(val) =>
-                            handleUpdateEquipment(item.id, { technicianNotes: val })
-                          }
-                          onSaveAudioAttachment={(audioFile) => {
-                            const newAtt: MediaAttachment = {
-                              id: generateId(),
-                              type: 'audio',
-                              name: audioFile.name,
-                              dataUrl: audioFile.dataUrl,
-                              size: audioFile.blob.size,
-                              createdAt: new Date().toISOString(),
-                            }
-                            setVisit((prev) => ({
-                              ...prev,
-                              equipments: prev.equipments.map((eq) =>
-                                eq.id === item.id
-                                  ? {
-                                      ...eq,
-                                      attachments: [...(eq.attachments || []), newAtt],
-                                    }
-                                  : eq,
-                              ),
-                            }))
-                            toast({
-                              title: 'Áudio anexado ao equipamento',
-                              description: 'Gravação salva como anexo do equipamento.',
-                            })
-                          }}
-                          placeholder="Vazamento nas gaxetas, placas incrustadas, corrosão no tirante, necessidade de banho químico..."
-                          rows={3}
-                        />
-                      </CardContent>
-                    </Card>
-                  ))}
-
-                  <div className="pt-2">
-                    <Button
-                      type="button"
-                      onClick={() => handleAddEquipment()}
-                      variant="outline"
-                      className="w-full h-12 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-teal-600 hover:text-teal-700 font-semibold text-xs"
-                    >
-                      <Plus className="h-4 w-4 mr-1.5" />
-                      Adicionar outro equipamento
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 7. SEÇÃO: PLANO DE AÇÃO GERADO PELA IA */}
-        {visit.actionPlan && visit.actionPlan.length > 0 && (
-          <Card className="border-violet-300 dark:border-violet-800 bg-white dark:bg-slate-900 shadow-sm">
-            <CardHeader className="bg-violet-50/70 dark:bg-violet-950/40 border-b border-violet-200 dark:border-violet-800 py-3.5 px-4">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-violet-600" />
-                  <CardTitle className="text-sm font-bold text-violet-950 dark:text-violet-200">
-                    Plano de Ação para Orçamento ({visit.actionPlan.length}{' '}
-                    {visit.actionPlan.length === 1 ? 'item' : 'itens'})
-                  </CardTitle>
-                </div>
-                <Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 text-[10px] font-semibold border-violet-300">
-                  Gerado por Análise da IA
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="p-4 space-y-4">
-              <p className="text-xs text-muted-foreground">
-                Plano técnico estruturado a partir dos dados coletados na visita para subsidiar o
-                orçamento e o relatório ao cliente.
-              </p>
-              <div className="space-y-3">
-                {visit.actionPlan.map((action, aIdx) => (
-                  <div
-                    key={action.id || aIdx}
-                    className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 space-y-2.5 text-xs"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <span className="h-5 w-5 rounded-full bg-violet-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
-                          {aIdx + 1}
-                        </span>
-                        <strong className="text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
-                          {action.title}
-                        </strong>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={`text-[9.5px] font-semibold ${
-                          action.priority === 'Alta'
-                            ? 'text-rose-700 border-rose-300 bg-rose-50'
-                            : action.priority === 'Média'
-                              ? 'text-amber-700 border-amber-300 bg-amber-50'
-                              : 'text-emerald-700 border-emerald-300 bg-emerald-50'
-                        }`}
-                      >
-                        Prioridade {action.priority}
-                      </Badge>
-                    </div>
-
-                    {/* 1. Diagnóstico */}
-                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
-                      <span className="text-[10.5px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide block">
-                        1. Diagnóstico (baseado exclusivamente no registro da visita):
-                      </span>
-                      <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
-                        {action.diagnosis || action.description}
-                      </p>
-                    </div>
-
-                    {/* 2. Ações recomendadas */}
-                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
-                      <span className="text-[10.5px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide block">
-                        2. Ações Recomendadas:
-                      </span>
-                      <p className="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
-                        {action.suggestedAction || action.description}
-                      </p>
-                      {action.technicalReference && (
-                        <div className="pt-1 text-[11px] text-teal-800 dark:text-teal-300 flex items-start gap-1 font-medium">
-                          <strong className="shrink-0">Referência técnica:</strong>
-                          <span>{action.technicalReference}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 3. Condições do local de instalação */}
-                    <div className="p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 space-y-1">
-                      <span className="text-[10.5px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wide block">
-                        3. Condições do Local de Instalação (Grau de Dificuldade Físico):
-                      </span>
-                      <p className="text-amber-800 dark:text-amber-200 text-[11px] leading-relaxed">
-                        {action.installationConditions ||
-                          'Condições do local não detalhadas na visita'}
-                      </p>
-                    </div>
-
-                    {/* 4. Itens pendentes de levantamento */}
-                    {action.pendingItems && action.pendingItems.length > 0 && (
-                      <div className="p-2.5 rounded-lg bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 space-y-1">
-                        <span className="text-[10.5px] font-bold text-rose-900 dark:text-rose-300 uppercase tracking-wide block">
-                          4. Itens Pendentes de Levantamento:
-                        </span>
-                        <ul className="list-disc list-inside text-rose-800 dark:text-rose-200 text-[11px] space-y-0.5 leading-relaxed">
-                          {action.pendingItems.map((item, pIdx) => (
-                            <li key={pIdx}>{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Bloco de Envio Grande no Rodapé */}
-        <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-teal-600/30 dark:border-teal-700/40 shadow-sm space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                <Send className="h-4 w-4 text-teal-700 dark:text-teal-400" />
-                Finalizar Atendimento & Sincronizar com o CRM
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Gera o registro oficial da visita, envia o plano de ação e dados levantados ao CRM e
-                gera o PDF completo.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="lg"
-                onClick={() => setIsPdfDialogOpen(true)}
-                className="h-11 px-4 text-xs font-bold border-teal-300 dark:border-teal-700 text-teal-800 dark:text-teal-300 hover:bg-teal-50"
-              >
-                <Printer className="h-4 w-4 mr-1.5 text-teal-600" />
-                Gerar Resumo em PDF
-              </Button>
-
-              <Button
-                type="button"
-                size="lg"
-                onClick={handleSendToCrm}
-                disabled={isSendingToCrm}
-                className={`h-11 px-6 text-xs font-bold shadow-sm ${
-                  visit.crmStatus === 'enviada'
-                    ? 'bg-emerald-700 hover:bg-emerald-600 text-white'
-                    : 'bg-teal-700 hover:bg-teal-600 text-white'
-                }`}
-              >
-                {isSendingToCrm ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Enviando ao CRM...
-                  </>
-                ) : visit.crmStatus === 'enviada' ? (
-                  <>
-                    <Check className="h-4 w-4 mr-2" />
-                    Reenviar ao CRM
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    Enviar a Visita ao CRM
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {visit.lastSentAt && (
-            <div className="text-[11px] text-muted-foreground pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <span>Rascunho local vinculado ao CRM.</span>
-              <span className="font-medium text-emerald-700 dark:text-emerald-400">
-                Sincronizado em {new Date(visit.lastSentAt).toLocaleString('pt-BR')}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* Rodapé informativo */}
-        <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-muted-foreground space-y-1">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
-            <Info className="h-4 w-4 text-teal-700 dark:text-teal-400" />
-            Armazenamento Seguro em Campo
-          </div>
-          <p>
-            Todos os dados digitados e fotos ficam guardados no seu celular (armazenamento local).
-            Você pode fechar a tela, abrir outra aba ou reiniciar o aparelho que as informações
-            continuarão salvas aqui mesmo após enviar ao CRM.
-          </p>
-        </div>
-
-        {/* Diagnóstico visível temporário para validação em campo */}
-        <div className="pt-2">
-          <VoiceDiagnosticFooter />
-        </div>
-      </main>
-
-      {/* Modal de Prévia e Impressão do PDF da Visita */}
-      <FieldVisitPdfDialog open={isPdfDialogOpen} onOpenChange={setIsPdfDialogOpen} visit={visit} />
-
-      {/* Modal de Revisão Leve da Leitura da Plaqueta (Confirmação Não-Bloqueante) */}
-      <NameplateOcrReviewDialog
-        open={ocrReviewOpen}
-        onOpenChange={setOcrReviewOpen}
-        comparisonResult={ocrComparisonResult}
-        onApply={handleApplyNameplateOcr}
-        onDiscard={handleDiscardNameplateOcr}
-        equipmentName={
-          targetOcrEquipment
-            ? formatEquipmentTitle(
-                targetOcrEquipment,
-                visit.equipments.findIndex((e) => e.id === targetOcrEquipment.id),
-              )
-            : undefined
-        }
-      />
-
-      {/* Modal de confirmação da Análise IA */}
-      <AlertDialog open={aiConfirmOpen} onOpenChange={setAiConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Aplicar plano de ação da IA?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="max-h-64 overflow-y-auto space-y-2 text-sm">
-                <p className="text-amber-700 dark:text-amber-400 font-semibold">
-                  Revise antes de salvar — você poderá editar depois.
-                </p>
-                {(aiDraft || []).map((it, idx) => (
-                  <div
-                    key={idx}
-                    className="border rounded p-2.5 bg-slate-50 dark:bg-slate-900 space-y-1.5 text-xs"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="font-semibold text-xs text-slate-900 dark:text-slate-100">
-                        {idx + 1}. {it.title}
-                      </p>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300">
-                        {it.priority}
-                      </span>
-                    </div>
-
-                    {it.diagnosis && (
-                      <div className="p-1.5 rounded bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
-                        <strong className="text-[11px] text-slate-700 dark:text-slate-300 block">
-                          1. Diagnóstico:
-                        </strong>
-                        <p className="text-[11px] text-slate-600 dark:text-slate-400">
-                          {it.diagnosis}
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="p-1.5 rounded bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-1">
-                      <strong className="text-[11px] text-slate-700 dark:text-slate-300 block">
-                        2. Ações recomendadas:
-                      </strong>
-                      <p className="text-[11px] text-slate-700 dark:text-slate-300">
-                        {it.suggestedAction || it.description}
-                      </p>
-                      {it.technicalReference && (
-                        <p className="text-[10.5px] text-teal-700 dark:text-teal-400 font-medium">
-                          <strong>Referência do fabricante:</strong> {it.technicalReference}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="p-1.5 rounded bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
-                      <strong className="text-[11px] text-amber-900 dark:text-amber-300 block">
-                        3. Condições do local de instalação:
-                      </strong>
-                      <p className="text-[11px] text-amber-800 dark:text-amber-400">
-                        {it.installationConditions || 'Condições do local não detalhadas na visita'}
-                      </p>
-                    </div>
-
-                    {Array.isArray(it.pendingItems) && it.pendingItems.length > 0 && (
-                      <div className="p-1.5 rounded bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50">
-                        <strong className="text-[11px] text-rose-900 dark:text-rose-300 block">
-                          4. Itens pendentes de levantamento:
-                        </strong>
-                        <ul className="list-disc list-inside text-[10.5px] text-rose-800 dark:text-rose-400 space-y-0.5">
-                          {it.pendingItems.map((p: string, pIdx: number) => (
-                            <li key={pIdx}>{p}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {it.equipment_id && (
-                      <p className="text-[10px] text-teal-700 dark:text-teal-400 pt-0.5">
-                        📷 Fotos do equipamento serão vinculadas no relatório
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setAiConfirmOpen(false)}>Descartar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleAiConfirm}
-              className="bg-violet-600 hover:bg-violet-700 text-white font-semibold"
-            >
-              Aplicar plano
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Modal de Confirmação: Nova Visita */}
-      <AlertDialog open={isNewVisitDialogOpen} onOpenChange={setIsNewVisitDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Iniciar uma nova visita a campo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação irá limpar os dados da visita em curso da tela para começar um novo
-              atendimento. O nome do funcionário será preservado para você não precisar digitar de
-              novo.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmNewVisit}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
-            >
-              Sim, começar nova visita
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Modal de Confirmação: Remover Equipamento */}
-      <AlertDialog
-        open={equipmentToDelete !== null}
-        onOpenChange={(open) => !open && setEquipmentToDelete(null)}
+  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+}`}
+>
+Não
+</Button>
+</div>
+</div>
+
+{/* Se Sim: textarea de recomendações e identificações */}
+{eq.needsMaintenance === true && (
+<div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+<label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+O que foi identificado e recomendações do técnico:
+</label>
+<textarea
+value={eq.maintenanceNotes || ''}
+onChange={(e) =>
+handleUpdateEquipment(eq.id, {
+  maintenanceNotes: e.target.value,
+})
+}
+placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+rows={3}
+className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+/>
+</div>
+)}
+</div>
+
+{/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+<EquipmentCustomFieldsSection
+customFields={item.customFields || []}
+onChange={(fields) =>
+handleUpdateEquipment(item.id, { customFields: fields })
+}
+confidenceMap={item.nameplateOcrData?.confidence}
+/>
+
+{/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+<div
+className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+item.needsMaintenance === true
+? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+: item.needsMaintenance === false
+? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+: 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+}`}
+>
+<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+<div>
+<label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+<span>Necessita de Manutenção?</span>
+<span className="text-rose-600 font-bold">*</span>
+{item.needsMaintenance === undefined && (
+<span className="text-[10px] text-rose-600 font-normal">
+  (obrigatório responder)
+</span>
+)}
+</label>
+<p className="text-[11px] text-muted-foreground">
+Indique se este equipamento precisa de intervenção ou reparo
+</p>
+</div>
+
+<div className="flex items-center gap-1.5 shrink-0">
+<Button
+type="button"
+size="sm"
+onClick={() =>
+handleUpdateEquipment(item.id, { needsMaintenance: true })
+}
+className={`h-8 px-3 text-xs font-bold transition-all ${
+item.needsMaintenance === true
+  ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+}`}
+>
+Sim, necessita
+</Button>
+<Button
+type="button"
+size="sm"
+onClick={() =>
+handleUpdateEquipment(item.id, {
+  needsMaintenance: false,
+  maintenanceNotes: '',
+})
+}
+className={`h-8 px-3 text-xs font-bold transition-all ${
+item.needsMaintenance === false
+  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+}`}
+>
+Não
+</Button>
+</div>
+</div>
+
+{/* Se Sim: textarea de recomendações e identificações */}
+{item.needsMaintenance === true && (
+<div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+<label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+O que foi identificado e recomendações do técnico:
+</label>
+<textarea
+value={item.maintenanceNotes || ''}
+onChange={(e) =>
+handleUpdateEquipment(item.id, {
+  maintenanceNotes: e.target.value,
+})
+}
+placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+rows={3}
+className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+/>
+</div>
+)}
+</div>
+{/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+<EquipmentCustomFieldsSection
+customFields={item.customFields || []}
+onChange={(fields) =>
+handleUpdateEquipment(item.id, { customFields: fields })
+}
+confidenceMap={item.nameplateOcrData?.confidence}
+/>
+
+{/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+<div
+className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+item.needsMaintenance === true
+? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+: item.needsMaintenance === false
+? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+: 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+}`}
+>
+<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+<div>
+<label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+<span>Necessita de Manutenção?</span>
+<span className="text-rose-600 font-bold">*</span>
+{item.needsMaintenance === undefined && (
+<span className="text-[10px] text-rose-600 font-normal">
+  (obrigatório responder)
+</span>
+)}
+</label>
+<p className="text-[11px] text-muted-foreground">
+Indique se este equipamento precisa de intervenção ou reparo
+</p>
+</div>
+
+<div className="flex items-center gap-1.5 shrink-0">
+<Button
+type="button"
+size="sm"
+onClick={() =>
+handleUpdateEquipment(item.id, { needsMaintenance: true })
+}
+className={`h-8 px-3 text-xs font-bold transition-all ${
+item.needsMaintenance === true
+  ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+}`}
+>
+Sim, necessita
+</Button>
+<Button
+type="button"
+size="sm"
+onClick={() =>
+handleUpdateEquipment(item.id, {
+  needsMaintenance: false,
+  maintenanceNotes: '',
+})
+}
+className={`h-8 px-3 text-xs font-bold transition-all ${
+item.needsMaintenance === false
+  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+}`}
+>
+Não
+</Button>
+</div>
+</div>
+
+{/* Se Sim: textarea de recomendações e identificações */}
+{item.needsMaintenance === true && (
+<div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+<label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+O que foi identificado e recomendações do técnico:
+</label>
+<textarea
+value={item.maintenanceNotes || ''}
+onChange={(e) =>
+handleUpdateEquipment(item.id, {
+  maintenanceNotes: e.target.value,
+})
+}
+placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+rows={3}
+className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+/>
+</div>
+)}
+</div>
+{/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+{/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+<EquipmentCustomFieldsSection
+customFields={item.customFields || []}
+onChange={(fields) =>
+handleUpdateEquipment(item.id, { customFields: fields })
+}
+confidenceMap={item.nameplateOcrData?.confidence}
+/>
+
+{/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+<div
+className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+item.needsMaintenance === true
+? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+: item.needsMaintenance === false
+? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+: 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+}`}
+>
+<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+<div>
+<label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+<span>Necessita de Manutenção?</span>
+<span className="text-rose-600 font-bold">*</span>
+{item.needsMaintenance === undefined && (
+<span className="text-[10px] text-rose-600 font-normal">
+  (obrigatório responder)
+</span>
+)}
+</label>
+<p className="text-[11px] text-muted-foreground">
+Indique se este equipamento precisa de intervenção ou reparo
+</p>
+</div>
+
+<div className="flex items-center gap-1.5 shrink-0">
+<Button
+type="button"
+size="sm"
+onClick={() =>
+handleUpdateEquipment(item.id, { needsMaintenance: true })
+}
+className={`h-8 px-3 text-xs font-bold transition-all ${
+item.needsMaintenance === true
+  ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+}`}
+>
+Sim, necessita
+</Button>
+<Button
+type="button"
+size="sm"
+onClick={() =>
+handleUpdateEquipment(item.id, {
+  needsMaintenance: false,
+  maintenanceNotes: '',
+})
+}
+className={`h-8 px-3 text-xs font-bold transition-all ${
+item.needsMaintenance === false
+  ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+  : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+}`}
+>
+Não
+</Button>
+</div>
+</div>
+
+{/* Se Sim: textarea de recomendações e identificações */}
+{item.needsMaintenance === true && (
+<div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+<label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+O que foi identificado e recomendações do técnico:
+</label>
+<textarea
+value={item.maintenanceNotes || ''}
+onChange={(e) =>
+handleUpdateEquipment(item.id, {
+  maintenanceNotes: e.target.value,
+})
+}
+placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+rows={3}
+className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+/>
+</div>
+)}
+</div>
+<EquipmentMediaAttachmentSection
+title={`Anexos de ${eqLabel}`}
+description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
+attachments={eq.attachments || []}
+onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
+onRemoveAttachment={(attId) =>
+handleRemoveEquipmentAttachment(eq.id, attId)
+}
+onReadNameplatePhoto={(photo) =>
+handleTriggerNameplateOcr(eq.id, photo)
+}
+isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
+activeReadingAttachmentId={activeReadingAttachmentId}
+readingStatusText={nameplateReadingStatus}
+isCompressing={isCompressingGlobal}
+/>
+
+{/* Observações com Voz para este equipamento */}
+<VoiceDictationField
+label={`Observações do técnico sobre ${eqLabel}`}
+sublabel="Digite ou grave sua fala com transcrição automática"
+value={eq.technicianNotes}
+onChange={(val) =>
+  handleUpdateEquipment(eq.id, { technicianNotes: val })
+}
+onSaveAudioAttachment={(audioFile) => {
+  const newAtt: MediaAttachment = {
+    id: generateId(),
+    type: 'audio',
+    name: audioFile.name,
+    dataUrl: audioFile.dataUrl,
+    size: audioFile.blob.size,
+    createdAt: new Date().toISOString(),
+  }
+  setVisit((prev) => ({
+    ...prev,
+    equipments: prev.equipments.map((item) =>
+      item.id === eq.id
+        ? {
+            ...item,
+            attachments: [...(item.attachments || []), newAtt],
+          }
+        : item,
+    ),
+  }))
+  toast({
+    title: 'Áudio anexado ao equipamento',
+    description: `Gravação salva nos anexos de ${eqLabel}.`,
+  })
+}}
+placeholder="Descreva detalhes específicos, medidas, pontos críticos ou necessidades deste equipamento..."
+rows={3}
+/>
+</CardContent>
+</Card>
+)
+})}
+
+<div className="pt-2">
+<Button
+type="button"
+onClick={() => handleAddEquipment()}
+variant="outline"
+className="w-full h-12 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-teal-600 hover:text-teal-700 font-semibold text-xs"
+>
+<Plus className="h-4 w-4 mr-1.5" />
+Adicionar mais um equipamento (
+{`Equipamento ${String(visit.equipments.length + 1).padStart(2, '0')}`})
+</Button>
+</div>
+</div>
+)}
+</div>
+</div>
+) : (
+/* ========================================================================= */
+/* FLUXO 2: MANUTENÇÃO PREVENTIVA, CORRETIVA E CATÁLOGO DE EQUIPAMENTOS */
+/* (FORMULÁRIO EXISTENTE INTACTO + GRAVAÇÃO DE VOZ NAS OBSERVAÇÕES DO TÉCNICO) */
+/* ========================================================================= */
+<div className="space-y-5 animate-in fade-in duration-300">
+{/* 5. SEÇÃO: OBSERVAÇÕES GERAIS + GRAVAÇÃO DE VOZ */}
+<Card className="border-slate-200 dark:border-slate-800 shadow-xs bg-white dark:bg-slate-900">
+<CardHeader className="pb-3">
+<div className="flex items-center gap-2">
+<div className="h-8 w-8 rounded-lg bg-teal-100 dark:bg-teal-950 text-teal-800 dark:text-teal-300 flex items-center justify-center">
+<FileText className="h-4 w-4" />
+</div>
+<div>
+<CardTitle className="text-sm font-bold">
+5. Observações Gerais da Visita
+</CardTitle>
+<p className="text-[11px] text-muted-foreground">
+Relato técnico, condições da fábrica, demandas extras do cliente
+</p>
+</div>
+</div>
+</CardHeader>
+<CardContent className="space-y-2">
+<VoiceDictationField
+label="Relato técnico geral:"
+value={visit.generalObservations}
+onChange={(val) =>
+setVisit((prev) => ({
+...prev,
+generalObservations: val,
+freeDescription: val,
+}))
+}
+onSaveAudioAttachment={(audioFile) => {
+const newAtt: MediaAttachment = {
+id: generateId(),
+type: 'audio',
+name: audioFile.name,
+dataUrl: audioFile.dataUrl,
+size: audioFile.blob.size,
+createdAt: new Date().toISOString(),
+}
+setVisit((prev) => ({
+...prev,
+visitAttachments: [...(prev.visitAttachments || []), newAtt],
+}))
+toast({
+title: 'Áudio anexado à visita',
+description: 'Gravação salva como anexo da visita com sucesso.',
+})
+}}
+placeholder="Digite aqui ou use o botão de microfone acima para gravar seu relato técnico..."
+rows={5}
+/>
+</CardContent>
+</Card>
+
+{/* 6. SEÇÃO: LISTA DE EQUIPAMENTOS INTACTA COM BOTÃO DE VOZ NAS OBSERVAÇÕES */}
+<div className="space-y-4">
+<div className="flex items-center justify-between gap-2 pt-2">
+<div>
+<h2 className="text-base font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+<Layers className="h-5 w-5 text-teal-700 dark:text-teal-400" />
+Equipamentos Vistoriados
+<Badge variant="secondary" className="text-xs">
+{visit.equipments.length}
+</Badge>
+</h2>
+<p className="text-xs text-muted-foreground">
+Formulário técnico com parâmetros mecânicos, fluidos, temperaturas e anexos
+</p>
+</div>
+
+<Button
+type="button"
+onClick={() => handleAddEquipment()}
+className="bg-teal-700 hover:bg-teal-600 text-white font-semibold text-xs h-10 px-4 rounded-xl shadow-xs"
+>
+<Plus className="h-4 w-4 mr-1" />
+Adicionar equipamento
+</Button>
+</div>
+
+{visit.equipments.length === 0 ? (
+<div className="p-8 text-center rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 space-y-3">
+<div className="h-12 w-12 rounded-full bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-400 mx-auto flex items-center justify-center">
+<Layers className="h-6 w-6" />
+</div>
+<div>
+<p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+Nenhum equipamento adicionado ainda
+</p>
+<p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+Toque no botão abaixo para registrar o primeiro trocador de calor
+inspecionado.
+</p>
+</div>
+<Button
+type="button"
+onClick={() => handleAddEquipment()}
+variant="outline"
+className="text-xs h-9 font-semibold text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-700 hover:bg-teal-50"
+>
+<Plus className="h-3.5 w-3.5 mr-1" />
+Adicionar primeiro equipamento
+</Button>
+</div>
+) : (
+<div className="space-y-5">
+{visit.equipments.map((item, index) => (
+<Card
+key={item.id}
+className="border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden"
+>
+<CardHeader className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 py-3 px-4">
+<div className="flex items-center justify-between gap-2">
+<div className="flex items-center gap-2">
+<span className="h-6 w-6 rounded-full bg-teal-700 text-white text-xs font-bold flex items-center justify-center">
+  {index + 1}
+</span>
+<CardTitle className="text-sm font-bold truncate">
+  {formatEquipmentTitle(item, index)}
+</CardTitle>
+</div>
+
+<Button
+type="button"
+variant="ghost"
+size="sm"
+onClick={() => setEquipmentToDelete(item.id)}
+className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950 h-8 px-2 text-xs"
+title="Remover este equipamento"
+>
+<Trash2 className="h-4 w-4 mr-1" />
+Remover
+</Button>
+</div>
+</CardHeader>
+
+<CardContent className="p-4 space-y-4">
+{/* Linha 1: Modelo, Série, Fabricante, Tag */}
+<div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+<div>
+<label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+  Modelo
+</label>
+<Input
+  value={item.model}
+  onChange={(e) =>
+    handleUpdateEquipment(item.id, { model: e.target.value })
+  }
+  placeholder="Ex.: BP 60 B"
+  className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+/>
+{(() => {
+  const disc = item.nameplateOcrData?.discrepancies?.find(
+    (d) => d.fieldKey === 'model',
+  )
+  if (!disc) return null
+  return (
+    <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+      Placa indica {disc.plateValue} — campo preenchido com{' '}
+      {disc.currentValue}
+    </p>
+  )
+})()}
+</div>
+<div>
+<label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+  Série
+</label>
+<Input
+  value={item.serialNumber}
+  onChange={(e) =>
+    handleUpdateEquipment(item.id, { serialNumber: e.target.value })
+  }
+  placeholder="Ex.: 30105-884"
+  className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+/>
+{(() => {
+  const disc = item.nameplateOcrData?.discrepancies?.find(
+    (d) => d.fieldKey === 'serialNumber',
+  )
+  if (!disc) return null
+  return (
+    <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+      Placa indica {disc.plateValue} — campo preenchido com{' '}
+      {disc.currentValue}
+    </p>
+  )
+})()}
+</div>
+
+<div>
+<label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+  Fabricante
+</label>
+{(() => {
+  const isPreset =
+    !item.manufacturer ||
+    MANUFACTURER_PRESETS.some(
+      (m) =>
+        m.toLowerCase() === (item.manufacturer || '').toLowerCase(),
+    )
+  const presetValue = isPreset ? item.manufacturer || '' : 'OUTROS'
+  return (
+    <div className="flex gap-1.5">
+      <select
+        value={presetValue}
+        onChange={(e) => {
+          const v = e.target.value
+          if (v === 'OUTROS') {
+            if (!item.manufacturer) {
+              handleUpdateEquipment(item.id, { manufacturer: '' })
+            }
+          } else {
+            handleUpdateEquipment(item.id, { manufacturer: v })
+          }
+        }}
+        className="h-10 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 text-slate-700 dark:text-slate-300 shrink-0 w-[42%]"
+        title="Selecione o fabricante"
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover este equipamento?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Os dados e os anexos deste equipamento serão excluídos do formulário desta visita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setEquipmentToDelete(null)}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDeleteEquipment}
-              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
-            >
-              Sim, remover
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <option value="">—</option>
+        {MANUFACTURER_PRESETS.map((m) => (
+          <option key={m} value={m}>
+            {m}
+          </option>
+        ))}
+        <option value="OUTROS">Outros</option>
+      </select>
+      {!isPreset && (
+        <Input
+          value={item.manufacturer}
+          onChange={(e) =>
+            handleUpdateEquipment(item.id, {
+              manufacturer: e.target.value,
+            })
+          }
+          placeholder="Digite o fabricante"
+          className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+          autoFocus
+        />
+      )}
     </div>
   )
+})()}
+</div>
+
+<div>
+<label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+  Tag do Equipamento (Opcional)
+</label>
+<Input
+  value={item.tag || ''}
+  onChange={(e) =>
+    handleUpdateEquipment(item.id, { tag: e.target.value })
+  }
+  placeholder="Ex.: TQ-101 / TC-01"
+  className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+/>
+{(() => {
+  const disc = item.nameplateOcrData?.discrepancies?.find(
+    (d) => d.fieldKey === 'tag',
+  )
+  if (!disc) return null
+  return (
+    <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+      Placa indica {disc.plateValue} — campo preenchido com{' '}
+      {disc.currentValue}
+    </p>
+  )
+})()}
+</div>
+</div>
+
+{/* SUB-SEÇÃO: DADOS DA PLAQUETA DE IDENTIFICAÇÃO (Plaqueta BERMO) */}
+<div className="rounded-xl border border-teal-200/80 dark:border-teal-900/60 bg-teal-50/30 dark:bg-teal-950/20 p-3.5 space-y-3">
+<div className="flex items-center justify-between gap-2 border-b border-teal-200/60 dark:border-teal-900/40 pb-2">
+<div className="flex items-center gap-2">
+  <span className="h-6 w-6 rounded-md bg-teal-700 text-white flex items-center justify-center text-xs font-bold shadow-2xs">
+    🏷️
+  </span>
+  <div>
+    <h4 className="text-xs font-bold text-teal-950 dark:text-teal-200 tracking-tight">
+      Dados da Plaqueta de Identificação (BERMO)
+    </h4>
+    <p className="text-[10.5px] text-teal-800/80 dark:text-teal-400">
+      Informações gravadas na plaqueta de fábrica do trocador de calor
+      (todos opcionais)
+    </p>
+  </div>
+</div>
+<span className="text-[10px] font-medium text-teal-700 dark:text-teal-300 bg-teal-100/80 dark:bg-teal-900/60 px-2 py-0.5 rounded-full">
+  Referência de campo
+</span>
+</div>
+{/* Plaqueta - Linha 1: Serviço e Nº de Fabricação */}
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Serviço
+      </label>
+      {renderConfidenceBadge(item, 'service', item.service)}
+    </div>
+    <Input
+      value={item.service || ''}
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'service')
+        handleUpdateEquipment(item.id, { service: e.target.value })
+      }}
+      placeholder="Ex.: RESFRIAMENTO, AQUECIMENTO, CONDENSAÇÃO"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'service',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Nº de Fabricação
+      </label>
+      {renderConfidenceBadge(item, 'manufacturingNumber', item.manufacturingNumber)}
+    </div>
+    <Input
+      value={item.manufacturingNumber || ''}
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'manufacturingNumber')
+        handleUpdateEquipment(item.id, {
+          manufacturingNumber: e.target.value,
+        })
+      }}
+      placeholder="Ex.: 639.065"
+      className="h-9 text-xs bg-white dark:bg-slate-900 font-mono"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'manufacturingNumber',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+</div>
+
+{/* Plaqueta - Linha 2: Pressão Projeto, Pressão Teste, Temp Projeto, PMTA */}
+<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Pressão de Projeto (bar)
+      </label>
+      {renderConfidenceBadge(item, 'designPressureBar', item.designPressureBar)}
+    </div>
+    <Input
+      value={item.designPressureBar || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'designPressureBar')
+        handleUpdateEquipment(item.id, {
+          designPressureBar: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 10,00"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'designPressureBar',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Pressão de Teste (bar)
+      </label>
+      {renderConfidenceBadge(item, 'testPressureBar', item.testPressureBar)}
+    </div>
+    <Input
+      value={item.testPressureBar || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'testPressureBar')
+        handleUpdateEquipment(item.id, {
+          testPressureBar: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 13,00"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'testPressureBar',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Temp. de Projeto (°C)
+      </label>
+      {renderConfidenceBadge(item, 'designTempC', item.designTempC)}
+    </div>
+    <Input
+      value={item.designTempC || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'designTempC')
+        handleUpdateEquipment(item.id, {
+          designTempC: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 165"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'designTempC',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        PMTA (MPa)
+      </label>
+      {renderConfidenceBadge(item, 'pmtaMpa', item.pmtaMpa)}
+    </div>
+    <Input
+      value={item.pmtaMpa || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'pmtaMpa')
+        handleUpdateEquipment(item.id, {
+          pmtaMpa: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 1,30"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'pmtaMpa',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+</div>
+
+{/* Plaqueta - Linha 3: Peso Vazio, Ano Fabr., "a" Máx, "a" Mín */}
+<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Peso Vazio (kgf)
+      </label>
+      {renderConfidenceBadge(item, 'emptyWeightKg', item.emptyWeightKg)}
+    </div>
+    <Input
+      value={item.emptyWeightKg || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'emptyWeightKg')
+        handleUpdateEquipment(item.id, {
+          emptyWeightKg: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 164,30"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'emptyWeightKg',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Ano de Fabricação
+      </label>
+      {renderConfidenceBadge(item, 'manufacturingYear', item.manufacturingYear)}
+    </div>
+    <Input
+      value={item.manufacturingYear || ''}
+      inputMode="numeric"
+      maxLength={4}
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'manufacturingYear')
+        handleUpdateEquipment(item.id, {
+          manufacturingYear: e.target.value.replace(/\D/g, ''),
+        })
+      }}
+      placeholder="Ex.: 2025"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'manufacturingYear',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        &quot;a&quot; Máximo (mm)
+      </label>
+      {renderConfidenceBadge(item, 'tighteningMaxA', item.tighteningMaxA)}
+    </div>
+    <Input
+      value={item.tighteningMaxA || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'tighteningMaxA')
+        handleUpdateEquipment(item.id, {
+          tighteningMaxA: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 66"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'tighteningMaxA',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        &quot;a&quot; Mínimo (mm)
+      </label>
+      {renderConfidenceBadge(item, 'tighteningMinA', item.tighteningMinA)}
+    </div>
+    <Input
+      value={item.tighteningMinA || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'tighteningMinA')
+        handleUpdateEquipment(item.id, {
+          tighteningMinA: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 70"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'tighteningMinA',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+</div>
+</div>
+
+{/* Linha 2: Quantidade de placas, Local instalado */}
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+<div>
+  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+    Quantidade de placas
+  </label>
+  <Input
+    value={item.plateCount}
+    onChange={(e) =>
+      handleUpdateEquipment(item.id, { plateCount: e.target.value })
+    }
+    placeholder="Ex.: 64 placas"
+    className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+  />
+  {(() => {
+    const disc = item.nameplateOcrData?.discrepancies?.find(
+      (d) => d.fieldKey === 'plateCount',
+    )
+    if (!disc) return null
+    return (
+      <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+        Placa indica {disc.plateValue} — campo preenchido com{' '}
+        {disc.currentValue}
+      </p>
+    )
+  })()}
+</div>
+
+<div>
+  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+    Local instalado
+  </label>
+  <Input
+    value={item.installedLocation}
+    onChange={(e) =>
+      handleUpdateEquipment(item.id, {
+        installedLocation: e.target.value,
+      })
+    }
+    placeholder="Ex.: Setor de Evaporação / Mezanino 2"
+    className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+  />
+</div>
+</div>
+
+{/* Linha 3: Fluidos e Vazão */}
+<div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+<div>
+  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+    Fluido 1 (Lado quente)
+  </label>
+  <Input
+    value={item.fluid1}
+    onChange={(e) =>
+      handleUpdateEquipment(item.id, { fluid1: e.target.value })
+    }
+    placeholder="Ex.: Vapor saturated 3 bar / Caldo"
+    className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+  />
+  {(() => {
+    const disc = item.nameplateOcrData?.discrepancies?.find(
+      (d) => d.fieldKey === 'fluid1',
+    )
+    if (!disc) return null
+    return (
+      <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+        Placa indica {disc.plateValue} — campo preenchido com{' '}
+        {disc.currentValue}
+      </p>
+    )
+  })()}
+</div>
+
+<div>
+  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+    Fluido 2 (Lado frio)
+  </label>
+  <Input
+    value={item.fluid2}
+    onChange={(e) =>
+      handleUpdateEquipment(item.id, { fluid2: e.target.value })
+    }
+    placeholder="Ex.: Água de resfriamento"
+    className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+  />
+  {(() => {
+    const disc = item.nameplateOcrData?.discrepancies?.find(
+      (d) => d.fieldKey === 'fluid2',
+    )
+    if (!disc) return null
+    return (
+      <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+        Placa indica {disc.plateValue} — campo preenchido com{' '}
+        {disc.currentValue}
+      </p>
+    )
+  })()}
+</div>
+
+<div>
+  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+    Vazão
+  </label>
+  <div className="flex gap-1.5">
+    <Input
+      value={item.flowRate}
+      inputMode="decimal"
+      onChange={(e) =>
+        handleUpdateEquipment(item.id, {
+          flowRate: onlyNumericPtBR(e.target.value),
+        })
+      }
+      placeholder="Ex.: 45,5"
+      className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+    />
+    <select
+      value={item.flowUnit || 'm³/h'}
+      onChange={(e) =>
+        handleUpdateEquipment(item.id, { flowUnit: e.target.value })
+      }
+      className="h-10 text-xs rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 text-slate-700 dark:text-slate-300"
+      title="Unidade da vazão"
+    >
+      {FLOW_UNIT_OPTIONS.map((u) => (
+        <option key={u} value={u}>
+          {u}
+        </option>
+      ))}
+    </select>
+  </div>
+  {(() => {
+    const disc = item.nameplateOcrData?.discrepancies?.find(
+      (d) => d.fieldKey === 'flowRate',
+    )
+    if (!disc) return null
+    return (
+      <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+        Placa indica {disc.plateValue} — campo preenchido com{' '}
+        {disc.currentValue}
+      </p>
+    )
+  })()}
+</div>
+</div>
+
+{/* Linha 4: Temperaturas */}
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+<div>
+  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+    Temperatura de entrada (°C)
+  </label>
+  <Input
+    value={item.inletTemp}
+    inputMode="decimal"
+    onChange={(e) =>
+      handleUpdateEquipment(item.id, {
+        inletTemp: onlyNumericPtBR(e.target.value),
+      })
+    }
+    placeholder="Ex.: 92,5"
+    className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+  />
+</div>
+
+<div>
+  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+    Temperatura de saída (°C)
+  </label>
+  <Input
+    value={item.outletTemp}
+    inputMode="decimal"
+    onChange={(e) =>
+      handleUpdateEquipment(item.id, {
+        outletTemp: onlyNumericPtBR(e.target.value),
+      })
+    }
+    placeholder="Ex.: 45,0"
+    className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+  />
+</div>
+</div>
+
+{/* Grau de dificuldade (Apenas condições físicas do local de instalação) */}
+<div>
+<div className="flex items-center justify-between mb-1.5">
+  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+    Grau de dificuldade do local de instalação
+  </label>
+  <span className="text-[10px] text-muted-foreground">
+    Acesso, altura, espaço confinado
+  </span>
+</div>
+<div className="grid grid-cols-3 gap-2">
+  {DIFFICULTY_OPTIONS.map((diff) => {
+    const isSelected = item.difficulty === diff.level
+    return (
+      <button
+        key={diff.level}
+        type="button"
+        onClick={() =>
+          handleUpdateEquipment(item.id, { difficulty: diff.level })
+        }
+        className={`h-11 rounded-lg border-2 text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+          isSelected
+            ? `${diff.color} ring-1 ring-offset-1`
+            : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900'
+        }`}
+      >
+        {isSelected && <CheckCircle2 className="h-3.5 w-3.5" />}
+        {diff.level}
+      </button>
+    )
+  })}
+</div>
+</div>
+
+{/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+<EquipmentCustomFieldsSection
+customFields={item.customFields || []}
+onChange={(fields) =>
+  handleUpdateEquipment(item.id, { customFields: fields })
 }
+confidenceMap={item.nameplateOcrData?.confidence}
+/>
+
+{/* ANEXOS DO EQUIPAMENTO (Múltiplas Fotos ou Vídeos com Leitura OCR de Plaqueta) */}
+<EquipmentMediaAttachmentSection
+title="Anexos deste equipamento (Fotos / Vídeos)"
+description="Foto da placa (leitura automática por IA), vazamentos ou vídeo de operação"
+attachments={
+  item.attachments && item.attachments.length > 0
+    ? item.attachments
+    : item.photoDataUrl
+      ? [
+          {
+            id: 'legacy_photo',
+            name: 'Foto da Placa',
+            type: 'image',
+            dataUrl: item.photoDataUrl,
+          },
+        ]
+      : []
+}
+onAddFiles={(files) => handleAddEquipmentAttachments(item.id, files)}
+onRemoveAttachment={(attId) =>
+  handleRemoveEquipmentAttachment(item.id, attId)
+}
+onReadNameplatePhoto={(photo) =>
+  handleTriggerNameplateOcr(item.id, photo)
+}
+isReadingNameplate={isReadingNameplate && readingEquipmentId === item.id}
+activeReadingAttachmentId={activeReadingAttachmentId}
+readingStatusText={nameplateReadingStatus}
+isCompressing={isCompressingGlobal}
+/>
+
+{/* OBSERVAÇÕES DO TÉCNICO COM GRAVAÇÃO DE VOZ E TRANSCRIÇÃO AUTOMÁTICA */}
+<VoiceDictationField
+label="Observações do técnico sobre o estado do equipamento:"
+sublabel="Grave por voz ou digite. O texto permanece 100% editável após falar."
+value={item.technicianNotes}
+onChange={(val) =>
+  handleUpdateEquipment(item.id, { technicianNotes: val })
+}
+onSaveAudioAttachment={(audioFile) => {
+  const newAtt: MediaAttachment = {
+    id: generateId(),
+    type: 'audio',
+    name: audioFile.name,
+    dataUrl: audioFile.dataUrl,
+    size: audioFile.blob.size,
+    createdAt: new Date().toISOString(),
+  }
+  setVisit((prev) => ({
+    ...prev,
+    equipments: prev.equipments.map((eq) =>
+      eq.id === item.id
+        ? {
+            ...eq,
+            attachments: [...(eq.attachments || []), newAtt],
+          }
+        : eq,
+    ),
+  }))
+  toast({
+    title: 'Áudio anexado ao equipamento',
+    description: 'Gravação salva como anexo do equipamento.',
+  })
+}}
+placeholder="Vazamento nas gaxetas, placas incrustadas, corrosão no tirante, necessidade de banho químico..."
+rows={3}
+/>
+</CardContent>
+</Card>
+))}
+
+<div className="pt-2">
+<Button
+type="button"
+onClick={() => handleAddEquipment()}
+variant="outline"
+className="w-full h-12 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-teal-600 hover:text-teal-700 font-semibold text-xs"
+>
+<Plus className="h-4 w-4 mr-1.5" />
+Adicionar outro equipamento
+</Button>
+</div>
+</div>
+)}
+</div>
+</div>
+)}
+
+{/* 7. SEÇÃO: PLANO DE AÇÃO GERADO PELA IA */}
+{visit.actionPlan && visit.actionPlan.length > 0 && (
+<Card className="border-violet-300 dark:border-violet-800 bg-white dark:bg-slate-900 shadow-sm">
+<CardHeader className="bg-violet-50/70 dark:bg-violet-950/40 border-b border-violet-200 dark:border-violet-800 py-3.5 px-4">
+<div className="flex items-center justify-between gap-2 flex-wrap">
+<div className="flex items-center gap-2">
+<Sparkles className="h-4 w-4 text-violet-600" />
+<CardTitle className="text-sm font-bold text-violet-950 dark:text-violet-200">
+Plano de Ação para Orçamento ({visit.actionPlan.length}{' '}
+{visit.actionPlan.length === 1 ? 'item' : 'itens'})
+</CardTitle>
+</div>
+<Badge className="bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200 text-[10px] font-semibold border-violet-300">
+Gerado por Análise da IA
+</Badge>
+</div>
+</CardHeader>
+<CardContent className="p-4 space-y-4">
+<p className="text-xs text-muted-foreground">
+Plano técnico estruturado a partir dos dados coletados na visita para subsidiar o
+orçamento e o relatório ao cliente.
+</p>
+<div className="space-y-3">
+{visit.actionPlan.map((action, aIdx) => (
+<div
+key={action.id || aIdx}
+className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 space-y-2.5 text-xs"
+>
+<div className="flex items-center justify-between gap-2">
+<div className="flex items-center gap-2">
+<span className="h-5 w-5 rounded-full bg-violet-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+{aIdx + 1}
+</span>
+<strong className="text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
+{action.title}
+</strong>
+</div>
+<Badge
+variant="outline"
+className={`text-[9.5px] font-semibold ${
+action.priority === 'Alta'
+  ? 'text-rose-700 border-rose-300 bg-rose-50'
+  : action.priority === 'Média'
+    ? 'text-amber-700 border-amber-300 bg-amber-50'
+    : 'text-emerald-700 border-emerald-300 bg-emerald-50'
+}`}
+>
+Prioridade {action.priority}
+</Badge>
+</div>
+
+{/* 1. Diagnóstico */}
+<div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+<span className="text-[10.5px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide block">
+1. Diagnóstico (baseado exclusivamente no registro da visita):
+</span>
+<p className="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
+{action.diagnosis || action.description}
+</p>
+</div>
+
+{/* 2. Ações recomendadas */}
+<div className="p-2.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
+<span className="text-[10.5px] font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wide block">
+2. Ações Recomendadas:
+</span>
+<p className="text-slate-700 dark:text-slate-300 text-[11px] leading-relaxed">
+{action.suggestedAction || action.description}
+</p>
+{action.technicalReference && (
+<div className="pt-1 text-[11px] text-teal-800 dark:text-teal-300 flex items-start gap-1 font-medium">
+<strong className="shrink-0">Referência técnica:</strong>
+<span>{action.technicalReference}</span>
+</div>
+)}
+</div>
+
+{/* 3. Condições do local de instalação */}
+<div className="p-2.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 space-y-1">
+<span className="text-[10.5px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wide block">
+3. Condições do Local de Instalação (Grau de Dificuldade Físico):
+</span>
+<p className="text-amber-800 dark:text-amber-200 text-[11px] leading-relaxed">
+{action.installationConditions ||
+'Condições do local não detalhadas na visita'}
+</p>
+</div>
+
+{/* 4. Itens pendentes de levantamento */}
+{action.pendingItems && action.pendingItems.length > 0 && (
+<div className="p-2.5 rounded-lg bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/60 space-y-1">
+<span className="text-[10.5px] font-bold text-rose-900 dark:text-rose-300 uppercase tracking-wide block">
+4. Itens Pendentes de Levantamento:
+</span>
+<ul className="list-disc list-inside text-rose-800 dark:text-rose-200 text-[11px] space-y-0.5 leading-relaxed">
+{action.pendingItems.map((item, pIdx) => (
+  <li key={pIdx}>{item}</li>
+))}
+</ul>
+</div>
+)}
+</div>
+))}
+</div>
+</CardContent>
+</Card>
+)}
+
+{/* Bloco de Envio Grande no Rodapé */}
+<div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-teal-600/30 dark:border-teal-700/40 shadow-sm space-y-3">
+<div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+<div>
+<h3 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+<Send className="h-4 w-4 text-teal-700 dark:text-teal-400" />
+Finalizar Atendimento & Sincronizar com o CRM
+</h3>
+<p className="text-xs text-muted-foreground mt-0.5">
+Gera o registro oficial da visita, envia o plano de ação e dados levantados ao CRM e
+gera o PDF completo.
+</p>
+</div>
+
+<div className="flex items-center gap-2">
+<Button
+type="button"
+variant="outline"
+size="lg"
+onClick={() => setIsPdfDialogOpen(true)}
+className="h-11 px-4 text-xs font-bold border-teal-300 dark:border-teal-700 text-teal-800 dark:text-teal-300 hover:bg-teal-50"
+>
+<Printer className="h-4 w-4 mr-1.5 text-teal-600" />
+Gerar Resumo em PDF
+</Button>
+
+<Button
+type="button"
+size="lg"
+onClick={handleSendToCrm}
+disabled={isSendingToCrm}
+className={`h-11 px-6 text-xs font-bold shadow-sm ${
+visit.crmStatus === 'enviada'
+? 'bg-emerald-700 hover:bg-emerald-600 text-white'
+: 'bg-teal-700 hover:bg-teal-600 text-white'
+}`}
+>
+{isSendingToCrm ? (
+<>
+<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+Enviando ao CRM...
+</>
+) : visit.crmStatus === 'enviada' ? (
+<>
+<Check className="h-4 w-4 mr-2" />
+Reenviar ao CRM
+</>
+) : (
+<>
+<Send className="h-4 w-4 mr-2" />
+Enviar a Visita ao CRM
+</>
+)}
+</Button>
+</div>
+</div>
+
+{visit.lastSentAt && (
+<div className="text-[11px] text-muted-foreground pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+<span>Rascunho local vinculado ao CRM.</span>
+<span className="font-medium text-emerald-700 dark:text-emerald-400">
+Sincronizado em {new Date(visit.lastSentAt).toLocaleString('pt-BR')}
+</span>
+</div>
+)}
+</div>
+
+{/* Rodapé informativo */}
+<div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs text-muted-foreground space-y-1">
+<div className="flex items-center gap-1.5 font-semibold text-slate-700 dark:text-slate-300">
+<Info className="h-4 w-4 text-teal-700 dark:text-teal-400" />
+Armazenamento Seguro em Campo
+</div>
+<p>
+Todos os dados digitados e fotos ficam guardados no seu celular (armazenamento local).
+Você pode fechar a tela, abrir outra aba ou reiniciar o aparelho que as informações
+continuarão salvas aqui mesmo após enviar ao CRM.
+</p>
+</div>
+
+{/* Diagnóstico visível temporário para validação em campo */}
+<div className="pt-2">
+<VoiceDiagnosticFooter />
+</div>
+</main>
+
+{/* Modal de Prévia e Impressão do PDF da Visita */}
+<FieldVisitPdfDialog open={isPdfDialogOpen} onOpenChange={setIsPdfDialogOpen} visit={visit} />
+
+{/* Modal de Revisão Leve da Leitura da Plaqueta (Confirmação Não-Bloqueante) */}
+<NameplateOcrReviewDialog
+open={ocrReviewOpen}
+onOpenChange={setOcrReviewOpen}
+comparisonResult={ocrComparisonResult}
+onApply={handleApplyNameplateOcr}
+onDiscard={handleDiscardNameplateOcr}
+equipmentName={
+targetOcrEquipment
+? formatEquipmentTitle(
+targetOcrEquipment,
+visit.equipments.findIndex((e) => e.id === targetOcrEquipment.id),
+)
+: undefined
+}
+/>
+
+{/* Modal de confirmação da Análise IA */}
+<AlertDialog open={aiConfirmOpen} onOpenChange={setAiConfirmOpen}>
+<AlertDialogContent>
+<AlertDialogHeader>
+<AlertDialogTitle>Aplicar plano de ação da IA?</AlertDialogTitle>
+<AlertDialogDescription asChild>
+<div className="max-h-64 overflow-y-auto space-y-2 text-sm">
+<p className="text-amber-700 dark:text-amber-400 font-semibold">
+Revise antes de salvar — você poderá editar depois.
+</p>
+{(aiDraft || []).map((it, idx) => (
+<div
+key={idx}
+className="border rounded p-2.5 bg-slate-50 dark:bg-slate-900 space-y-1.5 text-xs"
+>
+<div className="flex items-center justify-between gap-2">
+<p className="font-semibold text-xs text-slate-900 dark:text-slate-100">
+{idx + 1}. {it.title}
+</p>
+<span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 dark:bg-violet-950 text-violet-700 dark:text-violet-300">
+{it.priority}
+</span>
+</div>
+
+{it.diagnosis && (
+<div className="p-1.5 rounded bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800">
+<strong className="text-[11px] text-slate-700 dark:text-slate-300 block">
+1. Diagnóstico:
+</strong>
+<p className="text-[11px] text-slate-600 dark:text-slate-400">
+{it.diagnosis}
+</p>
+</div>
+)}
+
+<div className="p-1.5 rounded bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 space-y-1">
+<strong className="text-[11px] text-slate-700 dark:text-slate-300 block">
+2. Ações recomendadas:
+</strong>
+<p className="text-[11px] text-slate-700 dark:text-slate-300">
+{it.suggestedAction || it.description}
+</p>
+{it.technicalReference && (
+<p className="text-[10.5px] text-teal-700 dark:text-teal-400 font-medium">
+<strong>Referência do fabricante:</strong> {it.technicalReference}
+</p>
+)}
+</div>
+
+<div className="p-1.5 rounded bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
+<strong className="text-[11px] text-amber-900 dark:text-amber-300 block">
+3. Condições do local de instalação:
+</strong>
+<p className="text-[11px] text-amber-800 dark:text-amber-400">
+{it.installationConditions || 'Condições do local não detalhadas na visita'}
+</p>
+</div>
+
+{Array.isArray(it.pendingItems) && it.pendingItems.length > 0 && (
+<div className="p-1.5 rounded bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50">
+<strong className="text-[11px] text-rose-900 dark:text-rose-300 block">
+4. Itens pendentes de levantamento:
+</strong>
+<ul className="list-disc list-inside text-[10.5px] text-rose-800 dark:text-rose-400 space-y-0.5">
+{it.pendingItems.map((p: string, pIdx: number) => (
+  <li key={pIdx}>{p}</li>
+))}
+</ul>
+</div>
+)}
+
+{it.equipment_id && (
+<p className="text-[10px] text-teal-700 dark:text-teal-400 pt-0.5">
+📷 Fotos do equipamento serão vinculadas no relatório
+</p>
+)}
+</div>
+))}
+</div>
+</AlertDialogDescription>
+</AlertDialogHeader>
+<AlertDialogFooter>
+<AlertDialogCancel onClick={() => setAiConfirmOpen(false)}>Descartar</AlertDialogCancel>
+<AlertDialogAction
+onClick={handleAiConfirm}
+className="bg-violet-600 hover:bg-violet-700 text-white font-semibold"
+>
+Aplicar plano
+</AlertDialogAction>
+</AlertDialogFooter>
+</AlertDialogContent>
+</AlertDialog>
+
+{/* Modal de Confirmação: Nova Visita */}
+<AlertDialog open={isNewVisitDialogOpen} onOpenChange={setIsNewVisitDialogOpen}>
+<AlertDialogContent>
+<AlertDialogHeader>
+<AlertDialogTitle>Iniciar uma nova visita a campo?</AlertDialogTitle>
+<AlertDialogDescription>
+Esta ação irá limpar os dados da visita em curso da tela para começar um novo
+atendimento. O nome do funcionário será preservado para você não precisar digitar de
+novo.
+</AlertDialogDescription>
+</AlertDialogHeader>
+<AlertDialogFooter>
+<AlertDialogCancel>Continuar editando</AlertDialogCancel>
+<AlertDialogAction
+onClick={handleConfirmNewVisit}
+className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+>
+Sim, começar nova visita
+</AlertDialogAction>
+</AlertDialogFooter>
+</AlertDialogContent>
+</AlertDialog>
+
+{/* Modal de Confirmação: Remover Equipamento */}
+<AlertDialog
+open={equipmentToDelete !== null}
+onOpenChange={(open) => !open && setEquipmentToDelete(null)}
+>
+<AlertDialogContent>
+<AlertDialogHeader>
+<AlertDialogTitle>Remover este equipamento?</AlertDialogTitle>
+<AlertDialogDescription>
+Os dados e os anexos deste equipamento serão excluídos do formulário desta visita.
+</AlertDialogDescription>
+</AlertDialogHeader>
+<AlertDialogFooter>
+<AlertDialogCancel onClick={() => setEquipmentToDelete(null)}>
+Cancelar
+</AlertDialogCancel>
+<AlertDialogAction
+onClick={handleConfirmDeleteEquipment}
+className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+>
+Sim, remover
+</AlertDialogAction>
+</AlertDialogFooter>
+</AlertDialogContent>
+</AlertDialog>
+</div>
+)
+}
+      placeholder="Ex.: 165"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'designTempC',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        PMTA (MPa)
+      </label>
+      {renderConfidenceBadge(item, 'pmtaMpa', item.pmtaMpa)}
+    </div>
+    <Input
+      value={item.pmtaMpa || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'pmtaMpa')
+        handleUpdateEquipment(item.id, {
+          pmtaMpa: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 1,30"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'pmtaMpa',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+</div>
+
+{/* Plaqueta - Linha 3: Peso Vazio, Ano Fabr., "a" Máx, "a" Mín */}
+<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Peso Vazio (kgf)
+      </label>
+      {renderConfidenceBadge(item, 'emptyWeightKg', item.emptyWeightKg)}
+    </div>
+    <Input
+      value={item.emptyWeightKg || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'emptyWeightKg')
+        handleUpdateEquipment(item.id, {
+          emptyWeightKg: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 164,30"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'emptyWeightKg',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Ano de Fabricação
+      </label>
+      {renderConfidenceBadge(item, 'manufacturingYear', item.manufacturingYear)}
+    </div>
+    <Input
+      value={item.manufacturingYear || ''}
+      inputMode="numeric"
+      maxLength={4}
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'manufacturingYear')
+        handleUpdateEquipment(item.id, {
+          manufacturingYear: e.target.value.replace(/\D/g, ''),
+        })
+      }}
+      placeholder="Ex.: 2025"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'manufacturingYear',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        &quot;a&quot; Máximo (mm)
+      </label>
+      {renderConfidenceBadge(item, 'tighteningMaxA', item.tighteningMaxA)}
+    </div>
+    <Input
+      value={item.tighteningMaxA || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'tighteningMaxA')
+        handleUpdateEquipment(item.id, {
+          tighteningMaxA: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 66"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'tighteningMaxA',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        &quot;a&quot; Mínimo (mm)
+      </label>
+      {renderConfidenceBadge(item, 'tighteningMinA', item.tighteningMinA)}
+    </div>
+    <Input
+      value={item.tighteningMinA || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'tighteningMinA')
+        handleUpdateEquipment(item.id, {
+          tighteningMinA: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 70"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'tighteningMinA',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+</div>
+{/* Plaqueta - Linha 1: Serviço e Nº de Fabricação */}
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Serviço
+      </label>
+      {renderConfidenceBadge(item, 'service', item.service)}
+    </div>
+    <Input
+      value={item.service || ''}
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'service')
+        handleUpdateEquipment(item.id, { service: e.target.value })
+      }}
+      placeholder="Ex.: RESFRIAMENTO, AQUECIMENTO, CONDENSAÇÃO"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'service',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Nº de Fabricação
+      </label>
+      {renderConfidenceBadge(item, 'manufacturingNumber', item.manufacturingNumber)}
+    </div>
+    <Input
+      value={item.manufacturingNumber || ''}
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'manufacturingNumber')
+        handleUpdateEquipment(item.id, {
+          manufacturingNumber: e.target.value,
+        })
+      }}
+      placeholder="Ex.: 639.065"
+      className="h-9 text-xs bg-white dark:bg-slate-900 font-mono"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'manufacturingNumber',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+</div>
+
+{/* Plaqueta - Linha 2: Pressão Projeto, Pressão Teste, Temp Projeto, PMTA */}
+<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Pressão de Projeto (bar)
+      </label>
+      {renderConfidenceBadge(item, 'designPressureBar', item.designPressureBar)}
+    </div>
+    <Input
+      value={item.designPressureBar || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'designPressureBar')
+        handleUpdateEquipment(item.id, {
+          designPressureBar: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 10,00"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'designPressureBar',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Pressão de Teste (bar)
+      </label>
+      {renderConfidenceBadge(item, 'testPressureBar', item.testPressureBar)}
+    </div>
+    <Input
+      value={item.testPressureBar || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'testPressureBar')
+        handleUpdateEquipment(item.id, {
+          testPressureBar: onlyNumericPtBR(e.target.value),
+        })
+      }}
+      placeholder="Ex.: 13,00"
+      className="h-9 text-xs bg-white dark:bg-slate-900"
+    />
+    {(() => {
+      const disc = item.nameplateOcrData?.discrepancies?.find(
+        (d) => d.fieldKey === 'testPressureBar',
+      )
+      if (!disc) return null
+      return (
+        <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-1 font-medium leading-tight">
+          Placa indica {disc.plateValue} — campo preenchido com{' '}
+          {disc.currentValue}
+        </p>
+      )
+    })()}
+  </div>
+
+  <div>
+    <div className="flex items-center justify-between mb-1">
+      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+        Temp. de Projeto (°C)
+      </label>
+      {renderConfidenceBadge(item, 'designTempC', item.designTempC)}
+    </div>
+    <Input
+      value={item.designTempC || ''}
+      inputMode="decimal"
+      onChange={(e) => {
+        markFieldAsManuallyEdited(item.id, 'designTempC')
+        handleUpdateEquipment(item.id, {
+          designTempC: onlyNumericPtBR(e.target.value),
+        })
+      }}                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {item.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={item.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(item.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <EquipmentMediaAttachmentSection
+                            title={`Anexos de ${eqLabel}`}
+                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
+                            attachments={eq.attachments || []}
+                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
+                            onRemoveAttachment={(attId) =>
+                              handleRemoveEquipmentAttachment(eq.id, attId)
+                            }
+                            onReadNameplatePhoto={(photo) =>
+                              handleTriggerNameplateOcr(eq.id, photo)
+                            }
+                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
+                            activeReadingAttachmentId={activeReadingAttachmentId}
+                            readingStatusText={nameplateReadingStatus}
+                            isCompressing={isCompressingGlobal}
+                          />
+                          <EquipmentCustomFieldsSection
+                            customFields={eq.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(eq.id, { customFields: fields })
+                            }
+                            confidenceMap={eq.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              eq.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : eq.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {eq.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {eq.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={eq.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={item.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(item.id, { customFields: fields })
+                            }
+                            confidenceMap={item.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              item.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : item.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {item.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {item.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={item.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(item.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={item.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(item.id, { customFields: fields })
+                            }
+                            confidenceMap={item.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              item.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : item.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {item.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {item.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={item.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(item.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <EquipmentMediaAttachmentSection
+                            title={`Anexos de ${eqLabel}`}
+                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
+                            attachments={eq.attachments || []}
+                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
+                            onRemoveAttachment={(attId) =>
+                              handleRemoveEquipmentAttachment(eq.id, attId)
+                            }
+                            onReadNameplatePhoto={(photo) =>
+                              handleTriggerNameplateOcr(eq.id, photo)
+                            }
+                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
+                            activeReadingAttachmentId={activeReadingAttachmentId}
+                            readingStatusText={nameplateReadingStatus}
+                            isCompressing={isCompressingGlobal}
+                          />
+
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={eq.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(eq.id, { customFields: fields })
+                            }
+                            confidenceMap={eq.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              eq.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : eq.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {eq.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {eq.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={eq.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <EquipmentMediaAttachmentSection
+                            title={`Anexos de ${eqLabel}`}
+                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
+                            attachments={eq.attachments || []}
+                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
+                            onRemoveAttachment={(attId) =>
+                              handleRemoveEquipmentAttachment(eq.id, attId)
+                            }
+                            onReadNameplatePhoto={(photo) =>
+                              handleTriggerNameplateOcr(eq.id, photo)
+                            }
+                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
+                            activeReadingAttachmentId={activeReadingAttachmentId}
+                            readingStatusText={nameplateReadingStatus}
+                            isCompressing={isCompressingGlobal}
+                          />
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={item.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(item.id, { customFields: fields })
+                            }
+                            confidenceMap={item.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              item.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : item.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {item.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(item.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    item.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {item.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={item.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(item.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <EquipmentMediaAttachmentSection
+                            title={`Anexos de ${eqLabel}`}
+                            description="Fotos da placa (leitura automática por IA), detalhes mecânicos ou vídeos deste equipamento"
+                            attachments={eq.attachments || []}
+                            onAddFiles={(files) => handleAddEquipmentAttachments(eq.id, files)}
+                            onRemoveAttachment={(attId) =>
+                              handleRemoveEquipmentAttachment(eq.id, attId)
+                            }
+                            onReadNameplatePhoto={(photo) =>
+                              handleTriggerNameplateOcr(eq.id, photo)
+                            }
+                            isReadingNameplate={isReadingNameplate && readingEquipmentId === eq.id}
+                            activeReadingAttachmentId={activeReadingAttachmentId}
+                            readingStatusText={nameplateReadingStatus}
+                            isCompressing={isCompressingGlobal}
+                          />
+                          <EquipmentCustomFieldsSection
+                            customFields={eq.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(eq.id, { customFields: fields })
+                            }
+                            confidenceMap={eq.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              eq.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : eq.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {eq.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Indique se este equipamento precisa de intervenção ou reparo
+                                </p>
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, { needsMaintenance: true })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === true
+                                      ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  Sim, necessita
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleUpdateEquipment(eq.id, {
+                                      needsMaintenance: false,
+                                      maintenanceNotes: '',
+                                    })
+                                  }
+                                  className={`h-8 px-3 text-xs font-bold transition-all ${
+                                    eq.needsMaintenance === false
+                                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700 hover:bg-emerald-50'
+                                  }`}
+                                >
+                                  Não
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Se Sim: textarea de recomendações e identificações */}
+                            {eq.needsMaintenance === true && (
+                              <div className="pt-2 border-t border-amber-200 dark:border-amber-900/60 space-y-1 animate-in fade-in duration-200">
+                                <label className="block text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                                  O que foi identificado e recomendações do técnico:
+                                </label>
+                                <textarea
+                                  value={eq.maintenanceNotes || ''}
+                                  onChange={(e) =>
+                                    handleUpdateEquipment(eq.id, {
+                                      maintenanceNotes: e.target.value,
+                                    })
+                                  }
+                                  placeholder="Descreva problemas observados (ex.: vazamento nas gaxetas, placas incrustadas, corrosão, deformação) e a intervenção recomendada..."
+                                  rows={3}
+                                  className="w-full text-xs rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-2 text-slate-900 dark:text-slate-100 placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-amber-500"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          {/* Campos Complementares Dinâmicos da Plaqueta (Novos campos sem alterar existentes) */}
+                          <EquipmentCustomFieldsSection
+                            customFields={item.customFields || []}
+                            onChange={(fields) =>
+                              handleUpdateEquipment(item.id, { customFields: fields })
+                            }
+                            confidenceMap={item.nameplateOcrData?.confidence}
+                          />
+
+                          {/* CAMPO DE DECISÃO: NECESSITA DE MANUTENÇÃO? */}
+                          <div
+                            className={`p-3.5 rounded-xl border-2 transition-all space-y-2.5 ${
+                              item.needsMaintenance === true
+                                ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-400 dark:border-amber-600'
+                                : item.needsMaintenance === false
+                                  ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700'
+                                  : 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800'
+                            }`}
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div>
+                                <label className="block text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                                  <span>Necessita de Manutenção?</span>
+                                  <span className="text-rose-600 font-bold">*</span>
+                                  {item.needsMaintenance === undefined && (
+                                    <span className="text-[10px] text-rose-600 font-normal">
+                                      (obrigatório responder)
+                                    </span>
+                                  )}
+                                </label>
+                                <p className="text-[11px] text-muted-foreground">
