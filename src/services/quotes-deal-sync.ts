@@ -142,7 +142,8 @@ export const quoteDealSyncService = {
     // proposta enviada ('proposal'), aprovada ('won') ou recusada ('lost').
     // Salvar/editar a proposta sem mudar o status NÃO move o card.
     // Movimento manual (feito no funil) nunca é desfeito: se o negócio já está
-    // em 'won' ou 'lost', nenhuma sincronização automática reverte isso.
+    // em 'won', nenhuma sincronização automática reverte isso. 'lost' pode ser
+    // reaberto pelos 3 momentos com mudança de status (ex.: recusada -> enviada).
     const AUTO_MOVE_STAGES: Record<string, { stage: DealStage; probability: number }> = {
       sent: { stage: 'proposal', probability: 60 },
       enviada: { stage: 'proposal', probability: 60 },
@@ -171,16 +172,17 @@ export const quoteDealSyncService = {
 
       // Etapa efetiva respeitando a regra dos 3 momentos + manual nunca revertido
       const currentStage = (existingDeal?.stage || '').toLowerCase().trim()
-      const isTerminal = currentStage === 'won' || currentStage === 'lost'
-      const manualStage = !!existingDeal && !isTerminal && !autoMove
-      const effectiveStage = isTerminal
+      const isWon = currentStage === 'won'
+      const isLost = currentStage === 'lost'
+      const manualStage = !!existingDeal && !isWon && !isLost && !autoMove
+      const effectiveStage = isWon
         ? existingDeal!.stage
         : autoMove
           ? autoMove.stage
           : manualStage
             ? existingDeal!.stage
             : stage
-      const effectiveProbability = isTerminal
+      const effectiveProbability = isWon
         ? existingDeal!.probability
         : autoMove
           ? autoMove.probability
