@@ -131,14 +131,14 @@ routerAdd('POST', '/backend/v1/field-visits/media/upload', (e) => {
       const va = parseJsonArr(v.get('visit_attachments'))
       if (va) {
         fixAtts(va)
-        if (touched) v.set('visit_attachments', JSON.stringify(va))
+        if (touched) v.set('visit_attachments', va)
       }
       const eq = parseJsonArr(v.get('equipment'))
       if (eq) {
         for (const eqi of eq) {
           if (eqi && Array.isArray(eqi.attachments)) fixAtts(eqi.attachments)
         }
-        if (touched) v.set('equipment', JSON.stringify(eq))
+        if (touched) v.set('equipment', eq)
       }
       if (touched) $app.save(v)
     } catch (_) {}
