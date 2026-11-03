@@ -101,6 +101,19 @@ routerAdd('POST', '/backend/v1/field-visits/media/upload', (e) => {
       const v = $app.findFirstRecordByFilter('field_visits', 'client_visit_id = {:c}', {
         c: clientVisitId,
       })
+      // JSON fields no JSVM podem voltar como string ou array — cobre os dois
+      const parseJsonArr = (raw) => {
+        if (Array.isArray(raw)) return raw
+        if (typeof raw === 'string' && raw.trim()) {
+          try {
+            const p = JSON.parse(raw)
+            return Array.isArray(p) ? p : null
+          } catch (_) {
+            return null
+          }
+        }
+        return null
+      }
       let touched = false
       const fixAtts = (atts) => {
         for (const att of Array.isArray(atts) ? atts : []) {
@@ -115,19 +128,17 @@ routerAdd('POST', '/backend/v1/field-visits/media/upload', (e) => {
           }
         }
       }
-      const va = v.get('visit_attachments')
-      if (Array.isArray(va)) {
-        const copy = JSON.parse(JSON.stringify(va))
-        fixAtts(copy)
-        if (touched) v.set('visit_attachments', copy)
+      const va = parseJsonArr(v.get('visit_attachments'))
+      if (va) {
+        fixAtts(va)
+        if (touched) v.set('visit_attachments', JSON.stringify(va))
       }
-      const eq = v.get('equipment')
-      if (Array.isArray(eq)) {
-        const eqCopy = JSON.parse(JSON.stringify(eq))
-        for (const eqi of eqCopy) {
+      const eq = parseJsonArr(v.get('equipment'))
+      if (eq) {
+        for (const eqi of eq) {
           if (eqi && Array.isArray(eqi.attachments)) fixAtts(eqi.attachments)
         }
-        if (touched) v.set('equipment', eqCopy)
+        if (touched) v.set('equipment', JSON.stringify(eq))
       }
       if (touched) $app.save(v)
     } catch (_) {}
