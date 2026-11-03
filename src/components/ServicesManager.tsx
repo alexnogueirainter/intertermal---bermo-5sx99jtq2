@@ -524,6 +524,19 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                                 </Button>{' '}
                                 <Button
                                   size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedOrderForApproval(so)
+                                    setActionType('reject')
+                                    setApprovalNotes('')
+                                    setIsApproveModalOpen(true)
+                                  }}
+                                  className="h-7 px-2 text-[11px] text-rose-600 hover:bg-rose-50 border-rose-200 dark:border-rose-800"
+                                >
+                                  <XCircle className="h-3.5 w-3.5 mr-1" /> Rejeitar
+                                </Button>{' '}
+                                <Button
+                                  size="sm"
                                   onClick={() => {
                                     setSelectedOrderForApproval(so)
                                     setActionType('complete')
