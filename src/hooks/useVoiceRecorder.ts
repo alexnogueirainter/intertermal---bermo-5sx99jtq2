@@ -15,11 +15,13 @@
  *    - Toque único: toca para iniciar, toca para parar (sem segurar)
  *    - Estados visuais: "idle", "recording" com temporizador, "transcribing" e "saved"
  *
- * 3. TRANSCRIÇÃO COM CAMINHO DUPLO:
- *    - Caminho 1 (Chrome/Android): Web Speech API (webkitSpeechRecognition/SpeechRecognition) pt-BR, contínua
- *      NUNCA depende de conexão com servidor próprio do app
- *    - Caminho 2 (Fallback universal / Safari): grava o áudio com MediaRecorder; se não houver transcrição,
- *      preserva o áudio gravado e oferece salvá-lo como anexo no campo sem perder nada
+ * 3. TRANSCRIÇÃO — SERVIDOR É O CAMINHO PRINCIPAL (qualquer navegador):
+ *    - Caminho 1 (principal): ao parar, o áudio gravado vai à rota /backend/v1/audio/transcribe
+ *      (Whisper no servidor) e o texto volta para o campo
+ *    - Caminho 2 (fallback): se o servidor não responder, usa o texto capturado pelo
+ *      reconhecimento do navegador nesta sessão (deixou de ser o caminho principal)
+ *    - Último recurso: preserva o áudio gravado e oferece salvá-lo como anexo
+ *      ("Áudio salvo, transcrição indisponível") sem perder nada
  *
  * 4. SALVAMENTO E MÚLTIPLAS GRAVAÇÕES:
  *    - Salva imediatamente no campo ao parar
@@ -760,10 +762,11 @@ export function useVoiceRecorder({
 
           if (newFinalAccumulated) {
             setAudioDetected(true)
+            // Reconhecimento do navegador NÃO é mais o caminho principal: o texto
+            // fica só como fallback (usado se o servidor não responder no stop).
             activeSessionTranscriptRef.current = activeSessionTranscriptRef.current
               ? `${activeSessionTranscriptRef.current} ${newFinalAccumulated}`
               : newFinalAccumulated
-            commitFinalText(newFinalAccumulated)
           }
         }
 
@@ -840,13 +843,13 @@ export function useVoiceRecorder({
       lastAction: 'Finalizando gravação e processando transcrição...',
     })
 
-    // Se havia qualquer texto interim não finalizado no momento do stop, salva aditivamente
+    // Texto interim não finalizado no stop: guardado como fallback do navegador
+    // (o campo só recebe texto depois da tentativa pelo servidor)
     if (interimTranscript && interimTranscript.trim()) {
       const leftover = interimTranscript.trim()
       activeSessionTranscriptRef.current = activeSessionTranscriptRef.current
         ? `${activeSessionTranscriptRef.current} ${leftover}`
         : leftover
-      commitFinalText(leftover)
     }
 
     // 1. Para Web Speech API com limpeza de listeners para não auto-reiniciar no onend
@@ -890,52 +893,33 @@ export function useVoiceRecorder({
     // Aguarda breve fração para garantir que o evento onstop do recorder gerou o blob
     await new Promise((resolve) => setTimeout(resolve, 150))
 
-    const hadTranscribedText = activeSessionTranscriptRef.current.trim().length > 0
-
-    // Se a Web Speech API já coletou texto finalizado (típico no desktop/Android e fala contínua)
-    if (hadTranscribedText) {
-      isStoppingRef.current = false
-      setShowAttachmentFallback(false)
-      transitionTimeoutRef.current = setTimeout(() => {
-        setState('saved')
-        updateGlobalDiagnostic({
-          lastAction: 'Transcrição salva no campo com sucesso (Web Speech API pt-BR)',
-        })
-        transitionTimeoutRef.current = setTimeout(() => {
-          setState('idle')
-          transitionTimeoutRef.current = null
-        }, 1500)
-      }, 300)
-      return
-    }
-
-    // VIA 2 / RECUPERAÇÃO AUTOMÁTICA:
-    // Se a Web Speech API não produziu texto (caso do iOS Safari ou oscilação de rede),
-    // processamos o áudio captado pelo MediaRecorder através do endpoint alternativo de transcrição
+    // CAMINHO PRINCIPAL (qualquer navegador): transcrição pelo servidor
+    // (/backend/v1/audio/transcribe). O reconhecimento do navegador deixou de
+    // ser o caminho principal — vira apenas fallback se o servidor falhar.
     const audioBlob = latestRecordedBlobRef.current || recordedAudioBlob
-    let transcribedAltText: string | null = null
+    let serverText: string | null = null
 
     if (audioBlob && audioBlob.size > 0) {
       updateGlobalDiagnostic({
-        lastAction: 'Processando transcrição do áudio gravado...',
+        lastAction: 'Transcrevendo pelo servidor...',
       })
 
-      // Tentativa 1 do caminho alternativo
-      transcribedAltText = await transcribeAudioBlobViaBackend(audioBlob)
+      // Tentativa 1 do caminho principal
+      serverText = await transcribeAudioBlobViaBackend(audioBlob)
 
       // RETENTATIVA AUTOMÁTICA: se falhou a primeira vez, tenta novamente uma vez
-      if (!transcribedAltText) {
+      if (!serverText) {
         updateGlobalDiagnostic({
-          lastAction: 'Retentando transcrição do áudio gravado...',
+          lastAction: 'Retentando transcrição pelo servidor...',
         })
         await new Promise((resolve) => setTimeout(resolve, 300))
-        transcribedAltText = await transcribeAudioBlobViaBackend(audioBlob)
+        serverText = await transcribeAudioBlobViaBackend(audioBlob)
       }
     }
 
-    // Se o caminho alternativo conseguiu o texto transcrito:
-    if (transcribedAltText && transcribedAltText.trim()) {
-      commitFinalText(transcribedAltText.trim())
+    // Servidor respondeu: texto vai ao campo (em qualquer navegador)
+    if (serverText && serverText.trim()) {
+      commitFinalText(serverText.trim())
       setShowAttachmentFallback(false)
       setErrorMessage(null)
       setExactErrorDetail(null)
@@ -944,7 +928,7 @@ export function useVoiceRecorder({
       transitionTimeoutRef.current = setTimeout(() => {
         setState('saved')
         updateGlobalDiagnostic({
-          lastAction: 'Transcrição salva no campo com sucesso via caminho de áudio',
+          lastAction: 'Transcrição salva no campo com sucesso (servidor)',
         })
         transitionTimeoutRef.current = setTimeout(() => {
           setState('idle')
@@ -954,25 +938,47 @@ export function useVoiceRecorder({
       return
     }
 
-    // ÚLTIMO RECURSO ABSOLUTO:
-    // Somente se TODAS as formas de transcrição falharem (nenhum texto via Web Speech
-    // e nenhuma transcrição do áudio gravado), oferecemos o áudio como anexo com mensagem clara.
+    // FALLBACK: texto capturado pelo reconhecimento do navegador nesta sessão
+    // (só entra se o servidor não respondeu)
+    const browserText = activeSessionTranscriptRef.current.trim()
+    if (browserText) {
+      commitFinalText(browserText)
+      setShowAttachmentFallback(false)
+      setErrorMessage(null)
+      setExactErrorDetail(null)
+      isStoppingRef.current = false
+
+      transitionTimeoutRef.current = setTimeout(() => {
+        setState('saved')
+        updateGlobalDiagnostic({
+          lastAction: 'Servidor indisponível — texto do reconhecimento do navegador aplicado',
+        })
+        transitionTimeoutRef.current = setTimeout(() => {
+          setState('idle')
+          transitionTimeoutRef.current = null
+        }, 1500)
+      }, 300)
+      return
+    }
+
+    // TRANSCRIÇÃO INDISPONÍVEL: mantém o áudio gravado preservado para salvar
+    // como anexo e avisa na tela (nunca perde o relato).
     isStoppingRef.current = false
     setState('idle')
     setShowAttachmentFallback(true)
 
     const reasonMsg =
       audioBlob && audioBlob.size > 0
-        ? 'A transcrição automática da fala não pôde ser completada pelo dispositivo. Você pode salvar esta gravação como anexo da visita para não perder o relato ou tentar gravar novamente.'
+        ? 'Áudio salvo, transcrição indisponível. Salve esta gravação como anexo da visita para não perder o relato ou tente gravar novamente.'
         : 'Nenhum áudio foi captado na gravação. Toque em Gravar novamente e fale próximo ao microfone.'
 
     setErrorMessage(reasonMsg)
     setExactErrorDetail(
-      'Falha na transcrição: Web Speech API e processamento de áudio não retornaram texto.',
+      'Falha na transcrição: servidor não retornou texto e o navegador não captou fala.',
     )
     updateGlobalDiagnostic({
       lastError: 'Falha na transcrição: nenhum texto retornado',
-      lastAction: 'Fallback para anexo acionado como último recurso',
+      lastAction: 'Áudio preservado como anexo (transcrição indisponível)',
     })
   }, [
     commitFinalText,

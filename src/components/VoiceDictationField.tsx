@@ -327,11 +327,7 @@ export function VoiceDictationField({
         <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300 text-xs flex flex-col gap-1.5 animate-in fade-in">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-rose-600 animate-ping" />
-            <span className="font-semibold">
-              {isMediaRecorderFallback
-                ? 'Gravando áudio do microfone...'
-                : 'Ouvindo sua fala em português (pt-BR)...'}
-            </span>
+            <span className="font-semibold">Gravando áudio do microfone...</span>
 
             {audioDetected && (
               <span className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-medium bg-emerald-100/80 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded">
