@@ -1,42 +1,51 @@
-import type {
-  QuoteLaborConfig,
-  QuotePricingConfig,
-  QuoteTravelConfig,
-  QuoteLodgingMealsConfig,
+import { buildServiceDetails } from './quoteServiceDetails'
+import {
+  QuoteChemicalProductItem,
+  QuoteCustomMaterial,
   QuoteEquipmentItem,
+  QuoteLaborConfig,
+  QuoteLodgingMealsConfig,
+  QuoteMaterialItem,
   QuoteRecord,
+  QuoteStatus,
+  QuoteTravelConfig,
 } from '@/types/crm'
 
 interface MakeGetFormDataObjectDeps {
+  materialsItems: QuoteMaterialItem[]
+  chemicalProducts: QuoteChemicalProductItem[]
   clientId: string
   clientName: string
   clientDocument?: string
   quoteTitle: string
   quoteNumber: string
-  status: string
+  status: QuoteStatus
   equipmentModel: string
   equipmentBrand: string
   equipmentQuantity: number
-  plateCount?: number
+  plateCount: number | undefined
   plateMaterial: string
-  plateThickness?: number
+  plateThickness: number | undefined
   gasketMaterial: string
   connectionSize: string
-  connectionType?: string
-  pressureTestBar?: number
-  workingPressureBar?: number
+  pressureTestBar: number | undefined
+  workingPressureBar: number | undefined
   dimensionsWHd: string
   workFluid: string
   homologatedProcedure: string
-  scopeOfWork: string
+  technicalProvenance: any[]
   integrationRequired: boolean
-  integrationTiming: string
+  integrationTiming: 'same_day' | 'early' | string
   integrationWeekday: string
   integrationCost: number
   workPermitRequired: boolean
-  materialsItems: QuoteMaterialItemLocal[]
-  customMaterials?: QuoteCustomMaterialLocal[]
-  chemicalProducts: QuoteChemicalProductLocal[]
+  customMaterials: QuoteCustomMaterial[]
+  equipments: QuoteEquipmentItem[]
+  scopeOfWork: string
+  dealId: string
+  dealTitle: string
+  assignedTo: string
+  approvalToken: string
   techCount: number
   techHours: number
   techRate: number
@@ -46,50 +55,15 @@ interface MakeGetFormDataObjectDeps {
   inspectorCount: number
   inspectorHours: number
   inspectorRate: number
-  welderCount?: number
-  welderHours?: number
-  welderRate?: number
-  plumberCount?: number
-  plumberHours?: number
-  plumberRate?: number
-  foremanCount?: number
-  foremanHours?: number
-  foremanRate?: number
-  pisRate: number
-  cofinsRate: number
-  issRate: number
-  csllRate: number
-  irpjRate: number
-  irDiffRate: number
-  serviceMargin: number
-  salesCommission: number
-  adminRate: number
-  adminCost: number
-  laborTotal: number
-  techTotal: number
-  helperTotal: number
-  inspectorTotal: number
-  welderTotal: number
-  plumberTotal: number
-  foremanTotal: number
-  travelConfig: QuoteTravelConfig
-  lodgingConfig: QuoteLodgingMealsConfig
-  laborConfig: QuoteLaborConfig
-  pricingConfig: QuotePricingConfig
-  dealId: string
-  dealTitle: string
-  assignedTo: string
-  approvalToken: string
-  lastSavedAt: string | null
-  technicalProvenance: any[]
-  subtotal: number
-  total: number
-  totalCost: number
-  finalPrice: number
-  paymentTerms: string
-  validityDays: number
-  technicalNotes: string
-  commercialNotes: string
+  welderCount: number
+  welderHours: number
+  welderRate: number
+  plumberCount: number
+  plumberHours: number
+  plumberRate: number
+  foremanCount: number
+  foremanHours: number
+  foremanRate: number
   originCep: string
   originAddress: string
   destinationCep: string
@@ -104,7 +78,6 @@ interface MakeGetFormDataObjectDeps {
   carRentalType: string
   carRentalDailyRate: number
   carRentalDays: number
-  carRentalSubtotal: number
   hotelDays: number
   hotelRate: number
   mealsDays: number
@@ -113,39 +86,177 @@ interface MakeGetFormDataObjectDeps {
   mealVoucherHousedRate: number
   mealVoucherUnhousedQty: number
   mealVoucherUnhousedRate: number
-}
-
-interface QuoteMaterialItemLocal {
-  id: string
-  description: string
-  quantity: number
-  unit_price: number
-  subtotal: number
-}
-
-interface QuoteCustomMaterialLocal {
-  id: string
-  description: string
-  qty?: number
-  unitPrice?: number
-  quantity?: number
-  unit_cost?: number
-  unitCost?: number
-  subtotal?: number
-}
-
-interface QuoteChemicalProductLocal {
-  id: string
-  category: 'cleaning' | 'painting'
-  description: string
-  unit: 'L' | 'kg' | 'un' | 'gl' | 'lata'
-  quantity: number
-  unit_price: number
-  subtotal: number
+  materialsCost: number
+  thirdPartyCost: number
+  otherCosts: number
+  serviceMargin: number
+  salesCommission: number
+  adminRate: number
+  pisRate: number
+  cofinsRate: number
+  issRate: number
+  csllRate: number
+  irpjRate: number
+  irDiffRate: number
+  paymentTerms: string
+  validityDays: number
+  technicalNotes: string
+  commercialNotes: string
+  materialsItemsTotal: number
+  chemicalProductsTotal: number
+  techTotal: number
+  helperTotal: number
+  inspectorTotal: number
+  welderTotal: number
+  plumberTotal: number
+  foremanTotal: number
+  totalLaborCost: number
+  baseFuelCost: number
+  baseTollCost: number
+  carRentalSubtotal: number
+  travelTotalCost: number
+  lodgingMealsTotalCost: number
+  totalMaterialsWithChemicals: number
+  materialsPassThrough: number
+  effectiveIntegrationCost: number
+  serviceDirectCostsTotal: number
+  directCostsTotal: number
+  totalTaxesPercent: number
+  divisor: number
+  adminAmount: number
+  serviceSalePrice: number
+  calculatedSalePrice: number
+  serviceMarginAmount: number
+  salesCommissionAmount: number
+  taxesAmount: number
+  totalIndirectMarkupSum: number
+  totalLaborHours: number
 }
 
 export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
-  return (): Partial<QuoteRecord> => {
+  const {
+    materialsItems,
+    chemicalProducts,
+    clientId,
+    clientName,
+    clientDocument,
+    quoteTitle,
+    quoteNumber,
+    status,
+    equipmentModel,
+    equipmentBrand,
+    equipmentQuantity,
+    plateCount,
+    plateMaterial,
+    plateThickness,
+    gasketMaterial,
+    connectionSize,
+    pressureTestBar,
+    workingPressureBar,
+    dimensionsWHd,
+    workFluid,
+    homologatedProcedure,
+    technicalProvenance,
+    integrationRequired,
+    integrationTiming,
+    integrationWeekday,
+    integrationCost,
+    workPermitRequired,
+    customMaterials,
+    equipments,
+    scopeOfWork,
+    dealId,
+    dealTitle,
+    assignedTo,
+    approvalToken,
+    techCount,
+    techHours,
+    techRate,
+    helperCount,
+    helperHours,
+    helperRate,
+    inspectorCount,
+    inspectorHours,
+    inspectorRate,
+    welderCount,
+    welderHours,
+    welderRate,
+    plumberCount,
+    plumberHours,
+    plumberRate,
+    foremanCount,
+    foremanHours,
+    foremanRate,
+    originCep,
+    originAddress,
+    destinationCep,
+    destinationAddress,
+    distanceKm,
+    isRoundTrip,
+    consumptionKmL,
+    fuelPrice,
+    tollRoadPercent,
+    manualFuelAdj,
+    manualTollAdj,
+    carRentalType,
+    carRentalDailyRate,
+    carRentalDays,
+    hotelDays,
+    hotelRate,
+    mealsDays,
+    mealsRate,
+    mealVoucherHousedQty,
+    mealVoucherHousedRate,
+    mealVoucherUnhousedQty,
+    mealVoucherUnhousedRate,
+    materialsCost,
+    thirdPartyCost,
+    otherCosts,
+    serviceMargin,
+    salesCommission,
+    adminRate,
+    pisRate,
+    cofinsRate,
+    issRate,
+    csllRate,
+    irpjRate,
+    irDiffRate,
+    paymentTerms,
+    validityDays,
+    technicalNotes,
+    commercialNotes,
+    materialsItemsTotal,
+    chemicalProductsTotal,
+    techTotal,
+    helperTotal,
+    inspectorTotal,
+    welderTotal,
+    plumberTotal,
+    foremanTotal,
+    totalLaborCost,
+    baseFuelCost,
+    baseTollCost,
+    carRentalSubtotal,
+    travelTotalCost,
+    lodgingMealsTotalCost,
+    totalMaterialsWithChemicals,
+    materialsPassThrough,
+    effectiveIntegrationCost,
+    serviceDirectCostsTotal,
+    directCostsTotal,
+    totalTaxesPercent,
+    divisor,
+    adminAmount,
+    serviceSalePrice,
+    calculatedSalePrice,
+    serviceMarginAmount,
+    salesCommissionAmount,
+    taxesAmount,
+    totalIndirectMarkupSum,
+    totalLaborHours,
+  } = p
+
+  const getFormDataObject = (): Partial<QuoteRecord> => {
     const travelConfig: QuoteTravelConfig = {
       originCep,
       originAddress,
@@ -196,66 +307,83 @@ export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
       foremanRate,
     }
 
-    const pricingConfig: QuotePricingConfig = {
-      serviceMargin,
-      salesCommission,
-      adminRate,
-      pisRate,
-      cofinsRate,
-      issRate,
-      csllRate,
-      irpjRate,
-      irDiffRate,
-    }
-
-    const sanitizedEquipments: QuoteEquipmentItem[] = ((p as any).equipments || []).map(
-      (eq: any, idx: number) => ({
-        id: eq.id || `eq-${idx + 1}`,
-        model: eq.model || undefined,
-        brand: eq.brand || undefined,
-        series: eq.series || undefined,
-        plate_count:
-          eq.plate_count != null && !isNaN(Number(eq.plate_count))
-            ? Number(eq.plate_count)
-            : undefined,
-        plate_material:
-          eq.plate_material != null && String(eq.plate_material).trim()
-            ? String(eq.plate_material).trim()
-            : undefined,
-        plate_thickness:
-          eq.plate_thickness != null && !isNaN(Number(eq.plate_thickness))
-            ? Number(eq.plate_thickness)
-            : undefined,
-        gasket_material:
-          eq.gasket_material != null && String(eq.gasket_material).trim()
-            ? String(eq.gasket_material).trim()
-            : undefined,
-        connection_size:
-          eq.connection_size != null && String(eq.connection_size).trim()
-            ? String(eq.connection_size).trim()
-            : undefined,
-        connection_type: eq.connection_type || undefined,
-        pressure_test_bar:
-          eq.pressure_test_bar != null && !isNaN(Number(eq.pressure_test_bar))
-            ? Number(eq.pressure_test_bar)
-            : undefined,
-        working_pressure_bar:
-          eq.working_pressure_bar != null && !isNaN(Number(eq.working_pressure_bar))
-            ? Number(eq.working_pressure_bar)
-            : undefined,
-        dimensions: eq.dimensions || undefined,
-        dimensions_w_h_d: eq.dimensions_w_h_d || undefined,
-        weight_kg:
-          eq.weight_kg != null && !isNaN(Number(eq.weight_kg)) ? Number(eq.weight_kg) : undefined,
-        weightKg:
-          eq.weightKg != null && !isNaN(Number(eq.weightKg)) ? Number(eq.weightKg) : undefined,
-      }),
-    )
+    const sanitizedEquipments: QuoteEquipmentItem[] = (
+      equipments && equipments.length > 0
+        ? equipments
+        : [
+            {
+              id: `eq-${Date.now()}-1`,
+              model: equipmentModel || '',
+              brand: equipmentBrand || '',
+              quantity: equipmentQuantity || 1,
+              tag: '',
+              serial_number: '',
+              plate_count: plateCount,
+              plate_material: plateMaterial || '',
+              plate_thickness: plateThickness,
+              gasket_material: gasketMaterial || '',
+              connection_size: connectionSize || '',
+              pressure_test_bar: pressureTestBar,
+              working_pressure_bar: workingPressureBar,
+            },
+          ]
+    ).map((eq, idx) => ({
+      id: eq.id || `eq-${idx + 1}`,
+      model: eq.model != null ? String(eq.model).trim() : '',
+      brand: eq.brand != null && String(eq.brand).trim() ? String(eq.brand).trim() : '',
+      series: eq.series || undefined,
+      quantity: Math.max(1, Number(eq.quantity) || 1),
+      tag: eq.tag || undefined,
+      serial_number: eq.serial_number || undefined,
+      plate_count:
+        eq.plate_count != null && !isNaN(Number(eq.plate_count))
+          ? Number(eq.plate_count)
+          : undefined,
+      plate_material:
+        eq.plate_material != null && String(eq.plate_material).trim()
+          ? String(eq.plate_material).trim()
+          : undefined,
+      plate_thickness:
+        eq.plate_thickness != null && !isNaN(Number(eq.plate_thickness))
+          ? Number(eq.plate_thickness)
+          : undefined,
+      gasket_material:
+        eq.gasket_material != null && String(eq.gasket_material).trim()
+          ? String(eq.gasket_material).trim()
+          : undefined,
+      connection_size:
+        eq.connection_size != null && String(eq.connection_size).trim()
+          ? String(eq.connection_size).trim()
+          : undefined,
+      connection_type: eq.connection_type || undefined,
+      pressure_test_bar:
+        eq.pressure_test_bar != null && !isNaN(Number(eq.pressure_test_bar))
+          ? Number(eq.pressure_test_bar)
+          : undefined,
+      working_pressure_bar:
+        eq.working_pressure_bar != null && !isNaN(Number(eq.working_pressure_bar))
+          ? Number(eq.working_pressure_bar)
+          : undefined,
+      dimensions: eq.dimensions || undefined,
+      dimensions_w_h_d: eq.dimensions_w_h_d || undefined,
+      weight_kg:
+        eq.weight_kg != null && !isNaN(Number(eq.weight_kg)) ? Number(eq.weight_kg) : undefined,
+      weightKg:
+        eq.weightKg != null && !isNaN(Number(eq.weightKg)) ? Number(eq.weightKg) : undefined,
+    }))
 
     const primaryEq = sanitizedEquipments[0] || {
       id: 'eq-1',
       model: equipmentModel || '',
       brand: equipmentBrand || '',
+      quantity: equipmentQuantity || 1,
+      plate_count: plateCount,
+      plate_material: plateMaterial || '',
+      plate_thickness: plateThickness,
+      gasket_material: gasketMaterial || '',
+      connection_size: connectionSize || '',
+      pressure_test_bar: pressureTestBar,
+      working_pressure_bar: workingPressureBar,
     }
 
     const currentSavedTime = new Date().toISOString()
@@ -329,40 +457,172 @@ export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
       foreman_rate: foremanRate,
       labor_config: laborConfig,
 
-      // Custos diretos - Deslocamento
-      travel_cost: travelCost,
+      // Deslocamento & Rotas
+      origin_cep: originCep,
+      origin_address: originAddress,
+      destination_cep: destinationCep,
+      destination_address: destinationAddress,
+      distance_km: distanceKm,
+      is_round_trip: isRoundTrip,
+      consumption_km_l: consumptionKmL,
+      fuel_price: fuelPrice,
+      toll_road_percent: tollRoadPercent,
+      manual_fuel_adj: manualFuelAdj,
+      manual_toll_adj: manualTollAdj,
+      car_rental_type: carRentalType,
+      car_rental_daily_rate: carRentalDailyRate,
+      car_rental_days: carRentalDays,
+      car_rental_total: carRentalSubtotal,
       travel_config: travelConfig,
-      lodging_meals_cost: lodgingMealsCost,
+
+      // Hospedagem & Alimentação
+      hotel_days: hotelDays,
+      hotel_rate: hotelRate,
+      meals_days: mealsDays,
+      meals_rate: mealsRate,
+      meal_voucher_housed_qty: mealVoucherHousedQty,
+      meal_voucher_housed_rate: mealVoucherHousedRate,
+      meal_voucher_unhoused_qty: mealVoucherUnhousedQty,
+      meal_voucher_unhoused_rate: mealVoucherUnhousedRate,
       lodging_meals_config: lodgingConfig,
+
+      lodging_meals_cost: lodgingMealsTotalCost,
+      travel_cost: travelTotalCost,
       materials_cost: materialsCost,
       third_party_cost: thirdPartyCost,
       other_costs: otherCosts,
-      total_cost: totalCost,
+      total_cost: directCostsTotal,
 
-      // Impostos e Margens
-      service_margin: serviceMargin,
-      sales_commission: salesCommission,
-      admin_rate: adminRate,
-      admin_cost: adminCost,
+      // Margens e Tributos
+      service_margin: Math.round(serviceMargin),
+      sales_commission: Math.round(salesCommission),
+      admin_rate: Math.round(adminRate),
+      admin_cost: adminAmount,
       pis_rate: pisRate,
       cofins_rate: cofinsRate,
       iss_rate: issRate,
       csll_rate: csllRate,
       irpj_rate: irpjRate,
       ir_diff_rate: irDiffRate,
-      pricing_config: pricingConfig,
+      pricing_config: {
+        serviceMargin: Math.round(serviceMargin),
+        salesCommission: Math.round(salesCommission),
+        adminRate: Math.round(adminRate),
+        pisRate,
+        cofinsRate,
+        issRate,
+        csllRate,
+        irpjRate,
+        irDiffRate,
+      },
 
-      // Preço e condições
-      subtotal: subtotal,
-      total: total,
-      final_price: finalPrice,
+      // Atualização em tempo real de service_details para manter a Composição Interna e relatórios 100% sincronizados
+      service_details: buildServiceDetails({
+        primaryEq,
+        sanitizedEquipments,
+        connectionSize,
+        equipmentModel,
+        equipmentBrand,
+        plateCount,
+        plateMaterial,
+        gasketMaterial,
+        pressureTestBar,
+        workingPressureBar,
+        workFluid,
+        integrationRequired,
+        scopeOfWork,
+        techCount,
+        techHours,
+        techRate,
+        helperCount,
+        helperHours,
+        helperRate,
+        inspectorCount,
+        inspectorHours,
+        inspectorRate,
+        welderCount,
+        welderHours,
+        welderRate,
+        plumberCount,
+        plumberHours,
+        plumberRate,
+        foremanCount,
+        foremanHours,
+        foremanRate,
+        originCep,
+        originAddress,
+        destinationCep,
+        destinationAddress,
+        distanceKm,
+        isRoundTrip,
+        consumptionKmL,
+        fuelPrice,
+        tollRoadPercent,
+        manualFuelAdj,
+        manualTollAdj,
+        carRentalType,
+        carRentalDailyRate,
+        carRentalDays,
+        hotelDays,
+        hotelRate,
+        mealsDays,
+        mealsRate,
+        mealVoucherHousedQty,
+        mealVoucherHousedRate,
+        mealVoucherUnhousedQty,
+        mealVoucherUnhousedRate,
+        materialsCost,
+        serviceMargin,
+        salesCommission,
+        adminRate,
+        pisRate,
+        cofinsRate,
+        issRate,
+        csllRate,
+        irpjRate,
+        irDiffRate,
+        paymentTerms,
+        validityDays,
+        materialsItemsTotal,
+        chemicalProductsTotal,
+        techTotal,
+        helperTotal,
+        inspectorTotal,
+        welderTotal,
+        plumberTotal,
+        foremanTotal,
+        totalLaborCost,
+        baseFuelCost,
+        baseTollCost,
+        carRentalSubtotal,
+        travelTotalCost,
+        lodgingMealsTotalCost,
+        totalMaterialsWithChemicals,
+        materialsPassThrough,
+        effectiveIntegrationCost,
+        serviceDirectCostsTotal,
+        directCostsTotal,
+        totalTaxesPercent,
+        divisor,
+        adminAmount,
+        serviceSalePrice,
+        calculatedSalePrice,
+        serviceMarginAmount,
+        salesCommissionAmount,
+        taxesAmount,
+        totalIndirectMarkupSum,
+      }),
+
+      final_price: calculatedSalePrice,
+      total: calculatedSalePrice,
+      subtotal: calculatedSalePrice,
       payment_terms: paymentTerms,
       validity_days: validityDays,
       technical_notes: technicalNotes,
       commercial_notes: commercialNotes,
       technical_provenance: technicalProvenance,
-      last_saved_at: currentSavedTime,
-      service_details: serviceDetails,
     }
   }
+
+  return getFormDataObject
 }

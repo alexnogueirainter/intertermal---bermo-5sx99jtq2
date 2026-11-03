@@ -472,7 +472,13 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
                           {so.rejection_notes && (
                             <div className="text-[10px] text-rose-700 dark:text-rose-400 flex items-center gap-1 bg-rose-50 dark:bg-rose-950/40 p-1.5 rounded">
                               <AlertCircle className="h-3 w-3 shrink-0" />
-                              <span>Motivo Rejeição: {so.rejection_notes}</span>
+                              <span>
+                                Motivo Rejeição: {so.rejection_notes}
+                                {so.rejected_by ? ` — por ${so.rejected_by}` : ''}
+                                {so.rejected_at
+                                  ? ` em ${new Date(so.rejected_at).toLocaleString('pt-BR')}`
+                                  : ''}
+                              </span>
                             </div>
                           )}
                           <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">

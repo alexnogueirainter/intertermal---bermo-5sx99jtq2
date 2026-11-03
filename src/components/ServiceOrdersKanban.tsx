@@ -631,6 +631,24 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                           )
                         })()}
 
+                        {/* Recusa registrada (rejected_at/rejected_by/rejection_notes) */}
+                        {(order.rejected_at || order.rejected_by || order.rejection_notes) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedOrder(order)
+                              setIsHistoryModalOpen(true)
+                            }}
+                            className="w-full text-left text-[10px] text-rose-700 dark:text-rose-400 hover:underline flex items-center gap-1 pt-0.5"
+                          >
+                            <Ban className="h-3 w-3" />
+                            <span className="truncate">
+                              Recusa: {order.rejection_notes || order.rejected_by || 'registrada'}
+                            </span>
+                          </button>
+                        )}
+
                         {/* Histórico / Notificações badge */}
                         {order.status_history && order.status_history.length > 0 && (
                           <button
@@ -964,6 +982,34 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                 Equipamento: {selectedOrder?.equipment_model || 'Trocador BERMO'}
               </p>
             </div>
+
+            {/* Registro de Recusa da OS (rejected_at / rejected_by / rejection_notes) */}
+            {(selectedOrder?.rejected_at ||
+              selectedOrder?.rejected_by ||
+              selectedOrder?.rejection_notes) && (
+              <div className="p-3 rounded-lg border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 space-y-1">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-rose-800 dark:text-rose-300 flex items-center gap-1.5">
+                  <Ban className="h-3.5 w-3.5" />
+                  Recusa registrada
+                </h4>
+                {selectedOrder?.rejected_at && (
+                  <p className="text-[11px] text-rose-900 dark:text-rose-200">
+                    <strong>Data:</strong>{' '}
+                    {new Date(selectedOrder.rejected_at).toLocaleString('pt-BR')}
+                  </p>
+                )}
+                {selectedOrder?.rejected_by && (
+                  <p className="text-[11px] text-rose-900 dark:text-rose-200">
+                    <strong>Recusada por:</strong> {selectedOrder.rejected_by}
+                  </p>
+                )}
+                {selectedOrder?.rejection_notes && (
+                  <p className="text-[11px] text-rose-900 dark:text-rose-200 whitespace-pre-wrap">
+                    <strong>Motivo:</strong> {selectedOrder.rejection_notes}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
