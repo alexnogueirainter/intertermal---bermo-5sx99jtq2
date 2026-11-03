@@ -141,58 +141,13 @@ export const quoteDealSyncService = {
     try {
       let existingDeal: DealRecord | null = null
 
-      // 1. Tentar buscar pelo deal_id existente na proposta
+      // Vínculo SEMPRE pelo deal_id gravado na proposta — nunca por busca de título/código.
+      // Se o deal_id aponta para negócio inexistente (ex.: excluído), cria um novo.
       if (quote.deal_id) {
         try {
           existingDeal = await pb.collection('deals').getOne<DealRecord>(quote.deal_id, {
             requestKey: null,
           })
-        } catch (_) {
-          existingDeal = null
-        }
-      }
-
-      // 2. Se não encontrou por deal_id (ou deal_id estava apontando para deal inexistente),
-      // buscar negócio existente pelo código da proposta no título ou notas
-      if (!existingDeal && (quoteCode || altCode)) {
-        try {
-          const codesToTry = Array.from(new Set([quoteCode, altCode].filter(Boolean)))
-          for (const code of codesToTry) {
-            if (existingDeal) break
-            const list = await pb.collection('deals').getList<DealRecord>(1, 10, {
-              filter: `title ~ "${code}" || notes ~ "${code}"`,
-              // Preferir o negócio que já foi ganho ('won'), ou o mais recentemente atualizado
-              sort: '-updated,-created',
-              requestKey: null,
-            })
-            if (list.items && list.items.length > 0) {
-              // Se existirem múltiplos deals históricos vinculados ao mesmo código,
-              // selecionar preferencialmente aquele com o id que a proposta já referenciava,
-              // ou o que já está em 'won' (se a proposta for aprovada), ou o primeiro retornado.
-              const preferred =
-                (quote.deal_id ? list.items.find((d) => d.id === quote.deal_id) : null) ||
-                (quote.status === 'approved' ? list.items.find((d) => d.stage === 'won') : null) ||
-                list.items[0]
-              existingDeal = preferred
-            }
-          }
-        } catch (searchErr) {
-          console.warn('Erro ao pesquisar deal existente por código:', searchErr)
-          existingDeal = null
-        }
-      }
-
-      // 3. Se ainda não encontrou e temos clientId, buscar se existe deal com título exato da proposta
-      if (!existingDeal && quoteCode) {
-        try {
-          const list = await pb.collection('deals').getList<DealRecord>(1, 5, {
-            filter: `title ~ "${quoteCode}"`,
-            sort: '-updated',
-            requestKey: null,
-          })
-          if (list.items && list.items.length > 0) {
-            existingDeal = list.items[0]
-          }
         } catch (_) {
           existingDeal = null
         }

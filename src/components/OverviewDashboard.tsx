@@ -200,6 +200,61 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     return s !== 'lost' && s !== 'perdido' && s !== 'recusado' && s !== 'rejeitado'
   }
 
+  // Utilitário para negócios ganhos (won) — "Ganhos no período" no painel
+  const isDealWon = (deal: DealRecord): boolean => {
+    if (!deal) return false
+    const s = (deal.stage || '').toLowerCase().trim()
+    return s === 'won' || s === 'ganho' || s === 'fechado' || s === 'concluido' || s === 'concluído'
+  }
+
+  // Deals afetados pelo seletor de período (mesma régua de datas das propostas)
+  const filteredDealsByPeriod = React.useMemo(() => {
+    if (periodFilter === 'all') return deals
+
+    const now = new Date()
+    return deals.filter((d) => {
+      const dateStr = d.created || d.updated
+      if (!dateStr) return true
+      const dDate = new Date(dateStr)
+      if (isNaN(dDate.getTime())) return true
+
+      if (periodFilter === 'month') {
+        return dDate.getMonth() === now.getMonth() && dDate.getFullYear() === now.getFullYear()
+      }
+
+      if (periodFilter === 'quarter') {
+        const currentQuarter = Math.floor(now.getMonth() / 3)
+        const dealQuarter = Math.floor(dDate.getMonth() / 3)
+        return dealQuarter === currentQuarter && dDate.getFullYear() === now.getFullYear()
+      }
+
+      if (periodFilter === 'year') {
+        return dDate.getFullYear() === now.getFullYear()
+      }
+
+      if (periodFilter === 'custom') {
+        if (!customStartDate && !customEndDate) return true
+        const dTime = dDate.getTime()
+        if (customStartDate) {
+          const start = new Date(`${customStartDate}T00:00:00`).getTime()
+          if (!isNaN(start) && dTime < start) return false
+        }
+        if (customEndDate) {
+          const end = new Date(`${customEndDate}T23:59:59`).getTime()
+          if (!isNaN(end) && dTime > end) return false
+        }
+        return true
+      }
+
+      return true
+    })
+  }, [deals, periodFilter, customStartDate, customEndDate])
+
+  const activeDeals = filteredDealsByPeriod.filter(isDealActive)
+  const totalPipelineValue = activeDeals.reduce((sum, d) => sum + getDealNumericValue(d), 0)
+  const wonDeals = filteredDealsByPeriod.filter(isDealWon)
+  const wonDealsTotal = wonDeals.reduce((sum, d) => sum + getDealNumericValue(d), 0)
+
   // Função utilitária para extrair o valor monetário real de um negócio (com fallback de campos numéricos)
   const getDealNumericValue = (deal: DealRecord | any): number => {
     if (!deal) return 0
@@ -1404,7 +1459,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
           </Card>
 
           {/* Grid de KPIs de Propostas e Status Comercial */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <Card
               onClick={() => onNavigate('quotes')}
               className="border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-emerald-400 transition-all"
@@ -1501,6 +1556,31 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1">
                   {activeDeals.length} oportunidades ativas no pipeline
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card
+              onClick={() => onNavigate('pipeline')}
+              className="border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:border-emerald-400 transition-all"
+            >
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Ganhos no período
+                </CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
+                  {wonDealsTotal.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                  })}
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  {wonDeals.length} negócios ganhos no período selecionado
                 </p>
               </CardContent>
             </Card>

@@ -1,3 +1,4 @@
+import pb from '@/lib/pocketbase/client'
 import { quoteDealSyncService } from '@/services/quotes-deal-sync'
 import {
   computeQuoteDiffs,
@@ -197,27 +198,46 @@ export function makeQuoteActions(p: MakeQuoteActionsDeps) {
     setIsPreviewOpen(true)
   }
 
-  // Excluir proposta com confirmação
+  // Excluir proposta com confirmação + opção de excluir o negócio vinculado
   const handleDelete = async (quote: QuoteRecord) => {
     if (
-      confirm(
+      !confirm(
         `Deseja realmente excluir a proposta ${quote.quote_number || ''} do cliente ${quote.client_name || ''}?`,
       )
     ) {
-      try {
-        await onDeleteQuote(quote.id)
-        if (activeQuoteId === quote.id) {
-          setIsEditorOpen(false)
-          resetForm()
+      return
+    }
+    let deleteLinkedDeal = false
+    if (quote.deal_id) {
+      deleteLinkedDeal = confirm(
+        `A proposta está vinculada ao negócio "${quote.deal_title || quote.quote_number || ''}" no Pipeline Comercial.\n\nExcluir também o negócio vinculado?`,
+      )
+    }
+    try {
+      await onDeleteQuote(quote.id)
+      if (deleteLinkedDeal && quote.deal_id) {
+        try {
+          await pb.collection('deals').delete(quote.deal_id)
+        } catch (dealErr: any) {
+          toast({
+            title: 'Negócio vinculado não excluído',
+            description:
+              dealErr?.message || 'A proposta foi excluída, mas o negócio permaneceu no pipeline.',
+            variant: 'destructive',
+          })
         }
-        toast({ title: 'Proposta excluída com sucesso.' })
-      } catch (err: any) {
-        toast({
-          title: 'Erro ao excluir proposta',
-          description: err.message,
-          variant: 'destructive',
-        })
       }
+      if (activeQuoteId === quote.id) {
+        setIsEditorOpen(false)
+        resetForm()
+      }
+      toast({ title: 'Proposta excluída com sucesso.' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao excluir proposta',
+        description: err.message,
+        variant: 'destructive',
+      })
     }
   }
 
