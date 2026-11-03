@@ -82,7 +82,7 @@ export function QuotesManager({
   const routesH = makeQuoteRoutes({ ...S, toast })
   const newClientH = makeNewClientQuick({ ...S, toast, onCreateClient })
   const getFormDataObject = makeGetFormDataObject({ ...S, ...D })
-  const loadQuoteHistory = makeLoadQuoteHistory({ ...S, loadQuoteHistory: async () => {} })
+  const loadQuoteHistory = makeLoadQuoteHistory(S)
   const loadQuoteIntoForm = makeLoadQuoteIntoForm({ ...S, loadQuoteHistory })
   const resetForm = makeResetForm(S)
   const actionsH = makeQuoteActions({
