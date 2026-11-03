@@ -273,9 +273,6 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     return 0
   }
 
-  const activeDeals = deals.filter(isDealActive)
-  const totalPipelineValue = activeDeals.reduce((sum, d) => sum + getDealNumericValue(d), 0)
-
   // Status de Ordens de Serviço (service_orders) reais do banco
   // OS ativas em campo: tudo que não estiver 'fechado', 'completed' ou 'cancelled'/'rejeitado'
   const isFieldServiceOrderActive = (status?: string): boolean => {
