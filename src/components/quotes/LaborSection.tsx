@@ -61,6 +61,7 @@ interface LaborSectionProps {
 }
 
 export function LaborSection(props: LaborSectionProps) {
+  const { totalLaborCost, ...rest } = props
   return (
     <>
       {/* SEÇÃO 3B: Mão de Obra */}
@@ -83,8 +84,8 @@ export function LaborSection(props: LaborSectionProps) {
           </div>
         </CardHeader>
         <CardContent className="p-4 space-y-4">
-          <LaborRolesGrid {...props} />
-          <IntegrationPermitPanel {...props} />
+          <LaborRolesGrid {...rest} />
+          <IntegrationPermitPanel {...rest} />
         </CardContent>
       </Card>
     </>

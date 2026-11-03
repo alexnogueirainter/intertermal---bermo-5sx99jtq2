@@ -13,6 +13,8 @@ import { EquipmentWebSearchResultItem } from '@/services/quotes'
 import { Check, Copy, Globe, Loader2, Search, Sparkles } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 
+import type { useToast } from '@/hooks/use-toast'
+
 interface WebSearchSpecsDialogProps {
   equipmentModel: string
   plateMaterial: string

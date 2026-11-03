@@ -56,6 +56,7 @@ interface MarginsClosingSectionProps {
 }
 
 export function MarginsClosingSection(props: MarginsClosingSectionProps) {
+  const { calculatedSalePrice, paymentTerms, setPaymentTerms, status, setStatus, ...rest } = props
   return (
     <>
       {/* SEÇÃO 3E: Margens & Fechamento */}
@@ -78,9 +79,9 @@ export function MarginsClosingSection(props: MarginsClosingSectionProps) {
           </div>
         </CardHeader>
         <CardContent className="p-4 space-y-4">
-          <MarginsSlidersPanel {...props} />
-          <TaxesPanel {...props} />
-          <PriceFormationPanel {...props} />
+          <MarginsSlidersPanel {...rest} />
+          <TaxesPanel {...rest} />
+          <PriceFormationPanel {...rest} />
           {/* Bloco 4: Condições de Pagamento e Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div className="space-y-1">

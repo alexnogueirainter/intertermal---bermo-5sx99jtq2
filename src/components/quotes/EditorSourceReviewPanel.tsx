@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { EquipmentSpecsExtractionResponse } from '@/services/quotes'
 import { EquipmentWebSearchResultItem } from '@/services/quotes'
 import { QuoteStatus } from '@/types/crm'
 import { Check, ExternalLink, Globe, Loader2, Search } from 'lucide-react'

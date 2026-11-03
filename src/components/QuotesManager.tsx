@@ -56,9 +56,20 @@ export function QuotesManager({
   onCreateClient,
   onOpenCatalog,
 }: QuotesManagerProps) {
+  const S = useQuoteEditorState()
+  const {
+    isEditorOpen,
+    setIsEditorOpen,
+    isPreviewOpen,
+    setIsPreviewOpen,
+    quoteForPreview,
+    setQuoteForPreview,
+    previewViewMode,
+    activeQuoteId,
+    setStatus,
+  } = S
   const { toast } = useToast()
 
-  const S = useQuoteEditorState()
   const D = computeQuoteCalculations({ ...S, quotes })
   const eqH = useEquipmentHandlers({ ...S, toast })
   const specSearchH = makeSpecsSearch({ ...S, toast })
@@ -71,7 +82,7 @@ export function QuotesManager({
   const routesH = makeQuoteRoutes({ ...S, toast })
   const newClientH = makeNewClientQuick({ ...S, toast, onCreateClient })
   const getFormDataObject = makeGetFormDataObject({ ...S, ...D })
-  const loadQuoteHistory = makeLoadQuoteHistory(S)
+  const loadQuoteHistory = makeLoadQuoteHistory({ ...S, loadQuoteHistory: async () => {} })
   const loadQuoteIntoForm = makeLoadQuoteIntoForm({ ...S, loadQuoteHistory })
   const resetForm = makeResetForm(S)
   const actionsH = makeQuoteActions({

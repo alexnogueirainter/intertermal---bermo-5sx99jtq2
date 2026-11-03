@@ -7,6 +7,7 @@ import {
 } from '@/services/quote-history'
 import { QuoteRecord, QuoteStatus } from '@/types/crm'
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
+import type { useToast } from '@/hooks/use-toast'
 
 interface MakeQuoteActionsDeps {
   activeQuoteId: string | null

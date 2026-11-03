@@ -6,6 +6,8 @@ import { QuoteEquipmentItem } from '@/types/crm'
 import { Plus } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 
+import type { useToast } from '@/hooks/use-toast'
+
 interface EquipmentItemsEditorProps {
   equipmentModel: string
   equipmentBrand: string

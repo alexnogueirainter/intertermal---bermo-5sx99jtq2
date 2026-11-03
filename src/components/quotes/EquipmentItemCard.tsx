@@ -7,6 +7,8 @@ import { QuoteEquipmentItem } from '@/types/crm'
 import { Globe, Loader2, Sparkles, Trash2 } from 'lucide-react'
 import type { Dispatch, SetStateAction } from 'react'
 
+import type { useToast } from '@/hooks/use-toast'
+
 interface EquipmentItemCardProps {
   eq: QuoteEquipmentItem
   eqIdx: number

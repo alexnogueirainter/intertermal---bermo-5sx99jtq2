@@ -2,6 +2,7 @@ import { quoteHistoryService, QuoteHistoryItem } from '@/services/quote-history'
 import type { Dispatch, SetStateAction } from 'react'
 
 interface MakeLoadQuoteHistoryDeps {
+  loadQuoteHistory: (qId: string) => any
   setIsLoadingHistory: Dispatch<SetStateAction<boolean>>
   setQuoteHistoryList: Dispatch<SetStateAction<QuoteHistoryItem[]>>
 }

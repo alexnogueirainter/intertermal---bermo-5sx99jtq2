@@ -9,7 +9,6 @@ interface BuildServiceDetailsDeps {
   plateCount: number | undefined
   plateMaterial: string
   gasketMaterial: string
-  connectionSize: string
   pressureTestBar: number | undefined
   workingPressureBar: number | undefined
   workFluid: string

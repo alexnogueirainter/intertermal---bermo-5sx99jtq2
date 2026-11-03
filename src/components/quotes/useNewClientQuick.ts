@@ -1,6 +1,7 @@
 import { clientsService } from '@/services/clients'
 import { ClientRecord, QuoteStatus } from '@/types/crm'
 import type { Dispatch, FormEvent, SetStateAction } from 'react'
+import type { useToast } from '@/hooks/use-toast'
 
 interface MakeNewClientQuickDeps {
   newClientCity: string

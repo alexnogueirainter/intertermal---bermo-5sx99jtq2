@@ -110,7 +110,6 @@ interface MakeGetFormDataObjectDeps {
   plumberTotal: number
   foremanTotal: number
   totalLaborCost: number
-  totalLaborHours: number
   baseFuelCost: number
   baseTollCost: number
   carRentalSubtotal: number
@@ -130,6 +129,7 @@ interface MakeGetFormDataObjectDeps {
   salesCommissionAmount: number
   taxesAmount: number
   totalIndirectMarkupSum: number
+  totalLaborHours: number
 }
 
 export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
@@ -232,7 +232,6 @@ export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
     plumberTotal,
     foremanTotal,
     totalLaborCost,
-    totalLaborHours,
     baseFuelCost,
     baseTollCost,
     carRentalSubtotal,
@@ -252,6 +251,7 @@ export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
     salesCommissionAmount,
     taxesAmount,
     totalIndirectMarkupSum,
+    totalLaborHours,
   } = p
 
   const getFormDataObject = (): Partial<QuoteRecord> => {
@@ -523,7 +523,6 @@ export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
         plateCount,
         plateMaterial,
         gasketMaterial,
-        connectionSize,
         pressureTestBar,
         workingPressureBar,
         workFluid,
