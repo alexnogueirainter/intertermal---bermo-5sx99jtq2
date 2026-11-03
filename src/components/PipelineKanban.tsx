@@ -151,7 +151,7 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
         <div>
           <h2 className="text-xl md:text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 flex items-center gap-2">
             <Briefcase className="h-6 w-6 text-indigo-600" />
-            Funil de Vendas & Pipeline Comercial
+            Funil comercial
           </h2>
           <p className="text-xs md:text-sm text-muted-foreground mt-0.5">
             Mova oportunidades pelas etapas do modelo de conversão B2B.
