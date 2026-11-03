@@ -153,25 +153,6 @@ export const quoteDealSyncService = {
     }
     const sNorm = (quote.status || '').toLowerCase().trim()
     const autoMove = AUTO_MOVE_STAGES[sNorm]
-    const currentStage = (existingDeal?.stage || '').toLowerCase().trim()
-    const isTerminal = currentStage === 'won' || currentStage === 'lost'
-    const stageUnchanged = !autoMove || (existingDeal && currentStage === autoMove.stage)
-    const manualStage = existingDeal && !isTerminal && !autoMove
-    const effectiveStage = isTerminal
-      ? existingDeal!.stage
-      : autoMove
-        ? autoMove.stage
-        : manualStage
-          ? existingDeal!.stage
-          : stage
-    const effectiveProbability = isTerminal
-      ? existingDeal!.probability
-      : autoMove
-        ? autoMove.probability
-        : manualStage
-          ? existingDeal!.probability
-          : probability
-    void stageUnchanged
 
     try {
       let existingDeal: DealRecord | null = null
@@ -187,6 +168,25 @@ export const quoteDealSyncService = {
           existingDeal = null
         }
       }
+
+      // Etapa efetiva respeitando a regra dos 3 momentos + manual nunca revertido
+      const currentStage = (existingDeal?.stage || '').toLowerCase().trim()
+      const isTerminal = currentStage === 'won' || currentStage === 'lost'
+      const manualStage = !!existingDeal && !isTerminal && !autoMove
+      const effectiveStage = isTerminal
+        ? existingDeal!.stage
+        : autoMove
+          ? autoMove.stage
+          : manualStage
+            ? existingDeal!.stage
+            : stage
+      const effectiveProbability = isTerminal
+        ? existingDeal!.probability
+        : autoMove
+          ? autoMove.probability
+          : manualStage
+            ? existingDeal!.probability
+            : probability
 
       if (existingDeal) {
         // Preservar loss_reason existente se o status for rejeitado e não tiver novo
