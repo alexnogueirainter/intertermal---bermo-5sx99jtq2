@@ -25,6 +25,8 @@ export interface MediaAttachment {
   dataUrl: string
   size?: number
   createdAt?: string
+  // Sincronização do arquivo com o servidor (o rascunho guarda só a referência)
+  uploadStatus?: 'pendente' | 'enviado'
 }
 
 export interface EquipmentItem {
@@ -128,6 +130,17 @@ export interface FieldVisitData {
   backendRecordId?: string
   crmStatus?: 'rascunho' | 'enviada' | 'pendente'
   lastSentAt?: string
+}
+
+const PB_BASE = String(import.meta.env.VITE_POCKETBASE_URL || '').replace(/\/+$/, '')
+
+/** Caminho relativo do servidor (/api/files/...) vira URL absoluta do backend. */
+export function absolutizeMediaUrl(u?: string | null): string {
+  const v = String(u || '')
+  if (!v) return ''
+  if (v.startsWith('data:') || v.startsWith('blob:') || v.startsWith('http')) return v
+  if (v.startsWith('/api/files/')) return PB_BASE + v
+  return v
 }
 
 export const STORAGE_KEY_CURRENT_VISIT = 'intertermal_field_visit_draft_v1'
@@ -679,7 +692,9 @@ export function recordToFieldVisitData(record: any): {
     workTypeOther: record.work_type_other || '',
     generalObservations: record.general_notes || '',
     freeDescription: record.free_description || '',
-    visitAttachments: [],
+    visitAttachments: Array.isArray((record as any).visit_attachments)
+      ? (record as any).visit_attachments
+      : [],
     equipments: safeEquipments,
     actionPlan: safeActionPlan.length > 0 ? safeActionPlan : undefined,
     updatedAt: record.updated || record.created || new Date().toISOString(),
@@ -687,6 +702,15 @@ export function recordToFieldVisitData(record: any): {
     crmStatus: 'enviada',
     lastSentAt: record.sent_at || record.created,
   }
+
+  // Normaliza referências de mídia: caminhos do servidor viram URL absoluta
+  const abs = (a: any) => ({ ...a, dataUrl: absolutizeMediaUrl(a.dataUrl) })
+  data.visitAttachments = (data.visitAttachments || []).map(abs)
+  data.equipments = data.equipments.map((eq) => ({
+    ...eq,
+    photoDataUrl: eq.photoDataUrl ? absolutizeMediaUrl(eq.photoDataUrl) : eq.photoDataUrl,
+    attachments: (eq.attachments || []).map(abs),
+  }))
 
   return { data, parsedCompany, parsedContact }
 }

@@ -9,6 +9,7 @@ import {
   Printer,
   Loader2,
   Check,
+  CloudOff,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { FieldVisitData } from '@/types/field-visit'
@@ -23,6 +24,8 @@ export function VisitPageHeader({
   handleSendToCrm,
   setIsPdfDialogOpen,
   setIsNewVisitDialogOpen,
+  mediaStatus,
+  onRetryMedia,
 }: {
   sellerMode: boolean
   saveStatus: 'saved' | 'saving'
@@ -33,6 +36,8 @@ export function VisitPageHeader({
   handleSendToCrm: () => void
   setIsPdfDialogOpen: (open: boolean) => void
   setIsNewVisitDialogOpen: (open: boolean) => void
+  mediaStatus?: { uploading: number; pending: number }
+  onRetryMedia?: () => void
 }) {
   return (
     <>
@@ -76,22 +81,62 @@ export function VisitPageHeader({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Status do Auto-save */}
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">
-              {saveStatus === 'saving' ? (
-                <>
-                  <RotateCcw className="h-3 w-3 animate-spin text-amber-500" />
-                  <span className="hidden md:inline">Salvando...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                  <span className="hidden md:inline font-medium text-emerald-700 dark:text-emerald-400">
-                    Salvo
-                  </span>
-                </>
-              )}
-            </div>
+            {/* Status no topo: Salvo no celular / Enviado ao CRM / Não enviado (tocar p/ reenviar) */}
+            {(() => {
+              const uploading = mediaStatus?.uploading || 0
+              const pending = mediaStatus?.pending || 0
+              if (uploading > 0) {
+                return (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">
+                    <Loader2 className="h-3 w-3 animate-spin text-teal-600" />
+                    <span className="hidden md:inline">Enviando {uploading} arquivo(s)...</span>
+                  </div>
+                )
+              }
+              if (pending > 0) {
+                return (
+                  <button
+                    type="button"
+                    onClick={onRetryMedia}
+                    title="Reenviar arquivos ao CRM"
+                    className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900 transition-colors"
+                  >
+                    <CloudOff className="h-3 w-3" />
+                    <span className="hidden md:inline font-semibold">
+                      Não enviado — tocar para reenviar ({pending})
+                    </span>
+                    <span className="md:hidden font-semibold">{pending}</span>
+                  </button>
+                )
+              }
+              if (visit.crmStatus === 'enviada') {
+                return (
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    <span className="hidden md:inline font-medium text-emerald-700 dark:text-emerald-400">
+                      Enviado ao CRM ✔
+                    </span>
+                  </div>
+                )
+              }
+              return (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800">
+                  {saveStatus === 'saving' ? (
+                    <>
+                      <RotateCcw className="h-3 w-3 animate-spin text-amber-500" />
+                      <span className="hidden md:inline">Salvando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                      <span className="hidden md:inline font-medium text-emerald-700 dark:text-emerald-400">
+                        Salvo no celular
+                      </span>
+                    </>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Botão Análise IA */}
             <Button

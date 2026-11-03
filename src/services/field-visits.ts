@@ -21,6 +21,7 @@ export interface FieldVisitRecord {
   free_description?: string
   action_plan?: any
   equipment?: EquipmentItem[]
+  visit_attachments?: any
   status?: string
   sent_at?: string
   created?: string

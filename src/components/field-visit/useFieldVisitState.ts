@@ -2,7 +2,17 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams, useLocation } from 'react-router-dom'
 import { toast } from '@/hooks/use-toast'
 import { fieldVisitsService } from '@/services/field-visits'
-import { pendingQueue } from '@/services/field-visit-queue'
+import { pendingQueue, type QueueRetryResult } from '@/services/field-visit-queue'
+import { getStoredToken, getStoredDeviceId } from '@/services/field-visit-token'
+import {
+  cacheMediaBlob,
+  retryAllCachedMedia,
+  applyMediaResults,
+  countPendingMedia,
+  hydrateVisitMedia,
+  deleteServerMedia,
+  sanitizeVisitForStorage,
+} from '@/services/field-visit-media'
 import {
   type FieldVisitData,
   type EquipmentItem,
@@ -13,8 +23,15 @@ import {
   createInitialVisitData,
   calculateDurationBetween,
   recordToFieldVisitData,
-  readFileAsMediaAttachment,
+  compressImageFile,
+  generateId,
 } from '@/types/field-visit'
+
+/** Status da mídia no topo do formulário (barra fina, sem mudar o layout). */
+export interface MediaStatusBar {
+  uploading: number
+  pending: number
+}
 
 export function useFieldVisitState({
   sellerMode = false,
@@ -128,13 +145,20 @@ export function useFieldVisitState({
 
         setVisit(data)
         try {
-          localStorage.setItem(STORAGE_KEY_CURRENT_VISIT, JSON.stringify(data))
+          localStorage.setItem(
+            STORAGE_KEY_CURRENT_VISIT,
+            JSON.stringify(sanitizeVisitForStorage(data)),
+          )
           if (data.employeeName) {
             localStorage.setItem(STORAGE_KEY_EMPLOYEE_NAME, data.employeeName)
           }
         } catch (e) {
           console.warn('Erro ao sincronizar visita carregada no localStorage:', e)
         }
+        // Base64 legado do registro vira cópia local + pendente (sobe ao servidor)
+        hydrateVisitMedia(data).then((h) => {
+          if (isMounted && h !== data) setVisit(h)
+        })
       })
       .catch((err) => {
         console.error('Erro ao carregar visita por ID:', err)
@@ -154,17 +178,90 @@ export function useFieldVisitState({
     }
   }, [queryVisitId, visit.backendRecordId])
 
-  // Reenvio automático da fila de pendentes quando a conexão volta
+  // ---- Mídia no servidor (fotos/vídeos) ----
+  // O rascunho guarda só a referência; a cópia local fica no IndexedDB até o
+  // servidor confirmar. Barra de status + avisos na tela (nunca falha em silêncio).
+  const [mediaStatus, setMediaStatus] = useState<MediaStatusBar>({ uploading: 0, pending: 0 })
+  const [mediaNotice, setMediaNotice] = useState<string | null>(null)
+  const [uploadingCount, setUploadingCount] = useState(0)
+  const autoRetryRef = useRef(false)
+  const hydratedForRef = useRef('')
+
   useEffect(() => {
+    const pending = countPendingMedia(visit)
+    setMediaStatus({
+      uploading: uploadingCount,
+      pending: Math.max(0, pending - uploadingCount),
+    })
+  }, [visit, uploadingCount])
+
+  const sellerAuth = () => ({
+    sellerToken: getStoredToken() || undefined,
+    deviceId: getStoredDeviceId(),
+  })
+
+  // Sobe ao servidor toda cópia local em cache e aplica as referências no estado
+  const runMediaRetry = async (announce = true): Promise<void> => {
+    if (autoRetryRef.current) return
+    autoRetryRef.current = true
+    try {
+      const r = await retryAllCachedMedia(sellerAuth())
+      if (r.results.length > 0) {
+        setVisit((prev) => applyMediaResults(prev, r.results))
+      }
+      const fails = r.results.filter((x) => !x.ok)
+      if (fails.length > 0) {
+        if (announce)
+          setMediaNotice(
+            `${fails.length} ${fails.length === 1 ? 'arquivo não foi enviado' : 'arquivos não foram enviados'} — serão reenviados automaticamente quando a internet voltar.`,
+          )
+      } else if (r.sent > 0) {
+        setMediaNotice(null)
+      }
+    } catch (_) {
+      if (announce)
+        setMediaNotice('Não foi possível enviar os arquivos agora — toque na barra para reenviar.')
+    } finally {
+      autoRetryRef.current = false
+    }
+  }
+
+  // Reenvio manual (tocar na barra "Não enviado")
+  const retryMediaNow = async () => {
+    setMediaNotice(null)
+    await runMediaRetry()
+  }
+
+  // Hidratação do rascunho carregado: base64 legado vira cópia local + pendente;
+  // pendentes recuperam o preview do IndexedDB (uma única vez por visita).
+  useEffect(() => {
+    const key = (visit as any).clientVisitId || visit.id || ''
+    if (!key || hydratedForRef.current === key) return
+    hydratedForRef.current = key
+    hydrateVisitMedia(visit).then((h) => {
+      if (h !== visit) setVisit(h)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Reenvio automático ao abrir a página e quando a conexão volta (mídia + fila)
+  useEffect(() => {
+    runMediaRetry()
     const onOnline = async () => {
       try {
+        await runMediaRetry()
         if (pendingQueue.count() > 0) {
-          const r = await pendingQueue.retryAll()
+          const r: QueueRetryResult = await pendingQueue.retryAll()
           if (r.sent > 0) {
             toast({
               title: 'Visitas pendentes enviadas!',
               description: `${r.sent} visita(s) sincronizada(s) com o CRM.`,
             })
+          }
+          if (r.failed > 0) {
+            setMediaNotice(
+              `Visita pendente: não foi possível enviar agora (${r.errors[0]?.error || 'sem conexão'}). Toque em "Enviar CRM" para tentar de novo.`,
+            )
           }
         }
       } catch (_) {
@@ -173,7 +270,67 @@ export function useFieldVisitState({
     }
     window.addEventListener('online', onOnline)
     return () => window.removeEventListener('online', onOnline)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Prepara o anexo: vídeo usa objectURL (leve); imagem mantém o dataUrl comprimido
+  // em memória (preview e leitura de plaqueta funcionam como antes). O rascunho
+  // gravado no celular guarda só a referência — o autosave sanitiza antes de gravar.
+  const buildPendingAttachment = async (
+    file: File,
+    clientVisitId: string,
+  ): Promise<MediaAttachment> => {
+    const isVideo = file.type.startsWith('video/')
+    if (isVideo) {
+      if (file.size > 25 * 1024 * 1024) {
+        throw new Error('Vídeo muito grande. Limite máximo recomendado de 25MB por vídeo.')
+      }
+      const att: MediaAttachment = {
+        id: generateId(),
+        name: file.name,
+        type: 'video',
+        dataUrl: URL.createObjectURL(file),
+        size: file.size,
+        uploadStatus: 'pendente',
+      }
+      await cacheMediaBlob(att.id, file, {
+        name: att.name,
+        kind: 'video',
+        size: file.size,
+        clientVisitId,
+      })
+      return att
+    }
+
+    let dataUrl = ''
+    try {
+      dataUrl = await compressImageFile(file, 1000, 0.7)
+    } catch (_) {
+      dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error('Erro ao ler imagem'))
+        reader.readAsDataURL(file)
+      })
+    }
+    const blob = await (await fetch(dataUrl)).blob()
+    const att: MediaAttachment = {
+      id: generateId(),
+      name: file.name,
+      type: 'image',
+      dataUrl,
+      size: blob.size,
+      uploadStatus: 'pendente',
+    }
+    await cacheMediaBlob(att.id, blob, {
+      name: att.name,
+      kind: 'image',
+      size: blob.size,
+      clientVisitId,
+    })
+    return att
+  }
+
   // Mensagens e feedbacks
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving'>('saved')
   const [quotaWarning, setQuotaWarning] = useState<string | null>(null)
@@ -228,15 +385,15 @@ export function useFieldVisitState({
     }))
   }
 
-  // Handlers para anexos gerais da visita (fluxo enxuto)
+  // Handlers para anexos gerais da visita (fluxo enxuto) — upload imediato ao servidor
   const handleAddVisitAttachments = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     setIsCompressingGlobal(true)
     try {
+      const clientVisitId = String((visit as any).clientVisitId || visit.id || '')
       const newAttachments: MediaAttachment[] = []
       for (let i = 0; i < files.length; i++) {
-        const item = await readFileAsMediaAttachment(files[i])
-        newAttachments.push(item)
+        newAttachments.push(await buildPendingAttachment(files[i], clientVisitId))
       }
       setVisit((prev) => ({
         ...prev,
@@ -244,8 +401,13 @@ export function useFieldVisitState({
       }))
       toast({
         title: 'Anexos adicionados',
-        description: `${newAttachments.length} ${newAttachments.length === 1 ? 'arquivo anexado' : 'arquivos anexados'} com sucesso.`,
+        description: `${newAttachments.length} ${newAttachments.length === 1 ? 'arquivo anexado' : 'arquivos anexados'} — enviando ao CRM...`,
       })
+      // Upload em segundo plano; falha cai na barra de status com reenvio automático
+      setUploadingCount((n) => n + newAttachments.length)
+      runMediaRetry()
+        .catch(() => {})
+        .finally(() => setUploadingCount((n) => Math.max(0, n - newAttachments.length)))
     } catch (err: any) {
       console.error('Erro ao processar anexos da visita:', err)
       toast({
@@ -263,6 +425,8 @@ export function useFieldVisitState({
       ...prev,
       visitAttachments: (prev.visitAttachments || []).filter((a) => a.id !== attachmentId),
     }))
+    // Remove do servidor e da cópia local (sem bloquear o usuário)
+    deleteServerMedia(attachmentId, sellerAuth())
   }
 
   // Ações de Equipamentos
@@ -285,6 +449,10 @@ export function useFieldVisitState({
 
   const handleConfirmDeleteEquipment = () => {
     if (!equipmentToDelete) return
+    const eq = visit.equipments.find((e) => e.id === equipmentToDelete)
+    if (eq) {
+      for (const a of eq.attachments || []) deleteServerMedia(a.id, sellerAuth())
+    }
     setVisit((prev) => ({
       ...prev,
       equipments: prev.equipments.filter((eq) => eq.id !== equipmentToDelete),
@@ -297,10 +465,10 @@ export function useFieldVisitState({
     if (!files || files.length === 0) return
     setIsCompressingGlobal(true)
     try {
+      const clientVisitId = String((visit as any).clientVisitId || visit.id || '')
       const newAttachments: MediaAttachment[] = []
       for (let i = 0; i < files.length; i++) {
-        const item = await readFileAsMediaAttachment(files[i])
-        newAttachments.push(item)
+        newAttachments.push(await buildPendingAttachment(files[i], clientVisitId))
       }
 
       setVisit((prev) => ({
@@ -313,15 +481,22 @@ export function useFieldVisitState({
             ...eq,
             attachments: updated,
             // Sincroniza também photoDataUrl para retrocompatibilidade se for imagem
-            photoDataUrl: updated.find((a) => a.type === 'image')?.dataUrl || eq.photoDataUrl,
+            photoDataUrl:
+              updated.find((a) => a.type === 'image' && a.dataUrl)?.dataUrl || eq.photoDataUrl,
           }
         }),
       }))
 
       toast({
         title: 'Anexo adicionado ao equipamento',
-        description: `${newAttachments.length} ${newAttachments.length === 1 ? 'arquivo salvo' : 'arquivos salvos'}.`,
+        description: `${newAttachments.length} ${newAttachments.length === 1 ? 'arquivo salvo' : 'arquivos salvos'} — enviando ao CRM...`,
       })
+
+      // Upload em segundo plano; falha cai na barra de status com reenvio automático
+      setUploadingCount((n) => n + newAttachments.length)
+      runMediaRetry()
+        .catch(() => {})
+        .finally(() => setUploadingCount((n) => Math.max(0, n - newAttachments.length)))
 
       // Se houver fotos entre os arquivos anexados, dispara a leitura da 1ª imagem automaticamente
       const firstPhoto = newAttachments.find((a) => a.type === 'image' || !a.type)
@@ -349,10 +524,11 @@ export function useFieldVisitState({
         return {
           ...eq,
           attachments: updated,
-          photoDataUrl: updated.find((a) => a.type === 'image')?.dataUrl,
+          photoDataUrl: updated.find((a) => a.type === 'image' && a.dataUrl)?.dataUrl,
         }
       }),
     }))
+    deleteServerMedia(attachmentId, sellerAuth())
   }
 
   const handleConfirmNewVisit = () => {
@@ -363,6 +539,7 @@ export function useFieldVisitState({
     localStorage.removeItem(STORAGE_KEY_CURRENT_VISIT)
     setIsNewVisitDialogOpen(false)
     setQuotaWarning(null)
+    setMediaNotice(null)
   }
   return {
     visit,
@@ -396,5 +573,10 @@ export function useFieldVisitState({
     handleRemoveEquipmentAttachment,
     handleConfirmNewVisit,
     photoTriggerRef,
+    // Mídia no servidor
+    mediaStatus,
+    mediaNotice,
+    setMediaNotice,
+    retryMediaNow,
   }
 }

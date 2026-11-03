@@ -4,6 +4,11 @@ import { toast } from '@/hooks/use-toast'
 import { fieldVisitsService, type FieldVisitRecord } from '@/services/field-visits'
 import { pendingQueue } from '@/services/field-visit-queue'
 import { sellerTokenApi, getStoredToken, getStoredDeviceId } from '@/services/field-visit-token'
+import {
+  retryAllCachedMedia,
+  applyMediaResults,
+  stripLocalMediaRefs,
+} from '@/services/field-visit-media'
 import { formatEquipmentTitle, type FieldVisitData } from '@/types/field-visit'
 
 export function useVisitSubmit({
@@ -58,12 +63,31 @@ export function useVisitSubmit({
     setIsSendingToCrm(true)
     const nowIso = new Date().toISOString()
 
+    // 1. Sobe ao servidor toda mídia em cache local (reenvio automático antes do envio).
+    // Falha de mídia NÃO bloqueia o envio: o hook do servidor resolve as referências depois.
+    let effectiveVisit = visit
+    try {
+      const mediaRes = await retryAllCachedMedia({
+        sellerToken: sellerMode ? getStoredToken() || undefined : undefined,
+        deviceId: getStoredDeviceId(),
+      })
+      if (mediaRes.results.length > 0) {
+        effectiveVisit = applyMediaResults(visit, mediaRes.results)
+        setVisit(effectiveVisit)
+      }
+    } catch (_) {
+      // segue com as referências pendentes; o servidor completa depois
+    }
+
     // Preserva o plano já gerado (pela IA ou existente no formulário), sem regenerar automaticamente
-    const currentPlan = visit.actionPlan && visit.actionPlan.length > 0 ? visit.actionPlan : []
+    const currentPlan =
+      effectiveVisit.actionPlan && effectiveVisit.actionPlan.length > 0
+        ? effectiveVisit.actionPlan
+        : []
 
     // Formatar nome de cliente/empresa compatível
-    const companyTrimmed = (visit.companyName || '').trim()
-    const contactPersonTrimmed = (visit.clientName || '').trim()
+    const companyTrimmed = (effectiveVisit.companyName || '').trim()
+    const contactPersonTrimmed = (effectiveVisit.clientName || '').trim()
     let combinedClientName: string | undefined = undefined
     if (companyTrimmed && contactPersonTrimmed) {
       combinedClientName = `${companyTrimmed} (${contactPersonTrimmed})`
@@ -73,37 +97,43 @@ export function useVisitSubmit({
       combinedClientName = contactPersonTrimmed
     }
 
-    // Preparar payload salvando em campos aditivos sem sobrescrever ou perder dados
-    const payload: Partial<FieldVisitRecord> = {
-      employee_name: trimmedEmployee || 'Técnico Intertermal',
-      visit_date: trimmedDate || undefined,
-      start_time: visit.startTime || undefined,
-      end_time: visit.endTime || undefined,
-      duration: visit.visitDuration || undefined,
-      client_name: combinedClientName,
-      company_name: companyTrimmed || undefined,
-      contact_person: contactPersonTrimmed || undefined,
-      client_role: visit.clientRole?.trim() || undefined,
-      client_contact: visit.clientContact?.trim() || undefined,
-      client_email: visit.clientEmail?.trim() || undefined,
-      work_area: visit.clientWorkArea?.trim() || undefined,
-      work_type: visit.workType || undefined,
-      work_type_other: visit.workTypeOther?.trim() || undefined,
-      general_notes: visit.generalObservations?.trim() || undefined,
-      free_description: visit.freeDescription?.trim() || undefined,
-      action_plan: currentPlan,
-      equipment: visit.equipments || [],
-      status: 'enviada',
-      sent_at: nowIso,
-    }
-
     // Identificador único da visita gerado no celular (idempotência de reenvio).
-    let clientVisitId = (visit as any).clientVisitId || ''
+    let clientVisitId = (effectiveVisit as any).clientVisitId || ''
     if (!clientVisitId) {
       clientVisitId =
         'cv_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10)
       setVisit((prev) => ({ ...prev, clientVisitId }) as any)
     }
+
+    // Preparar payload salvando em campos aditivos sem sobrescrever ou perder dados
+    const payload: Partial<FieldVisitRecord> = {
+      employee_name: trimmedEmployee || 'Técnico Intertermal',
+      visit_date: trimmedDate || undefined,
+      start_time: effectiveVisit.startTime || undefined,
+      end_time: effectiveVisit.endTime || undefined,
+      duration: effectiveVisit.visitDuration || undefined,
+      client_name: combinedClientName,
+      company_name: companyTrimmed || undefined,
+      contact_person: contactPersonTrimmed || undefined,
+      client_role: effectiveVisit.clientRole?.trim() || undefined,
+      client_contact: effectiveVisit.clientContact?.trim() || undefined,
+      client_email: effectiveVisit.clientEmail?.trim() || undefined,
+      work_area: effectiveVisit.clientWorkArea?.trim() || undefined,
+      work_type: effectiveVisit.workType || undefined,
+      work_type_other: effectiveVisit.workTypeOther?.trim() || undefined,
+      general_notes: effectiveVisit.generalObservations?.trim() || undefined,
+      free_description: effectiveVisit.freeDescription?.trim() || undefined,
+      action_plan: currentPlan,
+      equipment: effectiveVisit.equipments || [],
+      visit_attachments: effectiveVisit.visitAttachments || [],
+      status: 'enviada',
+      sent_at: nowIso,
+    }
+
+    // Nenhuma URL local (blob:/data:) sai do celular: anexo pendente vai como
+    // referência vazia e o servidor resolve com o arquivo já enviado (ou que
+    // ainda vai subir — o hook de upload completa o registro depois).
+    const cleanPayload = stripLocalMediaRefs(payload) as Partial<FieldVisitRecord>
 
     if (sellerMode) {
       // Modo vendedor: envio pelo link seguro (token + aparelho autorizado), sem login.
@@ -111,26 +141,8 @@ export function useVisitSubmit({
         token: getStoredToken(),
         device_id: getStoredDeviceId(),
         client_visit_id: clientVisitId,
-        visit: {
-          visit_date: trimmedDate || undefined,
-          start_time: visit.startTime || undefined,
-          end_time: visit.endTime || undefined,
-          duration: visit.visitDuration || undefined,
-          client_name: combinedClientName,
-          company_name: companyTrimmed || undefined,
-          contact_person: contactPersonTrimmed || undefined,
-          client_role: visit.clientRole?.trim() || undefined,
-          client_contact: visit.clientContact?.trim() || undefined,
-          client_email: visit.clientEmail?.trim() || undefined,
-          work_area: visit.clientWorkArea?.trim() || undefined,
-          work_type: visit.workType || undefined,
-          work_type_other: visit.workTypeOther?.trim() || undefined,
-          general_notes: visit.generalObservations?.trim() || undefined,
-          free_description: visit.freeDescription?.trim() || undefined,
-          action_plan: currentPlan,
-          equipment: visit.equipments || [],
-        },
-        edit_id: visit.backendRecordId || undefined,
+        visit: cleanPayload,
+        edit_id: effectiveVisit.backendRecordId || undefined,
       })
       if (!submitRes.ok) {
         if (submitRes.error === 'device_not_authorized' || submitRes.error === 'invalid_token') {
@@ -146,37 +158,22 @@ export function useVisitSubmit({
         // Falha de rede/servidor: salva na fila de pendentes (idempotente).
         pendingQueue.add({
           client_visit_id: clientVisitId,
-          visit: {
-            visit_date: trimmedDate || undefined,
-            start_time: visit.startTime || undefined,
-            end_time: visit.endTime || undefined,
-            duration: visit.visitDuration || undefined,
-            client_name: combinedClientName,
-            company_name: companyTrimmed || undefined,
-            contact_person: contactPersonTrimmed || undefined,
-            client_role: visit.clientRole?.trim() || undefined,
-            client_contact: visit.clientContact?.trim() || undefined,
-            client_email: visit.clientEmail?.trim() || undefined,
-            work_area: visit.clientWorkArea?.trim() || undefined,
-            work_type: visit.workType || undefined,
-            work_type_other: visit.workTypeOther?.trim() || undefined,
-            general_notes: visit.generalObservations?.trim() || undefined,
-            free_description: visit.freeDescription?.trim() || undefined,
-            action_plan: currentPlan,
-            equipment: visit.equipments || [],
-          },
-          edit_id: visit.backendRecordId || undefined,
+          visit: cleanPayload,
+          edit_id: effectiveVisit.backendRecordId || undefined,
           seller_token: getStoredToken(),
         })
         setVisit((prev) => ({ ...prev, crmStatus: 'pendente' }) as any)
         toast({
-          title: 'Sem conexão — visita salva em Pendentes',
-          description: 'Será enviada automaticamente quando a internet voltar.',
+          title: 'Não enviado — salvo em Pendentes',
+          description:
+            'Toque em "Enviar CRM" quando a internet voltar, ou aguarde o reenvio automático.',
           variant: 'destructive',
         })
         setIsSendingToCrm(false)
         return
       }
+      // Servidor confirmou: visita nunca mais volta para pendente
+      pendingQueue.remove(clientVisitId)
       setVisit((prev) => ({
         ...prev,
         actionPlan: currentPlan,
@@ -195,22 +192,24 @@ export function useVisitSubmit({
 
     try {
       let savedRecord: FieldVisitRecord
-      if (visit.backendRecordId) {
+      if (effectiveVisit.backendRecordId) {
         // Reenvio: atualiza o mesmo registro sem duplicar
-        savedRecord = await fieldVisitsService.update(visit.backendRecordId, payload)
+        savedRecord = await fieldVisitsService.update(effectiveVisit.backendRecordId, cleanPayload)
         toast({
           title: 'Visita atualizada no CRM!',
           description: `Os dados da visita e plano de ação foram sincronizados com sucesso.`,
         })
       } else {
         // Primeiro envio: cria novo registro
-        savedRecord = await fieldVisitsService.create(payload)
+        savedRecord = await fieldVisitsService.create(cleanPayload)
         toast({
           title: 'Visita enviada ao CRM!',
           description: `Visita técnica gravada com sucesso no CRM Intertermal.`,
         })
       }
 
+      // Servidor confirmou: tira da fila de pendentes (rascunho pode ser apagado com segurança)
+      pendingQueue.remove(clientVisitId)
       setVisit((prev) => ({
         ...prev,
         actionPlan: currentPlan,
@@ -221,11 +220,16 @@ export function useVisitSubmit({
       }))
     } catch (err: any) {
       console.error('Erro ao enviar visita ao CRM:', err)
+      // Falha de rede/servidor: entra na fila de pendentes (reenvio automático)
+      pendingQueue.add({
+        client_visit_id: clientVisitId,
+        visit: cleanPayload,
+      })
+      setVisit((prev) => ({ ...prev, crmStatus: 'pendente' }) as any)
       toast({
-        title: 'Erro ao enviar ao CRM',
+        title: 'Não enviado — salvo em Pendentes',
         description:
-          err.message ||
-          'Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.',
+          'Toque em "Enviar CRM" quando a internet voltar, ou aguarde o reenvio automático.',
         variant: 'destructive',
       })
     } finally {

@@ -120,6 +120,7 @@ routerAdd('GET', '/backend/v1/field-visits/get', (e) => {
       free_description: visit.get('free_description'),
       action_plan: visit.get('action_plan'),
       equipment: visit.get('equipment'),
+      visit_attachments: visit.get('visit_attachments'),
       status: visit.get('status'),
       sent_at: visit.get('sent_at'),
       created: visit.get('created'),

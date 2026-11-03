@@ -54,9 +54,24 @@ export default function FieldVisitPage({
         handleSendToCrm={submit.handleSendToCrm}
         setIsPdfDialogOpen={s.setIsPdfDialogOpen}
         setIsNewVisitDialogOpen={s.setIsNewVisitDialogOpen}
+        mediaStatus={s.mediaStatus}
+        onRetryMedia={s.retryMediaNow}
       />
 
       <main className="max-w-3xl mx-auto px-4 pt-4 space-y-5">
+        {/* Aviso da fila: nunca falha em silêncio (mídia não enviada / visita pendente) */}
+        {s.mediaNotice && (
+          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 flex items-center justify-between gap-2 text-xs text-amber-900 dark:text-amber-200 shadow-xs">
+            <span className="leading-relaxed">{s.mediaNotice}</span>
+            <button
+              type="button"
+              onClick={s.retryMediaNow}
+              className="shrink-0 text-[11px] font-bold px-2 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Reenviar agora
+            </button>
+          </div>
+        )}
         <VisitAlertsSection
           visit={s.visit}
           queryVisitId={s.queryVisitId}

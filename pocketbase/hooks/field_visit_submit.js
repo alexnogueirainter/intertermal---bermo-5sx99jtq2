@@ -80,11 +80,45 @@ routerAdd('POST', '/backend/v1/field-visits/submit', (e) => {
     free_description: String(visit.free_description || ''),
     action_plan: visit.action_plan || [],
     equipment: visit.equipment || [],
+    visit_attachments: Array.isArray(visit.visit_attachments) ? visit.visit_attachments : [],
     status: 'enviada',
     sent_at: nowIso,
     seller_name: sellerName,
     seller_token: token,
     client_visit_id: clientVisitId,
+  }
+
+  // Referencias de midia: anexo sem dataUrl (ou pendente) busca o arquivo ja
+  // enviado a colecao field_visit_media e recebe o caminho publico do servidor.
+  const resolveMediaRefs = (atts) => {
+    for (const att of Array.isArray(atts) ? atts : []) {
+      if (!att || att.type === 'audio') continue
+      const url = String(att.dataUrl || '')
+      const needsResolve = !url || att.uploadStatus === 'pendente' || /^(blob:|data:)/.test(url)
+      if (!needsResolve) continue
+      try {
+        const m = $app.findFirstRecordByFilter('field_visit_media', 'client_media_id = {:c}', {
+          c: String(att.id || ''),
+        })
+        const fname = String(m.get('file') || '')
+        if (fname) {
+          att.dataUrl = '/api/files/field_visit_media/' + m.id + '/' + fname
+          att.uploadStatus = 'enviado'
+        } else if (/^(blob:|data:)/.test(url)) {
+          att.dataUrl = ''
+          att.uploadStatus = 'pendente'
+        }
+      } catch (_) {
+        if (/^(blob:|data:)/.test(url)) {
+          att.dataUrl = ''
+          att.uploadStatus = 'pendente'
+        }
+      }
+    }
+  }
+  resolveMediaRefs(payload.visit_attachments)
+  for (const eq of Array.isArray(payload.equipment) ? payload.equipment : []) {
+    if (eq && Array.isArray(eq.attachments)) resolveMediaRefs(eq.attachments)
   }
 
   // IDEMPOTENCIA: reenvio com mesmo client_visit_id atualiza em vez de duplicar.

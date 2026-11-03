@@ -4,6 +4,41 @@ import {
   STORAGE_KEY_CURRENT_VISIT,
   STORAGE_KEY_EMPLOYEE_NAME,
 } from '@/types/field-visit'
+import { sanitizeVisitForStorage } from '@/services/field-visit-media'
+
+/**
+ * Grava o rascunho SEM base64/blob de foto ou vídeo: o arquivo mora no servidor
+ * (field_visit_media) e o celular guarda só a referência + cópia no IndexedDB.
+ */
+function persistNow(visit: FieldVisitData): { ok: true } | { ok: false; err: any } {
+  try {
+    const payload = JSON.stringify(
+      sanitizeVisitForStorage({ ...visit, updatedAt: new Date().toISOString() }),
+    )
+    localStorage.setItem(STORAGE_KEY_CURRENT_VISIT, payload)
+    if (visit.employeeName) {
+      localStorage.setItem(STORAGE_KEY_EMPLOYEE_NAME, visit.employeeName)
+    }
+    return { ok: true }
+  } catch (err: any) {
+    return { ok: false, err }
+  }
+}
+
+function storageWarning(err: any): string {
+  const quota =
+    err?.name === 'QuotaExceededError' ||
+    err?.code === 22 ||
+    err?.code === 1014 ||
+    err?.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+  if (quota) {
+    return (
+      'Atenção: o limite de armazenamento local foi atingido. Seus textos continuam preservados ' +
+      'na tela; as fotos e vídeos ficam guardados no servidor — toque em "Enviar CRM" para garantir o envio.'
+    )
+  }
+  return 'Não foi possível salvar no armazenamento local: ' + (err?.message || 'Erro desconhecido')
+}
 
 export function useVisitAutosave({
   visit,
@@ -14,38 +49,17 @@ export function useVisitAutosave({
   setSaveStatus: (s: 'saved' | 'saving') => void
   setQuotaWarning: (s: string | null) => void
 }) {
-  // Auto-save com debounce de 400ms (Regra geral: salvar automaticamente cada campo preenchido)
+  // Auto-save com debounce (mesma régua de antes) — agora sem base64 no rascunho
   useEffect(() => {
     setSaveStatus('saving')
     const timer = setTimeout(() => {
-      try {
-        const payload = JSON.stringify({
-          ...visit,
-          updatedAt: new Date().toISOString(),
-        })
-        localStorage.setItem(STORAGE_KEY_CURRENT_VISIT, payload)
-        if (visit.employeeName) {
-          localStorage.setItem(STORAGE_KEY_EMPLOYEE_NAME, visit.employeeName)
-        }
+      const r = persistNow(visit)
+      if (r.ok) {
         setSaveStatus('saved')
         setQuotaWarning(null)
-      } catch (err: any) {
-        console.error('Erro ao salvar no localStorage:', err)
-        if (
-          err.name === 'QuotaExceededError' ||
-          err.code === 22 ||
-          err.code === 1014 ||
-          err.name === 'NS_ERROR_DOM_QUOTA_REACHED'
-        ) {
-          setQuotaWarning(
-            'Atenção: O limite de armazenamento local foi atingido devido a múltiplos vídeos ou fotos em alta resolução. Seus textos continuam preservados na tela, mas recomendamos enviar ao CRM.',
-          )
-        } else {
-          setQuotaWarning(
-            'Não foi possível salvar no armazenamento local: ' +
-              (err.message || 'Erro desconhecido'),
-          )
-        }
+      } else {
+        console.error('Erro ao salvar no localStorage:', r.err)
+        setQuotaWarning(storageWarning(r.err))
         setSaveStatus('saved')
       }
     }, 1000)
@@ -56,14 +70,7 @@ export function useVisitAutosave({
   // Salvar também ao sair/minimizar a página (mobile: momento mais comum de perda)
   useEffect(() => {
     const saveNow = () => {
-      try {
-        localStorage.setItem(
-          STORAGE_KEY_CURRENT_VISIT,
-          JSON.stringify({ ...visit, updatedAt: new Date().toISOString() }),
-        )
-      } catch (_) {
-        // storage indisponível: segue sem travar
-      }
+      persistNow(visit)
     }
     window.addEventListener('pagehide', saveNow)
     document.addEventListener('visibilitychange', saveNow)
@@ -74,17 +81,9 @@ export function useVisitAutosave({
   }, [visit])
 
   // Auto-save por inatividade: se o técnico parar de digitar por 15s, salva na hora
-  // (protege contra perda quando o app do navegador é fechado sem disparar pagehide)
   useEffect(() => {
     const idleSave = setTimeout(() => {
-      try {
-        localStorage.setItem(
-          STORAGE_KEY_CURRENT_VISIT,
-          JSON.stringify({ ...visit, updatedAt: new Date().toISOString() }),
-        )
-      } catch (_) {
-        // storage indisponível: segue sem travar
-      }
+      persistNow(visit)
     }, 15000)
     return () => clearTimeout(idleSave)
   }, [visit])
