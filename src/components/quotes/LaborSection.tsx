@@ -84,7 +84,7 @@ export function LaborSection(props: LaborSectionProps) {
           </div>
         </CardHeader>
         <CardContent className="p-4 space-y-4">
-          <LaborRolesGrid {...rest} />
+          <LaborRolesGrid {...rest} totalLaborCost={totalLaborCost} />
           <IntegrationPermitPanel {...rest} />
         </CardContent>
       </Card>

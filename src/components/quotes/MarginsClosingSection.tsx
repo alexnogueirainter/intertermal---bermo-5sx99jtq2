@@ -79,9 +79,9 @@ export function MarginsClosingSection(props: MarginsClosingSectionProps) {
           </div>
         </CardHeader>
         <CardContent className="p-4 space-y-4">
-          <MarginsSlidersPanel {...rest} />
+          <MarginsSlidersPanel {...rest} calculatedSalePrice={calculatedSalePrice} />
           <TaxesPanel {...rest} />
-          <PriceFormationPanel {...rest} />
+          <PriceFormationPanel {...rest} calculatedSalePrice={calculatedSalePrice} />
           {/* Bloco 4: Condições de Pagamento e Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div className="space-y-1">
