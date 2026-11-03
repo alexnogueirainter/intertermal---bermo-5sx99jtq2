@@ -175,23 +175,25 @@ export const quoteDealSyncService = {
         }
       }
 
-      // Etapa efetiva respeitando a regra dos 3 momentos + manual nunca revertido
+      // Etapa efetiva respeitando a regra dos 3 momentos + manual nunca revertido:
+      // - negócio em 'won': nunca revertido automaticamente;
+      // - sem mudança real de status: a etapa atual permanece (manual ou anterior);
+      // - com mudança real de status: só os 3 momentos movem (enviada/aprovada/recusada);
+      // - negócio novo: etapa derivada do status da proposta.
       const currentStage = (existingDeal?.stage || '').toLowerCase().trim()
       const isWon = currentStage === 'won'
-      const isLost = currentStage === 'lost'
-      const manualStage = !!existingDeal && !isWon && !isLost && !stageMoves
       const effectiveStage = isWon
         ? existingDeal!.stage
         : stageMoves
           ? autoMove!.stage
-          : manualStage
+          : existingDeal
             ? existingDeal!.stage
             : stage
       const effectiveProbability = isWon
         ? existingDeal!.probability
         : stageMoves
           ? autoMove!.probability
-          : manualStage
+          : existingDeal
             ? existingDeal!.probability
             : probability
 
@@ -208,7 +210,7 @@ export const quoteDealSyncService = {
           notes: `Proposta Intertermal ${quoteCode} conectada automaticamente ao pipeline comercial.`,
         }
 
-        if (effectiveStage === 'lost') {
+        if (effectiveStage === 'lost' && stageMoves) {
           payloadToUpdate.loss_reason =
             quote.rejected_by_client_reason ||
             existingDeal.loss_reason ||
