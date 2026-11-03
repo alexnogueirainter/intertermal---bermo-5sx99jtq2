@@ -29,6 +29,8 @@ import {
   Clock,
   Briefcase,
   AlertCircle,
+  Archive,
+  ArchiveRestore,
   FileSpreadsheet,
 } from 'lucide-react'
 import type { DealRecord, DealStage, ClientRecord, QuoteRecord } from '@/types/crm'
@@ -37,6 +39,10 @@ interface PipelineKanbanProps {
   deals: DealRecord[]
   clients: ClientRecord[]
   quotes?: QuoteRecord[]
+  archivedDeals?: DealRecord[]
+  onArchiveDeal?: (deal: DealRecord) => void
+  onRestoreDeal?: (deal: DealRecord) => void
+  isAdmin?: boolean
   onUpdateDealStage: (dealId: string, newStage: DealStage) => void
   onCreateDeal: (data: Partial<DealRecord>) => void
   onSelectDeal?: (deal: DealRecord) => void
@@ -92,6 +98,10 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
   deals,
   clients,
   quotes = [],
+  archivedDeals = [],
+  onArchiveDeal,
+  onRestoreDeal,
+  isAdmin = false,
   onUpdateDealStage,
   onCreateDeal,
   onSelectDeal,
@@ -256,6 +266,17 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
                             ))}
                           </SelectContent>
                         </Select>
+                        {isAdmin && onArchiveDeal && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-1.5 text-[10px] text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 border-slate-200 dark:border-slate-700 shrink-0"
+                            title="Arquivar negócio (sai do funil e dos totais)"
+                            onClick={() => onArchiveDeal(deal)}
+                          >
+                            <Archive className="h-3 w-3" />
+                          </Button>
+                        )}
                       </div>
                     </Card>
                   ))
@@ -265,6 +286,58 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
           )
         })}
       </div>
+
+      {/* Negócios Arquivados — fora do funil e dos totais, restauráveis */}
+      {archivedDeals.length > 0 && (
+        <Card className="border-slate-200 dark:border-slate-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-slate-700 dark:text-slate-300">
+              <Archive className="h-4 w-4 text-slate-400" />
+              Arquivados
+              <Badge variant="secondary" className="text-[10px] font-mono">
+                {archivedDeals.length}
+              </Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Fora do funil e dos totais. Restaure para devolver ao pipeline.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {archivedDeals.map((deal) => (
+              <div
+                key={deal.id}
+                className="flex items-center justify-between gap-3 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40"
+              >
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                    {deal.title}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground truncate">
+                    {deal.client_name || 'Sem cliente'} ·{' '}
+                    {(deal.value || 0).toLocaleString('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL',
+                    })}
+                    {deal.archived_at
+                      ? ` · arquivado em ${new Date(deal.archived_at).toLocaleDateString('pt-BR')}`
+                      : ''}
+                  </div>
+                </div>
+                {isAdmin && onRestoreDeal && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-[11px] shrink-0"
+                    onClick={() => onRestoreDeal(deal)}
+                  >
+                    <ArchiveRestore className="h-3 w-3 mr-1" /> Restaurar
+                  </Button>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Modal Nova Oportunidade */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

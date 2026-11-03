@@ -142,6 +142,8 @@ export interface DealRecord {
   notes?: string
   loss_reason?: string
   assigned_to?: string
+  archived?: boolean
+  archived_at?: string
   created?: string
   updated?: string
 }
@@ -283,6 +285,8 @@ export interface DealRecord {
   notes?: string
   loss_reason?: string
   assigned_to?: string
+  archived?: boolean
+  archived_at?: string
   created?: string
   updated?: string
 }
@@ -434,6 +438,8 @@ export interface QuoteRecord {
   rejected_by_client_reason?: string
   rejected_by_client_date?: string
   pdf_file?: string
+  archived?: boolean
+  archived_at?: string
   created?: string
   updated?: string
 }

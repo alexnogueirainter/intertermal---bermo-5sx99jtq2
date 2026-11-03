@@ -35,6 +35,10 @@ export interface QuotesManagerProps {
   quotes: QuoteRecord[]
   clients: ClientRecord[]
   deals?: DealRecord[]
+  archivedQuotes?: QuoteRecord[]
+  onArchiveQuote?: (quote: QuoteRecord) => void
+  onRestoreQuote?: (quote: QuoteRecord) => void
+  isAdmin?: boolean
   selectedQuote?: QuoteRecord | null
   onCreateQuote: (data: Partial<QuoteRecord>) => Promise<void>
   onUpdateQuote: (id: string, data: Partial<QuoteRecord>) => Promise<void>
@@ -48,6 +52,10 @@ export function QuotesManager({
   quotes,
   clients,
   deals = [],
+  archivedQuotes = [],
+  onArchiveQuote,
+  onRestoreQuote,
+  isAdmin = false,
   selectedQuote,
   onCreateQuote,
   onUpdateQuote,
@@ -112,6 +120,10 @@ export function QuotesManager({
     quotes,
     clients,
     deals,
+    archivedQuotes,
+    onArchiveQuote,
+    onRestoreQuote,
+    isAdmin,
     selectedQuote,
     onCreateQuote,
     onUpdateQuote,

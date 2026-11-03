@@ -105,6 +105,13 @@ export default function IndexPage() {
   const [clients, setClients] = useState<ClientRecord[]>([])
   const [deals, setDeals] = useState<DealRecord[]>([])
   const [quotes, setQuotes] = useState<QuoteRecord[]>([])
+
+  // Arquivamento: só admin arquiva/restaura; listas ativas excluem arquivados
+  const isAdmin = user?.role === 'admin'
+  const activeDeals = React.useMemo(() => deals.filter((d) => !d.archived), [deals])
+  const archivedDeals = React.useMemo(() => deals.filter((d) => d.archived), [deals])
+  const activeQuotes = React.useMemo(() => quotes.filter((q) => !q.archived), [quotes])
+  const archivedQuotes = React.useMemo(() => quotes.filter((q) => q.archived), [quotes])
   const [products, setProducts] = useState<ProductRecord[]>([])
   const [tickets, setTickets] = useState<TicketRecord[]>([])
   const [services, setServices] = useState<ServiceRecord[]>([])
@@ -409,6 +416,40 @@ export default function IndexPage() {
     }
   }
 
+  const handleArchiveDeal = async (deal: DealRecord) => {
+    if (
+      !confirm(
+        `Arquivar o negócio "${deal.title}"? Ele sai do funil e dos totais, e pode ser restaurado na lista "Arquivados".`,
+      )
+    ) {
+      return
+    }
+    try {
+      const updated = await dealsService.update(deal.id, {
+        archived: true,
+        archived_at: new Date().toISOString(),
+      })
+      setDeals(deals.map((d) => (d.id === deal.id ? updated : d)))
+      toast({ title: 'Negócio arquivado.' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao arquivar negócio', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  const handleRestoreDeal = async (deal: DealRecord) => {
+    try {
+      const updated = await dealsService.update(deal.id, { archived: false, archived_at: null })
+      setDeals(deals.map((d) => (d.id === deal.id ? updated : d)))
+      toast({ title: 'Negócio restaurado ao funil!' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao restaurar negócio',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleCreateDeal = async (data: Partial<DealRecord>) => {
     try {
       const created = await dealsService.create(data)
@@ -468,6 +509,44 @@ export default function IndexPage() {
     } catch (err: any) {
       console.error('Erro ao deletar proposta:', err)
       throw err
+    }
+  }
+
+  const handleArchiveQuote = async (quote: QuoteRecord) => {
+    if (
+      !confirm(
+        `Arquivar a proposta ${quote.quote_number || ''} do cliente ${quote.client_name || ''}? Ela sai das listas e dos totais, e pode ser restaurada na lista "Arquivados".`,
+      )
+    ) {
+      return
+    }
+    try {
+      const updated = await quotesService.update(quote.id, {
+        archived: true,
+        archived_at: new Date().toISOString(),
+      })
+      setQuotes(quotes.map((q) => (q.id === quote.id ? updated : q)))
+      toast({ title: 'Proposta arquivada.' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao arquivar proposta',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleRestoreQuote = async (quote: QuoteRecord) => {
+    try {
+      const updated = await quotesService.update(quote.id, { archived: false, archived_at: null })
+      setQuotes(quotes.map((q) => (q.id === quote.id ? updated : q)))
+      toast({ title: 'Proposta restaurada!' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao restaurar proposta',
+        description: err.message,
+        variant: 'destructive',
+      })
     }
   }
 
@@ -1026,8 +1105,8 @@ export default function IndexPage() {
           {activeTab === 'overview' && (
             <OverviewDashboard
               clients={clients}
-              deals={deals}
-              quotes={quotes}
+              deals={activeDeals}
+              quotes={activeQuotes}
               tickets={tickets}
               services={services}
               serviceOrders={serviceOrders}
@@ -1039,9 +1118,13 @@ export default function IndexPage() {
           )}
           {activeTab === 'quotes' && (
             <QuotesManager
-              quotes={quotes}
+              quotes={activeQuotes}
               clients={clients}
               deals={deals}
+              archivedQuotes={archivedQuotes}
+              onArchiveQuote={handleArchiveQuote}
+              onRestoreQuote={handleRestoreQuote}
+              isAdmin={isAdmin}
               selectedQuote={selectedQuote}
               onCreateQuote={handleCreateQuote}
               onUpdateQuote={handleUpdateQuote}
@@ -1057,9 +1140,13 @@ export default function IndexPage() {
           )}
           {activeTab === 'deals' && (
             <PipelineKanban
-              deals={deals}
+              deals={activeDeals}
               clients={clients}
-              quotes={quotes}
+              quotes={activeQuotes}
+              archivedDeals={archivedDeals}
+              onArchiveDeal={handleArchiveDeal}
+              onRestoreDeal={handleRestoreDeal}
+              isAdmin={isAdmin}
               onUpdateDealStage={handleUpdateDealStage}
               onCreateDeal={handleCreateDeal}
               onNavigateToQuote={(quoteId) => {
