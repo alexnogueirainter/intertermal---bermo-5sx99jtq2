@@ -98,6 +98,7 @@ export function ScopeClientDealFields(props: ScopeClientDealFieldsProps) {
                 const found = clients.find((c) => c.id === val)
                 if (found) {
                   setClientName(found.name || found.company_name || '')
+                  setClientDocument((found as any).document || '')
                   if (found.address) setDestinationAddress(found.address)
                 }
               }}

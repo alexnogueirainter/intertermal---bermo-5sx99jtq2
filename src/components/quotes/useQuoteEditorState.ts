@@ -63,6 +63,7 @@ export function useQuoteEditorState() {
   // Form Fields - Identificação Geral
   const [clientId, setClientId] = useState('')
   const [clientName, setClientName] = useState('')
+  const [clientDocument, setClientDocument] = useState('')
   const [quoteTitle, setQuoteTitle] = useState('')
   const [quoteNumber, setQuoteNumber] = useState('')
   const [status, setStatus] = useState<QuoteStatus>('draft')
@@ -288,6 +289,8 @@ export function useQuoteEditorState() {
     setClientId,
     clientName,
     setClientName,
+    clientDocument,
+    setClientDocument,
     quoteTitle,
     setQuoteTitle,
     quoteNumber,

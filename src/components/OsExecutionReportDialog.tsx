@@ -232,7 +232,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
 
     // 2. Peças e materiais customizados da proposta
     if (q?.materials_items && Array.isArray(q.materials_items)) {
-      q.materials_items.forEach((m, idx) => 2 {
+      q.materials_items.forEach((m, idx) => {
         list.push({
           id: `mat-${idx}`,
           description: m.description || 'Peça / Componente de Reposição',
@@ -778,7 +778,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
               <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
                   <Layers className="h-4 w-4 text-teal-600" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-8 dark:text-slate-200">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
                     2. Equipamento & Status Atual do Trocador
                   </h3>
                 </div>
@@ -872,7 +872,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                       <ImageIcon className="h-5 w-5" />
                     </div>
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
-                      Nenhuma foto grid adicionada
+                      Nenhuma foto adicionada
                     </span>
                     <span className="text-[11px] text-muted-foreground block mt-0.5">
                       Clique aqui para selecionar fotos do dispositivo (JPG, PNG ou WEBP)
@@ -992,9 +992,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                           step="any"
                           placeholder="Custo un. (R$)"
                           value={mat.unit_cost ?? ''}
-                          onChange={(e) =>
-                            handleUpdateMaterial(index, 'unit_cost', e.target.value)
-                          }
+                          onChange={(e) => handleUpdateMaterial(index, 'unit_cost', e.target.value)}
                           className="text-xs h-8 text-center bg-white dark:bg-slate-900 font-mono"
                         />
                       </div>
@@ -1003,8 +1001,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                         <Input
                           placeholder="Obs / Lote / Aplicação (opcional)"
                           value={mat.notes || ''}
-                          onChange={(e) => handleUpdateMaterial(index, 'notes', e.target.value)
-                          }
+                          onChange={(e) => handleUpdateMaterial(index, 'notes', e.target.value)}
                           className="text-xs h-8 bg-white dark:bg-slate-900"
                         />
                       </div>
@@ -1438,7 +1435,9 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                       <tbody className="divide-y divide-slate-100">
                         {extraHours.map((eh, idx) => (
                           <tr key={idx}>
-                            <td className="p-1.5 text-center font-mono text-slate-500">{idx + 1}</td>
+                            <td className="p-1.5 text-center font-mono text-slate-500">
+                              {idx + 1}
+                            </td>
                             <td className="p-1.5 font-medium text-slate-800">
                               {eh.description || '—'}
                             </td>

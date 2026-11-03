@@ -67,6 +67,7 @@ interface MakeLoadQuoteIntoFormDeps {
   setChemicalProducts: Dispatch<SetStateAction<QuoteChemicalProductItem[]>>
   setClientId: Dispatch<SetStateAction<string>>
   setClientName: Dispatch<SetStateAction<string>>
+  setClientDocument: Dispatch<SetStateAction<string>>
   setCofinsRate: Dispatch<SetStateAction<number>>
   setCommercialNotes: Dispatch<SetStateAction<string>>
   setConnectionSize: Dispatch<SetStateAction<string>>
@@ -221,6 +222,7 @@ export function makeLoadQuoteIntoForm(p: MakeLoadQuoteIntoFormDeps) {
     setChemicalProducts,
     setClientId,
     setClientName,
+    setClientDocument,
     setCofinsRate,
     setCommercialNotes,
     setConnectionSize,
@@ -323,6 +325,7 @@ export function makeLoadQuoteIntoForm(p: MakeLoadQuoteIntoFormDeps) {
     initialSnapshotRef.current = extractQuoteSnapshot(quote)
     setClientId(quote.client_id || '')
     setClientName(quote.client_name || '')
+    setClientDocument(quote.client_document || '')
     setDealId(quote.deal_id || '')
     setDealTitle(quote.deal_title || '')
     setAssignedTo(quote.assigned_to || 'Alex Nogueira')
@@ -427,7 +430,14 @@ export function makeLoadQuoteIntoForm(p: MakeLoadQuoteIntoFormDeps) {
     }
 
     setDimensionsWHd(quote.dimensions_w_h_d || '')
-    setWorkFluid(quote.work_fluid || '')
+    // Fluido de trabalho: campo próprio (novo); propostas antigas ficam em service_details
+    setWorkFluid(
+      quote.work_fluid ||
+        quote.service_details?.service_technical_specs?.workFluid ||
+        quote.service_details?.service_technical_specs?.work_fluid ||
+        quote.service_details?.technical_scope?.workFluid ||
+        '',
+    )
     setHomologatedProcedure(quote.homologated_procedure || '')
     setLastSavedAt(quote.last_saved_at || quote.updated || null)
     setTechnicalProvenance(

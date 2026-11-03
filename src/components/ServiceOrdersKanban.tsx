@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -57,7 +57,9 @@ import {
   Printer,
 } from 'lucide-react'
 import { OsExecutionReportDialog } from '@/components/OsExecutionReportDialog'
+import { osExecutionReportsService } from '@/services/os-execution-reports'
 import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
+import { computeOrderMargins } from '@/lib/order-margins'
 import type {
   ServiceOrderRecord,
   ServiceOrderStatus,
@@ -195,6 +197,32 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   // Modal do Relatório de Execução da OS (PDF)
   const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [orderForReport, setOrderForReport] = useState<ServiceOrderRecord | null>(null)
+
+  // Relatórios de execução (custo real lançado) por OS
+  const [executionReports, setExecutionReports] = useState<Record<string, any[]>>({})
+  useEffect(() => {
+    let isMounted = true
+    osExecutionReportsService
+      .getAll()
+      .then((reports) => {
+        if (!isMounted) return
+        const byOrder: Record<string, any[]> = {}
+        for (const rep of reports) {
+          const soId = (rep as any).service_order_id
+          if (soId) {
+            byOrder[soId] = byOrder[soId] || []
+            byOrder[soId].push(rep)
+          }
+        }
+        setExecutionReports(byOrder)
+      })
+      .catch(() => {
+        // falha silenciosa: margem realizada simplesmente não aparece
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [isReportModalOpen])
 
   // Modais de Exclusão e Cancelamento de OS
   const [orderToDelete, setOrderToDelete] = useState<ServiceOrderRecord | null>(null)
@@ -549,6 +577,59 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                             })}
                           </span>
                         </div>
+
+                        {/* Margens: prevista (proposta) vs realizada (execução) */}
+                        {(() => {
+                          const price = resolveServiceOrderLiveValue(order, quotes)
+                          const m = computeOrderMargins(
+                            order,
+                            price,
+                            quotes,
+                            executionReports[order.id],
+                          )
+                          return (
+                            <div className="grid grid-cols-2 gap-1.5 pt-1">
+                              <div className="p-1.5 rounded bg-slate-50 dark:bg-slate-950/70 border border-slate-100 dark:border-slate-800">
+                                <p className="text-[9px] text-muted-foreground uppercase font-semibold">
+                                  Margem prevista
+                                </p>
+                                <p
+                                  className={`text-[11px] font-bold ${
+                                    m.plannedMargin !== null
+                                      ? m.plannedMargin >= 25
+                                        ? 'text-emerald-700 dark:text-emerald-400'
+                                        : m.plannedMargin >= 0
+                                          ? 'text-amber-700 dark:text-amber-400'
+                                          : 'text-rose-700 dark:text-rose-400'
+                                      : 'text-slate-400 dark:text-slate-500'
+                                  }`}
+                                >
+                                  {m.plannedMargin !== null
+                                    ? `${m.plannedMargin.toFixed(1)}%`
+                                    : '—'}
+                                </p>
+                              </div>
+                              <div className="p-1.5 rounded bg-teal-50/60 dark:bg-teal-950/30 border border-teal-100 dark:border-teal-900/60">
+                                <p className="text-[9px] text-teal-800/70 dark:text-teal-300/70 uppercase font-semibold">
+                                  Margem realizada
+                                </p>
+                                <p
+                                  className={`text-[11px] font-bold ${
+                                    m.realMargin !== null
+                                      ? m.realMargin >= 25
+                                        ? 'text-emerald-700 dark:text-emerald-400'
+                                        : m.realMargin >= 0
+                                          ? 'text-amber-700 dark:text-amber-400'
+                                          : 'text-rose-700 dark:text-rose-400'
+                                      : 'text-slate-400 dark:text-slate-500'
+                                  }`}
+                                >
+                                  {m.realMargin !== null ? `${m.realMargin.toFixed(1)}%` : '—'}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })()}
 
                         {/* Histórico / Notificações badge */}
                         {order.status_history && order.status_history.length > 0 && (
