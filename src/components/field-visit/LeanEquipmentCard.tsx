@@ -8,6 +8,7 @@ import { EquipmentMediaAttachmentSection } from '@/components/EquipmentMediaAtta
 import { EquipmentCustomFieldsSection } from '@/components/EquipmentCustomFieldsSection'
 import { LeanNameplateSectionTop } from '@/components/field-visit/LeanNameplateTop'
 import { LeanNameplateSectionBottom } from '@/components/field-visit/LeanNameplateBottom'
+import type { FieldHighlightHelpers } from '@/components/field-visit/fieldVisitConfidence'
 import { generateId } from '@/types/field-visit'
 import type { EquipmentItem, MediaAttachment, FieldVisitData } from '@/types/field-visit'
 import type { Dispatch, SetStateAction } from 'react'
@@ -20,6 +21,7 @@ export function LeanEquipmentCard({
   handleUpdateEquipment,
   markFieldAsManuallyEdited,
   renderConfidenceBadge,
+  fieldHighlight,
   handleAddEquipmentAttachments,
   handleRemoveEquipmentAttachment,
   handleTriggerNameplateOcr,
@@ -36,6 +38,7 @@ export function LeanEquipmentCard({
   handleUpdateEquipment: (id: string, updates: Partial<EquipmentItem>) => void
   markFieldAsManuallyEdited: (equipmentId: string, fieldKey: string) => void
   renderConfidenceBadge: RenderConfidenceBadge
+  fieldHighlight: FieldHighlightHelpers
   handleAddEquipmentAttachments: (equipmentId: string, files: FileList | null) => Promise<void>
   handleRemoveEquipmentAttachment: (equipmentId: string, attachmentId: string) => void
   handleTriggerNameplateOcr: (equipmentId: string, photo: MediaAttachment) => Promise<void>
@@ -91,7 +94,7 @@ export function LeanEquipmentCard({
               value={eq.serialNumber}
               onChange={(e) => handleUpdateEquipment(eq.id, { serialNumber: e.target.value })}
               placeholder="Ex.: 30105-884"
-              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+              className={`h-10 text-xs bg-slate-50/70 dark:bg-slate-950 ${fieldHighlight.highlightClass(eq, 'serialNumber', eq.serialNumber)}`}
             />
             {(() => {
               const disc = eq.nameplateOcrData?.discrepancies?.find(
@@ -148,12 +151,14 @@ export function LeanEquipmentCard({
             handleUpdateEquipment={handleUpdateEquipment}
             markFieldAsManuallyEdited={markFieldAsManuallyEdited}
             renderConfidenceBadge={renderConfidenceBadge}
+            fieldHighlight={fieldHighlight}
           />
           <LeanNameplateSectionBottom
             eq={eq}
             handleUpdateEquipment={handleUpdateEquipment}
             markFieldAsManuallyEdited={markFieldAsManuallyEdited}
             renderConfidenceBadge={renderConfidenceBadge}
+            fieldHighlight={fieldHighlight}
           />
         </div>
         <EquipmentMediaAttachmentSection

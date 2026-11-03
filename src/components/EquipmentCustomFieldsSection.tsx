@@ -3,6 +3,7 @@ import { Plus, Trash2, Tag } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { generateId } from '@/types/field-visit'
+import { REVIEW_INPUT_YELLOW } from '@/components/field-visit/fieldVisitConfidence'
 
 export interface CustomFieldItem {
   id: string
@@ -51,7 +52,7 @@ export function EquipmentCustomFieldsSection({
     onChange(updated)
   }
 
-  const getCustomFieldConfidence = (label: string): 'high' | 'medium' | null => {
+  const getCustomFieldConfidence = (label: string): 'high' | 'medium' | 'low' | null => {
     if (!confidenceMap) return null
     const clean = label
       .trim()
@@ -65,9 +66,11 @@ export function EquipmentCustomFieldsSection({
       if (cleanKey === clean || cleanKey.includes(clean) || clean.includes(cleanKey)) {
         if (v === 'high') return 'high'
         if (v === 'medium') return 'medium'
+        if (v === 'low') return 'low'
         if (typeof v === 'number') {
           if (v >= 0.8) return 'high'
           if (v >= 0.5) return 'medium'
+          return 'low'
         }
       }
     }
@@ -155,6 +158,17 @@ export function EquipmentCustomFieldsSection({
                         </span>
                       )
                     }
+                    if (conf === 'low') {
+                      return (
+                        <span
+                          className="inline-flex items-center gap-1 text-[9px] font-bold text-yellow-900 bg-yellow-200 dark:bg-yellow-800/70 dark:text-yellow-100 px-1.5 py-0.5 rounded shrink-0 ring-1 ring-yellow-400"
+                          title="Leitura com baixa confiança — conferir na foto da placa"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 shrink-0" />
+                          Conferir
+                        </span>
+                      )
+                    }
                     return null
                   })()}
                 </div>
@@ -162,7 +176,7 @@ export function EquipmentCustomFieldsSection({
                   value={field.value}
                   onChange={(e) => handleUpdateField(field.id, { value: e.target.value })}
                   placeholder="Valor"
-                  className="h-8 text-xs bg-slate-50/70 dark:bg-slate-950"
+                  className={`h-8 text-xs bg-slate-50/70 dark:bg-slate-950 ${conf === 'low' ? REVIEW_INPUT_YELLOW : ''}`}
                 />
               </div>
               <button

@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from '@/hooks/use-toast'
 import { VoiceDictationField } from '@/components/VoiceDictationField'
 import { DetailedEquipmentCard } from '@/components/field-visit/DetailedEquipmentCard'
+import type { FieldHighlightHelpers } from '@/components/field-visit/fieldVisitConfidence'
 import { generateId } from '@/types/field-visit'
 import type { FieldVisitData, EquipmentItem, MediaAttachment } from '@/types/field-visit'
 import type { Dispatch, SetStateAction } from 'react'
@@ -17,6 +18,7 @@ export function DetailedFlowSection({
   handleUpdateEquipment,
   markFieldAsManuallyEdited,
   renderConfidenceBadge,
+  fieldHighlight,
   handleAddEquipmentAttachments,
   handleRemoveEquipmentAttachment,
   handleTriggerNameplateOcr,
@@ -33,6 +35,7 @@ export function DetailedFlowSection({
   handleUpdateEquipment: (id: string, updates: Partial<EquipmentItem>) => void
   markFieldAsManuallyEdited: (equipmentId: string, fieldKey: string) => void
   renderConfidenceBadge: RenderConfidenceBadge
+  fieldHighlight: FieldHighlightHelpers
   handleAddEquipmentAttachments: (equipmentId: string, files: FileList | null) => Promise<void>
   handleRemoveEquipmentAttachment: (equipmentId: string, attachmentId: string) => void
   handleTriggerNameplateOcr: (equipmentId: string, photo: MediaAttachment) => Promise<void>
@@ -155,6 +158,7 @@ export function DetailedFlowSection({
                 handleUpdateEquipment={handleUpdateEquipment}
                 markFieldAsManuallyEdited={markFieldAsManuallyEdited}
                 renderConfidenceBadge={renderConfidenceBadge}
+                fieldHighlight={fieldHighlight}
                 handleAddEquipmentAttachments={handleAddEquipmentAttachments}
                 handleRemoveEquipmentAttachment={handleRemoveEquipmentAttachment}
                 handleTriggerNameplateOcr={handleTriggerNameplateOcr}

@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { AlertCircle, CheckCircle2, Sparkles, Plus, AlertTriangle, Layers } from 'lucide-react'
 import { NameplateComparisonResult } from '@/services/nameplate-reader'
+import { NameplateEvidencePhoto } from '@/components/field-visit/NameplateEvidencePhoto'
+import { resolveConfidenceLevel } from '@/components/field-visit/fieldVisitConfidence'
 
 interface NameplateOcrReviewDialogProps {
   open: boolean
@@ -77,6 +79,9 @@ export function NameplateOcrReviewDialog({
             </div>
           </div>
 
+          {/* Foto da placa usada na leitura, ao lado dos campos para conferência */}
+          <NameplateEvidencePhoto eq={mergedEquipment} />
+
           {/* 1. Campos que serão preenchidos automaticamente */}
           {autoFilled.length > 0 && (
             <div className="space-y-2">
@@ -85,16 +90,37 @@ export function NameplateOcrReviewDialog({
                 <span>Campos vazios que serão preenchidos ({autoFilled.length})</span>
               </div>
               <div className="border border-emerald-200 dark:border-emerald-900/60 rounded-lg overflow-hidden divide-y divide-emerald-100 dark:divide-emerald-900/40 bg-emerald-50/20">
-                {autoFilled.map((f) => (
-                  <div key={f.fieldKey} className="p-2.5 flex items-center justify-between gap-2">
-                    <span className="text-slate-600 dark:text-slate-400 font-medium">
-                      {f.label}
-                    </span>
-                    <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-right">
-                      {f.value}
-                    </span>
-                  </div>
-                ))}
+                {autoFilled.map((f) => {
+                  const lowConf =
+                    resolveConfidenceLevel(
+                      mergedEquipment.nameplateOcrData?.confidence,
+                      f.fieldKey,
+                    ) === 'low'
+                  return (
+                    <div
+                      key={f.fieldKey}
+                      className={`p-2.5 flex items-center justify-between gap-2 ${
+                        lowConf ? 'bg-yellow-100/70 dark:bg-yellow-900/30' : ''
+                      }`}
+                    >
+                      <span className="text-slate-600 dark:text-slate-400 font-medium flex items-center gap-1.5">
+                        {f.label}
+                        {lowConf && (
+                          <span
+                            className="inline-flex items-center gap-1 text-[9px] font-bold text-yellow-900 bg-yellow-200 px-1.5 py-0.5 rounded shrink-0 ring-1 ring-yellow-400"
+                            title="Leitura com baixa confiança — conferir na foto da placa"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 shrink-0" />
+                            Conferir
+                          </span>
+                        )}
+                      </span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100 font-mono text-right">
+                        {f.value}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

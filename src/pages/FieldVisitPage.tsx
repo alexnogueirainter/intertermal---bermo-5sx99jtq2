@@ -3,7 +3,10 @@ import { useVisitAutosave } from '@/components/field-visit/useVisitAutosave'
 import { useAiActionPlan } from '@/components/field-visit/useAiActionPlan'
 import { useNameplateOcr } from '@/components/field-visit/useNameplateOcr'
 import { useVisitSubmit } from '@/components/field-visit/useVisitSubmit'
-import { makeRenderConfidenceBadge } from '@/components/field-visit/fieldVisitConfidence'
+import {
+  makeFieldHighlight,
+  makeRenderConfidenceBadge,
+} from '@/components/field-visit/fieldVisitConfidence'
 import { VisitPageHeader } from '@/components/field-visit/VisitPageHeader'
 import { VisitAlertsSection } from '@/components/field-visit/VisitAlertsSection'
 import { VisitBasicsSections } from '@/components/field-visit/VisitBasicsSections'
@@ -33,6 +36,7 @@ export default function FieldVisitPage({
   const ocr = useNameplateOcr({ visit: s.visit, setVisit: s.setVisit })
   const submit = useVisitSubmit({ visit: s.visit, setVisit: s.setVisit, sellerMode })
   const renderConfidenceBadge = makeRenderConfidenceBadge(s.manuallyEditedFields)
+  const fieldHighlight = makeFieldHighlight(s.manuallyEditedFields)
   // Liga o gatilho da leitura de plaqueta aos anexos do equipamento (mesmo comportamento de antes)
   s.photoTriggerRef.current = ocr.handleTriggerNameplateOcr
 
@@ -104,6 +108,7 @@ export default function FieldVisitPage({
             handleUpdateEquipment={s.handleUpdateEquipment}
             markFieldAsManuallyEdited={s.markFieldAsManuallyEdited}
             renderConfidenceBadge={renderConfidenceBadge}
+            fieldHighlight={fieldHighlight}
             handleAddEquipmentAttachments={s.handleAddEquipmentAttachments}
             handleRemoveEquipmentAttachment={s.handleRemoveEquipmentAttachment}
             handleTriggerNameplateOcr={ocr.handleTriggerNameplateOcr}
@@ -122,6 +127,7 @@ export default function FieldVisitPage({
             handleUpdateEquipment={s.handleUpdateEquipment}
             markFieldAsManuallyEdited={s.markFieldAsManuallyEdited}
             renderConfidenceBadge={renderConfidenceBadge}
+            fieldHighlight={fieldHighlight}
             handleAddEquipmentAttachments={s.handleAddEquipmentAttachments}
             handleRemoveEquipmentAttachment={s.handleRemoveEquipmentAttachment}
             handleTriggerNameplateOcr={ocr.handleTriggerNameplateOcr}

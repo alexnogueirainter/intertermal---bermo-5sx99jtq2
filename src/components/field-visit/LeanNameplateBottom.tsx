@@ -1,17 +1,22 @@
 import { Input } from '@/components/ui/input'
 import { onlyNumericPtBR, type EquipmentItem } from '@/types/field-visit'
-import type { RenderConfidenceBadge } from '@/components/field-visit/fieldVisitConfidence'
+import type {
+  FieldHighlightHelpers,
+  RenderConfidenceBadge,
+} from '@/components/field-visit/fieldVisitConfidence'
 
 export function LeanNameplateSectionBottom({
   eq,
   handleUpdateEquipment,
   markFieldAsManuallyEdited,
   renderConfidenceBadge,
+  fieldHighlight,
 }: {
   eq: EquipmentItem
   handleUpdateEquipment: (id: string, updates: Partial<EquipmentItem>) => void
   markFieldAsManuallyEdited: (equipmentId: string, fieldKey: string) => void
   renderConfidenceBadge: RenderConfidenceBadge
+  fieldHighlight: FieldHighlightHelpers
 }) {
   return (
     <>
@@ -34,7 +39,7 @@ export function LeanNameplateSectionBottom({
               })
             }}
             placeholder="Ex.: 164,30"
-            className="h-9 text-xs bg-white dark:bg-slate-900"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(eq, 'emptyWeightKg', eq.emptyWeightKg)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find(
@@ -67,7 +72,7 @@ export function LeanNameplateSectionBottom({
               })
             }}
             placeholder="Ex.: 2025"
-            className="h-9 text-xs bg-white dark:bg-slate-900"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(eq, 'manufacturingYear', eq.manufacturingYear)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find(
@@ -99,7 +104,7 @@ export function LeanNameplateSectionBottom({
               })
             }}
             placeholder="Ex.: 66"
-            className="h-9 text-xs bg-white dark:bg-slate-900"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(eq, 'tighteningMaxA', eq.tighteningMaxA)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find(
@@ -131,7 +136,7 @@ export function LeanNameplateSectionBottom({
               })
             }}
             placeholder="Ex.: 70"
-            className="h-9 text-xs bg-white dark:bg-slate-900"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(eq, 'tighteningMinA', eq.tighteningMinA)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find(

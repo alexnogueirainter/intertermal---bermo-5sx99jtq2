@@ -1,17 +1,23 @@
 import { Input } from '@/components/ui/input'
 import { onlyNumericPtBR, type EquipmentItem } from '@/types/field-visit'
-import type { RenderConfidenceBadge } from '@/components/field-visit/fieldVisitConfidence'
+import type {
+  FieldHighlightHelpers,
+  RenderConfidenceBadge,
+} from '@/components/field-visit/fieldVisitConfidence'
+import { NameplateEvidencePhoto } from '@/components/field-visit/NameplateEvidencePhoto'
 
 export function DetailedNameplateSection({
   item,
   handleUpdateEquipment,
   markFieldAsManuallyEdited,
   renderConfidenceBadge,
+  fieldHighlight,
 }: {
   item: EquipmentItem
   handleUpdateEquipment: (id: string, updates: Partial<EquipmentItem>) => void
   markFieldAsManuallyEdited: (equipmentId: string, fieldKey: string) => void
   renderConfidenceBadge: RenderConfidenceBadge
+  fieldHighlight: FieldHighlightHelpers
 }) {
   return (
     <>
@@ -35,6 +41,8 @@ export function DetailedNameplateSection({
             Referência de campo
           </span>
         </div>
+        {/* Foto da placa usada na leitura, ao lado dos campos para conferência */}
+        <NameplateEvidencePhoto eq={item} />
         {/* Plaqueta - Linha 1: Serviço e Nº de Fabricação */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -51,7 +59,7 @@ export function DetailedNameplateSection({
                 handleUpdateEquipment(item.id, { service: e.target.value })
               }}
               placeholder="Ex.: RESFRIAMENTO, AQUECIMENTO, CONDENSAÇÃO"
-              className="h-9 text-xs bg-white dark:bg-slate-900"
+              className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(item, 'service', item.service)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(
@@ -82,7 +90,7 @@ export function DetailedNameplateSection({
                 })
               }}
               placeholder="Ex.: 639.065"
-              className="h-9 text-xs bg-white dark:bg-slate-900 font-mono"
+              className={`h-9 text-xs bg-white dark:bg-slate-900 font-mono ${fieldHighlight.highlightClass(item, 'manufacturingNumber', item.manufacturingNumber)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(
@@ -117,7 +125,7 @@ export function DetailedNameplateSection({
                 })
               }}
               placeholder="Ex.: 10,00"
-              className="h-9 text-xs bg-white dark:bg-slate-900"
+              className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(item, 'designPressureBar', item.designPressureBar)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(
@@ -149,7 +157,7 @@ export function DetailedNameplateSection({
                 })
               }}
               placeholder="Ex.: 13,00"
-              className="h-9 text-xs bg-white dark:bg-slate-900"
+              className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(item, 'testPressureBar', item.testPressureBar)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(
@@ -181,7 +189,7 @@ export function DetailedNameplateSection({
                 })
               }}
               placeholder="Ex.: 165"
-              className="h-9 text-xs bg-white dark:bg-slate-900"
+              className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(item, 'designTempC', item.designTempC)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(
@@ -213,7 +221,7 @@ export function DetailedNameplateSection({
                 })
               }}
               placeholder="Ex.: 1,30"
-              className="h-9 text-xs bg-white dark:bg-slate-900"
+              className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(item, 'pmtaMpa', item.pmtaMpa)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(
@@ -248,7 +256,7 @@ export function DetailedNameplateSection({
                 })
               }}
               placeholder="Ex.: 164,30"
-              className="h-9 text-xs bg-white dark:bg-slate-900"
+              className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(item, 'emptyWeightKg', item.emptyWeightKg)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(
@@ -281,7 +289,7 @@ export function DetailedNameplateSection({
                 })
               }}
               placeholder="Ex.: 2025"
-              className="h-9 text-xs bg-white dark:bg-slate-900"
+              className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(item, 'manufacturingYear', item.manufacturingYear)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(
@@ -313,7 +321,7 @@ export function DetailedNameplateSection({
                 })
               }}
               placeholder="Ex.: 66"
-              className="h-9 text-xs bg-white dark:bg-slate-900"
+              className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(item, 'tighteningMaxA', item.tighteningMaxA)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(
@@ -345,7 +353,7 @@ export function DetailedNameplateSection({
                 })
               }}
               placeholder="Ex.: 70"
-              className="h-9 text-xs bg-white dark:bg-slate-900"
+              className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(item, 'tighteningMinA', item.tighteningMinA)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(

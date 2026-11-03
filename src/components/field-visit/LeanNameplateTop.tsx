@@ -1,20 +1,28 @@
 import { Input } from '@/components/ui/input'
 import { onlyNumericPtBR, type EquipmentItem } from '@/types/field-visit'
-import type { RenderConfidenceBadge } from '@/components/field-visit/fieldVisitConfidence'
+import type {
+  FieldHighlightHelpers,
+  RenderConfidenceBadge,
+} from '@/components/field-visit/fieldVisitConfidence'
+import { NameplateEvidencePhoto } from '@/components/field-visit/NameplateEvidencePhoto'
 
 export function LeanNameplateSectionTop({
   eq,
   handleUpdateEquipment,
   markFieldAsManuallyEdited,
   renderConfidenceBadge,
+  fieldHighlight,
 }: {
   eq: EquipmentItem
   handleUpdateEquipment: (id: string, updates: Partial<EquipmentItem>) => void
   markFieldAsManuallyEdited: (equipmentId: string, fieldKey: string) => void
   renderConfidenceBadge: RenderConfidenceBadge
+  fieldHighlight: FieldHighlightHelpers
 }) {
   return (
     <>
+      {/* Foto da placa usada na leitura, ao lado dos campos para conferência */}
+      <NameplateEvidencePhoto eq={eq} />
       {/* Plaqueta - Linha 1: Serviço, Nº Fabricação, Tag */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
@@ -31,7 +39,7 @@ export function LeanNameplateSectionTop({
               handleUpdateEquipment(eq.id, { service: e.target.value })
             }}
             placeholder="Ex.: RESFRIAMENTO"
-            className="h-9 text-xs bg-white dark:bg-slate-900"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(eq, 'service', eq.service)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find((d) => d.fieldKey === 'service')
@@ -60,7 +68,7 @@ export function LeanNameplateSectionTop({
               })
             }}
             placeholder="Ex.: 639.065"
-            className="h-9 text-xs bg-white dark:bg-slate-900 font-mono"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 font-mono ${fieldHighlight.highlightClass(eq, 'manufacturingNumber', eq.manufacturingNumber)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find(
@@ -89,7 +97,7 @@ export function LeanNameplateSectionTop({
               handleUpdateEquipment(eq.id, { tag: e.target.value })
             }}
             placeholder="Ex.: TC-01 / TQ-101"
-            className="h-9 text-xs bg-white dark:bg-slate-900"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(eq, 'tag', eq.tag)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find((d) => d.fieldKey === 'tag')
@@ -122,7 +130,7 @@ export function LeanNameplateSectionTop({
               })
             }}
             placeholder="Ex.: 10,00"
-            className="h-9 text-xs bg-white dark:bg-slate-900"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(eq, 'designPressureBar', eq.designPressureBar)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find(
@@ -154,7 +162,7 @@ export function LeanNameplateSectionTop({
               })
             }}
             placeholder="Ex.: 13,00"
-            className="h-9 text-xs bg-white dark:bg-slate-900"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(eq, 'testPressureBar', eq.testPressureBar)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find(
@@ -186,7 +194,7 @@ export function LeanNameplateSectionTop({
               })
             }}
             placeholder="Ex.: 165"
-            className="h-9 text-xs bg-white dark:bg-slate-900"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(eq, 'designTempC', eq.designTempC)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find(
@@ -218,7 +226,7 @@ export function LeanNameplateSectionTop({
               })
             }}
             placeholder="Ex.: 1,30"
-            className="h-9 text-xs bg-white dark:bg-slate-900"
+            className={`h-9 text-xs bg-white dark:bg-slate-900 ${fieldHighlight.highlightClass(eq, 'pmtaMpa', eq.pmtaMpa)}`}
           />
           {(() => {
             const disc = eq.nameplateOcrData?.discrepancies?.find((d) => d.fieldKey === 'pmtaMpa')

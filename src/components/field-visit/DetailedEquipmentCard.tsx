@@ -9,6 +9,7 @@ import { EquipmentMediaAttachmentSection } from '@/components/EquipmentMediaAtta
 import { EquipmentCustomFieldsSection } from '@/components/EquipmentCustomFieldsSection'
 import { DetailedNameplateSection } from '@/components/field-visit/DetailedNameplateSection'
 import { DetailedSpecRows } from '@/components/field-visit/DetailedSpecRows'
+import type { FieldHighlightHelpers } from '@/components/field-visit/fieldVisitConfidence'
 import {
   DIFFICULTY_OPTIONS,
   MANUFACTURER_PRESETS,
@@ -25,6 +26,7 @@ export function DetailedEquipmentCard({
   handleUpdateEquipment,
   markFieldAsManuallyEdited,
   renderConfidenceBadge,
+  fieldHighlight,
   handleAddEquipmentAttachments,
   handleRemoveEquipmentAttachment,
   handleTriggerNameplateOcr,
@@ -41,6 +43,7 @@ export function DetailedEquipmentCard({
   handleUpdateEquipment: (id: string, updates: Partial<EquipmentItem>) => void
   markFieldAsManuallyEdited: (equipmentId: string, fieldKey: string) => void
   renderConfidenceBadge: RenderConfidenceBadge
+  fieldHighlight: FieldHighlightHelpers
   handleAddEquipmentAttachments: (equipmentId: string, files: FileList | null) => Promise<void>
   handleRemoveEquipmentAttachment: (equipmentId: string, attachmentId: string) => void
   handleTriggerNameplateOcr: (equipmentId: string, photo: MediaAttachment) => Promise<void>
@@ -92,7 +95,7 @@ export function DetailedEquipmentCard({
               value={item.model}
               onChange={(e) => handleUpdateEquipment(item.id, { model: e.target.value })}
               placeholder="Ex.: BP 60 B"
-              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+              className={`h-10 text-xs bg-slate-50/70 dark:bg-slate-950 ${fieldHighlight.highlightClass(item, 'model', item.model)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find((d) => d.fieldKey === 'model')
@@ -112,7 +115,7 @@ export function DetailedEquipmentCard({
               value={item.serialNumber}
               onChange={(e) => handleUpdateEquipment(item.id, { serialNumber: e.target.value })}
               placeholder="Ex.: 30105-884"
-              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+              className={`h-10 text-xs bg-slate-50/70 dark:bg-slate-950 ${fieldHighlight.highlightClass(item, 'serialNumber', item.serialNumber)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find(
@@ -189,7 +192,7 @@ export function DetailedEquipmentCard({
               value={item.tag || ''}
               onChange={(e) => handleUpdateEquipment(item.id, { tag: e.target.value })}
               placeholder="Ex.: TQ-101 / TC-01"
-              className="h-10 text-xs bg-slate-50/70 dark:bg-slate-950"
+              className={`h-10 text-xs bg-slate-50/70 dark:bg-slate-950 ${fieldHighlight.highlightClass(item, 'tag', item.tag)}`}
             />
             {(() => {
               const disc = item.nameplateOcrData?.discrepancies?.find((d) => d.fieldKey === 'tag')
@@ -208,6 +211,7 @@ export function DetailedEquipmentCard({
           handleUpdateEquipment={handleUpdateEquipment}
           markFieldAsManuallyEdited={markFieldAsManuallyEdited}
           renderConfidenceBadge={renderConfidenceBadge}
+          fieldHighlight={fieldHighlight}
         />
 
         <DetailedSpecRows item={item} handleUpdateEquipment={handleUpdateEquipment} />
