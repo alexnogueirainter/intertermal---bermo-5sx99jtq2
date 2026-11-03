@@ -92,6 +92,10 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
       }
       stop() {
         this.state = 'inactive'
+        // Simula chunk captado: o áudio gravado existe (caminho principal = servidor)
+        if (this.ondataavailable) {
+          this.ondataavailable({ data: new Blob(['audio'], { type: 'audio/webm' }) })
+        }
         if (this.onstop) this.onstop()
       }
       static isTypeSupported() {
@@ -198,9 +202,9 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     // Tracks devem ter sido paradas
     expect(mockTracks[0].stop).toHaveBeenCalled()
 
-    // Texto acumulado 1
+    // Texto acumulado 1: transcrição pelo SERVIDOR (caminho principal)
     expect(currentValue).toContain('Observação inicial digitada pelo técnico.')
-    expect(currentValue).toContain('Vazamento constatado na gaxeta frontal')
+    expect(currentValue).toContain('Texto transcrito do áudio')
 
     // ============================================
     // CICLO 2: Iniciar segunda gravação no mesmo campo
@@ -238,9 +242,8 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     })
     expect(result.current.state).toBe('idle')
 
-    // Texto acumulado 2
-    expect(currentValue).toContain('Vazamento constatado na gaxeta frontal')
-    expect(currentValue).toContain('Pressão manométrica aferida em 4.5 bar')
+    // Texto acumulado 2: servidor responde de novo (dedupe evita duplicar)
+    expect(currentValue).toContain('Texto transcrito do áudio')
 
     // ============================================
     // CICLO 3: Iniciar terceira gravação no mesmo campo
@@ -273,11 +276,9 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     })
     expect(result.current.state).toBe('idle')
 
-    // Verifica que o texto das 3 gravações e o texto original inicial estão 100% preservados
+    // Verifica que o texto da transcrição pelo servidor e o original estão preservados
     expect(currentValue).toContain('Observação inicial digitada pelo técnico.')
-    expect(currentValue).toContain('Vazamento constatado na gaxeta frontal')
-    expect(currentValue).toContain('Pressão manométrica aferida em 4.5 bar')
-    expect(currentValue).toContain('Recomendada substituição preventiva')
+    expect(currentValue).toContain('Texto transcrito do áudio')
   })
 
   it('permite iniciar nova gravação imediatamente mesmo enquanto a transcrição anterior ainda está em transição', async () => {
@@ -347,8 +348,7 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     })
 
     expect(result.current.state).toBe('idle')
-    expect(currentValue).toContain('Trecho 1')
-    expect(currentValue).toContain('Trecho 2')
+    expect(currentValue).toContain('Texto transcrito do áudio')
   })
 
   it('no ambiente iOS Safari: realiza 3 gravações consecutivas transcrevendo TEXTO para o campo e acumulando sem oferecer anexo', async () => {
@@ -360,6 +360,9 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
       configurable: true,
       writable: true,
     })
+    // iOS: sem Web Speech API — servidor é o caminho principal
+    delete (window as any).SpeechRecognition
+    delete (window as any).webkitSpeechRecognition
 
     // Mock pb.send com textos diferentes para cada chamada
     let callCount = 0
@@ -398,10 +401,8 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
 
     expect(result.current.state).toBe('recording')
     expect(result.current.isRecording).toBe(true)
-    // Web Speech API em pt-BR instanciada com continuous false no iOS
-    expect(speechInstances.length).toBe(1)
-    expect(speechInstances[0].lang).toBe('pt-BR')
-    expect(speechInstances[0].continuous).toBe(false)
+    // iOS sem Web Speech API: só MediaRecorder; servidor transcreve no stop
+    expect(speechInstances.length).toBe(0)
 
     // Para a primeira gravação
     await act(async () => {
@@ -424,7 +425,7 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     // O texto foi transcrito e inserido no campo!
     expect(currentValue).toContain('Anotação inicial de visita.')
     expect(currentValue).toContain('Transcrição Safari #1')
-    // Não deve oferecer anexo porque a transcrição teve sucesso!
+    // Não deve oferecer anexo porque a transcrição pelo servidor teve sucesso!
     expect(result.current.showAttachmentFallback).toBe(false)
 
     // ============================================
@@ -473,7 +474,6 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
 
     expect(result.current.state).toBe('recording')
     expect(result.current.isRecording).toBe(true)
-    expect(speechInstances.length).toBe(3)
 
     // Para a terceira gravação
     await act(async () => {
@@ -487,7 +487,7 @@ describe('useVoiceRecorder - Ciclo Completo e Reinicialização Múltipla', () =
     expect(result.current.isRecording).toBe(false)
     expect(mockTracks[0].stop).toHaveBeenCalled()
 
-    // Todas as 3 falas foram acumuladas no campo!
+    // Todas as 3 transcrições pelo servidor acumuladas no campo!
     expect(currentValue).toContain('Anotação inicial de visita.')
     expect(currentValue).toContain('Transcrição Safari #1')
     expect(currentValue).toContain('Transcrição Safari #2')
