@@ -193,11 +193,21 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
     0,
   )
 
-  // Utilitário para verificar se um negócio está ativo (exclui perdidos/lost/recusados)
+  // Utilitário para verificar se um negócio está em aberto (exclui ganhos E perdidos)
   const isDealActive = (deal: DealRecord): boolean => {
     if (!deal) return false
     const s = (deal.stage || '').toLowerCase().trim()
-    return s !== 'lost' && s !== 'perdido' && s !== 'recusado' && s !== 'rejeitado'
+    return (
+      s !== 'lost' &&
+      s !== 'perdido' &&
+      s !== 'recusado' &&
+      s !== 'rejeitado' &&
+      s !== 'won' &&
+      s !== 'ganho' &&
+      s !== 'fechado' &&
+      s !== 'concluido' &&
+      s !== 'concluído'
+    )
   }
 
   // Utilitário para negócios ganhos (won) — "Ganhos no período" no painel
