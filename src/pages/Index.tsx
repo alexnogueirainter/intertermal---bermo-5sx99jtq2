@@ -882,7 +882,7 @@ export default function IndexPage() {
             >
               <div className="flex items-center gap-3">
                 <Kanban className="h-4 w-4" />
-                Pipeline Comercial
+                Funil comercial
               </div>
               <Badge variant="secondary" className="text-[10px] px-1.5">
                 {deals.length}
@@ -914,7 +914,7 @@ export default function IndexPage() {
             >
               <div className="flex items-center gap-3">
                 <Kanban className="h-4 w-4 text-amber-500" />
-                Pipeline de OS (Kanban)
+                Execução de serviços (OS)
               </div>
               <Badge className="bg-amber-500/20 text-amber-800 dark:text-amber-300 text-[10px] px-1.5">
                 {serviceOrders.length}
@@ -1068,9 +1068,9 @@ export default function IndexPage() {
                 {activeTab === 'overview' && 'Painel Geral'}
                 {activeTab === 'quotes' && 'Orçamentos de Serviços Intertermal'}
                 {activeTab === 'catalog' && 'Catálogo de Produtos & Válvulas BERMO'}
-                {activeTab === 'deals' && 'Pipeline Comercial (Funil)'}
+                {activeTab === 'deals' && 'Funil comercial'}
                 {activeTab === 'clients' && 'Gestão de Clientes'}
-                {activeTab === 'service_kanban' && 'Pipeline de Serviços Técnicos (Kanban)'}
+                {activeTab === 'service_kanban' && 'Execução de serviços (OS)'}
                 {activeTab === 'equipment_history' &&
                   'Histórico de Manutenções por Cliente & Equipamento'}
                 {activeTab === 'services' && 'Ordens de Serviço & Contratos'}

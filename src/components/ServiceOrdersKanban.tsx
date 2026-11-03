@@ -97,7 +97,7 @@ export const SERVICE_ORDER_STAGES: {
 }[] = [
   {
     key: 'vistoria',
-    label: '1. Vistoria',
+    label: '1. Vistoria técnica',
     color: 'text-amber-700 dark:text-amber-400',
     border: 'border-amber-300 dark:border-amber-800',
     bg: 'bg-amber-50/40 dark:bg-amber-950/20',
@@ -107,7 +107,7 @@ export const SERVICE_ORDER_STAGES: {
   },
   {
     key: 'proposta',
-    label: '2. Proposta',
+    label: '2. Proposta técnica',
     color: 'text-sky-700 dark:text-sky-400',
     border: 'border-sky-300 dark:border-sky-800',
     bg: 'bg-sky-50/40 dark:bg-sky-950/20',
@@ -117,7 +117,7 @@ export const SERVICE_ORDER_STAGES: {
   },
   {
     key: 'execucao',
-    label: '3. Execução',
+    label: '3. Execução em campo',
     color: 'text-blue-700 dark:text-blue-400',
     border: 'border-blue-300 dark:border-blue-800',
     bg: 'bg-blue-50/40 dark:bg-blue-950/20',
@@ -127,7 +127,7 @@ export const SERVICE_ORDER_STAGES: {
   },
   {
     key: 'inspecao',
-    label: '4. Inspeção',
+    label: '4. Inspeção e laudo',
     color: 'text-purple-700 dark:text-purple-400',
     border: 'border-purple-300 dark:border-purple-800',
     bg: 'bg-purple-50/40 dark:bg-purple-950/20',
@@ -137,7 +137,7 @@ export const SERVICE_ORDER_STAGES: {
   },
   {
     key: 'fechado',
-    label: '5. Fechado',
+    label: '5. Fechado e faturado',
     color: 'text-emerald-700 dark:text-emerald-400',
     border: 'border-emerald-300 dark:border-emerald-800',
     bg: 'bg-emerald-50/40 dark:bg-emerald-950/20',

@@ -138,6 +138,41 @@ export const quoteDealSyncService = {
     const { stage, probability } = mapQuoteStatusToDealStage(quote.status)
     const assignedTo = quote.assigned_to || 'Alex Nogueira'
 
+    // REGRA: a etapa do negócio só muda automaticamente em 3 momentos —
+    // proposta enviada ('proposal'), aprovada ('won') ou recusada ('lost').
+    // Salvar/editar a proposta sem mudar o status NÃO move o card.
+    // Movimento manual (feito no funil) nunca é desfeito: se o negócio já está
+    // em 'won' ou 'lost', nenhuma sincronização automática reverte isso.
+    const AUTO_MOVE_STAGES: Record<string, { stage: DealStage; probability: number }> = {
+      sent: { stage: 'proposal', probability: 60 },
+      enviada: { stage: 'proposal', probability: 60 },
+      approved: { stage: 'won', probability: 100 },
+      aprovada: { stage: 'won', probability: 100 },
+      rejected: { stage: 'lost', probability: 0 },
+      recusada: { stage: 'lost', probability: 0 },
+    }
+    const sNorm = (quote.status || '').toLowerCase().trim()
+    const autoMove = AUTO_MOVE_STAGES[sNorm]
+    const currentStage = (existingDeal?.stage || '').toLowerCase().trim()
+    const isTerminal = currentStage === 'won' || currentStage === 'lost'
+    const stageUnchanged = !autoMove || (existingDeal && currentStage === autoMove.stage)
+    const manualStage = existingDeal && !isTerminal && !autoMove
+    const effectiveStage = isTerminal
+      ? existingDeal!.stage
+      : autoMove
+        ? autoMove.stage
+        : manualStage
+          ? existingDeal!.stage
+          : stage
+    const effectiveProbability = isTerminal
+      ? existingDeal!.probability
+      : autoMove
+        ? autoMove.probability
+        : manualStage
+          ? existingDeal!.probability
+          : probability
+    void stageUnchanged
+
     try {
       let existingDeal: DealRecord | null = null
 
@@ -160,13 +195,13 @@ export const quoteDealSyncService = {
           client_id: clientId || existingDeal.client_id,
           client_name: clientName || existingDeal.client_name,
           value: dealValue,
-          stage,
-          probability,
+          stage: effectiveStage,
+          probability: effectiveProbability,
           assigned_to: assignedTo,
           notes: `Proposta Intertermal ${quoteCode} conectada automaticamente ao pipeline comercial.`,
         }
 
-        if (stage === 'lost') {
+        if (effectiveStage === 'lost') {
           payloadToUpdate.loss_reason =
             quote.rejected_by_client_reason ||
             existingDeal.loss_reason ||
@@ -199,13 +234,15 @@ export const quoteDealSyncService = {
             client_id: clientId,
             client_name: clientName,
             value: dealValue,
-            stage,
-            probability,
+            stage: effectiveStage,
+            probability: effectiveProbability,
             priority: 'medium',
             assigned_to: assignedTo,
             notes: `Proposta Intertermal ${quoteCode} gerada e conectada automaticamente ao pipeline comercial.`,
             loss_reason:
-              stage === 'lost' ? quote.rejected_by_client_reason || 'Proposta recusada' : undefined,
+              effectiveStage === 'lost'
+                ? quote.rejected_by_client_reason || 'Proposta recusada'
+                : undefined,
           },
           { requestKey: null },
         )

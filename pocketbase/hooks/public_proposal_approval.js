@@ -181,8 +181,12 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
       if (!dealVal || dealVal <= 0) dealVal = 0
 
       if (dealRecord) {
-        dealRecord.set('stage', 'won')
-        dealRecord.set('probability', 100)
+        // Movimento manual nunca é desfeito: se o negócio já está em won/lost, não reverter
+        const currentStage = dealRecord.getString('stage')
+        if (currentStage !== 'won' && currentStage !== 'lost') {
+          dealRecord.set('stage', 'won')
+          dealRecord.set('probability', 100)
+        }
         dealRecord.set('value', dealVal)
         dealRecord.set(
           'notes',
@@ -463,8 +467,12 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
       if (!dealVal || dealVal <= 0) dealVal = 0
 
       if (dealRecord) {
-        dealRecord.set('stage', 'lost')
-        dealRecord.set('probability', 0)
+        // Movimento manual nunca é desfeito: se o negócio já está em won/lost, não reverter
+        const currentStage = dealRecord.getString('stage')
+        if (currentStage !== 'won' && currentStage !== 'lost') {
+          dealRecord.set('stage', 'lost')
+          dealRecord.set('probability', 0)
+        }
         dealRecord.set('value', dealVal)
         dealRecord.set('loss_reason', rejectReason || 'Recusada pelo cliente')
         dealRecord.set(
