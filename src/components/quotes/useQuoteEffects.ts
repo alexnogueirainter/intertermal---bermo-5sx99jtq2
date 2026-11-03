@@ -250,8 +250,15 @@ export function useQuoteEffects(p: UseQuoteEffectsDeps) {
         const payload = getFormDataObject()
         await onUpdateQuote(activeQuoteId, payload)
 
-        // Sincronização em segundo plano com CRM (Deals + Service Orders) sem bloquear digitação
-        const quoteToSync = { ...payload, id: activeQuoteId } as QuoteRecord
+        // Sincronização em segundo plano com CRM (Deals + Service Orders) sem bloquear digitação.
+        // REGRA: carrega o mesmo sinal do Salvar explícito — se o STATUS mudou de verdade,
+        // o auto-save também move o card (3 momentos); senão, preserva a etapa atual.
+        // Sem isso, o auto-save corria com o sync do Salvar (lock inFlightSync) e gravava "não mover".
+        const quoteToSync = {
+          ...payload,
+          id: activeQuoteId,
+          _statusChanged: (initialSnapshotRef.current?.status ?? payload.status) !== payload.status,
+        } as QuoteRecord
         quoteDealSyncService.syncQuoteToCrm(quoteToSync).catch((err) => {
           console.warn('Auto-save syncQuoteToCrm falhou em segundo plano:', err)
         })
