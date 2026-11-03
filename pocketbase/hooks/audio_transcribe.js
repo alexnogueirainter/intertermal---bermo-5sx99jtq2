@@ -10,11 +10,32 @@
  * a Web Speech API nativa falha ou não transcreve.
  */
 routerAdd('POST', '/backend/v1/audio/transcribe', (e) => {
-  const gatewayUrl = $os.getenv('SKIP_AI_GATEWAY_URL') || ''
-  const gatewayKey = $os.getenv('SKIP_AI_GATEWAY_API_KEY') || ''
+  // Config do gateway: segredos do projeto ($secrets.get) com fallback para env.
+  // $os.getenv NÃO enxerga segredos do Skip Cloud — sem isso a rota responde
+  // service_unavailable mesmo com o gateway configurado.
+  let gatewayUrl = ''
+  let gatewayKey = ''
+  try {
+    gatewayUrl = $secrets.get('SKIP_AI_GATEWAY_URL') || ''
+  } catch (_) {
+    gatewayUrl = ''
+  }
+  try {
+    gatewayKey = $secrets.get('SKIP_AI_GATEWAY_API_KEY') || ''
+  } catch (_) {
+    gatewayKey = ''
+  }
+  if (!gatewayUrl) gatewayUrl = $os.getenv('SKIP_AI_GATEWAY_URL') || ''
+  if (!gatewayKey) gatewayKey = $os.getenv('SKIP_AI_GATEWAY_API_KEY') || ''
 
-  // 1. Tenta obter arquivo multipart "file" ou "audio"
-  const uploadedFiles = e.findUploadedFiles('file') || e.findUploadedFiles('audio') || []
+  // 1. Tenta obter arquivo multipart "file" ou "audio".
+  // Body JSON (fallback base64) NÃO pode quebrar a rota no findUploadedFiles.
+  let uploadedFiles = []
+  try {
+    uploadedFiles = e.findUploadedFiles('file') || e.findUploadedFiles('audio') || []
+  } catch (_) {
+    uploadedFiles = []
+  }
 
   if (uploadedFiles && uploadedFiles.length > 0) {
     const file = uploadedFiles[0]
