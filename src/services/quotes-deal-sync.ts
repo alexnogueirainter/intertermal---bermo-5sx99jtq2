@@ -154,6 +154,11 @@ export const quoteDealSyncService = {
     }
     const sNorm = (quote.status || '').toLowerCase().trim()
     const autoMove = AUTO_MOVE_STAGES[sNorm]
+    // Só os 3 momentos com MUDANÇA REAL de status movem o card. Se o status da
+    // proposta não mudou (salvar sem alterar, re-salvar Enviada, etc.), a etapa
+    // do negócio permanece onde está — movimento manual ou anterior preservado.
+    const statusChanged = quote._statusChanged === true
+    const stageMoves = !!autoMove && statusChanged
 
     try {
       let existingDeal: DealRecord | null = null
@@ -174,18 +179,18 @@ export const quoteDealSyncService = {
       const currentStage = (existingDeal?.stage || '').toLowerCase().trim()
       const isWon = currentStage === 'won'
       const isLost = currentStage === 'lost'
-      const manualStage = !!existingDeal && !isWon && !isLost && !autoMove
+      const manualStage = !!existingDeal && !isWon && !isLost && !stageMoves
       const effectiveStage = isWon
         ? existingDeal!.stage
-        : autoMove
-          ? autoMove.stage
+        : stageMoves
+          ? autoMove!.stage
           : manualStage
             ? existingDeal!.stage
             : stage
       const effectiveProbability = isWon
         ? existingDeal!.probability
-        : autoMove
-          ? autoMove.probability
+        : stageMoves
+          ? autoMove!.probability
           : manualStage
             ? existingDeal!.probability
             : probability

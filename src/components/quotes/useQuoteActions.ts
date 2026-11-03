@@ -76,9 +76,15 @@ export function makeQuoteActions(p: MakeQuoteActionsDeps) {
     try {
       if (activeQuoteId) {
         await onUpdateQuote(activeQuoteId, payload)
-        // Dispara sincronização com o CRM (deals + service orders vinculadas)
+        // Dispara sincronização com o CRM (deals + service orders vinculadas).
+        // REGRA: o card do funil só se move quando o STATUS da proposta muda de verdade.
         try {
-          const quoteToSync = { ...payload, id: activeQuoteId } as QuoteRecord
+          const quoteToSync = {
+            ...payload,
+            id: activeQuoteId,
+            _statusChanged:
+              (initialSnapshotRef.current?.status ?? payload.status) !== payload.status,
+          } as QuoteRecord
           await quoteDealSyncService.syncQuoteToCrm(quoteToSync)
         } catch (syncErr) {
           console.warn('Erro ao sincronizar quote com CRM após update:', syncErr)
@@ -124,9 +130,15 @@ export function makeQuoteActions(p: MakeQuoteActionsDeps) {
     try {
       if (activeQuoteId) {
         await onUpdateQuote(activeQuoteId, payload)
-        // Dispara sincronização com o CRM (deals + service orders vinculadas)
+        // Dispara sincronização com o CRM (deals + service orders vinculadas).
+        // REGRA: o card do funil só se move quando o STATUS da proposta muda de verdade.
         try {
-          const quoteToSync = { ...payload, id: activeQuoteId } as QuoteRecord
+          const quoteToSync = {
+            ...payload,
+            id: activeQuoteId,
+            _statusChanged:
+              (initialSnapshotRef.current?.status ?? payload.status) !== payload.status,
+          } as QuoteRecord
           await quoteDealSyncService.syncQuoteToCrm(quoteToSync)
         } catch (syncErr) {
           console.warn('Erro ao sincronizar quote com CRM após salvar rascunho:', syncErr)

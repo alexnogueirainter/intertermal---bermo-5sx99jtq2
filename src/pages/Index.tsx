@@ -563,7 +563,10 @@ export default function IndexPage() {
       // mesmo sync do editor; salvar sem mudar status continua sem mover o card.
       if (status !== previousStatus) {
         try {
-          await quoteDealSyncService.syncQuoteToDeal(updated)
+          await quoteDealSyncService.syncQuoteToDeal({
+            ...updated,
+            _statusChanged: true,
+          } as QuoteRecord)
         } catch (syncErr) {
           console.warn('Erro ao sincronizar mudança de status no pipeline:', syncErr)
         }

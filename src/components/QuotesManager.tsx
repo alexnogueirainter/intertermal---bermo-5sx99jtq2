@@ -196,10 +196,10 @@ export function QuotesManager({
             payload.status = 'approved'
 
             if (onUpdateQuoteStatus) {
-              await onUpdateQuote(quoteId, payload)
+              await onUpdateQuote(quoteId, { ...payload, _statusChanged: true })
               await onUpdateQuoteStatus(quoteId, 'approved')
             } else {
-              await onUpdateQuote(quoteId, payload)
+              await onUpdateQuote(quoteId, { ...payload, _statusChanged: true })
             }
             setStatus('approved')
             toast({

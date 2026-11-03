@@ -442,6 +442,9 @@ export interface QuoteRecord {
   archived_at?: string
   created?: string
   updated?: string
+  // Sinal interno (não persiste): true quando o STATUS mudou de verdade nesta operação.
+  // Usado pelo sync proposta->deal para aplicar a regra dos 3 momentos.
+  _statusChanged?: boolean
 }
 
 export interface OsExecutionReportMaterialItem {
