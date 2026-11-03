@@ -36,6 +36,7 @@ import { useAuth } from '@/lib/auth'
 import { clientsService } from '@/services/clients'
 import { dealsService } from '@/services/deals'
 import { quotesService } from '@/services/quotes'
+import { quoteDealSyncService } from '@/services/quotes-deal-sync'
 
 import {
   servicesExtraService,
@@ -552,9 +553,21 @@ export default function IndexPage() {
 
   const handleUpdateQuoteStatus = async (id: string, status: QuoteStatus) => {
     try {
+      const previousStatus = quotes.find((q) => q.id === id)?.status
       const updated = await quotesService.update(id, { status })
       setQuotes(quotes.map((q) => (q.id === id ? updated : q)))
       if (selectedQuote?.id === id) setSelectedQuote(updated)
+
+      // REGRA: a etapa do negócio só muda automaticamente quando o STATUS da proposta
+      // muda — enviada, aprovada ou recusada. Mudança de status pelo menu dispara o
+      // mesmo sync do editor; salvar sem mudar status continua sem mover o card.
+      if (status !== previousStatus) {
+        try {
+          await quoteDealSyncService.syncQuoteToDeal(updated)
+        } catch (syncErr) {
+          console.warn('Erro ao sincronizar mudança de status no pipeline:', syncErr)
+        }
+      }
 
       // Recarregar os deals para refletir instantaneamente no Pipeline e Dashboard
       try {
