@@ -445,6 +445,14 @@ export interface OsExecutionReportMaterialItem {
   unit?: string
   code?: string
   notes?: string
+  unit_cost?: number | string
+}
+
+export interface OsExecutionReportExtraHours {
+  id?: string
+  description: string
+  hours: number | string
+  total_cost?: number | string
 }
 
 export interface OsExecutionReportPhotoMeta {
@@ -466,6 +474,7 @@ export interface OsExecutionReportRecord {
   exchanger_current_status?: string
   technician_name?: string
   materials_used?: OsExecutionReportMaterialItem[]
+  extra_hours?: OsExecutionReportExtraHours[]
   observations?: string
   photos?: string[]
   photos_meta?: OsExecutionReportPhotoMeta[]

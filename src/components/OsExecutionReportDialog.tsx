@@ -40,6 +40,7 @@ import type {
   QuoteRecord,
   OsExecutionReportRecord,
   OsExecutionReportMaterialItem,
+  OsExecutionReportExtraHours,
   OsExecutionReportPhotoMeta,
 } from '@/types/crm'
 import { osExecutionReportsService, getReportPhotoUrl } from '@/services/os-execution-reports'
@@ -87,6 +88,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
   const [exchangerCurrentStatus, setExchangerCurrentStatus] = useState<string>('')
   const [technicianName, setTechnicianName] = useState<string>('')
   const [materials, setMaterials] = useState<OsExecutionReportMaterialItem[]>([])
+  const [extraHours, setExtraHours] = useState<OsExecutionReportExtraHours[]>([])
   const [observations, setObservations] = useState<string>('')
   const [photos, setPhotos] = useState<PhotoItem[]>([])
   const [removedExistingPhotoNames, setRemovedExistingPhotoNames] = useState<string[]>([])
@@ -151,6 +153,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
         ? rec.materials_used
         : buildDefaultMaterials(serviceOrder!, quote),
     )
+    setExtraHours(Array.isArray(rec.extra_hours) ? rec.extra_hours : [])
     setObservations(rec.observations || '')
     setRemovedExistingPhotoNames([])
 
@@ -199,6 +202,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
 
     setTechnicianName(so.assigned_to || defaultTechnicianName)
     setMaterials(buildDefaultMaterials(so, q))
+    setExtraHours([])
     setPhotos([])
     setRemovedExistingPhotoNames([])
     setObservations(
@@ -228,7 +232,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
 
     // 2. Peças e materiais customizados da proposta
     if (q?.materials_items && Array.isArray(q.materials_items)) {
-      q.materials_items.forEach((m, idx) => {
+      q.materials_items.forEach((m, idx) => 2 {
         list.push({
           id: `mat-${idx}`,
           description: m.description || 'Peça / Componente de Reposição',
@@ -289,6 +293,35 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
 
   const handleRemoveMaterial = (index: number) => {
     setMaterials((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // Horas extras (custo real de mão de obra adicional)
+  const handleAddExtraHour = () => {
+    setExtraHours((prev) => [
+      ...prev,
+      {
+        id: `extra-${Date.now()}`,
+        description: '',
+        hours: 1,
+        total_cost: 0,
+      },
+    ])
+  }
+
+  const handleUpdateExtraHour = (
+    index: number,
+    field: keyof OsExecutionReportExtraHours,
+    value: any,
+  ) => {
+    setExtraHours((prev) => {
+      const copy = [...prev]
+      copy[index] = { ...copy[index], [field]: value }
+      return copy
+    })
+  }
+
+  const handleRemoveExtraHour = (index: number) => {
+    setExtraHours((prev) => prev.filter((_, i) => i !== index))
   }
 
   // Manipulação de Fotos
@@ -395,6 +428,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
         exchanger_current_status: exchangerCurrentStatus,
         technician_name: technicianName,
         materials_used: JSON.stringify(materials),
+        extra_hours: JSON.stringify(extraHours),
         observations: observations,
         created_by: technicianName,
         photos_meta: JSON.stringify(photosMeta),
@@ -744,7 +778,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
               <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
                 <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
                   <Layers className="h-4 w-4 text-teal-600" />
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-8 dark:text-slate-200">
                     2. Equipamento & Status Atual do Trocador
                   </h3>
                 </div>
@@ -838,7 +872,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                       <ImageIcon className="h-5 w-5" />
                     </div>
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
-                      Nenhuma foto adicionada
+                      Nenhuma foto grid adicionada
                     </span>
                     <span className="text-[11px] text-muted-foreground block mt-0.5">
                       Clique aqui para selecionar fotos do dispositivo (JPG, PNG ou WEBP)
@@ -952,11 +986,25 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                         />
                       </div>
 
+                      <div className="w-28">
+                        <Input
+                          type="number"
+                          step="any"
+                          placeholder="Custo un. (R$)"
+                          value={mat.unit_cost ?? ''}
+                          onChange={(e) =>
+                            handleUpdateMaterial(index, 'unit_cost', e.target.value)
+                          }
+                          className="text-xs h-8 text-center bg-white dark:bg-slate-900 font-mono"
+                        />
+                      </div>
+
                       <div className="flex-1">
                         <Input
                           placeholder="Obs / Lote / Aplicação (opcional)"
                           value={mat.notes || ''}
-                          onChange={(e) => handleUpdateMaterial(index, 'notes', e.target.value)}
+                          onChange={(e) => handleUpdateMaterial(index, 'notes', e.target.value)
+                          }
                           className="text-xs h-8 bg-white dark:bg-slate-900"
                         />
                       </div>
@@ -982,12 +1030,100 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                 </div>
               </div>
 
-              {/* Card 4: Campo de Observações Livres */}
+              {/* Card 4: Horas Extras (custo real de mão de obra) */}
+              <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-teal-600" />
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                      4. Horas Extras & Mão de Obra Adicional
+                    </h3>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleAddExtraHour}
+                    className="text-[11px] h-7 px-2 text-teal-700 dark:text-teal-400 border-teal-300 dark:border-teal-800"
+                  >
+                    <Plus className="h-3 w-3 mr-1" /> Adicionar Horas
+                  </Button>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  Registre horas extras ou mão de obra adicional usada nesta execução (sábado,
+                  domingo, feriado, turno noturno, terceirizado). O valor lançado entra no custo
+                  real da OS.
+                </p>
+
+                <div className="space-y-2">
+                  {extraHours.map((eh, index) => (
+                    <div
+                      key={eh.id || index}
+                      className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+                    >
+                      <div className="flex-1">
+                        <Input
+                          placeholder="Descrição (ex: Sábado — desmontagem adicional)"
+                          value={eh.description}
+                          onChange={(e) =>
+                            handleUpdateExtraHour(index, 'description', e.target.value)
+                          }
+                          className="text-xs h-8 bg-white dark:bg-slate-900"
+                        />
+                      </div>
+
+                      <div className="w-24">
+                        <Input
+                          type="number"
+                          step="any"
+                          placeholder="Horas"
+                          value={eh.hours ?? ''}
+                          onChange={(e) => handleUpdateExtraHour(index, 'hours', e.target.value)}
+                          className="text-xs h-8 text-center bg-white dark:bg-slate-900 font-mono"
+                        />
+                      </div>
+
+                      <div className="w-28">
+                        <Input
+                          type="number"
+                          step="any"
+                          placeholder="Valor total (R$)"
+                          value={eh.total_cost ?? ''}
+                          onChange={(e) =>
+                            handleUpdateExtraHour(index, 'total_cost', e.target.value)
+                          }
+                          className="text-xs h-8 text-center bg-white dark:bg-slate-900 font-mono"
+                        />
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveExtraHour(index)}
+                        className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                        title="Remover"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  {extraHours.length === 0 && (
+                    <div className="p-4 text-center text-xs text-muted-foreground border border-dashed rounded-lg">
+                      Nenhuma hora extra lançada. Clique em "Adicionar Horas" acima se houver.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Card 5: Campo de Observações Livres */}
               <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-2">
                 <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-2">
                   <FileText className="h-4 w-4 text-teal-600" />
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
-                    4. Observações Gerais da Execução
+                    5. Observações Gerais da Execução
                   </h3>
                 </div>
 
@@ -1242,6 +1378,7 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                       <th className="p-2.5">Descrição do Insumo / Material</th>
                       <th className="p-2.5 text-center w-24">Quantidade</th>
                       <th className="p-2.5 text-center w-20">Unidade</th>
+                      <th className="p-2.5 text-center w-24">Custo (R$)</th>
                       <th className="p-2.5">Observações / Destinação</th>
                     </tr>
                   </thead>
@@ -1258,12 +1395,21 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                           {mat.quantity}
                         </td>
                         <td className="p-2.5 text-center text-slate-600">{mat.unit || 'un'}</td>
+                        <td className="p-2.5 text-center font-mono text-slate-700">
+                          {mat.unit_cost !== undefined &&
+                          mat.unit_cost !== null &&
+                          String(mat.unit_cost) !== ''
+                            ? Number(mat.unit_cost).toLocaleString('pt-BR', {
+                                minimumFractionDigits: 2,
+                              })
+                            : '—'}
+                        </td>
                         <td className="p-2.5 text-slate-600 text-[11px]">{mat.notes || '—'}</td>
                       </tr>
                     ))}
                     {materials.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="p-4 text-center text-slate-500 italic">
+                        <td colSpan={6} className="p-4 text-center text-slate-500 italic">
                           Nenhum insumo específico registrado.
                         </td>
                       </tr>
@@ -1271,6 +1417,50 @@ export const OsExecutionReportDialog: React.FC<OsExecutionReportDialogProps> = (
                   </tbody>
                 </table>
               </div>
+
+              {/* Horas Extras / Mão de Obra Adicional */}
+              {extraHours.length > 0 && (
+                <div className="report-print-card space-y-1.5 border border-slate-200 rounded-xl p-4 bg-white">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-teal-700" />
+                    Horas Extras & Mão de Obra Adicional
+                  </span>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px] border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-left">
+                          <th className="p-1.5 w-8 text-center">Item</th>
+                          <th className="p-1.5">Descrição</th>
+                          <th className="p-1.5 text-center w-20">Horas</th>
+                          <th className="p-1.5 text-right w-28">Valor (R$)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {extraHours.map((eh, idx) => (
+                          <tr key={idx}>
+                            <td className="p-1.5 text-center font-mono text-slate-500">{idx + 1}</td>
+                            <td className="p-1.5 font-medium text-slate-800">
+                              {eh.description || '—'}
+                            </td>
+                            <td className="p-1.5 text-center font-mono text-slate-700">
+                              {eh.hours ?? '—'}
+                            </td>
+                            <td className="p-1.5 text-right font-mono text-slate-700">
+                              {eh.total_cost !== undefined &&
+                              eh.total_cost !== null &&
+                              String(eh.total_cost) !== ''
+                                ? Number(eh.total_cost).toLocaleString('pt-BR', {
+                                    minimumFractionDigits: 2,
+                                  })
+                                : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
 
               {/* Observações Gerais */}
               {observations && (
