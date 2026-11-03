@@ -847,13 +847,16 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             const completedItems = [
               ...serviceOrders.map((so) => {
                 const finalPrice = resolveServiceOrderLiveValue(so, quotes)
+                // Custo real apenas: OS.internal_cost ou composição direta da proposta.
+                // Sem custo informado = "custo não informado" (fora da margem média).
                 const internalCost =
                   Number(so.internal_cost) ||
                   (so.technical_details?.service_composition?.directCostsTotal
                     ? Number(so.technical_details.service_composition.directCostsTotal)
-                    : Math.round(finalPrice * 0.65 * 100) / 100)
-                const grossProfit = finalPrice - internalCost
-                const realMargin = finalPrice > 0 ? (grossProfit / finalPrice) * 100 : 0
+                    : 0)
+                const hasCost = internalCost > 0
+                const grossProfit = hasCost ? finalPrice - internalCost : 0
+                const realMargin = hasCost && finalPrice > 0 ? (grossProfit / finalPrice) * 100 : 0
                 return {
                   id: so.id,
                   code: so.order_number,
@@ -861,6 +864,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                   client: so.client_name || 'Cliente Industrial',
                   finalPrice,
                   internalCost,
+                  hasCost,
                   grossProfit,
                   realMargin: Math.round(realMargin * 10) / 10,
                   status: so.status,
@@ -878,13 +882,15 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 )
                 .map((q) => {
                   const finalPrice = getQuoteNumericValue(q)
+                  // Custo real apenas: composição direta ou total_cost da proposta.
+                  // Sem custo informado = "custo não informado" (fora da margem média).
                   const internalCost =
                     Number(q.service_details?.service_composition?.directCostsTotal) ||
-                    (Number(q.total_cost) > 0
-                      ? Number(q.total_cost)
-                      : Math.round(finalPrice * 0.62 * 100) / 100)
-                  const grossProfit = finalPrice - internalCost
-                  const realMargin = finalPrice > 0 ? (grossProfit / finalPrice) * 100 : 0
+                    (Number(q.total_cost) > 0 ? Number(q.total_cost) : 0)
+                  const hasCost = internalCost > 0
+                  const grossProfit = hasCost ? finalPrice - internalCost : 0
+                  const realMargin =
+                    hasCost && finalPrice > 0 ? (grossProfit / finalPrice) * 100 : 0
                   return {
                     id: q.id,
                     code: q.quote_number,
@@ -892,6 +898,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                     client: q.client_name || 'Cliente Industrial',
                     finalPrice,
                     internalCost,
+                    hasCost,
                     grossProfit,
                     realMargin: Math.round(realMargin * 10) / 10,
                     status: 'approved',
@@ -901,35 +908,59 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             ]
 
             const totalRevenue = completedItems.reduce((acc, it) => acc + it.finalPrice, 0)
-            const totalCost = completedItems.reduce((acc, it) => acc + it.internalCost, 0)
-            const totalProfit = totalRevenue - totalCost
-            const averageMargin = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0
+            // Custos e lucro só dos itens COM custo informado (regra do Alex: sem estimativa)
+            const itemsWithCost = completedItems.filter((it) => it.hasCost)
+            const totalCost = itemsWithCost.reduce((acc, it) => acc + it.internalCost, 0)
+            const totalProfit = itemsWithCost.reduce((acc, it) => acc + it.grossProfit, 0)
+            const costInformedRevenue = itemsWithCost.reduce((acc, it) => acc + it.finalPrice, 0)
+            const averageMargin =
+              costInformedRevenue > 0 ? (totalProfit / costInformedRevenue) * 100 : 0
+            const costCoverage =
+              totalRevenue > 0
+                ? Math.round((itemsWithCost.length / completedItems.length) * 100)
+                : 0
 
             // Ordenar por mais rentáveis
             const topProfitable = [...completedItems].sort((a, b) => b.realMargin - a.realMargin)
 
-            // Agrupamento por período (Mês/Trimestre) para gráfico comparativo
-            const monthlyData = [
-              { month: 'Nov/24', billed: totalRevenue * 0.22, cost: totalCost * 0.22, margin: 34 },
-              {
-                month: 'Dez/24',
-                billed: totalRevenue * 0.28,
-                cost: totalCost * 0.27,
-                margin: 36.5,
-              },
-              {
-                month: 'Jan/25',
-                billed: totalRevenue * 0.24,
-                cost: totalCost * 0.25,
-                margin: 33.2,
-              },
-              {
-                month: 'Fev/25',
-                billed: totalRevenue * 0.26,
-                cost: totalCost * 0.26,
-                margin: 38.1,
-              },
-            ]
+            // Agrupamento mês a mês com dados REAIS (OSs + propostas aprovadas do período)
+            const monthlyMap = new Map<
+              string,
+              { billed: number; cost: number; costRevenue: number; hasCostCount: number }
+            >()
+            for (const it of completedItems) {
+              const d = it.date
+              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+              const cur = monthlyMap.get(key) || {
+                billed: 0,
+                cost: 0,
+                costRevenue: 0,
+                hasCostCount: 0,
+              }
+              cur.billed += it.finalPrice
+              if (it.hasCost) {
+                cur.cost += it.internalCost
+                cur.costRevenue += it.finalPrice
+                cur.hasCostCount += 1
+              }
+              monthlyMap.set(key, cur)
+            }
+            const monthlyData = [...monthlyMap.entries()]
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([key, v]) => {
+                const [year, month] = key.split('-').map(Number)
+                const label = `${['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][month - 1]}/${String(year).slice(2)}`
+                return {
+                  month: label,
+                  billed: v.billed,
+                  cost: v.cost,
+                  margin:
+                    v.costRevenue > 0
+                      ? Math.round(((v.costRevenue - v.cost) / v.costRevenue) * 1000) / 10
+                      : 0,
+                  hasCost: v.hasCostCount > 0,
+                }
+              })
 
             return (
               <div className="space-y-6">
@@ -967,15 +998,31 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-xl font-bold text-rose-700 dark:text-rose-400">
-                        {totalCost.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        MO + Deslocamento + Hospedagem + Peças
-                      </p>
+                      {completedItems.length > 0 && itemsWithCost.length === 0 ? (
+                        <>
+                          <div className="text-xl font-bold text-slate-400 dark:text-slate-500">
+                            Custo não informado
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Nenhuma OS ou proposta com custo direto registrado no período
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-xl font-bold text-rose-700 dark:text-rose-400">
+                            {totalCost.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            MO + Deslocamento + Hospedagem + Peças
+                            {completedItems.length > itemsWithCost.length
+                              ? ` · ${completedItems.length - itemsWithCost.length} sem custo informado`
+                              : ''}
+                          </p>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -989,15 +1036,28 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
-                        {totalProfit.toLocaleString('pt-BR', {
-                          style: 'currency',
-                          currency: 'BRL',
-                        })}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        Margem nominal retida pela empresa
-                      </p>
+                      {completedItems.length > 0 && itemsWithCost.length === 0 ? (
+                        <>
+                          <div className="text-xl font-bold text-slate-400 dark:text-slate-500">
+                            Custo não informado
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Lucro real depende do custo direto de cada serviço
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400">
+                            {totalProfit.toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Margem nominal retida pela empresa
+                          </p>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -1011,12 +1071,27 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-xl font-bold text-indigo-700 dark:text-indigo-400">
-                        {averageMargin.toFixed(1)}%
-                      </div>
-                      <p className="text-[11px] text-emerald-600 font-semibold mt-1">
-                        Meta operacional atingida (Acima de 25%)
-                      </p>
+                      {completedItems.length > 0 && itemsWithCost.length === 0 ? (
+                        <>
+                          <div className="text-xl font-bold text-slate-400 dark:text-slate-500">
+                            —
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Custo não informado nos serviços do período
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-xl font-bold text-indigo-700 dark:text-indigo-400">
+                            {averageMargin.toFixed(1)}%
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            {costCoverage < 100
+                              ? `Margem só dos ${itemsWithCost.length} itens com custo informado (${costCoverage}% do total)`
+                              : 'Meta operacional atingida (Acima de 25%)'}
+                          </p>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                 </div>
@@ -1036,7 +1111,9 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                           </CardDescription>
                         </div>
                         <Badge variant="outline" className="text-[10px] text-teal-700 font-mono">
-                          Média Margem: {averageMargin.toFixed(1)}%
+                          {itemsWithCost.length > 0
+                            ? `Média Margem: ${averageMargin.toFixed(1)}%`
+                            : 'Custo não informado'}
                         </Badge>
                       </div>
                     </CardHeader>
@@ -1065,14 +1142,24 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                                     })}
                                   </span>
                                   <span className="text-rose-600 dark:text-rose-400">
-                                    Custo:{' '}
-                                    {m.cost.toLocaleString('pt-BR', {
-                                      style: 'currency',
-                                      currency: 'BRL',
-                                    })}
+                                    {m.hasCost ? (
+                                      <>
+                                        Custo:{' '}
+                                        {m.cost.toLocaleString('pt-BR', {
+                                          style: 'currency',
+                                          currency: 'BRL',
+                                        })}
+                                      </>
+                                    ) : (
+                                      'Custo não informado'
+                                    )}
                                   </span>
-                                  <Badge className="bg-emerald-600 text-white text-[9px] px-1.5 py-0">
-                                    {m.margin}% Margem
+                                  <Badge
+                                    className={`text-white text-[9px] px-1.5 py-0 ${
+                                      m.hasCost ? 'bg-emerald-600' : 'bg-slate-400'
+                                    }`}
+                                  >
+                                    {m.hasCost ? `${m.margin}% Margem` : 'Sem custo'}
                                   </Badge>
                                 </div>
                               </div>
@@ -1146,16 +1233,33 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                             </div>
 
                             <div className="text-right space-y-0.5">
-                              <div className="font-bold text-emerald-700 dark:text-emerald-400 text-xs">
-                                +{item.realMargin}%
-                              </div>
-                              <span className="text-[10px] text-slate-500 block">
-                                Lucro:{' '}
-                                {item.grossProfit.toLocaleString('pt-BR', {
-                                  style: 'currency',
-                                  currency: 'BRL',
-                                })}
-                              </span>
+                              {item.hasCost ? (
+                                <>
+                                  <div className="font-bold text-emerald-700 dark:text-emerald-400 text-xs">
+                                    +{item.realMargin}%
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 block">
+                                    Lucro:{' '}
+                                    {item.grossProfit.toLocaleString('pt-BR', {
+                                      style: 'currency',
+                                      currency: 'BRL',
+                                    })}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="font-bold text-slate-400 dark:text-slate-500 text-xs">
+                                    Custo não informado
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 block">
+                                    Cobrado:{' '}
+                                    {item.finalPrice.toLocaleString('pt-BR', {
+                                      style: 'currency',
+                                      currency: 'BRL',
+                                    })}
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
                         ))

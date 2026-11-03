@@ -233,6 +233,8 @@ export const serviceOrdersService = {
       /* intentionally ignored */
     }
 
+    const internalCost = Number(quote.total_cost) || 0
+
     const record = await pb.collection('service_orders').create<ServiceOrderRecord>({
       order_number: orderNumber,
       quote_id: quote.id,
@@ -244,6 +246,7 @@ export const serviceOrdersService = {
       priority: 'high',
       assigned_to: quote.assigned_to || 'Alex Nogueira - Especialista BERMO',
       total_value: quote.final_price || quote.total || 0,
+      internal_cost: internalCost,
       services: quote.items || [],
       technical_details: quote.service_details || {},
       equipment_model: equipModel,

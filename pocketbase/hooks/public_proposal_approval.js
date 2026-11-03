@@ -237,6 +237,9 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
           quoteRecord.getFloat('subtotal') ||
           0
         existingSO.set('total_value', consolidatedVal)
+        // Custo direto total da proposta → custo interno da OS (fonte única de margem real)
+        const consolidatedCost = quoteRecord.getFloat('total_cost') || 0
+        existingSO.set('internal_cost', consolidatedCost)
         existingSO.set(
           'client_name',
           quoteRecord.getString('client_name') || existingSO.getString('client_name'),
@@ -277,6 +280,8 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
         // Como a proposta foi aprovada pelo cliente, a OS inicia no fluxo
         so.set('status', 'vistoria')
         so.set('total_value', consolidatedVal)
+        // Custo direto total da proposta → custo interno da OS (fonte única de margem real)
+        so.set('internal_cost', quoteRecord.getFloat('total_cost') || 0)
         so.set('priority', 'high')
         so.set(
           'assigned_to',
