@@ -92,7 +92,10 @@ export function LeanEquipmentCard({
             </label>
             <Input
               value={eq.serialNumber}
-              onChange={(e) => handleUpdateEquipment(eq.id, { serialNumber: e.target.value })}
+              onChange={(e) => {
+                markFieldAsManuallyEdited(eq.id, 'serialNumber')
+                handleUpdateEquipment(eq.id, { serialNumber: e.target.value })
+              }}
               placeholder="Ex.: 30105-884"
               className={`h-10 text-xs bg-slate-50/70 dark:bg-slate-950 ${fieldHighlight.highlightClass(eq, 'serialNumber', eq.serialNumber)}`}
             />

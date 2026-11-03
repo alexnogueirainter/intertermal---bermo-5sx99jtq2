@@ -93,7 +93,10 @@ export function DetailedEquipmentCard({
             </label>
             <Input
               value={item.model}
-              onChange={(e) => handleUpdateEquipment(item.id, { model: e.target.value })}
+              onChange={(e) => {
+                markFieldAsManuallyEdited(item.id, 'model')
+                handleUpdateEquipment(item.id, { model: e.target.value })
+              }}
               placeholder="Ex.: BP 60 B"
               className={`h-10 text-xs bg-slate-50/70 dark:bg-slate-950 ${fieldHighlight.highlightClass(item, 'model', item.model)}`}
             />
@@ -113,7 +116,10 @@ export function DetailedEquipmentCard({
             </label>
             <Input
               value={item.serialNumber}
-              onChange={(e) => handleUpdateEquipment(item.id, { serialNumber: e.target.value })}
+              onChange={(e) => {
+                markFieldAsManuallyEdited(item.id, 'serialNumber')
+                handleUpdateEquipment(item.id, { serialNumber: e.target.value })
+              }}
               placeholder="Ex.: 30105-884"
               className={`h-10 text-xs bg-slate-50/70 dark:bg-slate-950 ${fieldHighlight.highlightClass(item, 'serialNumber', item.serialNumber)}`}
             />
@@ -190,7 +196,10 @@ export function DetailedEquipmentCard({
             </label>
             <Input
               value={item.tag || ''}
-              onChange={(e) => handleUpdateEquipment(item.id, { tag: e.target.value })}
+              onChange={(e) => {
+                markFieldAsManuallyEdited(item.id, 'tag')
+                handleUpdateEquipment(item.id, { tag: e.target.value })
+              }}
               placeholder="Ex.: TQ-101 / TC-01"
               className={`h-10 text-xs bg-slate-50/70 dark:bg-slate-950 ${fieldHighlight.highlightClass(item, 'tag', item.tag)}`}
             />
@@ -214,7 +223,12 @@ export function DetailedEquipmentCard({
           fieldHighlight={fieldHighlight}
         />
 
-        <DetailedSpecRows item={item} handleUpdateEquipment={handleUpdateEquipment} />
+        <DetailedSpecRows
+          item={item}
+          handleUpdateEquipment={handleUpdateEquipment}
+          markFieldAsManuallyEdited={markFieldAsManuallyEdited}
+          fieldHighlight={fieldHighlight}
+        />
         {/* Grau de dificuldade (Apenas condições físicas do local de instalação) */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
