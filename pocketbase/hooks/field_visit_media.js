@@ -6,30 +6,8 @@
  * - IDEMPOTENTE por client_media_id: reenvio do mesmo arquivo NÃO duplica (devolve o existente).
  * - Modo vendedor: valida token ativo + aparelho vinculado (mesma régua do submit).
  * - O celular guarda só a referência; o arquivo mora aqui (coleção field_visit_media).
+ * NOTA JSVM: toda a lógica vive DENTRO dos callbacks (sem funções top-level).
  */
-
-function validateMediaToken(e, token, deviceId) {
-  if (!token) return null // modo interno (logado): sem token, segue aberto como o resto do CRM
-  let rec = null
-  try {
-    rec = $app.findFirstRecordByFilter('field_visit_tokens', 'token = {:t} && active = true', {
-      t: token,
-    })
-  } catch (_) {
-    rec = null
-  }
-  if (!rec) {
-    e.json(403, { ok: false, error: 'invalid_token' })
-    return null
-  }
-  const boundDevice = String(rec.get('device_id') || '')
-  if (boundDevice && deviceId && boundDevice !== deviceId) {
-    console.warn('[visita-media] APARELHO NAO AUTORIZADO | ip=' + e.request.remoteAddr)
-    e.json(403, { ok: false, error: 'device_not_authorized' })
-    return null
-  }
-  return rec
-}
 
 routerAdd('POST', '/backend/v1/field-visits/media/upload', (e) => {
   const body = e.requestInfo().body || {}
@@ -43,8 +21,27 @@ routerAdd('POST', '/backend/v1/field-visits/media/upload', (e) => {
 
   if (!clientMediaId) return e.json(400, { ok: false, error: 'missing_client_media_id' })
 
-  const seller = validateMediaToken(e, token, deviceId)
-  if (seller === null && token) return // resposta de erro já enviada
+  // Validação de token do vendedor (inline — JSVM não acessa funções top-level)
+  let sellerName = ''
+  if (token) {
+    let rec = null
+    try {
+      rec = $app.findFirstRecordByFilter('field_visit_tokens', 'token = {:t} && active = true', {
+        t: token,
+      })
+    } catch (_) {
+      rec = null
+    }
+    if (!rec) {
+      return e.json(403, { ok: false, error: 'invalid_token' })
+    }
+    const boundDevice = String(rec.get('device_id') || '')
+    if (boundDevice && deviceId && boundDevice !== deviceId) {
+      console.warn('[visita-media] APARELHO NAO AUTORIZADO | ip=' + e.request.remoteAddr)
+      return e.json(403, { ok: false, error: 'device_not_authorized' })
+    }
+    sellerName = String(rec.get('seller_name') || '')
+  }
 
   const uploaded = e.findUploadedFiles('file') || []
   if (uploaded.length === 0) return e.json(400, { ok: false, error: 'missing_file' })
@@ -91,12 +88,14 @@ routerAdd('POST', '/backend/v1/field-visits/media/upload', (e) => {
       size +
       ' | visit=' +
       clientVisitId +
+      ' | seller=' +
+      sellerName +
       ' | ip=' +
       e.request.remoteAddr,
   )
 
-  // Se a visita ja foi enviada ao CRM, injeta o caminho do arquivo nos anexos
-  // do registro (fecha o ciclo quando a midia sobe DEPOIS do submit).
+  // Se a visita já foi enviada ao CRM, injeta o caminho do arquivo nos anexos
+  // do registro (fecha o ciclo quando a mídia sobe DEPOIS do submit).
   if (clientVisitId) {
     try {
       const v = $app.findFirstRecordByFilter('field_visits', 'client_visit_id = {:c}', {
@@ -125,8 +124,8 @@ routerAdd('POST', '/backend/v1/field-visits/media/upload', (e) => {
       const eq = v.get('equipment')
       if (Array.isArray(eq)) {
         const eqCopy = JSON.parse(JSON.stringify(eq))
-        for (const e of eqCopy) {
-          if (e && Array.isArray(e.attachments)) fixAtts(e.attachments)
+        for (const eqi of eqCopy) {
+          if (eqi && Array.isArray(eqi.attachments)) fixAtts(eqi.attachments)
         }
         if (touched) v.set('equipment', eqCopy)
       }
@@ -151,8 +150,21 @@ routerAdd('DELETE', '/backend/v1/field-visits/media/delete', (e) => {
 
   if (!clientMediaId) return e.json(400, { ok: false, error: 'missing_client_media_id' })
 
-  const seller = validateMediaToken(e, token, deviceId)
-  if (seller === null && token) return
+  if (token) {
+    let recTok = null
+    try {
+      recTok = $app.findFirstRecordByFilter('field_visit_tokens', 'token = {:t} && active = true', {
+        t: token,
+      })
+    } catch (_) {
+      recTok = null
+    }
+    if (!recTok) return e.json(403, { ok: false, error: 'invalid_token' })
+    const boundDevice = String(recTok.get('device_id') || '')
+    if (boundDevice && deviceId && boundDevice !== deviceId) {
+      return e.json(403, { ok: false, error: 'device_not_authorized' })
+    }
+  }
 
   let rec = null
   try {
