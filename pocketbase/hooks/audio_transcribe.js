@@ -27,6 +27,12 @@ routerAdd('POST', '/backend/v1/audio/transcribe', (e) => {
   }
   if (!gatewayUrl) gatewayUrl = $os.getenv('SKIP_AI_GATEWAY_URL') || ''
   if (!gatewayKey) gatewayKey = $os.getenv('SKIP_AI_GATEWAY_API_KEY') || ''
+  console.log(
+    '[audio_transcribe] gateway configurado: ' +
+      (gatewayUrl ? 'sim' : 'NAO') +
+      ' | key: ' +
+      (gatewayKey ? 'sim' : 'NAO'),
+  )
 
   // 1. Tenta obter arquivo multipart "file" ou "audio".
   // Body JSON (fallback base64) NÃO pode quebrar a rota no findUploadedFiles.
@@ -70,6 +76,12 @@ routerAdd('POST', '/backend/v1/audio/transcribe', (e) => {
             source: 'whisper_gateway',
           })
         }
+        console.log(
+          '[audio_transcribe] gateway status inesperado: ' +
+            res.statusCode +
+            ' | body: ' +
+            JSON.stringify(res.json || {}).slice(0, 300),
+        )
       } catch (err) {
         console.log('[audio_transcribe] gateway upload error: ' + err)
       }
