@@ -276,7 +276,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
             'x-goog-api-key': geminiKey,
           },
           body: JSON.stringify(geminiPayload),
-          timeout: 45,
+          timeout: 50,
         })
         if (gRes.statusCode === 200 && gRes.json) {
           const gText =
