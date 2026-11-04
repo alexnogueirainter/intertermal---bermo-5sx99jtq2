@@ -504,13 +504,10 @@ export async function readNameplateFromImage(
         clientOcrText: payload.clientOcrText || payload.ocrText,
         ocrText: payload.clientOcrText || payload.ocrText,
         context: payload.context,
-        // Envia image/imageUrl apenas se não houver clientOcrText (ou se explicitamente fornecido)
-        ...(payload.clientOcrText
-          ? {}
-          : {
-              image: payload.imageDataUrl,
-              imageUrl: payload.imageUrl,
-            }),
+        // Envia SEMPRE a imagem quando disponível: o backend usa como fallback de
+        // visão (Gemini) quando o OCR do navegador não produz dados úteis
+        image: payload.imageDataUrl,
+        imageUrl: payload.imageUrl,
       }),
     })
     return res as any
