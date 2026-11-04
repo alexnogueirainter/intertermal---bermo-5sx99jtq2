@@ -2,12 +2,16 @@
  * Utilitário de OCR no cliente para placas de identificação industriais (BERMO, Alfa Laval, etc.)
  *
  * Inclui:
- * 1. Pré-processamento multi-variante via Canvas:
+ * 1. Pré-processamento multi-variante via Canvas, focado em TEXTO GRAVADO EM RELEVO:
  *    - Variante A: Alto contraste + normalização/estiramento de histograma
  *    - Variante B: Binarização adaptativa (Otsu / threshold local) para gravação em baixo relevo e reflexos metálicos
  *    - Variante C: Inversão / negativo para plaquetas com fundo escuro / anodizado
+ *    - Variante D: Limiar adaptativo local (luz desigual/sombra na placa) via imagem integral
+ *    - Variante E: Nitidez (unsharp mask) + estiramento — recupera gravação rasa e pouco contrastada
  * 2. Reconhecimento óptico com Tesseract.js avaliando as variantes:
  *    - Seleciona a variante com maior confiança média (limiar ~70%)
+ *    - Modo de página esparso (PSM 11) na melhor variante quando a leitura em bloco falha —
+ *      plaquetas são TABELAS com rótulos espalhados, não um parágrafo corrido
  *    - Se nenhuma atingir 70%, combina linhas únicas entre as variantes
  *    - Callbacks contínuos de progresso mantidos
  * 3. Sanitização do texto extraído para envio ao backend
@@ -54,10 +58,9 @@ function calculateOtsuThreshold(histogram: number[], totalPixels: number): numbe
     wF = totalPixels - wB
     if (wF === 0) break
 
-    sumB += t * histogram[t]
+    sumB += t * histogram[wB ? t : t]
     const mB = sumB / wB
-    const mF = (sum - sumB) / wF
-
+    const mF = wF > 0 ? (sum - sumB) / wF : 0
     // Variância inter-classes
     const variance = wB * wF * (mB - mF) * (mB - mF)
     if (variance > maxVariance) {
@@ -69,13 +72,15 @@ function calculateOtsuThreshold(histogram: number[], totalPixels: number): numbe
   return threshold
 }
 
-export type PreprocessVariant = 'contrast' | 'binarized' | 'inverted'
+export type PreprocessVariant = 'contrast' | 'binarized' | 'inverted' | 'adaptive' | 'sharpened'
 
 /**
  * Pré-processa a imagem da placa em um canvas de acordo com a variante escolhida:
  * - 'contrast': Alto contraste + estiramento de histograma
  * - 'binarized': Binarização adaptativa Otsu
  * - 'inverted': Negativo / inversão para placas escuras
+ * - 'adaptive': Limiar adaptativo local (janela via imagem integral) — luz desigual/sombra
+ * - 'sharpened': Unsharp mask + estiramento de contraste — gravação rasa
  */
 export async function preprocessVariant(
   imageSrc: string,
@@ -90,8 +95,8 @@ export async function preprocessVariant(
     const naturalWidth = img.naturalWidth || img.width || 800
     const naturalHeight = img.naturalHeight || img.height || 600
 
-    // Fator de escala: ~2x, limitando dimensões máximas
-    const scale = Math.min(2.0, 3000 / Math.max(naturalWidth, naturalHeight))
+    // Fator de escala: ~2.5x (texto gravado é pequeno), limitando dimensões máximas
+    const scale = Math.min(2.5, 4000 / Math.max(naturalWidth, naturalHeight))
     const width = Math.max(200, Math.round(naturalWidth * Math.max(1, scale)))
     const height = Math.max(200, Math.round(naturalHeight * Math.max(1, scale)))
 
@@ -164,13 +169,90 @@ export async function preprocessVariant(
         data[i + 2] = val
       }
     } else if (variant === 'inverted') {
-      // Variante C: Negativo / Inversão para placas com fundo escuro ou anodizado
+      // Variante C: Negativo / Inversão para placas escuras ou gravação clara em fundo escuro
       for (let i = 0, p = 0; i < data.length; i += 4, p++) {
         const inv = 255 - grayData[p]
         // Leve aumento de contraste do negativo
         let g = (inv - 128) * 1.35 + 128
         if (g < 0) g = 0
         if (g > 255) g = 255
+        data[i] = g
+        data[i + 1] = g
+        data[i + 2] = g
+      }
+    } else if (variant === 'adaptive') {
+      // Variante D: Limiar adaptativo LOCAL (janela 32px via imagem integral).
+      // Resolve sombra/reflexo parcial na placa: o Otsu global falha quando metade
+      // da placa está iluminada e a outra em sombra.
+      const winR = 16
+      // Im integral (soma) em Float64Array — O(n)
+      const integral = new Float64Array((width + 1) * (height + 1))
+      for (let y = 0; y < height; y++) {
+        let rowSum = 0
+        for (let x = 0; x < width; x++) {
+          rowSum += grayData[y * width + x]
+          integral[(y + 1) * (width + 1) + (x + 1)] = integral[y * (width + 1) + (x + 1)] + rowSum
+        }
+      }
+      const bias = 10 // texto gravado é levemente mais escuro que o fundo local
+      for (let y = 0; y < height; y++) {
+        const y0 = Math.max(0, y - winR)
+        const y1 = Math.min(height - 1, y + winR)
+        for (let x = 0; x < width; x++) {
+          const x0 = Math.max(0, x - winR)
+          const x1 = Math.min(width - 1, x + winR)
+          const area = (x1 - x0 + 1) * (y1 - y0 + 1)
+          const s =
+            integral[(y1 + 1) * (width + 1) + (x1 + 1)] -
+            integral[y0 * (width + 1) + (x1 + 1)] -
+            integral[(y1 + 1) * (width + 1) + x0] +
+            integral[y0 * (width + 1) + x0]
+          const localMean = s / area
+          const val = grayData[y * width + x] < localMean - bias ? 0 : 255
+          const idx = (y * width + x) * 4
+          data[idx] = val
+          data[idx + 1] = val
+          data[idx + 2] = val
+        }
+      }
+    } else if (variant === 'sharpened') {
+      // Variante E: Unsharp mask 3x3 + estiramento de contraste.
+      // Recupera gravação rasa: realça bordas dos caracteres pouco marcados.
+      const blur = new Uint8Array(totalPixels)
+      // Blur 3x3 (box)
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          let s = 0
+          let n = 0
+          for (let dy = -1; dy <= 1; dy++) {
+            const yy = y + dy
+            if (yy < 0 || yy >= height) continue
+            for (let dx = -1; dx <= 1; dx++) {
+              const xx = x + dx
+              if (xx < 0 || xx >= width) continue
+              s += grayData[yy * width + xx]
+              n++
+            }
+          }
+          blur[y * width + x] = Math.round(s / n)
+        }
+      }
+      const amount = 1.6
+      let lo = 255
+      let hi = 0
+      const sharp = new Uint8Array(totalPixels)
+      for (let p = 0; p < totalPixels; p++) {
+        let v = Math.round(grayData[p] + amount * (grayData[p] - blur[p]))
+        if (v < 0) v = 0
+        if (v > 255) v = 255
+        sharp[p] = v
+        if (v < lo) lo = v
+        if (v > hi) hi = v
+      }
+      // Estiramento de contraste (percentis 2–98 aproximados por lo/hi)
+      const range = Math.max(1, hi - lo)
+      for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+        const g = Math.round(((sharp[p] - lo) / range) * 255)
         data[i] = g
         data[i + 1] = g
         data[i + 2] = g
@@ -225,8 +307,11 @@ function mergeOcrTexts(texts: string[]): string {
 }
 
 /**
- * Executa o OCR no cliente com Tesseract.js avaliando 3 variantes de pré-processamento
- * (A: Contraste, B: Binarização Otsu, C: Inversão) para máxima leitura em placas metálicas.
+ * Executa o OCR no cliente com Tesseract.js avaliando 5 variantes de pré-processamento
+ * (A: Contraste, B: Otsu, C: Inversão, D: Limiar adaptativo local, E: Nitidez) para máxima
+ * leitura em placas metálicas gravadas em relevo. Quando a leitura em bloco (PSM 6) falha,
+ * roda o modo esparso (PSM 11) na melhor variante — plaquetas são tabelas com rótulos
+ * espalhados, não um parágrafo corrido.
  */
 export async function runClientOcr(
   imageSrc: string,
@@ -238,20 +323,26 @@ export async function runClientOcr(
 
   onProgress?.({ status: 'Preparando filtros de imagem...', progress: 0.1 })
 
-  // Gera as 3 variantes de pré-processamento
-  let variantA = imageSrc
-  let variantB = imageSrc
-  let variantC = imageSrc
+  // Gera as variantes de pré-processamento
+  const variantSrcs: Record<PreprocessVariant, string> = {
+    contrast: imageSrc,
+    binarized: imageSrc,
+    inverted: imageSrc,
+    adaptive: imageSrc,
+    sharpened: imageSrc,
+  }
 
   try {
-    variantA = await preprocessVariant(imageSrc, 'contrast')
-    variantB = await preprocessVariant(imageSrc, 'binarized')
-    variantC = await preprocessVariant(imageSrc, 'inverted')
+    variantSrcs.contrast = await preprocessVariant(imageSrc, 'contrast')
+    variantSrcs.binarized = await preprocessVariant(imageSrc, 'binarized')
+    variantSrcs.inverted = await preprocessVariant(imageSrc, 'inverted')
+    variantSrcs.adaptive = await preprocessVariant(imageSrc, 'adaptive')
+    variantSrcs.sharpened = await preprocessVariant(imageSrc, 'sharpened')
   } catch (e) {
     console.warn('[client-ocr] Erro gerando variantes:', e)
   }
 
-  onProgress?.({ status: 'Inicializando motor OCR...', progress: 0.25 })
+  onProgress?.({ status: 'Inicializando motor OCR...', progress: 0.2 })
 
   try {
     const tesseractModule = await import('tesseract.js')
@@ -267,68 +358,111 @@ export async function runClientOcr(
             const pct = Math.round(rawProg * 100)
             onProgress?.({
               status: `Lendo caracteres na placa... ${pct}%`,
-              progress: 0.25 + rawProg * 0.65,
+              progress: 0.2 + rawProg * 0.7,
             })
           }
         },
       })
 
-      // 1. Executa primeira variante (Alto Contraste)
-      onProgress?.({ status: 'Lendo com filtro de alto contraste...', progress: 0.35 })
-      const resA = await worker.recognize(variantA)
-      const textA = (resA?.data?.text || '').trim()
-      const confA = typeof resA?.data?.confidence === 'number' ? resA.data.confidence : 0
+      const results: Array<{ name: string; text: string; conf: number }> = []
 
-      // Se a variante A tiver confiança muito boa (>= 70%) e texto substantivo, finaliza cedo
-      if (confA >= 70 && textA.length > 30) {
-        await worker.terminate()
-        onProgress?.({ status: 'Concluído', progress: 1.0 })
-        return { text: textA, confidence: confA, methodUsed: 'contrast_variant' }
+      const recognizeVariant = async (
+        name: string,
+        src: string,
+        psm: string,
+        progressFrom: number,
+        progressTo: number,
+      ): Promise<{ text: string; conf: number }> => {
+        try {
+          await worker.setParameters({ tessedit_pageseg_mode: psm })
+          onProgress?.({
+            status: name.startsWith('sparse')
+              ? 'Lendo rótulos espalhados da placa...'
+              : `Lendo com filtro ${name}...`,
+            progress: progressFrom,
+          })
+          const res = await worker.recognize(src)
+          const text = (res?.data?.text || '').trim()
+          const conf = typeof res?.data?.confidence === 'number' ? res.data.confidence : 0
+          results.push({ name, text, conf })
+          if (conf >= 70 && text.length > 30) {
+            onProgress?.({ status: 'Concluído', progress: 1.0 })
+            return { text, conf }
+          }
+          return { text, conf }
+        } catch (err: any) {
+          console.warn(`[client-ocr] Falha na variante ${name}:`, err?.message || err)
+          return { text: '', conf: 0 }
+        }
       }
 
-      // 2. Executa segunda variante (Binarização adaptativa Otsu)
-      onProgress?.({ status: 'Lendo com filtro de relevo metálico...', progress: 0.55 })
-      const resB = await worker.recognize(variantB)
-      const textB = (resB?.data?.text || '').trim()
-      const confB = typeof resB?.data?.confidence === 'number' ? resB.data.confidence : 0
-
-      if (confB >= 70 && textB.length > 30) {
+      // 1. Variante A (Alto Contraste) em bloco
+      const a = await recognizeVariant('contrast', variantSrcs.contrast, '6', 0.3, 0.4)
+      if (a.conf >= 70 && a.text.length > 30) {
         await worker.terminate()
-        onProgress?.({ status: 'Concluído', progress: 1.0 })
-        return { text: textB, confidence: confB, methodUsed: 'binarized_variant' }
+        return { text: a.text, confidence: a.conf, methodUsed: 'contrast_variant' }
       }
 
-      // 3. Executa terceira variante (Inversão para placas escuras)
-      onProgress?.({ status: 'Lendo com filtro de placa escura...', progress: 0.75 })
-      const resC = await worker.recognize(variantC)
-      const textC = (resC?.data?.text || '').trim()
-      const confC = typeof resC?.data?.confidence === 'number' ? resC.data.confidence : 0
+      // 2. Variante B (Otsu) em bloco
+      const b = await recognizeVariant('binarized', variantSrcs.binarized, '6', 0.4, 0.5)
+      if (b.conf >= 70 && b.text.length > 30) {
+        await worker.terminate()
+        return { text: b.text, confidence: b.conf, methodUsed: 'binarized_variant' }
+      }
+
+      // 3. Variante D (Limiar adaptativo local) em bloco — a mais promissora para relevo com sombra
+      const d = await recognizeVariant('adaptive', variantSrcs.adaptive, '6', 0.5, 0.6)
+      if (d.conf >= 70 && d.text.length > 30) {
+        await worker.terminate()
+        return { text: d.text, confidence: d.conf, methodUsed: 'adaptive_variant' }
+      }
+
+      // 4. Variante E (Nitidez) em bloco — gravação rasa
+      const e = await recognizeVariant('sharpened', variantSrcs.sharpened, '6', 0.6, 0.7)
+      if (e.conf >= 70 && e.text.length > 30) {
+        await worker.terminate()
+        return { text: e.text, confidence: e.conf, methodUsed: 'sharpened_variant' }
+      }
+
+      // 5. Variante C (Inversão) em bloco — placas escuras
+      const c = await recognizeVariant('inverted', variantSrcs.inverted, '6', 0.7, 0.8)
+      if (c.conf >= 70 && c.text.length > 30) {
+        await worker.terminate()
+        return { text: c.text, confidence: c.conf, methodUsed: 'inverted_variant' }
+      }
+
+      // 6. Modo esparso (PSM 11) na melhor variante até agora — plaquetas são tabelas
+      const ranked = [...results].sort((x, y) => y.conf - x.conf)
+      const bestName = ranked[0]?.name || 'contrast'
+      const bestSrc =
+        bestName === 'binarized'
+          ? variantSrcs.binarized
+          : bestName === 'adaptive'
+            ? variantSrcs.adaptive
+            : bestName === 'sharpened'
+              ? variantSrcs.sharpened
+              : bestName === 'inverted'
+                ? variantSrcs.inverted
+                : variantSrcs.contrast
+      const sparse = await recognizeVariant('sparse-' + bestName, bestSrc, '11', 0.8, 0.92)
+      if (sparse.conf >= 70 && sparse.text.length > 30) {
+        await worker.terminate()
+        return { text: sparse.text, confidence: sparse.conf, methodUsed: 'sparse_variant' }
+      }
 
       await worker.terminate()
 
-      // Escolhe a melhor ou consolida as linhas únicas se nenhuma atingir 70%
-      const variants = [
-        { name: 'contrast', text: textA, conf: confA },
-        { name: 'binarized', text: textB, conf: confB },
-        { name: 'inverted', text: textC, conf: confC },
-      ].sort((a, b) => b.conf - a.conf)
-
-      const best = variants[0]
-
-      // Se a melhor tiver confiança razoável (>= 70%), usa ela
-      if (best.conf >= 70 && best.text.length > 20) {
-        onProgress?.({ status: 'Concluído', progress: 1.0 })
-        return { text: best.text, confidence: best.conf, methodUsed: best.name }
-      }
-
-      // Caso contrário, consolida linhas únicas entre as variantes para capturar o máximo de dados
-      const consolidatedText = mergeOcrTexts([textA, textB, textC])
-      const averageConf = Math.round((confA + confB + confC) / 3)
+      // Nenhuma atingiu 70%: consolida linhas únicas entre TODAS as variantes
+      // (inclui o esparso, que costuma capturar rótulos isolados que o bloco perde)
+      const consolidatedText = mergeOcrTexts(results.map((r) => r.text))
+      const averageConf = Math.round(
+        results.reduce((s, r) => s + r.conf, 0) / Math.max(1, results.length),
+      )
 
       onProgress?.({ status: 'Concluído', progress: 1.0 })
       return {
-        text: consolidatedText || best.text,
-        confidence: Math.max(best.conf, averageConf),
+        text: consolidatedText || ranked[0]?.text || '',
+        confidence: Math.max(ranked[0]?.conf || 0, averageConf),
         methodUsed: 'consolidated_variants',
       }
     }
