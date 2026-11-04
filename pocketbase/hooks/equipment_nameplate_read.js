@@ -345,7 +345,8 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
         })
         if (agentRes && agentRes.content) {
           const parsed = parseJsonSafe(agentRes.content)
-          if (parsed && typeof parsed === 'object') {
+          // Mesmo guard do caminho 2: objeto válido porém vazio NÃO é sucesso
+          if (parsed && typeof parsed === 'object' && hasUsefulData(parsed)) {
             extractedData = parsed
             extractionMethod = 'native_agent'
           }
