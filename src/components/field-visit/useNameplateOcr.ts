@@ -66,6 +66,16 @@ export function useNameplateOcr({
         context: `Equipamento ${currentEq.name || ''} - Modelo atual: ${currentEq.model || 'vazio'}`,
       })
 
+      // Debug temporário: registra o que o backend devolveu (remover após validação)
+      ;(window as any).__ocrDebug = {
+        at: new Date().toISOString(),
+        ok: res.ok,
+        method: res.method,
+        msg: (res.message || '').slice(0, 120),
+        dataKeys: res.data ? Object.keys(res.data).length : 0,
+      }
+      console.log('[OCR-DEBUG] resposta do backend:', (window as any).__ocrDebug)
+
       if (res.ok && res.data) {
         // Disparado diretamente pelo evento da foto: aplica os dados extraídos sem diálogo bloqueante
         const comparison = compareAndMergeNameplateData(currentEq, res.data, photo.id)
@@ -184,6 +194,11 @@ export function useNameplateOcr({
         })
       }
     } catch (err: any) {
+      ;(window as any).__ocrDebug = {
+        at: new Date().toISOString(),
+        erro: String(err?.message || err).slice(0, 200),
+        status: err?.status,
+      }
       console.warn('Falha na leitura da plaqueta:', err)
       toast({
         title: 'Não foi possível ler a placa',
