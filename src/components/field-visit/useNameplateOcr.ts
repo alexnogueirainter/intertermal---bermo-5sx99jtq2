@@ -27,7 +27,12 @@ export function useNameplateOcr({
   const [targetOcrEquipment, setTargetOcrEquipment] = useState<EquipmentItem | null>(null)
   const handleTriggerNameplateOcr = async (equipmentId: string, photo: MediaAttachment) => {
     const currentEq = visit.equipments.find((e) => e.id === equipmentId)
-    if (!currentEq) return
+    if (!currentEq) return // Debug temporário: ids no gatilho (remover após validação)
+    ;(window as any).__ocrIds = {
+      at: new Date().toISOString(),
+      triggerId: equipmentId,
+      idsAtTrigger: visit.equipments.map((e) => e.id),
+    }
 
     setIsReadingNameplate(true)
     setNameplateReadingStatus('Lendo placa...')
@@ -84,7 +89,22 @@ export function useNameplateOcr({
         // Aplica diretamente ao equipamento usando setVisit((prev) => ...) reativo
         setVisit((prev) => {
           const freshCurrentEq = prev.equipments.find((e) => e.id === equipmentId)
-          if (!freshCurrentEq) return prev
+          if (!freshCurrentEq) {
+            console.warn(
+              '[OCR-DEBUG] equipamento não encontrado no setVisit',
+              equipmentId,
+              prev.equipments.map((e) => e.id),
+            )
+            ;(window as any).__ocrMerge = { aplicado: false, motivo: 'id não encontrado' }
+            return prev
+          }
+          ;(window as any).__ocrMerge = {
+            aplicado: true,
+            model: updatedEquipmentPlaceholder(),
+          }
+          function updatedEquipmentPlaceholder() {
+            return 'ver campos abaixo'
+          }
 
           // Helper para preencher SÓ campos vazios, preservando estritamente valores já digitados pelo técnico
           const fillOnlyIfEmpty = (currentVal: any, incomingVal: any): string => {
