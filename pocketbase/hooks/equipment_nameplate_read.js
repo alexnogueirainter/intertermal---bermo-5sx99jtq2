@@ -228,6 +228,70 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     }
   }
 
+  // 2.5. Fallback VISÃO GEMINI: quando o OCR do navegador falhou (texto fraco/lixo) e há
+  // imagem disponível, manda a FOTO para o Gemini (visão) — lê gravação em relevo metálico.
+  // Só aciona quando o caminho nativo não produziu dados úteis (custo por leitura ~R$0,01).
+  if (!extractedData && (imageDataUrl || imageUrl)) {
+    try {
+      const geminiKey = $secrets.get('GEMINI_API_KEY') || ''
+      if (geminiKey) {
+        const imageTarget = imageUrl || imageDataUrl
+        const geminiPayload = {
+          contents: [
+            {
+              parts: [
+                { text: promptText },
+                {
+                  inline_data: {
+                    mime_type: 'image/jpeg',
+                    data: imageTarget.startsWith('data:')
+                      ? imageTarget.slice(imageTarget.indexOf(',') + 1)
+                      : imageTarget,
+                  },
+                },
+              ],
+            },
+          ],
+          generationConfig: { temperature: 0.1 },
+        }
+        const gRes = $http.send({
+          url: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent',
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': geminiKey,
+          },
+          body: JSON.stringify(geminiPayload),
+          timeout: 60,
+        })
+        if (gRes.statusCode === 200 && gRes.json) {
+          const gText =
+            gRes.json &&
+            gRes.json.candidates &&
+            gRes.json.candidates[0] &&
+            gRes.json.candidates[0].content &&
+            gRes.json.candidates[0].content.parts &&
+            gRes.json.candidates[0].content.parts[0]
+              ? gRes.json.candidates[0].content.parts[0].text
+              : ''
+          const parsed = parseJsonSafe(gText)
+          if (parsed && typeof parsed === 'object') {
+            extractedData = parsed
+            extractionMethod = 'gemini_vision'
+          }
+        } else {
+          console.warn(
+            '[read-nameplate] Gemini vision retornou status:',
+            gRes.statusCode,
+            JSON.stringify(gRes.json || {}).slice(0, 300),
+          )
+        }
+      }
+    } catch (errGemini) {
+      console.warn('[read-nameplate] Falha no Gemini vision:', errGemini.message)
+    }
+  }
+
   // 3. Fallback via Agente Nativo Skip Cloud ('equipment-nameplate-reader') usando contexto
   if (!extractedData) {
     try {
