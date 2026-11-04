@@ -27,12 +27,7 @@ export function useNameplateOcr({
   const [targetOcrEquipment, setTargetOcrEquipment] = useState<EquipmentItem | null>(null)
   const handleTriggerNameplateOcr = async (equipmentId: string, photo: MediaAttachment) => {
     const currentEq = visit.equipments.find((e) => e.id === equipmentId)
-    if (!currentEq) return // Debug temporário: ids no gatilho (remover após validação)
-    ;(window as any).__ocrIds = {
-      at: new Date().toISOString(),
-      triggerId: equipmentId,
-      idsAtTrigger: visit.equipments.map((e) => e.id),
-    }
+    if (!currentEq) return
 
     setIsReadingNameplate(true)
     setNameplateReadingStatus('Lendo placa...')
@@ -71,16 +66,6 @@ export function useNameplateOcr({
         context: `Equipamento ${currentEq.name || ''} - Modelo atual: ${currentEq.model || 'vazio'}`,
       })
 
-      // Debug temporário: registra o que o backend devolveu (remover após validação)
-      ;(window as any).__ocrDebug = {
-        at: new Date().toISOString(),
-        ok: res.ok,
-        method: res.method,
-        msg: (res.message || '').slice(0, 120),
-        dataKeys: res.data ? Object.keys(res.data).length : 0,
-      }
-      console.log('[OCR-DEBUG] resposta do backend:', (window as any).__ocrDebug)
-
       if (res.ok && res.data) {
         // Disparado diretamente pelo evento da foto: aplica os dados extraídos sem diálogo bloqueante
         const comparison = compareAndMergeNameplateData(currentEq, res.data, photo.id)
@@ -89,22 +74,7 @@ export function useNameplateOcr({
         // Aplica diretamente ao equipamento usando setVisit((prev) => ...) reativo
         setVisit((prev) => {
           const freshCurrentEq = prev.equipments.find((e) => e.id === equipmentId)
-          if (!freshCurrentEq) {
-            console.warn(
-              '[OCR-DEBUG] equipamento não encontrado no setVisit',
-              equipmentId,
-              prev.equipments.map((e) => e.id),
-            )
-            ;(window as any).__ocrMerge = { aplicado: false, motivo: 'id não encontrado' }
-            return prev
-          }
-          ;(window as any).__ocrMerge = {
-            aplicado: true,
-            model: updatedEquipmentPlaceholder(),
-          }
-          function updatedEquipmentPlaceholder() {
-            return 'ver campos abaixo'
-          }
+          if (!freshCurrentEq) return prev
 
           // Helper para preencher SÓ campos vazios, preservando estritamente valores já digitados pelo técnico
           const fillOnlyIfEmpty = (currentVal: any, incomingVal: any): string => {
@@ -214,11 +184,6 @@ export function useNameplateOcr({
         })
       }
     } catch (err: any) {
-      ;(window as any).__ocrDebug = {
-        at: new Date().toISOString(),
-        erro: String(err?.message || err).slice(0, 200),
-        status: err?.status,
-      }
       console.warn('Falha na leitura da plaqueta:', err)
       toast({
         title: 'Não foi possível ler a placa',
