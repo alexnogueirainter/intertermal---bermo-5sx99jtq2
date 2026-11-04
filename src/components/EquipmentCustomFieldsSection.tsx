@@ -113,82 +113,87 @@ export function EquipmentCustomFieldsSection({
       {/* Lista de campos existentes */}
       {customFields.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {customFields.map((field) => (
-            <div
-              key={field.id}
-              className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center gap-2"
-            >
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center justify-between gap-1">
-                  <input
-                    type="text"
-                    value={field.label}
-                    onChange={(e) => handleUpdateField(field.id, { label: e.target.value })}
-                    placeholder="Nome do campo"
-                    className="w-full text-[11px] font-semibold text-slate-700 dark:text-slate-300 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none"
-                  />
-                  {(() => {
-                    if (manuallyEditedIds[field.id]) {
-                      return (
-                        <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded shrink-0">
-                          editado
-                        </span>
-                      )
-                    }
-                    const conf = getCustomFieldConfidence(field.label)
-                    if (conf === 'high') {
-                      return (
-                        <span
-                          className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-950/70 dark:text-emerald-300 px-1.5 py-0.5 rounded shrink-0"
-                          title="Lido com clareza da placa (alta confiança)"
-                        >
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-                          Placa
-                        </span>
-                      )
-                    }
-                    if (conf === 'medium') {
-                      return (
-                        <span
-                          className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/70 dark:text-amber-300 px-1.5 py-0.5 rounded shrink-0"
-                          title="Leitura parcial da placa (revisar)"
-                        >
-                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
-                          Parcial
-                        </span>
-                      )
-                    }
-                    if (conf === 'low') {
-                      return (
-                        <span
-                          className="inline-flex items-center gap-1 text-[9px] font-bold text-yellow-900 bg-yellow-200 dark:bg-yellow-800/70 dark:text-yellow-100 px-1.5 py-0.5 rounded shrink-0 ring-1 ring-yellow-400"
-                          title="Leitura com baixa confiança — conferir na foto da placa"
-                        >
-                          <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 shrink-0" />
-                          Conferir
-                        </span>
-                      )
-                    }
-                    return null
-                  })()}
-                </div>
-                <Input
-                  value={field.value}
-                  onChange={(e) => handleUpdateField(field.id, { value: e.target.value })}
-                  placeholder="Valor"
-                  className={`h-8 text-xs bg-slate-50/70 dark:bg-slate-950 ${conf === 'low' ? REVIEW_INPUT_YELLOW : ''}`}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => handleRemoveField(field.id)}
-                className="text-slate-400 hover:text-rose-600 p-1"
-                title="Remover campo"
+          {customFields.map((field) => {
+            // conf calculado no nível do campo: é usado tanto no selo (IIFE abaixo)
+            // quanto no destaque amarelo do Input — referenciá-lo fora do escopo do
+            // IIFE crashava o render (ReferenceError: conf is not defined)
+            const conf = getCustomFieldConfidence(field.label)
+            return (
+              <div
+                key={field.id}
+                className="p-2 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center gap-2"
               >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ))}
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <input
+                      type="text"
+                      value={field.label}
+                      onChange={(e) => handleUpdateField(field.id, { label: e.target.value })}
+                      placeholder="Nome do campo"
+                      className="w-full text-[11px] font-semibold text-slate-700 dark:text-slate-300 bg-transparent border-0 p-0 focus:ring-0 focus:outline-none"
+                    />
+                    {(() => {
+                      if (manuallyEditedIds[field.id]) {
+                        return (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded shrink-0">
+                            editado
+                          </span>
+                        )
+                      }
+                      if (conf === 'high') {
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-800 bg-emerald-100 dark:bg-emerald-950/70 dark:text-emerald-300 px-1.5 py-0.5 rounded shrink-0"
+                            title="Lido com clareza da placa (alta confiança)"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            Placa
+                          </span>
+                        )
+                      }
+                      if (conf === 'medium') {
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-800 bg-amber-100 dark:bg-amber-950/70 dark:text-amber-300 px-1.5 py-0.5 rounded shrink-0"
+                            title="Leitura parcial da placa (revisar)"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                            Parcial
+                          </span>
+                        )
+                      }
+                      if (conf === 'low') {
+                        return (
+                          <span
+                            className="inline-flex items-center gap-1 text-[9px] font-bold text-yellow-900 bg-yellow-200 dark:bg-yellow-800/70 dark:text-yellow-100 px-1.5 py-0.5 rounded shrink-0 ring-1 ring-yellow-400"
+                            title="Leitura com baixa confiança — conferir na foto da placa"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-yellow-500 shrink-0" />
+                            Conferir
+                          </span>
+                        )
+                      }
+                      return null
+                    })()}
+                  </div>
+                  <Input
+                    value={field.value}
+                    onChange={(e) => handleUpdateField(field.id, { value: e.target.value })}
+                    placeholder="Valor"
+                    className={`h-8 text-xs bg-slate-50/70 dark:bg-slate-950 ${conf === 'low' ? REVIEW_INPUT_YELLOW : ''}`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveField(field.id)}
+                  className="text-slate-400 hover:text-rose-600 p-1"
+                  title="Remover campo"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )
+          })}
         </div>
       )}
 
