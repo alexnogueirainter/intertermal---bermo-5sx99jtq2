@@ -205,6 +205,43 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     }
   }
 
+  // Helper inline: resultado do agente só é útil se trouxe ALGUM campo técnico preenchido.
+  // Agente pode devolver objeto válido porém vazio ("Nenhuma plaqueta fornecida") — isso
+  // NÃO é sucesso: libera o fallback de visão (Gemini).
+  const hasUsefulData = (d) => {
+    if (!d || typeof d !== 'object') return false
+    const keys = [
+      'manufacturer',
+      'model',
+      'serialNumber',
+      'manufacturingNumber',
+      'service',
+      'tag',
+      'designPressureBar',
+      'testPressureBar',
+      'designTempC',
+      'pmtaMpa',
+      'emptyWeightKg',
+      'manufacturingYear',
+      'tighteningMaxA',
+      'tighteningMinA',
+      'plateCount',
+      'fluid1',
+      'fluid2',
+      'flowRate',
+      'thermalAreaM2',
+      'fabricationStandard',
+      'connectionSize',
+      'plateMaterial',
+      'gasketMaterial',
+    ]
+    for (const k of keys) {
+      if (d[k] !== undefined && d[k] !== null && String(d[k]).trim() !== '') return true
+    }
+    if (Array.isArray(d.extraFields) && d.extraFields.length > 0) return true
+    return false
+  }
+
   // 2. Se houver texto pré-extraído (OCR do navegador), processar via Agente Nativo
   if (!extractedData && clientOcrText) {
     try {
@@ -217,9 +254,13 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
         })
         if (agentRes && agentRes.content) {
           const parsed = parseJsonSafe(agentRes.content)
-          if (parsed && typeof parsed === 'object') {
+          if (parsed && typeof parsed === 'object' && hasUsefulData(parsed)) {
             extractedData = parsed
             extractionMethod = 'native_agent_with_ocr'
+          } else if (parsed) {
+            console.warn(
+              '[read-nameplate] Agente nativo devolveu objeto sem dados úteis — liberando fallback de visão',
+            )
           }
         }
       }

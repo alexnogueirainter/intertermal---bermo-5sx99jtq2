@@ -58,9 +58,11 @@ export function useNameplateOcr({
 
       setNameplateReadingStatus('Interpretando dados técnicos...')
 
-      // 2. Envia apenas o texto transcrito ao backend (sem base64 pesada de imagem)
+      // 2. Envia o texto transcrito + a foto ao backend: a foto é o fallback de
+      // visão (Gemini) quando o OCR do navegador não produz dados úteis
       const res = await readNameplateFromImage({
         clientOcrText: ocrText,
+        imageDataUrl: photo.dataUrl,
         context: `Equipamento ${currentEq.name || ''} - Modelo atual: ${currentEq.model || 'vazio'}`,
       })
 
