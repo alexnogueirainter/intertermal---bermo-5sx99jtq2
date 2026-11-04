@@ -242,36 +242,9 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     return false
   }
 
-  // 2. Se houver texto pré-extraído (OCR do navegador), processar via Agente Nativo
-  if (!extractedData && clientOcrText) {
-    try {
-      const agent = $ai.agent('equipment-nameplate-reader')
-      if (agent && contextUserId) {
-        const agentPrompt = `${promptText}\n\n--- TEXTO BRUTO DETECTADO NA PLAQUETA ---\n${clientOcrText}`
-        const agentRes = agent.chat({
-          user_id: contextUserId,
-          message: agentPrompt,
-        })
-        if (agentRes && agentRes.content) {
-          const parsed = parseJsonSafe(agentRes.content)
-          if (parsed && typeof parsed === 'object' && hasUsefulData(parsed)) {
-            extractedData = parsed
-            extractionMethod = 'native_agent_with_ocr'
-          } else if (parsed) {
-            console.warn(
-              '[read-nameplate] Agente nativo devolveu objeto sem dados úteis — liberando fallback de visão',
-            )
-          }
-        }
-      }
-    } catch (errAgent) {
-      console.warn('[equipment-nameplate-reader] Agente nativo falhou com OCR:', errAgent.message)
-    }
-  }
-
-  // 2.5. Fallback VISÃO GEMINI: quando o OCR do navegador falhou (texto fraco/lixo) e há
-  // imagem disponível, manda a FOTO para o Gemini (visão) — lê gravação em relevo metálico.
-  // Só aciona quando o caminho nativo não produziu dados úteis (custo por leitura ~R$0,01).
+  // 2. VISÃO GEMINI PRIMEIRO quando há imagem: lê gravação em relevo que o OCR do
+  // navegador não lê, e é mais rápido que agente + visão em cascata (o gateway
+  // corta a requisição em ~60s — a ordem agente→Gemini já estourou esse limite).
   if (!extractedData && (imageDataUrl || imageUrl)) {
     try {
       const geminiKey = $secrets.get('GEMINI_API_KEY') || ''
@@ -303,7 +276,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
             'x-goog-api-key': geminiKey,
           },
           body: JSON.stringify(geminiPayload),
-          timeout: 60,
+          timeout: 45,
         })
         if (gRes.statusCode === 200 && gRes.json) {
           const gText =
@@ -316,7 +289,7 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
               ? gRes.json.candidates[0].content.parts[0].text
               : ''
           const parsed = parseJsonSafe(gText)
-          if (parsed && typeof parsed === 'object') {
+          if (parsed && typeof parsed === 'object' && hasUsefulData(parsed)) {
             extractedData = parsed
             extractionMethod = 'gemini_vision'
           }
@@ -333,7 +306,34 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem \`\`\`json).`
     }
   }
 
-  // 3. Fallback via Agente Nativo Skip Cloud ('equipment-nameplate-reader') usando contexto
+  // 3. Se houver texto pré-extraído (OCR do navegador), processar via Agente Nativo
+  if (!extractedData && clientOcrText) {
+    try {
+      const agent = $ai.agent('equipment-nameplate-reader')
+      if (agent && contextUserId) {
+        const agentPrompt = `${promptText}\n\n--- TEXTO BRUTO DETECTADO NA PLAQUETA ---\n${clientOcrText}`
+        const agentRes = agent.chat({
+          user_id: contextUserId,
+          message: agentPrompt,
+        })
+        if (agentRes && agentRes.content) {
+          const parsed = parseJsonSafe(agentRes.content)
+          if (parsed && typeof parsed === 'object' && hasUsefulData(parsed)) {
+            extractedData = parsed
+            extractionMethod = 'native_agent_with_ocr'
+          } else if (parsed) {
+            console.warn(
+              '[read-nameplate] Agente nativo devolveu objeto sem dados úteis — liberando fallback de visão',
+            )
+          }
+        }
+      }
+    } catch (errAgent) {
+      console.warn('[equipment-nameplate-reader] Agente nativo falhou com OCR:', errAgent.message)
+    }
+  }
+
+  // 4. Fallback via Agente Nativo Skip Cloud ('equipment-nameplate-reader') usando contexto
   if (!extractedData) {
     try {
       const agent = $ai.agent('equipment-nameplate-reader')
