@@ -47,6 +47,12 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Send, Loader2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import {
+  sendProposalApprovalEmail,
+  getProposalEmailHistory,
+  getClientContactEmails,
+} from '@/services/quotes'
 
 interface QuotePdfPreviewDialogProps {
   quote: QuoteRecord | null
@@ -67,6 +73,15 @@ export function QuotePdfPreviewDialog({
   const [currentViewMode, setCurrentViewMode] = useState<'client' | 'internal'>(viewMode)
   const [showApprovalConfirm, setShowApprovalConfirm] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
+  const [contactEmails, setContactEmails] = useState<
+    Array<{ name: string; email: string; role: string }>
+  >([])
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([])
+  const [extraEmailInput, setExtraEmailInput] = useState('')
+  const [emailHistory, setEmailHistory] = useState<
+    Array<{ id: string; to_emails: string; status: string; error_message: string; created: string }>
+  >([])
+  const [sendError, setSendError] = useState('')
 
   // Sincroniza com a prop viewMode quando o modal abre ou a prop muda
   useEffect(() => {
@@ -74,6 +89,26 @@ export function QuotePdfPreviewDialog({
       setCurrentViewMode(viewMode || 'client')
     }
   }, [open, viewMode])
+
+  // Ao abrir o diálogo de envio: carrega contatos do cliente e histórico de envios
+  useEffect(() => {
+    if (!showApprovalConfirm || !quote?.id) return
+    setSendError('')
+    let cancelled = false
+    ;(async () => {
+      const contacts = await getClientContactEmails(quote.client_id || '')
+      if (cancelled) return
+      setContactEmails(contacts)
+      // Pré-seleciona o primeiro contato com e-mail
+      if (contacts.length > 0) setSelectedRecipients([contacts[0].email])
+      const history = await getProposalEmailHistory(quote.id)
+      if (cancelled) return
+      setEmailHistory(history)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [showApprovalConfirm, quote?.id])
 
   if (!quote) return null
 
@@ -84,6 +119,7 @@ export function QuotePdfPreviewDialog({
     if (!onApproveQuote) return
     try {
       setIsApproving(true)
+      setSendError('')
       // Gerar e anexar o PDF oficial real no campo pdf_file da proposta antes do disparo do e-mail
       try {
         const docEl = document.getElementById('quote-printable-document')
@@ -93,8 +129,16 @@ export function QuotePdfPreviewDialog({
       } catch (pdfErr) {
         console.warn('Erro ao gerar/anexar PDF na aprovação pela prévia:', pdfErr)
       }
+      // Envia o e-mail ANTES de aprovar: se falhar, mostra o motivo e não fecha o diálogo
+      const sendRes = await sendProposalApprovalEmail(quote.id, selectedRecipients)
+      if (!sendRes.success) {
+        setSendError(sendRes.error || 'Não foi possível enviar o e-mail.')
+        return
+      }
       await onApproveQuote(quote)
       setShowApprovalConfirm(false)
+    } catch (err: any) {
+      setSendError('Não foi possível enviar: ' + (err?.message || String(err)))
     } finally {
       setIsApproving(false)
     }
@@ -2461,7 +2505,7 @@ export function QuotePdfPreviewDialog({
         </DialogFooter>
       </DialogContent>
 
-      {/* Confirmação de Aprovação */}
+      {/* Confirmação de Aprovação + Envio ao Cliente */}
       <AlertDialog open={showApprovalConfirm} onOpenChange={setShowApprovalConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -2479,20 +2523,122 @@ export function QuotePdfPreviewDialog({
               </div>
             </div>
             <AlertDialogDescription className="text-xs pt-3 leading-relaxed">
-              Deseja aprovar esta proposta? O status será alterado para <strong>Aprovada</strong> e
-              a notificação técnica/comercial com os dados da proposta será enviada para:{' '}
+              O e-mail será enviado para os destinatários escolhidos abaixo, com cópia oculta para{' '}
               <strong className="text-slate-900 dark:text-slate-100 font-mono">
                 alex.nogueira@intertermal.com.br
-              </strong>
+              </strong>{' '}
+              (responder para você). O PDF da proposta vai anexado e o e-mail traz o botão "Ver e
+              aprovar a proposta".
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {/* Destinatários: contatos do cliente + e-mails adicionais */}
+          <div className="space-y-2 py-1">
+            <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+              Destinatários
+            </p>
+            {contactEmails.length > 0 ? (
+              <div className="space-y-1.5">
+                {contactEmails.map((c) => (
+                  <label key={c.email} className="flex items-center gap-2 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedRecipients.includes(c.email)}
+                      onChange={(e) => {
+                        setSelectedRecipients((prev) =>
+                          e.target.checked ? [...prev, c.email] : prev.filter((x) => x !== c.email),
+                        )
+                      }}
+                      className="h-3.5 w-3.5 accent-teal-700"
+                    />
+                    <span className="font-medium">{c.name || c.email}</span>
+                    {c.role && (
+                      <span className="text-[10px] text-muted-foreground">— {c.role}</span>
+                    )}
+                    <span className="text-[11px] text-slate-500 font-mono">{c.email}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                Nenhum contato com e-mail cadastrado para este cliente.
+              </p>
+            )}
+            <div className="flex gap-1.5">
+              <Input
+                value={extraEmailInput}
+                onChange={(e) => setExtraEmailInput(e.target.value)}
+                placeholder="Adicionar outro e-mail (ex.: contato@cliente.com)"
+                className="h-8 text-xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8 text-xs"
+                onClick={() => {
+                  const v = extraEmailInput.trim()
+                  if (/^.+@.+\..+$/.test(v) && !selectedRecipients.includes(v)) {
+                    setSelectedRecipients((prev) => [...prev, v])
+                    setExtraEmailInput('')
+                  }
+                }}
+              >
+                Adicionar
+              </Button>
+            </div>
+          </div>
+
+          {/* Histórico de envios (email_log) */}
+          {emailHistory.length > 0 && (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 p-2.5 space-y-1">
+              <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                Histórico de envios
+              </p>
+              {emailHistory.map((h) => (
+                <div key={h.id} className="flex items-center justify-between gap-2 text-[10.5px]">
+                  <span className="font-mono text-slate-600 dark:text-slate-400 truncate">
+                    {h.to_emails}
+                  </span>
+                  <span className="text-muted-foreground shrink-0">
+                    {new Date(h.created).toLocaleString('pt-BR')}
+                  </span>
+                  <span
+                    className={`font-bold shrink-0 ${
+                      h.status === 'sent' ? 'text-emerald-600' : 'text-rose-600'
+                    }`}
+                  >
+                    {h.status === 'sent'
+                      ? 'Enviado'
+                      : `Falhou${h.error_message ? ': ' + h.error_message.slice(0, 60) : ''}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {sendError && (
+            <p className="text-xs font-semibold text-rose-600 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-md px-3 py-2">
+              {sendError}
+            </p>
+          )}
+
           <AlertDialogFooter className="mt-4">
             <AlertDialogCancel disabled={isApproving} className="text-xs">
               Cancelar
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleConfirmApproval}
-              disabled={isApproving}
+              onClick={(e) => {
+                // Bloqueia o fechamento automático: o diálogo só fecha quando o envio
+                // realmente teve sucesso (ou o usuário cancela)
+                e.preventDefault()
+                if (selectedRecipients.length === 0) {
+                  setSendError('Não foi possível enviar: nenhum destinatário selecionado.')
+                  return
+                }
+                handleConfirmApproval()
+              }}
+              disabled={isApproving || selectedRecipients.length === 0}
               className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
             >
               {isApproving ? (

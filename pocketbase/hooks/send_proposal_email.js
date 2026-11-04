@@ -1,11 +1,142 @@
 /**
  * PocketBase Hook: Send Proposal Approval Email
  * Route: POST /send_proposal_email and POST /backend/v1/quotes/send-approval-email
- * Receives: { quoteId: string }
- * Sends professional HTML email to alex.nogueira@intertermal.com.br
+ * Receives: { quoteId: string, recipients: string[] }
+ * Envio ÚNICO via Resend (segredo RESEND_API_KEY): destinatários escolhidos na UI,
+ * BCC + Reply-To alex.nogueira@intertermal.com.br, PDF anexado, log em email_log.
  */
 
-routerAdd('POST', '/send_proposal_email', (c) => {
+// Base64 de bytes (para anexar o PDF ao Resend) — o runtime JS não tem btoa
+function uint8ToBase64(bytes) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  const out = []
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b1 = bytes[i]
+    const b2 = i + 1 < bytes.length ? bytes[i + 1] : 0
+    const b3 = i + 2 < bytes.length ? bytes[i + 2] : 0
+    const has2 = i + 1 < bytes.length
+    const has3 = i + 2 < bytes.length
+    out.push(
+      chars[b1 >> 2],
+      chars[((b1 & 3) << 4) | (b2 >> 4)],
+      has2 ? chars[((b2 & 15) << 2) | (b3 >> 6)] : '=',
+      has3 ? chars[b3 & 63] : '=',
+    )
+  }
+  return out.join('')
+}
+
+// Envio ÚNICO via Resend (segredo RESEND_API_KEY) + registro em email_log.
+// Destinatários escolhidos na UI; Alex recebe cópia oculta e fica como "responder para".
+async function sendProposalEmailViaResend(quoteRecord, quoteNumber, recipients, htmlBody, subject) {
+  const ALEX_EMAIL = 'alex.nogueira@intertermal.com.br'
+  const logResult = function (status, errMsg) {
+    try {
+      const col = $app.findCollectionByNameOrId('email_log')
+      const rec = new Record(col)
+      rec.set('quote_id', quoteRecord.id)
+      rec.set('quote_number', quoteNumber)
+      rec.set('to_emails', recipients.join(', '))
+      rec.set('status', status)
+      rec.set('error_message', errMsg || '')
+      rec.set('method', 'resend')
+      $app.save(rec)
+    } catch (logErr) {
+      console.warn('[Proposal Email] Falha ao registrar email_log:', logErr)
+    }
+  }
+
+  const resendKey = $secrets.get('RESEND_API_KEY') || ''
+  if (!resendKey) {
+    logResult('failed', 'RESEND_API_KEY nao configurada no backend')
+    return { ok: false, error: 'RESEND_API_KEY nao configurada no backend' }
+  }
+
+  // PDF anexado (se existir): baixa o arquivo do proprio PocketBase e converte para base64
+  const attachments = []
+  try {
+    const pdfFileName = quoteRecord.getString('pdf_file') || ''
+    if (pdfFileName) {
+      const fileUrl =
+        ($secrets.get('PB_INSTANCE_URL') || '') +
+        '/api/files/' +
+        quoteRecord.collection().id +
+        '/' +
+        quoteRecord.id +
+        '/' +
+        encodeURIComponent(pdfFileName) +
+        '?token=' +
+        ($secrets.get('PB_SUPERUSER_TOKEN') || '')
+      const fRes = await fetch(fileUrl, { idleTimeout: 60 })
+      if (fRes.ok && fRes.body) {
+        const reader = fRes.body.getReader()
+        const chunks = []
+        let total = 0
+        while (true) {
+          const rd = await reader.read()
+          if (rd.done) break
+          chunks.push(rd.value)
+          total += rd.value.length
+        }
+        const all = new Uint8Array(total)
+        let off = 0
+        for (const ch of chunks) {
+          all.set(ch, off)
+          off += ch.length
+        }
+        attachments.push({
+          filename: 'Proposta_' + String(quoteNumber).replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf',
+          content: uint8ToBase64(all),
+        })
+      } else {
+        console.warn(
+          '[Proposal Email] PDF nao baixado para anexo (status ' +
+            fRes.status +
+            ') — o link de download permanece no e-mail',
+        )
+      }
+    }
+  } catch (pdfErr) {
+    console.warn('[Proposal Email] Falha ao anexar PDF (link permanece no e-mail):', pdfErr)
+  }
+
+  try {
+    const res = $http.send({
+      url: 'https://api.resend.com/emails',
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + resendKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Intertermal - Comercial <' + ALEX_EMAIL + '>',
+        to: recipients,
+        bcc: [ALEX_EMAIL],
+        reply_to: ALEX_EMAIL,
+        subject: subject,
+        html: htmlBody,
+        attachments: attachments,
+      }),
+      timeout: 60,
+    })
+    if (res.statusCode === 200 && res.json && res.json.id) {
+      logResult('sent', '')
+      return { ok: true, error: '' }
+    }
+    const errMsg =
+      'Resend retornou ' + res.statusCode + ': ' + JSON.stringify(res.json || {}).slice(0, 300)
+    console.warn('[Proposal Email] Falha no envio via Resend:', errMsg)
+    logResult('failed', errMsg)
+    return { ok: false, error: errMsg }
+  } catch (sendErr) {
+    const errMsg = sendErr && sendErr.message ? sendErr.message : String(sendErr)
+    console.warn('[Proposal Email] Falha no envio via Resend:', errMsg)
+    logResult('failed', errMsg)
+    return { ok: false, error: errMsg }
+  }
+}
+
+routerAdd('POST', '/send_proposal_email', async (c) => {
   const reqInfo =
     typeof c.requestInfo === 'function'
       ? c.requestInfo()
@@ -570,10 +701,6 @@ routerAdd('POST', '/send_proposal_email', (c) => {
     '</body>' +
     '</html>'
 
-  const targetEmail = 'alex.nogueira@intertermal.com.br'
-  let emailSent = false
-  let sendError = null
-
   // Montar link direto para download do PDF se o registro possuir pdf_file anexado
   const pdfFileName = quoteRecord.getString('pdf_file') || ''
   let pdfDownloadUrl = ''
@@ -613,87 +740,41 @@ routerAdd('POST', '/send_proposal_email', (c) => {
       '      <div style="background-color: #f0fdf4; border-left: 4px solid #10b981;',
   )
 
-  // 1. Tentar envio nativo via PocketBase MailClient ($app.newMailClient()) com anexo real se disponível
-  let fsInstance = null
-  let pdfFileReader = null
-  try {
-    if (typeof $app !== 'undefined' && $app.newMailClient) {
-      const mailClient = $app.newMailClient()
-      const message = new MailerMessage({
-        from: {
-          address: 'alex.nogueira@intertermal.com.br',
-          name: 'Intertermal - Comercial',
-        },
-        to: [{ address: targetEmail }],
-        subject: emailSubject,
-        html: finalEmailHtml,
-        attachments: {},
-      })
-
-      // Se existir pdf_file, anexar diretamente como io.Reader via filesystem
-      if (pdfFileName) {
-        try {
-          fsInstance = $app.newFilesystem()
-          const fileKey = quoteRecord.baseFilesPath() + '/' + pdfFileName
-          if (fsInstance.exists(fileKey)) {
-            pdfFileReader = fsInstance.getReader(fileKey)
-            const attachName = 'Proposta_' + quoteNumber.replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf'
-            message.attachments[attachName] = pdfFileReader
-          }
-        } catch (attachErr) {
-          console.warn(
-            'Não foi possível anexar o PDF diretamente ao mailer (link direto permanecerá no e-mail):',
-            attachErr,
-          )
-        }
-      }
-
-      mailClient.send(message)
-      emailSent = true
-    }
-  } catch (mErr) {
-    sendError = mErr && mErr.message ? mErr.message : String(mErr)
-    console.warn('Falha no envio via $app.newMailClient():', sendError)
-  } finally {
-    try {
-      if (pdfFileReader && typeof pdfFileReader.close === 'function') {
-        pdfFileReader.close()
-      }
-    } catch (_) {}
-    try {
-      if (fsInstance && typeof fsInstance.close === 'function') {
-        fsInstance.close()
-      }
-    } catch (_) {}
+  // Destinatários: e-mails escolhidos na hora do envio (contato(s) do cliente);
+  // fallback = e-mail do cliente no cadastro. Alex recebe cópia oculta e "responder para".
+  let recipients = Array.isArray(body.recipients) ? body.recipients : []
+  recipients = recipients
+    .map(function (e) {
+      return String(e || '').trim()
+    })
+    .filter(function (e) {
+      return /.+@.+\..+/.test(e)
+    })
+  if (recipients.length === 0 && clientEmail && clientEmail !== 'Não informado') {
+    recipients = [clientEmail]
+  }
+  if (recipients.length === 0) {
+    return c.json(400, { success: false, error: 'Nenhum e-mail de destinatário informado.' })
   }
 
-  // 2. Se $app.newMailClient falhou ou SMTP não configurado, registrar log
-  if (!emailSent) {
-    try {
-      console.log(
-        '[Proposal Email] E-mail de aprovação gerado com sucesso para ' +
-          targetEmail +
-          ' (Proposta #' +
-          quoteNumber +
-          ')',
-      )
-      emailSent = true
-    } catch (_) {}
-  }
+  const sendRes = await sendProposalEmailViaResend(
+    quoteRecord,
+    quoteNumber,
+    recipients,
+    finalEmailHtml,
+    emailSubject,
+  )
 
   return c.json(200, {
-    success: true,
-    message: 'Proposta #' + quoteNumber + ' aprovada e notificação enviada para ' + targetEmail,
-    recipient: targetEmail,
+    success: sendRes.ok,
+    message: sendRes.ok ? 'E-mail enviado com sucesso para ' + recipients.join(', ') : '',
+    error: sendRes.ok ? '' : sendRes.error,
+    recipient: recipients.join(', '),
     quoteNumber: quoteNumber,
-    emailSent: emailSent,
-    detail: sendError
-      ? 'Envio processado (notificação registrada: ' + sendError + ')'
-      : 'E-mail enviado com sucesso',
   })
 })
 
-routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
+routerAdd('POST', '/backend/v1/quotes/send-approval-email', async (c) => {
   const reqInfo =
     typeof c.requestInfo === 'function'
       ? c.requestInfo()
@@ -1221,10 +1302,6 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
     '</body>' +
     '</html>'
 
-  const targetEmail = 'alex.nogueira@intertermal.com.br'
-  let emailSent = false
-  let sendError = null
-
   // Montar link direto para download do PDF se o registro possuir pdf_file anexado
   const pdfFileNameFallback = quoteRecord.getString('pdf_file') || ''
   let pdfDownloadUrlFallback = ''
@@ -1264,82 +1341,36 @@ routerAdd('POST', '/backend/v1/quotes/send-approval-email', (c) => {
       '      <div style="background-color: #f0fdf4; border-left: 4px solid #10b981;',
   )
 
-  // 1. Tentar envio nativo via PocketBase MailClient ($app.newMailClient()) com anexo real se disponível
-  let fsInstanceFallback = null
-  let pdfFileReaderFallback = null
-  try {
-    if (typeof $app !== 'undefined' && $app.newMailClient) {
-      const mailClient = $app.newMailClient()
-      const message = new MailerMessage({
-        from: {
-          address: 'alex.nogueira@intertermal.com.br',
-          name: 'Intertermal - Comercial',
-        },
-        to: [{ address: targetEmail }],
-        subject: emailSubject,
-        html: finalEmailHtmlFallback,
-        attachments: {},
-      })
-
-      // Se existir pdf_file, anexar diretamente como io.Reader via filesystem
-      if (pdfFileNameFallback) {
-        try {
-          fsInstanceFallback = $app.newFilesystem()
-          const fileKey = quoteRecord.baseFilesPath() + '/' + pdfFileNameFallback
-          if (fsInstanceFallback.exists(fileKey)) {
-            pdfFileReaderFallback = fsInstanceFallback.getReader(fileKey)
-            const attachName = 'Proposta_' + quoteNumber.replace(/[^a-zA-Z0-9_-]/g, '_') + '.pdf'
-            message.attachments[attachName] = pdfFileReaderFallback
-          }
-        } catch (attachErr) {
-          console.warn(
-            'Não foi possível anexar o PDF diretamente ao mailer (link direto permanecerá no e-mail):',
-            attachErr,
-          )
-        }
-      }
-
-      mailClient.send(message)
-      emailSent = true
-    }
-  } catch (mErr) {
-    sendError = mErr && mErr.message ? mErr.message : String(mErr)
-    console.warn('Falha no envio via $app.newMailClient():', sendError)
-  } finally {
-    try {
-      if (pdfFileReaderFallback && typeof pdfFileReaderFallback.close === 'function') {
-        pdfFileReaderFallback.close()
-      }
-    } catch (_) {}
-    try {
-      if (fsInstanceFallback && typeof fsInstanceFallback.close === 'function') {
-        fsInstanceFallback.close()
-      }
-    } catch (_) {}
+  // Destinatários: e-mails escolhidos na hora do envio (contato(s) do cliente);
+  // fallback = e-mail do cliente no cadastro. Alex recebe cópia oculta e "responder para".
+  let recipients = Array.isArray(body.recipients) ? body.recipients : []
+  recipients = recipients
+    .map(function (e) {
+      return String(e || '').trim()
+    })
+    .filter(function (e) {
+      return /.+@.+\..+/.test(e)
+    })
+  if (recipients.length === 0 && clientEmail && clientEmail !== 'Não informado') {
+    recipients = [clientEmail]
+  }
+  if (recipients.length === 0) {
+    return c.json(400, { success: false, error: 'Nenhum e-mail de destinatário informado.' })
   }
 
-  // 2. Se $app.newMailClient falhou ou SMTP não configurado, registrar log
-  if (!emailSent) {
-    try {
-      console.log(
-        '[Proposal Email] E-mail de aprovação gerado com sucesso para ' +
-          targetEmail +
-          ' (Proposta #' +
-          quoteNumber +
-          ')',
-      )
-      emailSent = true
-    } catch (_) {}
-  }
+  const sendRes = await sendProposalEmailViaResend(
+    quoteRecord,
+    quoteNumber,
+    recipients,
+    finalEmailHtmlFallback,
+    emailSubject,
+  )
 
   return c.json(200, {
-    success: true,
-    message: 'Proposta #' + quoteNumber + ' aprovada e notificação enviada para ' + targetEmail,
-    recipient: targetEmail,
+    success: sendRes.ok,
+    message: sendRes.ok ? 'E-mail enviado com sucesso para ' + recipients.join(', ') : '',
+    error: sendRes.ok ? '' : sendRes.error,
+    recipient: recipients.join(', '),
     quoteNumber: quoteNumber,
-    emailSent: emailSent,
-    detail: sendError
-      ? 'Envio processado (notificação registrada: ' + sendError + ')'
-      : 'E-mail enviado com sucesso',
   })
 })

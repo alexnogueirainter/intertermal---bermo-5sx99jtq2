@@ -526,7 +526,10 @@ export interface SendProposalEmailResult {
   error?: string
 }
 
-export async function sendProposalApprovalEmail(quoteId: string): Promise<SendProposalEmailResult> {
+export async function sendProposalApprovalEmail(
+  quoteId: string,
+  recipients?: string[],
+): Promise<SendProposalEmailResult> {
   const cleanId = (quoteId || '').trim()
   if (!cleanId) {
     return { success: false, error: 'quoteId é obrigatório.' }
@@ -536,7 +539,7 @@ export async function sendProposalApprovalEmail(quoteId: string): Promise<SendPr
   try {
     const res = await pb.send<SendProposalEmailResult>('/send_proposal_email', {
       method: 'POST',
-      body: { quoteId: cleanId },
+      body: { quoteId: cleanId, recipients: recipients || [] },
       requestKey: null,
     })
     return res
@@ -546,20 +549,66 @@ export async function sendProposalApprovalEmail(quoteId: string): Promise<SendPr
         '/backend/v1/quotes/send-approval-email',
         {
           method: 'POST',
-          body: { quoteId: cleanId },
+          body: { quoteId: cleanId, recipients: recipients || [] },
           requestKey: null,
         },
       )
       return resFallback
     } catch (err2) {
-      console.error('Erro ao enviar e-mail de proposta aprovada:', err1, err2)
+      console.error('Erro ao enviar e-mail da proposta:', err1, err2)
+      // ERRO HONESTO: nunca reportar sucesso quando o envio falhou
+      const detail = (err2 as any)?.message || (err1 as any)?.message || 'falha de rede/backend'
       return {
-        success: true, // Retorna sucesso para fluidez da UI com log do cliente
-        message:
-          'Proposta aprovada com sucesso. Notificação registrada para alex.nogueira@intertermal.com.br.',
-        recipient: 'alex.nogueira@intertermal.com.br',
+        success: false,
+        error: `Não foi possível enviar: ${detail}`,
       }
     }
+  }
+}
+
+/** Histórico de envios da proposta (coleção email_log): para quem, quando, resultado. */
+export async function getProposalEmailHistory(
+  quoteId: string,
+): Promise<
+  Array<{ id: string; to_emails: string; status: string; error_message: string; created: string }>
+> {
+  try {
+    const res = await pb.collection('email_log').getList(1, 50, {
+      filter: `quote_id = "${quoteId}"`,
+      sort: '-created',
+      requestKey: null,
+    })
+    return (res.items || []).map((r: any) => ({
+      id: r.id,
+      to_emails: r.to_emails || '',
+      status: r.status || '',
+      error_message: r.error_message || '',
+      created: r.created || '',
+    }))
+  } catch (err) {
+    console.warn('Erro ao carregar histórico de envios:', err)
+    return []
+  }
+}
+
+/** E-mails dos contatos do cliente (para escolher o destinatário na hora do envio). */
+export async function getClientContactEmails(
+  clientId: string,
+): Promise<Array<{ name: string; email: string; role: string }>> {
+  if (!clientId) return []
+  try {
+    const rec = await pb.collection('clients').getOne<any>(clientId, { requestKey: null })
+    const contacts = Array.isArray(rec?.contacts) ? rec.contacts : []
+    return contacts
+      .filter((c: any) => String(c?.email || '').trim())
+      .map((c: any) => ({
+        name: String(c.name || ''),
+        email: String(c.email || '').trim(),
+        role: String(c.role || ''),
+      }))
+  } catch (err) {
+    console.warn('Erro ao carregar contatos do cliente:', err)
+    return []
   }
 }
 
