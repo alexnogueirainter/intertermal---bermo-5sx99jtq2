@@ -46,8 +46,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Send, Loader2 } from 'lucide-react'
+import { Send, Loader2, Link2, MessageCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import pb from '@/lib/pocketbase/client'
+import { toast } from '@/hooks/use-toast'
 import {
   sendProposalApprovalEmail,
   getProposalEmailHistory,
@@ -73,6 +75,33 @@ export function QuotePdfPreviewDialog({
   const [currentViewMode, setCurrentViewMode] = useState<'client' | 'internal'>(viewMode)
   const [showApprovalConfirm, setShowApprovalConfirm] = useState(false)
   const [isApproving, setIsApproving] = useState(false)
+  const [approvalLink, setApprovalLink] = useState('')
+  const [approvalQrSvg, setApprovalQrSvg] = useState('')
+
+  // Link de aprovação + QR code (gerado no backend com a mesma lib do e-mail de aceite)
+  useEffect(() => {
+    if (!open || !quote?.id) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const token = quote.approval_token || quote.id
+        const res = await pb.send<{ success: boolean; svg?: string; link?: string }>(
+          `/backend/v1/public/proposals/${encodeURIComponent(token)}/qr`,
+          { method: 'GET', requestKey: null },
+        )
+        if (cancelled) return
+        if (res?.success && res.svg) {
+          setApprovalQrSvg(res.svg)
+          setApprovalLink(res.link || '')
+        }
+      } catch (err) {
+        console.warn('Erro ao carregar QR do link de aprovação:', err)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [open, quote?.id])
   const [contactEmails, setContactEmails] = useState<
     Array<{ name: string; email: string; role: string }>
   >([])
@@ -2460,6 +2489,27 @@ export function QuotePdfPreviewDialog({
               DIVULGAÇÃO EXTERNA ***
             </div>
           )}
+
+          {/* Rodapé da última página: link de aprovação + QR code (imprime no PDF) */}
+          {approvalLink && (
+            <div className="quote-print-keep-together pt-4 mt-4 border-t border-slate-300 flex items-center justify-between gap-4">
+              <div className="text-left">
+                <p className="text-[10px] font-bold text-slate-700 uppercase tracking-wide">
+                  Aprovação digital da proposta
+                </p>
+                <p className="text-[9.5px] text-slate-600 mt-1 leading-snug">
+                  Escaneie o QR code ao lado ou acesse o link abaixo para visualizar e aprovar esta
+                  proposta online:
+                </p>
+                <p className="text-[10px] font-mono text-sky-700 mt-1 break-all">{approvalLink}</p>
+              </div>
+              <div
+                className="shrink-0 bg-white p-1 border border-slate-300 rounded"
+                style={{ width: 96, height: 96 }}
+                dangerouslySetInnerHTML={{ __html: approvalQrSvg }}
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 print:hidden flex flex-row items-center justify-between sm:justify-between">
@@ -2475,6 +2525,56 @@ export function QuotePdfPreviewDialog({
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              className="text-xs"
+              disabled={!approvalLink}
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(approvalLink)
+                  toast({ title: 'Link copiado', description: approvalLink })
+                } catch (_) {
+                  toast({
+                    title: 'Não foi possível copiar',
+                    description: approvalLink,
+                    variant: 'destructive',
+                  })
+                }
+              }}
+            >
+              <Link2 className="h-3.5 w-3.5 mr-1.5" />
+              Copiar link para o cliente
+            </Button>
+            <Button
+              variant="outline"
+              className="text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+              disabled={!approvalLink}
+              onClick={() => {
+                const firstName = (quote.client_name || '').trim().split(/\s+/)[0] || 'cliente'
+                const msg =
+                  'Olá ' +
+                  firstName +
+                  ', segue a proposta ' +
+                  (quote.quote_number || quote.code || '') +
+                  ' da Intertermal. Você pode ver e aprovar por aqui: ' +
+                  approvalLink
+                const rawPhone = String(
+                  (quote as any).client_phone || (quote as any).client_whatsapp || '',
+                ).replace(/\D/g, '')
+                const phone = rawPhone
+                  ? rawPhone.startsWith('55')
+                    ? rawPhone
+                    : '55' + rawPhone
+                  : ''
+                const url = phone
+                  ? 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg)
+                  : 'https://wa.me/?text=' + encodeURIComponent(msg)
+                window.open(url, '_blank', 'noopener,noreferrer')
+              }}
+            >
+              <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+              Enviar por WhatsApp
+            </Button>
             <Button variant="outline" onClick={() => onOpenChange(false)} className="text-xs">
               Fechar Visualização
             </Button>
