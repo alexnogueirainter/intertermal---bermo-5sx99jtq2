@@ -48,8 +48,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Send, Loader2, Link2, MessageCircle } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import pb from '@/lib/pocketbase/client'
 import { toast } from '@/hooks/use-toast'
+import qrcode from 'qrcode-generator'
 import {
   sendProposalApprovalEmail,
   getProposalEmailHistory,
@@ -78,28 +78,21 @@ export function QuotePdfPreviewDialog({
   const [approvalLink, setApprovalLink] = useState('')
   const [approvalQrSvg, setApprovalQrSvg] = useState('')
 
-  // Link de aprovação + QR code (gerado no backend com a mesma lib do e-mail de aceite)
+  // Link de aprovação + QR code (gerado localmente com qrcode-generator)
   useEffect(() => {
     if (!open || !quote?.id) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const token = quote.approval_token || quote.id
-        const res = await pb.send<{ success: boolean; svg?: string; link?: string }>(
-          `/backend/v1/public/proposals/${encodeURIComponent(token)}/qr`,
-          { method: 'GET', requestKey: null },
-        )
-        if (cancelled) return
-        if (res?.success && res.svg) {
-          setApprovalQrSvg(res.svg)
-          setApprovalLink(res.link || '')
-        }
-      } catch (err) {
-        console.warn('Erro ao carregar QR do link de aprovação:', err)
-      }
-    })()
-    return () => {
-      cancelled = true
+    const token = quote.approval_token || quote.id
+    const base = window.location.origin
+    const link = base + '/aprovar/' + token
+    setApprovalLink(link)
+    try {
+      const qr = qrcode(0, 'M')
+      qr.addData(link)
+      qr.make()
+      setApprovalQrSvg(qr.createSvgTag({ cellSize: 4, margin: 2 }))
+    } catch (err) {
+      console.warn('Erro ao gerar QR code do link de aprovação:', err)
+      setApprovalQrSvg('')
     }
   }, [open, quote?.id])
   const [contactEmails, setContactEmails] = useState<
