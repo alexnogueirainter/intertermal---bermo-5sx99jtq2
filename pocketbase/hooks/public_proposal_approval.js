@@ -114,9 +114,10 @@ routerAdd('GET', '/backend/v1/public/proposals/{token}', (c) => {
           'client_name',
           quoteRecord.getString('client_name') || quoteRecord.get('client_name') || 'Cliente',
         )
-        alertRec.set('type', 'proposal_alert')
+        alertRec.set('type', 'meeting')
         alertRec.set('priority', 'medium')
         alertRec.set('status', 'pending')
+        alertRec.set('due_date', new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z')
         alertRec.set('description', marker + ' — O cliente acessou a proposta online hoje.')
         alertRec.set('assigned_to', quoteRecord.get('assigned_to') || 'Alex Nogueira')
         $app.save(alertRec)
@@ -199,9 +200,10 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
         'client_name',
         quoteRecord.getString('client_name') || quoteRecord.get('client_name') || 'Cliente',
       )
-      alertRec.set('type', 'proposal_alert')
+      alertRec.set('type', 'meeting')
       alertRec.set('priority', 'urgent')
       alertRec.set('status', 'pending')
+      alertRec.set('due_date', new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z')
       alertRec.set(
         'description',
         'Aprovada digitalmente por ' +
@@ -513,9 +515,10 @@ routerAdd('POST', '/backend/v1/public/proposals/{token}/action', (c) => {
         'client_name',
         quoteRecord.getString('client_name') || quoteRecord.get('client_name') || 'Cliente',
       )
-      alertRec.set('type', 'proposal_alert')
+      alertRec.set('type', 'meeting')
       alertRec.set('priority', 'urgent')
       alertRec.set('status', 'pending')
+      alertRec.set('due_date', new Date().toISOString().replace('T', ' ').slice(0, 19) + 'Z')
       alertRec.set(
         'description',
         'Motivo informado: ' +
