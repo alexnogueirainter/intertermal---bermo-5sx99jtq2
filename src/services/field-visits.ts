@@ -35,6 +35,20 @@ export const fieldVisitsService = {
     })
   },
 
+  /**
+   * Lista LEVE para dashboards/contagens: exclui o JSON `equipment` (fotos em
+   * base64 podem somar dezenas de MB e atrasar todo o carregamento do app).
+   * O registro completo continua disponível com getById(id) quando precisar
+   * abrir/editar a visita.
+   */
+  async getLightweight(): Promise<FieldVisitRecord[]> {
+    return await pb.collection('field_visits').getFullList<FieldVisitRecord>({
+      sort: '-created',
+      fields:
+        'id,employee_name,seller_name,visit_date,start_time,end_time,duration,client_name,company_name,contact_person,client_role,client_contact,client_email,work_area,work_type,work_type_other,general_notes,free_description,action_plan,visit_attachments,status,sent_at,created,updated',
+    })
+  },
+
   async getRecentSummary(limit = 100): Promise<FieldVisitRecord[]> {
     return await pb.collection('field_visits').getFullList<FieldVisitRecord>({
       sort: '-created',

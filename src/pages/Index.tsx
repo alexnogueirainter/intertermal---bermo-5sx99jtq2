@@ -183,7 +183,7 @@ export default function IndexPage() {
           console.warn('Erro ao carregar atividades:', err)
           return [] as ActivityRecord[]
         }),
-        fieldVisitsService.getAll().catch((err) => {
+        fieldVisitsService.getLightweight().catch((err) => {
           console.warn('Erro ao carregar visitas a campo no dashboard:', err)
           setFieldVisitsError(true)
           return [] as FieldVisitRecord[]
