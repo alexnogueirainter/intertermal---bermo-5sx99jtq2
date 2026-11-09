@@ -11,6 +11,7 @@ migrate(
     if (!col.fields.getByName('campaign_id')) {
       col.fields.add(new TextField({ name: 'campaign_id', required: true }))
     }
+
     // O índice idx_campaign_recipients_campaign (coluna campaign) morre com a relation:
     // PocketBase revalida os índices da coleção ao salvar — troca pelo índice do campo novo.
     const idx = col.indexes || []
@@ -25,6 +26,10 @@ migrate(
       'CREATE INDEX idx_campaign_recipients_campaign_id ON campaign_recipients (campaign_id)',
     )
     col.indexes = cleaned
+
+    // Salva 2x: a 1ª consolida campos (relation sai, campaign_id entra);
+    // a 2ª valida os índices já com a coluna nova no lugar.
+    app.save(col)
     app.save(col)
   },
   (app) => {
