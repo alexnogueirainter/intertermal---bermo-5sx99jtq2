@@ -1,7 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { createPortal } from 'react-dom'
-import printStyles from './ExecutiveReportPrint.css?inline'
-import { FileDown } from 'lucide-react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { FileDown, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type {
   ActivityRecord,
@@ -12,6 +10,7 @@ import type {
   TicketRecord,
 } from '@/types/crm'
 import type { FieldVisitRecord } from '@/services/field-visits'
+import { buildExecutivePdfFile } from '@/components/ExecutiveReportPdf'
 
 type PeriodFilter = 'all' | 'month' | 'quarter' | 'year' | 'custom'
 type QuoteBucket = 'approved' | 'pending' | 'rejected' | 'other'
@@ -44,7 +43,7 @@ interface ClientGroup {
   pending: number
   total: number
 }
-interface ReportData {
+export interface ReportData {
   generated: Date
   period: string
   proposals: {
@@ -198,7 +197,7 @@ function labelFor(value?: string) {
   )
 }
 
-function makeReport(p: ExecutiveReportProps, generated: Date): ReportData {
+export function makeReport(p: ExecutiveReportProps, generated: Date): ReportData {
   const totals = {
     approved: { count: 0, value: 0 },
     pending: { count: 0, value: 0 },
@@ -712,97 +711,37 @@ function ReportPage({ data }: { data: ReportData }) {
 }
 
 export function ExecutiveReportPrintButton(props: ExecutiveReportProps) {
-  const [requested, setRequested] = useState(false),
-    [generated, setGenerated] = useState<Date | null>(null)
-  const popup = useRef<Window | null>(null),
-    onBlocked = useRef(props.onPopupBlocked)
+  const [busy, setBusy] = useState(false)
+  const onBlocked = useRef(props.onPopupBlocked)
   useEffect(() => {
     onBlocked.current = props.onPopupBlocked
   }, [props.onPopupBlocked])
-  const data = useMemo(
-    () => makeReport(props, generated || new Date()),
-    [
-      props.clients,
-      props.deals,
-      props.quotes,
-      props.tickets,
-      props.activities,
-      props.serviceOrders,
-      props.fieldVisits,
-      props.fieldVisitsError,
-      props.periodFilter,
-      props.periodLabel,
-      props.customStartDate,
-      props.customEndDate,
-      generated,
-    ],
-  )
-  const portal =
-    requested && typeof document !== 'undefined'
-      ? createPortal(<ReportPage data={data} />, document.body)
-      : null
-  useEffect(() => {
-    if (!requested) return
-    const win = popup.current,
-      page = document.getElementById('executive-report-page')
-    if (!win || win.closed || !page) {
-      if (win && !win.closed) win.close()
-      popup.current = null
-      setRequested(false)
-      onBlocked.current?.()
-      return
-    }
+  const gerar = async () => {
+    if (busy) return
+    setBusy(true)
     try {
-      win.document.open()
-      win.document.write(
-        `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Relatório Diretoria 360° — Intertermal</title><style>${printStyles}</style></head><body>${page.parentElement?.outerHTML || page.outerHTML}</body></html>`,
-      )
-      win.document.close()
-      const timer = window.setTimeout(() => {
-        try {
-          win.focus()
-          win.print()
-        } catch {
-          onBlocked.current?.()
-        }
-        setRequested(false)
-      }, 260)
-      return () => window.clearTimeout(timer)
-    } catch {
-      if (!win.closed) win.close()
-      popup.current = null
-      setRequested(false)
+      const data = makeReport(props, new Date())
+      await buildExecutivePdfFile(data, props.quotes, props.serviceOrders || [])
+    } catch (err) {
+      console.warn('Erro ao gerar o relatório em PDF:', err)
       onBlocked.current?.()
+    } finally {
+      setBusy(false)
     }
-  }, [requested, generated])
+  }
   return (
-    <>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="shrink-0 border-teal-300 text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300 dark:hover:bg-teal-950/40"
-        title="Abrir impressão e escolher Salvar como PDF"
-        aria-label="Gerar relatório da diretoria em PDF"
-        onClick={() => {
-          const win = window.open('', 'intertermal-directoria360')
-          if (!win) {
-            onBlocked.current?.()
-            return
-          }
-          popup.current = win
-          win.document.write(
-            '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Preparando relatório…</title></head><body style="font-family:Arial,sans-serif;padding:24px;color:#172b3a">Preparando relatório para impressão…</body></html>',
-          )
-          win.document.close()
-          setGenerated(new Date())
-          setRequested(true)
-        }}
-      >
-        <FileDown className="h-4 w-4" />
-        Gerar PDF
-      </Button>
-      {portal}
-    </>
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="shrink-0 border-teal-300 text-teal-800 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300 dark:hover:bg-teal-950/40"
+      title="Gera o arquivo PDF do relatório para download direto"
+      aria-label="Gerar relatório do painel em PDF para download"
+      onClick={gerar}
+      disabled={busy}
+    >
+      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+      Gerar relatório (PDF)
+    </Button>
   )
 }
