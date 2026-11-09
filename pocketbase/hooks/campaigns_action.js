@@ -92,6 +92,12 @@ routerAdd(
 
     // ===== AÇÃO: TESTE =====
     if (action === 'test') {
+      if (!apiKey) {
+        return e.json(400, {
+          ok: false,
+          error: 'RESEND_API_KEY não configurada no painel de segredos do Skip',
+        })
+      }
       const subject = String(body.subject || '')
       const bodyTpl = String(body.body || '')
       const to = String(body.to || 'alex.nogueira@intertermal.com.br')
