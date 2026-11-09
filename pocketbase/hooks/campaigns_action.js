@@ -269,7 +269,7 @@ routerAdd(
             .trim()
           if (!emailNorm) continue
           const p = new Record(recCol)
-          p.set('campaign_id', campaignId)
+          p.set('campaign_id', String(campaignId))
           p.set('email', emailNorm)
           p.set('name', String(r.name || ''))
           p.set('company', String(r.company || ''))
