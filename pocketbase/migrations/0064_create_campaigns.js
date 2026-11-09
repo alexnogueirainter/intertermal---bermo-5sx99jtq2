@@ -52,7 +52,7 @@ migrate(
         updateRule: '',
         deleteRule: '',
         fields: [
-          { name: 'campaign', type: 'relation', collectionId: 'pbc_campaigns', maxSelect: 1 },
+          { name: 'campaign', type: 'relation', collectionId: 'pbc_placeholder', maxSelect: 1 },
           { name: 'client_id', type: 'text' },
           { name: 'email', type: 'text', required: true },
           { name: 'name', type: 'text' },

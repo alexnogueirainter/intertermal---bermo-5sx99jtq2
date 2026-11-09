@@ -83,10 +83,3 @@ routerAdd('GET', '/backend/v1/campaigns/unsubscribe', (e) => {
       '<p style="font-size: 12px; color: #64748b; margin-top: 16px;">Intertermal Projetos e Instalações · www.interproject.com.br</p></div></body></html>',
   )
 })
-
-function escapeHtml(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-}
