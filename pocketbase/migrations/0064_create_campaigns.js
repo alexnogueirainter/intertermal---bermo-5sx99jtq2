@@ -117,14 +117,9 @@ migrate(
       app.save(clientsCol)
     }
 
-    // 5) Resolves o id real da coleção campaigns e corrige a relation em campaign_recipients
-    const campaignsCol = app.findCollectionByNameOrId('campaigns')
-    const recCol = app.findCollectionByNameOrId('campaign_recipients')
-    const relField = recCol.fields.getByName('campaign')
-    if (relField && String(relField.collectionId || '') !== campaignsCol.id) {
-      relField.collectionId = campaignsCol.id
-      app.save(recCol)
-    }
+    // 5) Relation 'campaign' de campaign_recipients aponta para 'deals' (id válido p/ criar a
+    //    coleção) — remapear collectionId de relation existente é bloqueado pelo PocketBase.
+    //    A fila e a tela usam o campo TEXT campaign_id, não esta relation.
 
     // 6) Fila pausada por padrão (o Alex decide quando rodar)
     const cronCol = app.findCollectionByNameOrId('_cron_settings')
