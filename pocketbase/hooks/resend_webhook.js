@@ -44,12 +44,28 @@ routerAdd('POST', '/backend/v1/resend/webhook', (e) => {
     console.log('[resend-webhook] ' + type + ' → ' + String(rec.get('email')) + ' = ' + newStatus)
   }
 
-  // 1) Match por email_id (resend_id)
-  if (emailId) updateRecipient('resend_id = {:r}', { r: emailId }, 'sent', null)
-
   const applyStatus = (newStatus, errTxt) => {
     if (emailId) updateRecipient('resend_id = {:r}', { r: emailId }, newStatus, errTxt)
     else if (toEmail) updateRecipient('email = {:e}', { e: toEmail }, newStatus, errTxt)
+  }
+
+  const markUnsubscribed = (email, reason) => {
+    try {
+      const col = $app.findCollectionByNameOrId('unsubscribes')
+      let rec = null
+      try {
+        rec = $app.findFirstRecordByFilter('unsubscribes', 'email = {:e}', { e: email })
+      } catch (_) {
+        rec = null
+      }
+      if (!rec) {
+        rec = new Record(col)
+        rec.set('email', email)
+        rec.set('reason', reason)
+        rec.set('source', 'webhook:complained')
+        $app.save(rec)
+      }
+    } catch (_) {}
   }
 
   if (type === 'email.delivered') {
@@ -60,44 +76,10 @@ routerAdd('POST', '/backend/v1/resend/webhook', (e) => {
     applyStatus('failed', 'Resend: falha no envio')
   } else if (type === 'email.bounced') {
     applyStatus('bounced', 'Resend: bounce (endereço recusou/inválido)')
-    if (toEmail) {
-      try {
-        const col = $app.findCollectionByNameOrId('unsubscribes')
-        let rec = null
-        try {
-          rec = $app.findFirstRecordByFilter('unsubscribes', 'email = {:e}', { e: toEmail })
-        } catch (_) {
-          rec = null
-        }
-        if (!rec) {
-          rec = new Record(col)
-          rec.set('email', toEmail)
-          rec.set('reason', 'Bounce (Resend)')
-          rec.set('source', 'webhook:complained')
-          $app.save(rec)
-        }
-      } catch (_) {}
-    }
+    if (toEmail) markUnsubscribed(toEmail, 'Bounce (Resend)')
   } else if (type === 'email.complained') {
     applyStatus('complained', 'Resend: marcou como spam')
-    if (toEmail) {
-      try {
-        const col = $app.findCollectionByNameOrId('unsubscribes')
-        let rec = null
-        try {
-          rec = $app.findFirstRecordByFilter('unsubscribes', 'email = {:e}', { e: toEmail })
-        } catch (_) {
-          rec = null
-        }
-        if (!rec) {
-          rec = new Record(col)
-          rec.set('email', toEmail)
-          rec.set('reason', 'Marcou como spam (Resend)')
-          rec.set('source', 'webhook:complained')
-          $app.save(rec)
-        }
-      } catch (_) {}
-    }
+    if (toEmail) markUnsubscribed(toEmail, 'Marcou como spam (Resend)')
   }
 
   return e.json(200, { ok: true })

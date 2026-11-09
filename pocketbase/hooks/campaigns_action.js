@@ -150,7 +150,7 @@ routerAdd(
         const picked = new Map()
         for (const c of clients) {
           // JSON fields chegam como string no JSVM — parse antes de iterar
-          let contacts = c.get('contacts') || []
+          let contacts = c.get('contacts')
           if (typeof contacts === 'string') {
             try {
               contacts = JSON.parse(contacts)
@@ -249,15 +249,12 @@ routerAdd(
         let list = []
         try {
           list = JSON.parse(txt || '[]')
-        } catch (errParse) {
+        } catch (_) {
           list = []
         }
         if (!Array.isArray(list)) list = []
         if (list.length === 0) {
-          return e.json(400, {
-            ok: false,
-            error: 'Campanha sem destinatários (parse: ' + String(txt || '').slice(0, 60) + ')',
-          })
+          return e.json(400, { ok: false, error: 'Campanha sem destinatários' })
         }
 
         const recCol = $app.findCollectionByNameOrId('campaign_recipients')
