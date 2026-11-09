@@ -98,6 +98,8 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
     console.error('[campanhas] falha ao carregar pendentes:', err)
     return
   }
+  // eslint-disable-next-line no-unused-vars
+  const _unused = pending
 
   const sendable = []
   for (const p of pending) {
@@ -219,6 +221,8 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
     )
     stillPending = rest.length
   } catch (_) {}
+  // eslint-disable-next-line no-unused-vars
+  const _unused2 = stillPending
 
   if (stillPending === 0) {
     campaign.set('status', 'done')

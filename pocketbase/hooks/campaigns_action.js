@@ -5,8 +5,9 @@
  * - save: cria a campanha (modelo, etiqueta, destinatários) — NÃO envia, não usa chave
  * - test: envia 1 e-mail de teste para o próprio Alex (exige RESEND_API_KEY)
  * - send: cria os campaign_recipients pendentes e ativa a fila (status → sending)
- * Regra de destinatários: por etiqueta (list_tag) OU marcados um a um (recipients[]).
- * Nunca inclui descadastrados (unsubscribes) nem clientes com unsubscribed_at.
+ * Regra de destinatários: lista explícita de e-mails (etiqueta resolvida no frontend
+ * ou marcados um a um). Nunca inclui descadastrados (unsubscribes) nem clientes
+ * com unsubscribed_at.
  */
 routerAdd(
   'POST',
@@ -119,7 +120,8 @@ routerAdd(
         return e.json(400, { ok: false, error: 'Escolha a etiqueta ou marque os destinatários' })
       }
 
-      // Destinatários: da etiqueta (clients por tags) OU marcados um a um — nunca descadastrados
+      // Destinatários: lista explícita de e-mails (etiqueta resolvida no frontend
+      // ou marcados um a um) — nunca descadastrados
       let chosen = []
       try {
         const unsubSet = new Set()
@@ -131,18 +133,23 @@ routerAdd(
               .trim(),
           )
 
+        const wantSet = new Set(
+          recipientsIn
+            .map((r) =>
+              String(r || '')
+                .toLowerCase()
+                .trim(),
+            )
+            .filter((x) => x),
+        )
+        if (wantSet.size === 0) {
+          return e.json(400, { ok: false, error: 'Nenhum destinatário na lista' })
+        }
+
         const clients = $app.findRecordsByFilter('clients', 'id != ""', '-created', 5000, 0)
         const picked = new Map()
         for (const c of clients) {
           // JSON fields chegam como string no JSVM — parse antes de iterar
-          let tags = c.get('tags') || []
-          if (typeof tags === 'string') {
-            try {
-              tags = JSON.parse(tags)
-            } catch (_) {
-              tags = []
-            }
-          }
           let contacts = c.get('contacts') || []
           if (typeof contacts === 'string') {
             try {
@@ -153,36 +160,22 @@ routerAdd(
           }
           const unsubAt = String(c.get('unsubscribed_at') || '')
           if (unsubAt && unsubAt.indexOf('0001') !== 0) continue
-          // Match de etiqueta EXATO por item: tags pode vir como array OU JSON string
-          let tagsArr = tags
-          if (typeof tagsArr === 'string') {
-            try {
-              tagsArr = JSON.parse(tagsArr)
-            } catch (_) {
-              tagsArr = []
-            }
-          }
-          if (!Array.isArray(tagsArr)) tagsArr = []
-          const tagMatch =
-            listTag &&
-            tagsArr.map((t) => String(t).toLowerCase().trim()).indexOf(listTag.toLowerCase()) !== -1
           const emails = []
           if (c.get('email')) emails.push(String(c.get('email')))
           if (Array.isArray(contacts)) {
             for (const ct of contacts) if (ct.email) emails.push(String(ct.email))
           }
-          // A lista explícita vence (etiqueta é resolvida no frontend e chega aqui pronta)
-          const manualMatch =
-            recipientsIn.length > 0 &&
-            emails.some((em) =>
-              recipientsIn
-                .map((r) => String(r).toLowerCase().trim())
-                .includes(em.toLowerCase().trim()),
-            )
-          if (!tagMatch && !manualMatch) continue
+          let matched = false
+          for (const em of emails) {
+            if (wantSet.has(em.toLowerCase().trim())) {
+              matched = true
+              break
+            }
+          }
+          if (!matched) continue
           for (const em of emails) {
             const key = em.toLowerCase().trim()
-            if (!key || unsubSet.has(key) || picked.has(key)) continue
+            if (!key || !wantSet.has(key) || unsubSet.has(key) || picked.has(key)) continue
             picked.set(key, {
               email: key,
               name: String(c.get('name') || ''),
@@ -236,30 +229,36 @@ routerAdd(
         return e.json(400, { ok: false, error: 'Campanha não está em rascunho' })
       }
 
-      let recipients = campaign.get('recipients') || []
-      if (typeof recipients === 'string') {
-        try {
-          recipients = JSON.parse(recipients)
-        } catch (_) {
-          recipients = []
+      // O JSVM devolve o JSONField como ARRAY DE BYTES (números 0-255) —
+      // decodifica para texto UTF-8 e faz o parse do JSON.
+      const rawRecipients = campaign.get('recipients') || []
+      const bytes = []
+      for (const r0 of rawRecipients) {
+        if (typeof r0 === 'number') bytes.push(r0)
+        else if (typeof r0 === 'string') bytes.push(r0)
+      }
+      let txt = null
+      if (bytes.length > 0) {
+        if (bytes.every((b) => typeof b === 'number')) {
+          txt = new TextDecoder().decode(new Uint8Array(bytes))
+        } else {
+          txt = bytes.join('')
         }
       }
-      if (!Array.isArray(recipients) || recipients.length === 0) {
+      let list = []
+      try {
+        list = JSON.parse(txt || '[]')
+      } catch (_) {
+        list = []
+      }
+      if (!Array.isArray(list)) list = []
+      if (list.length === 0) {
         return e.json(400, { ok: false, error: 'Campanha sem destinatários' })
       }
 
       const recCol = $app.findCollectionByNameOrId('campaign_recipients')
       let created = 0
-      for (const r0 of recipients) {
-        // Item do JSON pode voltar como string — normaliza para objeto
-        let r = r0
-        if (typeof r === 'string') {
-          try {
-            r = JSON.parse(r)
-          } catch (_) {
-            r = null
-          }
-        }
+      for (const r of list) {
         if (!r || typeof r !== 'object') continue
         const emailNorm = String(r.email || '')
           .toLowerCase()
