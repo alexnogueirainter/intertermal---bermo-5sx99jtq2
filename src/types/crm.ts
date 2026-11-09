@@ -85,6 +85,7 @@ export interface ClientContact {
   phone?: string
   birth_date?: string
   is_primary?: boolean
+  tags?: string[]
 }
 
 export interface ClientSurveyRecord {

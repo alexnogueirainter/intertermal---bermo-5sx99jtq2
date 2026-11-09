@@ -1267,6 +1267,7 @@ export default function IndexPage() {
               onSelectClient={setSelectedClient}
               onCreateClient={handleCreateClient}
               onUpdateClient={handleUpdateClient}
+              onImportDone={() => loadAllData(true)}
             />
           )}
           {activeTab === 'service_kanban' && (

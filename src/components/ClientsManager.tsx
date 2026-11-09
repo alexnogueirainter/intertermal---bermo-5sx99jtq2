@@ -61,6 +61,7 @@ import {
   Sparkles,
   ClipboardCheck,
 } from 'lucide-react'
+import { ClientImportDialog } from '@/components/ClientImportDialog'
 import { ClientSurveyModal } from '@/components/ClientSurveyModal'
 import { clientSurveysService } from '@/services/client-surveys'
 import type { ClientSurveyRecord } from '@/types/crm'
@@ -85,6 +86,7 @@ interface ClientsManagerProps {
   onSelectClient: (client: ClientRecord | null) => void
   onCreateClient: (data: Partial<ClientRecord>) => void
   onUpdateClient: (id: string, data: Partial<ClientRecord>) => void
+  onImportDone?: () => void
 }
 
 const STATUS_MAP: Record<ClientStatus, { label: string; color: string }> = {
@@ -124,6 +126,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
   onSelectClient,
   onCreateClient,
   onUpdateClient,
+  onImportDone,
 }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
@@ -160,6 +163,9 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
       },
     ]
   })
+
+  // Modal de Importação de Planilha de Contatos
+  const [isImportOpen, setIsImportOpen] = useState(false)
 
   // Modal de Disparo de Pesquisa de Satisfação
   const [isSurveyModalOpen, setIsSurveyModalOpen] = useState(false)
@@ -511,13 +517,23 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
             Estrutura de dados cadastrais, score de lead, histórico de propostas e vínculos.
           </p>
         </div>
-        <Button
-          onClick={handleOpenNewClientModal}
-          className="bg-indigo-600 hover:bg-indigo-500 shadow-sm"
-        >
-          <Plus className="h-4 w-4 mr-1.5" />
-          Novo Cliente / Conta
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            onClick={() => setIsImportOpen(true)}
+            variant="outline"
+            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm dark:border-indigo-800 dark:text-indigo-300"
+          >
+            <FileText className="h-4 w-4 mr-1.5" />
+            Importar planilha
+          </Button>
+          <Button
+            onClick={handleOpenNewClientModal}
+            className="bg-indigo-600 hover:bg-indigo-500 shadow-sm"
+          >
+            <Plus className="h-4 w-4 mr-1.5" />
+            Novo Cliente / Conta
+          </Button>
+        </div>
       </div>
       {/* Barra de Filtros */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -1492,6 +1508,13 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
           )}
         </DialogContent>
       </Dialog>
+      {/* Modal de Importação de Planilha */}
+      <ClientImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        clients={clients}
+        onImportDone={onImportDone}
+      />
       {/* Modal de Disparo de Pesquisa de Satisfação */}
       <ClientSurveyModal
         isOpen={isSurveyModalOpen}
