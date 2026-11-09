@@ -122,7 +122,7 @@ routerAdd(
       let chosen = []
       try {
         const unsubSet = new Set()
-        const unsubs = $app.findRecordsByFilter('unsubscribes', '', '-created', 10000, 0)
+        const unsubs = $app.findRecordsByFilter('unsubscribes', 'id != ""', '-created', 10000, 0)
         for (const u of unsubs)
           unsubSet.add(
             String(u.get('email') || '')
@@ -130,15 +130,31 @@ routerAdd(
               .trim(),
           )
 
-        const clients = $app.findRecordsByFilter('clients', '', '-created', 5000, 0)
+        const clients = $app.findRecordsByFilter('clients', 'id != ""', '-created', 5000, 0)
         const picked = new Map()
         for (const c of clients) {
-          if (c.get('unsubscribed_at')) continue
-          const tags = c.get('tags') || []
-          const tagMatch = listTag && Array.isArray(tags) && tags.includes(listTag)
+          // JSON fields chegam como string no JSVM — parse antes de iterar
+          let tags = c.get('tags') || []
+          if (typeof tags === 'string') {
+            try {
+              tags = JSON.parse(tags)
+            } catch (_) {
+              tags = []
+            }
+          }
+          let contacts = c.get('contacts') || []
+          if (typeof contacts === 'string') {
+            try {
+              contacts = JSON.parse(contacts)
+            } catch (_) {
+              contacts = []
+            }
+          }
+          const unsubAt = String(c.get('unsubscribed_at') || '')
+          if (unsubAt && unsubAt.indexOf('0001') !== 0) continue
+          const tagMatch = listTag && Array.isArray(tags) && tags.indexOf(listTag) !== -1
           const emails = []
           if (c.get('email')) emails.push(String(c.get('email')))
-          const contacts = c.get('contacts') || []
           if (Array.isArray(contacts)) {
             for (const ct of contacts) if (ct.email) emails.push(String(ct.email))
           }
@@ -207,7 +223,14 @@ routerAdd(
         return e.json(400, { ok: false, error: 'Campanha não está em rascunho' })
       }
 
-      const recipients = campaign.get('recipients') || []
+      let recipients = campaign.get('recipients') || []
+      if (typeof recipients === 'string') {
+        try {
+          recipients = JSON.parse(recipients)
+        } catch (_) {
+          recipients = []
+        }
+      }
       if (!Array.isArray(recipients) || recipients.length === 0) {
         return e.json(400, { ok: false, error: 'Campanha sem destinatários' })
       }

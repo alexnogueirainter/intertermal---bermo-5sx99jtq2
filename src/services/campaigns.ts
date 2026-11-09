@@ -98,7 +98,7 @@ export const campaignsService = {
 
   async getRecipients(campaignId: string): Promise<CampaignRecipientRecord[]> {
     return await pb.collection('campaign_recipients').getFullList<CampaignRecipientRecord>({
-      filter: `campaign = "${campaignId}"`,
+      filter: `campaign_id = "${campaignId}"`,
       sort: 'email',
     })
   },

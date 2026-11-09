@@ -32,7 +32,7 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
       0,
     )
     for (const r of recs) {
-      const s = String(r.get('sent_at') || '')
+      const s = String(r.getDateTime('sent_at').string() || '')
       if (s.slice(0, 10) === todayKey) usedToday++
     }
   } catch (err) {
@@ -42,9 +42,16 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
   try {
     const logs = $app.findRecordsByFilter('_logs', "data.source = 'email'", '-created', 500, 0)
     for (const l of logs) {
-      const data = l.get('data') || {}
+      let data = l.get('data') || {}
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data)
+        } catch (_) {
+          data = {}
+        }
+      }
       if (String(data.source || '') !== 'email') continue
-      const c = String(l.get('created') || '')
+      const c = String(l.getDateTime('created').string() || '')
       if (c.slice(0, 10) === todayKey) usedToday++
     }
   } catch (_) {
@@ -67,7 +74,7 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
   // ---- Descadastrados (nunca recebem) ----
   const unsubSet = new Set()
   try {
-    const unsubs = $app.findRecordsByFilter('unsubscribes', '', '-created', 10000, 0)
+    const unsubs = $app.findRecordsByFilter('unsubscribes', 'id != ""', '-created', 10000, 0)
     for (const u of unsubs)
       unsubSet.add(
         String(u.get('email') || '')

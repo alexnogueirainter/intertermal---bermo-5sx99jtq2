@@ -5,6 +5,12 @@
  * - Exclui o e-mail de TODAS as próximas campanhas (a fila consulta unsubscribes).
  */
 routerAdd('GET', '/backend/v1/campaigns/unsubscribe', (e) => {
+  const escapeHtml = (s) =>
+    String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+
   const email = String(e.request.url.query().get('t') || '')
     .toLowerCase()
     .trim()
@@ -38,36 +44,46 @@ routerAdd('GET', '/backend/v1/campaigns/unsubscribe', (e) => {
       $app.save(rec)
     }
 
-    // Marca o contato correspondente no CRM (se houver)
+    // Marca o contato correspondente no CRM (se houver).
+    // JSON fields chegam como string no JSVM — parse antes de iterar.
     try {
-      const clients = $app.findRecordsByFilter('clients', '', '-created', 2000, 0)
+      const clients = $app.findRecordsByFilter('clients', 'id != ""', '-created', 2000, 0)
       for (const c of clients) {
-        let match = false
-        if (
-          String(c.get('email') || '')
-            .toLowerCase()
-            .trim() === email
-        )
-          match = true
-        const contacts = c.get('contacts')
-        if (!match && contacts && Array.isArray(contacts)) {
-          for (const ct of contacts) {
-            if (
-              String(ct.email || '')
-                .toLowerCase()
-                .trim() === email
-            ) {
-              match = true
-              break
+        try {
+          let match =
+            String(c.get('email') || '')
+              .toLowerCase()
+              .trim() === email
+          let contacts = c.get('contacts')
+          if (typeof contacts === 'string') {
+            try {
+              contacts = JSON.parse(contacts)
+            } catch (_) {
+              contacts = []
             }
           }
-        }
-        if (match && !c.get('unsubscribed_at')) {
-          c.set('unsubscribed_at', new Date().toISOString())
-          $app.save(c)
-        }
+          if (!match && contacts && contacts.length) {
+            for (const ct of contacts) {
+              if (
+                String(ct.email || '')
+                  .toLowerCase()
+                  .trim() === email
+              ) {
+                match = true
+                break
+              }
+            }
+          }
+          const unsubAt = String(c.get('unsubscribed_at') || '')
+          if (match && (unsubAt === '' || unsubAt.indexOf('0001') === 0)) {
+            c.set('unsubscribed_at', new Date().toISOString())
+            $app.save(c)
+          }
+        } catch (_) {}
       }
-    } catch (_) {}
+    } catch (err) {
+      console.error('[campanhas] falha ao marcar cliente descadastrado:', err)
+    }
 
     console.log('[campanhas] Descadastrado: ' + email)
   } catch (err) {
