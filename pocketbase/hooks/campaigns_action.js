@@ -153,7 +153,10 @@ routerAdd(
           }
           const unsubAt = String(c.get('unsubscribed_at') || '')
           if (unsubAt && unsubAt.indexOf('0001') !== 0) continue
-          const tagMatch = listTag && Array.isArray(tags) && tags.indexOf(listTag) !== -1
+          // Match de etiqueta robusto: tags pode vir como array OU JSON string —
+          // serializa e procura a etiqueta entre aspas (evita falso positivo parcial).
+          const tagsStr = Array.isArray(tags) ? JSON.stringify(tags) : String(tags || '')
+          const tagMatch = listTag && tagsStr.indexOf('"' + listTag + '"') !== -1
           const emails = []
           if (c.get('email')) emails.push(String(c.get('email')))
           if (Array.isArray(contacts)) {
