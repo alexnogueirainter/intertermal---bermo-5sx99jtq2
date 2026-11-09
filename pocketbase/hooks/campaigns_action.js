@@ -248,12 +248,15 @@ routerAdd(
       let list = []
       try {
         list = JSON.parse(txt || '[]')
-      } catch (_) {
+      } catch (errParse) {
         list = []
       }
       if (!Array.isArray(list)) list = []
       if (list.length === 0) {
-        return e.json(400, { ok: false, error: 'Campanha sem destinatários' })
+        return e.json(400, {
+          ok: false,
+          error: 'Campanha sem destinatários (parse: ' + String(txt || '').slice(0, 60) + ')',
+        })
       }
 
       const recCol = $app.findCollectionByNameOrId('campaign_recipients')
