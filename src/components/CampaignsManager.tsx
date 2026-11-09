@@ -87,18 +87,21 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
 
   const loadAll = async () => {
     try {
-      const [t, c, cs, u, tp] = await Promise.all([
+      const [t, c, cs, u] = await Promise.all([
         campaignsService.getAllTags(),
         campaignsService.getEligibleContacts(),
         campaignsService.getAll(),
         campaignsService.getUnsubscribedCount(),
-        templatesService.getAll(),
       ])
       setTags(t)
       setContacts(c)
       setCampaigns(cs)
       setUnsubCount(u)
-      setTemplates(tp)
+      // Modelos carregam em separado — falha aqui não derruba a tela inteira
+      templatesService
+        .getAll()
+        .then(setTemplates)
+        .catch(() => setTemplates([]))
     } catch (err: any) {
       toast({
         title: 'Erro ao carregar campanhas',
@@ -256,26 +259,19 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
       return
     }
     try {
-      if (tplEditingId) {
-        await templatesService.update(tplEditingId, {
-          name: tplName.trim(),
-          category: tplCategory,
-          subject: subject.trim(),
-          body: body.trim(),
-        })
-        toast({ title: 'Modelo atualizado' })
-      } else {
-        await templatesService.create({
-          name: tplName.trim(),
-          category: tplCategory,
-          subject: subject.trim(),
-          body: body.trim(),
-        })
-        toast({
-          title: 'Modelo salvo',
-          description: 'Aparece no botão Modelos de agora em diante.',
-        })
-      }
+      // Salva pelo hook do backend (caminho único e provado, igual campanha)
+      const res = await campaignsService.saveTemplate({
+        name: tplName.trim(),
+        category: tplCategory,
+        subject: subject.trim(),
+        body: body.trim(),
+        template_id: tplEditingId || undefined,
+      })
+      if (!res.ok) throw new Error(res.error || 'Falha ao salvar modelo')
+      toast({
+        title: tplEditingId ? 'Modelo atualizado' : 'Modelo salvo',
+        description: 'Aparece no botão Modelos de agora em diante.',
+      })
       setTplEditingId(null)
       setTplName('')
       setTplCategory('Prospecção')
@@ -303,6 +299,7 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
       toast({ title: 'Erro ao excluir modelo', description: err.message, variant: 'destructive' })
     }
   }
+  // deleteTemplate usa o SDK direto (delete da própria coleção funciona com o token do Alex)
 
   return (
     <div className="space-y-6">

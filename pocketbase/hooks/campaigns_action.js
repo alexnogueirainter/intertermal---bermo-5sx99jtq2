@@ -219,6 +219,46 @@ routerAdd(
       return e.json(200, { ok: true, campaign_id: rec.id, recipients: chosen.length })
     }
 
+    // ===== AÇÃO: TEMPLATE-SAVE (criar/atualizar modelo) =====
+    if (action === 'template-save') {
+      try {
+        const name = String(body.name || '').trim()
+        const category = String(body.category || 'Outro').trim()
+        const subject = String(body.subject || '').trim()
+        const bodyTpl = String(body.body || '').trim()
+        const templateId = String(body.template_id || '').trim()
+        if (!name || !subject || !bodyTpl) {
+          return e.json(400, { ok: false, error: 'Nome, assunto e texto obrigatórios' })
+        }
+        const col = $app.findCollectionByNameOrId('campaign_templates')
+        if (templateId) {
+          let rec = null
+          try {
+            rec = $app.findRecordById('campaign_templates', templateId)
+          } catch (_) {
+            rec = null
+          }
+          if (!rec) return e.json(404, { ok: false, error: 'Modelo não encontrado' })
+          rec.set('name', name)
+          rec.set('category', category)
+          rec.set('subject', subject)
+          rec.set('body', bodyTpl)
+          $app.save(rec)
+          return e.json(200, { ok: true, template_id: rec.id })
+        }
+        const rec = new Record(col)
+        rec.set('name', name)
+        rec.set('category', category)
+        rec.set('subject', subject)
+        rec.set('body', bodyTpl)
+        $app.save(rec)
+        console.log('[campanhas] Modelo salvo: ' + rec.id + ' (' + category + ')')
+        return e.json(200, { ok: true, template_id: rec.id })
+      } catch (errTpl) {
+        return e.json(500, { ok: false, error: 'template-save falhou: ' + String(errTpl) })
+      }
+    }
+
     // ===== AÇÃO: SEND =====
     if (action === 'send') {
       try {

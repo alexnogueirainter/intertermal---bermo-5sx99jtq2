@@ -83,6 +83,21 @@ export const campaignsService = {
     })
   },
 
+  /** Salva/edita um modelo de campanha pelo hook do backend. */
+  async saveTemplate(input: {
+    name: string
+    category?: string
+    subject: string
+    body: string
+    template_id?: string
+  }): Promise<{ ok: boolean; error?: string }> {
+    return await pb.send('/backend/v1/campaigns/action', {
+      method: 'POST',
+      body: { action: 'template-save', ...input },
+      requestKey: null,
+    })
+  },
+
   /** Ativa a campanha: cria a fila (90/dia, continua no dia seguinte). */
   async activate(campaignId: string): Promise<{ ok: boolean; queued?: number; error?: string }> {
     return await pb.send('/backend/v1/campaigns/action', {
