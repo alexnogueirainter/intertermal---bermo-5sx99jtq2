@@ -29,6 +29,7 @@ import {
   Plus,
   Building2,
   ListTodo,
+  MessageCircle,
 } from 'lucide-react'
 import type { ActivityRecord, ActivityType, ActivityStatus, ClientRecord } from '@/types/crm'
 
@@ -38,6 +39,24 @@ interface ActivitiesManagerProps {
   onCreateActivity: (data: Partial<ActivityRecord>) => void
   onUpdateActivity: (id: string, data: Partial<ActivityRecord>) => void
 }
+
+const waDigits = (v?: string) => (v || '').replace(/\D/g, '')
+const waMessage = (a: ActivityRecord) => {
+  const contact = ((a as any).quote_contact || '').trim()
+  const numero = ((a as any).quote_number || '').trim()
+  return (
+    'Olá ' +
+    (contact || 'cliente') +
+    ', tudo bem? Conseguiu avaliar a proposta ' +
+    (numero || '') +
+    '? Fico à disposição.'
+  )
+}
+const waLink = (phone: string, msg: string) =>
+  'https://wa.me/' +
+  (phone.startsWith('55') ? phone : '55' + phone) +
+  '?text=' +
+  encodeURIComponent(msg)
 
 const TYPE_ICONS: Record<ActivityType, { label: string; icon: any }> = {
   call: { label: 'Ligação Telefônica', icon: Phone },
@@ -211,19 +230,38 @@ export const ActivitiesManager: React.FC<ActivitiesManagerProps> = ({
                   </span>
                 </div>
 
-                <Button
-                  size="sm"
-                  variant={isDone ? 'outline' : 'default'}
-                  onClick={() => handleToggleComplete(act)}
-                  className={`h-7 text-[11px] ${
-                    isDone
-                      ? 'border-emerald-300 text-emerald-600 hover:bg-emerald-50'
-                      : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
-                  }`}
-                >
-                  <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                  {isDone ? 'Concluída' : 'Marcar Feita'}
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  {(act as any).quote_cobranca && waDigits(act.contact_phone) && (
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        window.open(
+                          waLink(waDigits(act.contact_phone), waMessage(act)),
+                          '_blank',
+                          'noopener,noreferrer',
+                        )
+                      }
+                      className="h-7 text-[11px] bg-emerald-600 hover:bg-emerald-500 text-white"
+                      title="Abrir WhatsApp com a mensagem pronta"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5 mr-1" />
+                      WhatsApp
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant={isDone ? 'outline' : 'default'}
+                    onClick={() => handleToggleComplete(act)}
+                    className={`h-7 text-[11px] ${
+                      isDone
+                        ? 'border-emerald-300 text-emerald-600 hover:bg-emerald-50'
+                        : 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900'
+                    }`}
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                    {isDone ? 'Concluída' : 'Marcar Feita'}
+                  </Button>
+                </div>
               </div>
             </Card>
           )

@@ -280,6 +280,23 @@ export default function IndexPage() {
     }
   })
 
+  // Inscrição em Realtime para a coleção 'activities' (cobranças criadas pelo cron aparecem na hora)
+  useRealtime<any>('activities', (e) => {
+    const record = e.record as unknown as ActivityRecord
+    if (e.action === 'create') {
+      setActivities((prev) => {
+        const exists = prev.some((a) => a.id === record.id)
+        return exists
+          ? prev.map((a) => (a.id === record.id ? { ...a, ...record } : a))
+          : [record, ...prev]
+      })
+    } else if (e.action === 'update') {
+      setActivities((prev) => prev.map((a) => (a.id === record.id ? { ...a, ...record } : a)))
+    } else if (e.action === 'delete') {
+      setActivities((prev) => prev.filter((a) => a.id !== record.id))
+    }
+  })
+
   // Inscrição em Realtime para a coleção 'field_visits'
   useRealtime<any>('field_visits', (e) => {
     const record = e.record as unknown as FieldVisitRecord

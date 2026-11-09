@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-09T18:46:39.220Z",
+  "generatedAt": "2026-11-09T19:01:03.853Z",
   "collections": [
     {
       "name": "users",
@@ -1615,6 +1615,24 @@
         },
         {
           "name": "contact_phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quote_cobranca",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quote_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quote_contact",
           "type": "text",
           "required": false,
           "system": false
