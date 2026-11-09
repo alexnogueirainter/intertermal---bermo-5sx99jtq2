@@ -143,6 +143,7 @@ export const campaignsService = {
           email: key,
           name: String(c.name || ''),
           company: String(c.company_name || c.name || ''),
+          tags: Array.isArray(c.tags) ? c.tags.map(String) : [],
         })
       }
     }
