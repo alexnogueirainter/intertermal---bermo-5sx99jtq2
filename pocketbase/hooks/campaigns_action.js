@@ -153,10 +153,19 @@ routerAdd(
           }
           const unsubAt = String(c.get('unsubscribed_at') || '')
           if (unsubAt && unsubAt.indexOf('0001') !== 0) continue
-          // Match de etiqueta robusto: tags pode vir como array OU JSON string —
-          // serializa e procura a etiqueta entre aspas (evita falso positivo parcial).
-          const tagsStr = Array.isArray(tags) ? JSON.stringify(tags) : String(tags || '')
-          const tagMatch = listTag && tagsStr.indexOf('"' + listTag + '"') !== -1
+          // Match de etiqueta EXATO por item: tags pode vir como array OU JSON string
+          let tagsArr = tags
+          if (typeof tagsArr === 'string') {
+            try {
+              tagsArr = JSON.parse(tagsArr)
+            } catch (_) {
+              tagsArr = []
+            }
+          }
+          if (!Array.isArray(tagsArr)) tagsArr = []
+          const tagMatch =
+            listTag &&
+            tagsArr.map((t) => String(t).toLowerCase().trim()).indexOf(listTag.toLowerCase()) !== -1
           const emails = []
           if (c.get('email')) emails.push(String(c.get('email')))
           if (Array.isArray(contacts)) {
@@ -241,15 +250,24 @@ routerAdd(
 
       const recCol = $app.findCollectionByNameOrId('campaign_recipients')
       let created = 0
-      for (const r of recipients) {
+      for (const r0 of recipients) {
+        // Item do JSON pode voltar como string — normaliza para objeto
+        let r = r0
+        if (typeof r === 'string') {
+          try {
+            r = JSON.parse(r)
+          } catch (_) {
+            r = null
+          }
+        }
+        if (!r || typeof r !== 'object') continue
+        const emailNorm = String(r.email || '')
+          .toLowerCase()
+          .trim()
+        if (!emailNorm) continue
         const p = new Record(recCol)
         p.set('campaign_id', campaignId)
-        p.set(
-          'email',
-          String(r.email || '')
-            .toLowerCase()
-            .trim(),
-        )
+        p.set('email', emailNorm)
         p.set('name', String(r.name || ''))
         p.set('company', String(r.company || ''))
         p.set('status', 'pending')
