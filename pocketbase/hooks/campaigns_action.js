@@ -217,73 +217,77 @@ routerAdd(
 
     // ===== AÇÃO: SEND =====
     if (action === 'send') {
-      const campaignId = String(body.campaign_id || '')
-      let campaign = null
       try {
-        campaign = $app.findRecordById('campaigns', campaignId)
-      } catch (_) {
-        campaign = null
-      }
-      if (!campaign) return e.json(404, { ok: false, error: 'Campanha não encontrada' })
-      if (String(campaign.get('status') || '') !== 'draft') {
-        return e.json(400, { ok: false, error: 'Campanha não está em rascunho' })
-      }
-
-      // O JSVM devolve o JSONField como ARRAY DE BYTES (números 0-255) —
-      // decodifica para texto UTF-8 e faz o parse do JSON.
-      const rawRecipients = campaign.get('recipients') || []
-      const bytes = []
-      for (const r0 of rawRecipients) {
-        if (typeof r0 === 'number') bytes.push(r0)
-        else if (typeof r0 === 'string') bytes.push(r0)
-      }
-      let txt = null
-      if (bytes.length > 0) {
-        if (bytes.every((b) => typeof b === 'number')) {
-          txt = new TextDecoder().decode(new Uint8Array(bytes))
-        } else {
-          txt = bytes.join('')
+        const campaignId = String(body.campaign_id || '')
+        let campaign = null
+        try {
+          campaign = $app.findRecordById('campaigns', campaignId)
+        } catch (_) {
+          campaign = null
         }
-      }
-      let list = []
-      try {
-        list = JSON.parse(txt || '[]')
-      } catch (errParse) {
-        list = []
-      }
-      if (!Array.isArray(list)) list = []
-      if (list.length === 0) {
-        return e.json(400, {
-          ok: false,
-          error: 'Campanha sem destinatários (parse: ' + String(txt || '').slice(0, 60) + ')',
-        })
-      }
+        if (!campaign) return e.json(404, { ok: false, error: 'Campanha não encontrada' })
+        if (String(campaign.get('status') || '') !== 'draft') {
+          return e.json(400, { ok: false, error: 'Campanha não está em rascunho' })
+        }
 
-      const recCol = $app.findCollectionByNameOrId('campaign_recipients')
-      let created = 0
-      for (const r of list) {
-        if (!r || typeof r !== 'object') continue
-        const emailNorm = String(r.email || '')
-          .toLowerCase()
-          .trim()
-        if (!emailNorm) continue
-        const p = new Record(recCol)
-        p.set('campaign_id', campaignId)
-        p.set('email', emailNorm)
-        p.set('name', String(r.name || ''))
-        p.set('company', String(r.company || ''))
-        p.set('status', 'pending')
-        $app.save(p)
-        created++
+        // O JSVM devolve o JSONField como ARRAY DE BYTES (números 0-255) —
+        // decodifica para texto UTF-8 e faz o parse do JSON.
+        const rawRecipients = campaign.get('recipients') || []
+        const bytes = []
+        for (const r0 of rawRecipients) {
+          if (typeof r0 === 'number') bytes.push(r0)
+          else if (typeof r0 === 'string') bytes.push(r0)
+        }
+        let txt = null
+        if (bytes.length > 0) {
+          if (bytes.every((b) => typeof b === 'number')) {
+            txt = new TextDecoder().decode(new Uint8Array(bytes))
+          } else {
+            txt = bytes.join('')
+          }
+        }
+        let list = []
+        try {
+          list = JSON.parse(txt || '[]')
+        } catch (errParse) {
+          list = []
+        }
+        if (!Array.isArray(list)) list = []
+        if (list.length === 0) {
+          return e.json(400, {
+            ok: false,
+            error: 'Campanha sem destinatários (parse: ' + String(txt || '').slice(0, 60) + ')',
+          })
+        }
+
+        const recCol = $app.findCollectionByNameOrId('campaign_recipients')
+        let created = 0
+        for (const r of list) {
+          if (!r || typeof r !== 'object') continue
+          const emailNorm = String(r.email || '')
+            .toLowerCase()
+            .trim()
+          if (!emailNorm) continue
+          const p = new Record(recCol)
+          p.set('campaign_id', campaignId)
+          p.set('email', emailNorm)
+          p.set('name', String(r.name || ''))
+          p.set('company', String(r.company || ''))
+          p.set('status', 'pending')
+          $app.save(p)
+          created++
+        }
+
+        campaign.set('status', 'sending')
+        $app.save(campaign)
+
+        console.log(
+          '[campanhas] Campanha ATIVADA: ' + campaignId + ' (' + created + ' na fila, 90/dia)',
+        )
+        return e.json(200, { ok: true, queued: created, daily_limit: 90 })
+      } catch (errSend) {
+        return e.json(500, { ok: false, error: 'SEND falhou: ' + String(errSend) })
       }
-
-      campaign.set('status', 'sending')
-      $app.save(campaign)
-
-      console.log(
-        '[campanhas] Campanha ATIVADA: ' + campaignId + ' (' + created + ' na fila, 90/dia)',
-      )
-      return e.json(200, { ok: true, queued: created, daily_limit: 90 })
     }
 
     return e.json(400, { ok: false, error: 'Ação desconhecida' })
