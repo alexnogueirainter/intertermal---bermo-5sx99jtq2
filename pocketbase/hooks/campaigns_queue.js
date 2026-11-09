@@ -81,7 +81,7 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
   try {
     pending = $app.findRecordsByFilter(
       'campaign_recipients',
-      'campaign = {:c} && status = {:s}',
+      'campaign_id = {:c} && status = {:s}',
       '-created',
       500,
       0,
@@ -204,7 +204,7 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
   try {
     const rest = $app.findRecordsByFilter(
       'campaign_recipients',
-      'campaign = {:c} && status = {:s}',
+      'campaign_id = {:c} && status = {:s}',
       '-created',
       1,
       0,

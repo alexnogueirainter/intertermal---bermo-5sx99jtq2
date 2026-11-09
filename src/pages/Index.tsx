@@ -1177,7 +1177,7 @@ export default function IndexPage() {
                 {activeTab === 'services' && 'Ordens de Serviço & Contratos'}
                 {activeTab === 'tickets' && 'Suporte Técnico & Pós-Venda'}
                 {activeTab === 'activities' && 'Agenda & Visitas de Campo'}
-                {activeTab === 'copilot' && 'Campanhas de E-mail'}
+                {activeTab === 'campaigns' && 'Campanhas de E-mail'}
                 {activeTab === 'copilot' && 'Copiloto de Engenharia'}
                 {activeTab === 'architecture' && 'Especificação da Arquitetura'}
               </span>
