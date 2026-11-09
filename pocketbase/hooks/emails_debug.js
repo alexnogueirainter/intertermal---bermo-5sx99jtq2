@@ -78,7 +78,15 @@ routerAdd(
       })
       steps.http_ok = true
       steps.status = res.statusCode
-      steps.body_preview = String(res.body ? new TextDecoder().decode(res.body) : '').slice(0, 300)
+      let bodyTxt = ''
+      try {
+        if (res.body && res.body.length > 0) {
+          bodyTxt = new TextDecoder().decode(new Uint8Array(res.body))
+        }
+      } catch (_) {
+        bodyTxt = '(sem corpo)'
+      }
+      steps.body_preview = bodyTxt.slice(0, 300)
     } catch (err) {
       steps.http_ok = false
       steps.http_err = String(err)
