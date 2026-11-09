@@ -594,6 +594,8 @@ export interface ServiceRecord {
 
 export interface ActivityRecord {
   id: string
+  quick_contact?: string
+  contact_phone?: string
   title: string
   description?: string
   type: ActivityType | string

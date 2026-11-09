@@ -60,6 +60,9 @@ import type {
   DealStage,
 } from '@/types/crm'
 import { BermoProductItem } from '@/data/bermo-catalog'
+import { QuickContactButton } from '@/components/QuickContactButton'
+import { QuickReturnContacts } from '@/components/QuickReturnContacts'
+import { quickContactService } from '@/services/quick-contact'
 
 // Feature Components
 import { OverviewDashboard } from '@/components/OverviewDashboard'
@@ -784,6 +787,73 @@ export default function IndexPage() {
     }
   }
 
+  // ===== Contato rápido: registro, lista de retorno e ações =====
+  const handleCreateQuickContact = async (record: ActivityRecord) => {
+    setActivities((prev) => [record, ...prev])
+  }
+
+  const returnContacts = React.useMemo(
+    () => activities.filter((a) => a.quick_contact && a.status === 'pending'),
+    [activities],
+  )
+
+  const handleConvertQuickContact = async (id: string) => {
+    try {
+      const res = await quickContactService.convert(id)
+      const updated = await activitiesService.update(id, { status: 'completed' })
+      setActivities(activities.map((a) => (a.id === id ? updated : a)))
+      try {
+        const freshClients = await clientsService.getAll()
+        setClients(freshClients)
+        const freshDeals = await dealsService.getAll()
+        setDeals(freshDeals)
+      } catch (refreshErr) {
+        console.warn('Erro ao recarregar clientes/deals após conversão:', refreshErr)
+      }
+      toast({
+        title: 'Oportunidade criada no funil!',
+        description: `Cliente ${res.created_client ? 'cadastrado' : 'já existia na base'} · negócio criado na etapa Prospecção.`,
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao virar oportunidade',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleSnoozeQuickContact = async (id: string) => {
+    try {
+      const current = activities.find((a) => a.id === id)
+      const base = current?.due_date ? new Date(current.due_date) : new Date()
+      base.setDate(base.getDate() + 1)
+      const updated = await activitiesService.update(id, { due_date: base.toISOString() })
+      setActivities(activities.map((a) => (a.id === id ? updated : a)))
+      toast({ title: 'Retorno adiado 1 dia.' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao adiar',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleDiscardQuickContact = async (id: string) => {
+    try {
+      const updated = await activitiesService.update(id, { status: 'cancelled' })
+      setActivities(activities.map((a) => (a.id === id ? updated : a)))
+      toast({ title: 'Contato descartado.' })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao descartar',
+        description: err.message,
+        variant: 'destructive',
+      })
+    }
+  }
+
   return (
     <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden font-sans">
       {/* Sidebar de Navegação */}
@@ -1113,8 +1183,22 @@ export default function IndexPage() {
               <Plus className="h-3.5 w-3.5 mr-1" />
               Novo Orçamento
             </Button>
+
+            <QuickContactButton onCreated={handleCreateQuickContact} />
           </div>
         </header>
+
+        {/* Contatos a retornar — alerta no topo do conteúdo, em todas as abas */}
+        {returnContacts.length > 0 && (
+          <div className="px-4 sm:px-6 lg:px-8 pt-4 shrink-0">
+            <QuickReturnContacts
+              activities={activities}
+              onConvert={handleConvertQuickContact}
+              onSnooze={handleSnoozeQuickContact}
+              onDiscard={handleDiscardQuickContact}
+            />
+          </div>
+        )}
 
         {/* Conteúdo Renderizado por Aba */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
