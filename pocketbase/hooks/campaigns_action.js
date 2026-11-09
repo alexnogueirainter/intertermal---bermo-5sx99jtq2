@@ -76,13 +76,17 @@ routerAdd(
       if (res.statusCode === 200 && res.json && res.json.id) {
         return { ok: true, id: String(res.json.id) }
       }
+      let errBody = ''
+      try {
+        if (res.body && res.body.length > 0) {
+          errBody = new TextDecoder().decode(new Uint8Array(res.body))
+        }
+      } catch (_) {
+        errBody = ''
+      }
       return {
         ok: false,
-        error:
-          'HTTP ' +
-          res.statusCode +
-          ': ' +
-          String(res.body ? new TextDecoder().decode(res.body) : '').slice(0, 200),
+        error: 'HTTP ' + res.statusCode + ': ' + String(errBody).slice(0, 250),
       }
     }
 

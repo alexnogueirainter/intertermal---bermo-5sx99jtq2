@@ -182,11 +182,15 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
         ok = true
         resendId = String(res.json.id || '')
       } else {
-        errTxt =
-          'HTTP ' +
-          res.statusCode +
-          ': ' +
-          String(res.body ? new TextDecoder().decode(res.body) : '').slice(0, 200)
+        let errBody = ''
+        try {
+          if (res.body && res.body.length > 0) {
+            errBody = new TextDecoder().decode(new Uint8Array(res.body))
+          }
+        } catch (_) {
+          errBody = ''
+        }
+        errTxt = 'HTTP ' + res.statusCode + ': ' + String(errBody).slice(0, 250)
       }
     } catch (err) {
       errTxt = 'transporte: ' + String(err)

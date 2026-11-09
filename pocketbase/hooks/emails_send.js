@@ -84,11 +84,15 @@ routerAdd(
       console.log('[emails/send] Enviado para ' + to + ' | resend_id=' + String(res.json.id))
       return e.json(200, { ok: true, resend_id: String(res.json.id) })
     }
-    const errTxt =
-      'HTTP ' +
-      res.statusCode +
-      ': ' +
-      String(res.body ? new TextDecoder().decode(res.body) : '').slice(0, 200)
+    let errBody = ''
+    try {
+      if (res.body && res.body.length > 0) {
+        errBody = new TextDecoder().decode(new Uint8Array(res.body))
+      }
+    } catch (_) {
+      errBody = ''
+    }
+    const errTxt = 'HTTP ' + res.statusCode + ': ' + String(errBody).slice(0, 250)
     console.error('[emails/send] Falha para ' + to + ': ' + errTxt)
     return e.json(502, { ok: false, error: errTxt })
   },
