@@ -70,17 +70,19 @@ cronAdd('quote_followup_cobranca', '3 11 * * 1-5', () => {
   for (const q of sent) {
     sentIds.add(String(q.id))
 
-    // Âncora do ciclo: 1ª vez vista como 'sent' (ou rearmada após cobrança concluída)
+    // Âncora do ciclo: 1ª vez vista como 'sent' (ou rearmada após cobrança concluída).
+    // Proposta sem âncora: usa a data da última atualização da própria proposta
+    // (quando virou "Enviada") — cobrança de proposta já vencida sai na próxima rodada.
     let anchor = String(q.get('follow_up_date') || '').trim()
     if (!anchor) {
-      q.set('follow_up_date', nowIso)
+      anchor = String(q.getDateTime('updated').string() || nowIso)
+      q.set('follow_up_date', anchor)
       try {
         $app.save(q)
       } catch (err) {
         console.error('[cobranca] falha ao ancorar follow_up_date da proposta ' + q.id + ':', err)
         continue
       }
-      anchor = nowIso
     }
 
     const diasCorridos = Math.floor((Date.now() - new Date(anchor).getTime()) / 86400000)
