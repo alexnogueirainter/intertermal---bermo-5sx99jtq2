@@ -354,6 +354,8 @@ export interface EquipmentWebSearchResponse {
   searchProvider?: string
   totalResults: number
   results: EquipmentWebSearchResultItem[]
+  primaryResult?: EquipmentWebSearchResultItem | null
+  otherResults?: EquipmentWebSearchResultItem[]
   recommendedSpecs?: EquipmentWebSearchResultItem['specs']
   message?: string
 }
@@ -471,48 +473,15 @@ export async function searchEquipmentSpecsOnline(
   model: string,
   brand?: string,
 ): Promise<EquipmentSpecsSearchResult> {
-  const clean = (model || '').trim()
-  if (!clean) {
-    return {
-      found: false,
-      brand: brand || 'Outro',
-      model: '',
-      specs: null,
-      message: 'Modelo não informado.',
-    }
-  }
-
-  try {
-    const res = await pb.send<EquipmentSpecsSearchResult>(
-      '/backend/v1/intertermal/equipment-specs',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: clean, brand: brand || '' }),
-      },
-    )
-    return res
-  } catch (firstErr) {
-    try {
-      const resFallback = await pb.send<EquipmentSpecsSearchResult>(
-        '/backend/v1/equipment/search-specs',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: clean, brand: brand || '' }),
-        },
-      )
-      return resFallback
-    } catch (error) {
-      console.warn('Erro ao consultar backend para specs do equipamento:', error)
-      return {
-        found: false,
-        brand: brand || 'Outro',
-        model: clean,
-        specs: null,
-        message: 'Busca online indisponível no momento. Preencha manualmente os campos técnicos.',
-      }
-    }
+  // Busca UNIFICADA: mesma rota da pesquisa oficial (equipment-official-research).
+  const res = await searchEquipmentWeb(model, brand)
+  return {
+    found: res.found,
+    brand: res.brand,
+    model: res.model,
+    specs: res.recommendedSpecs || null,
+    source: res.primaryResult?.url || '',
+    message: res.message || '',
   }
 }
 

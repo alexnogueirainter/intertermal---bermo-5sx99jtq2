@@ -10,7 +10,17 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { EquipmentWebSearchResultItem } from '@/services/quotes'
-import { Check, Copy, Globe, Loader2, Search, Sparkles } from 'lucide-react'
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  ExternalLink,
+  Globe,
+  Loader2,
+  Search,
+} from 'lucide-react'
+import { useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 
 import type { useToast } from '@/hooks/use-toast'
@@ -55,16 +65,133 @@ export function WebSearchSpecsDialog(props: WebSearchSpecsDialogProps) {
     toast,
   } = props
 
+  // 1 resultado principal + demais atrás do botão "ver outros resultados"
+  const primaryResult = webSearchResults.length > 0 ? webSearchResults[0] : null
+  const otherResults = webSearchResults.length > 1 ? webSearchResults.slice(1) : []
+  const [showOtherResults, setShowOtherResults] = useState(false)
+
+  const renderResultCard = (resItem: EquipmentWebSearchResultItem) => {
+    const specs = resItem.specs
+    return (
+      <div className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-teal-500/50 hover:shadow-xs transition-all space-y-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                {resItem.title}
+              </span>
+              {resItem.badge && (
+                <Badge
+                  variant="secondary"
+                  className="text-[10px] px-1.5 py-0 h-4 bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800"
+                >
+                  {resItem.badge}
+                </Badge>
+              )}
+            </div>
+            {resItem.snippet && (
+              <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                {resItem.snippet}
+              </p>
+            )}
+          </div>
+
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => {
+              const applied = applySpecsToEquipment(
+                webSearchActiveIndex,
+                resItem.specs,
+                resItem.brand,
+                resItem.model,
+              )
+              if (applied) {
+                setIsWebSearchModalOpen(false)
+                toast({
+                  title: 'Especificações aplicadas!',
+                  description: `Dados de ${resItem.title} preenchidos com sucesso no Item #${webSearchActiveIndex + 1}.`,
+                })
+              }
+            }}
+            className="h-7 px-3 text-xs bg-teal-600 hover:bg-teal-700 text-white shrink-0"
+          >
+            <Check className="h-3 w-3 mr-1" />
+            Aplicar Specs
+          </Button>
+        </div>
+
+        {specs && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 bg-slate-50 dark:bg-slate-950/60 rounded border border-slate-100 dark:border-slate-800/80 text-[11px]">
+            <div>
+              <span className="text-muted-foreground block text-[10px]">Qtd Placas:</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">
+                {specs.platesCount || specs.platesRange || 'N/A'}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block text-[10px]">Material:</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                {specs.material || specs.plateMaterial || '—'}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block text-[10px]">Gaxeta / Vedação:</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                {specs.gasketMaterial || '—'}
+              </span>
+            </div>
+            <div>
+              <span className="text-muted-foreground block text-[10px]">Conexão / Pressão:</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
+                {specs.connection || '—'} • {specs.pressure || '—'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {resItem.url && (
+          <div className="flex items-center justify-between pt-0.5 text-[10px] text-muted-foreground">
+            <a
+              href={resItem.url}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="truncate max-w-[80%] text-teal-700 dark:text-teal-300 hover:underline flex items-center gap-1"
+              title={resItem.url}
+            >
+              <ExternalLink className="h-2.5 w-2.5 shrink-0" />
+              Fonte: {resItem.url}
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(resItem.url || '')
+                toast({
+                  title: 'URL copiada',
+                  description: 'Endereço da fonte copiado para a área de transferência.',
+                })
+              }}
+              className="text-teal-600 hover:underline flex items-center gap-1 shrink-0"
+            >
+              <Copy className="h-2.5 w-2.5" />
+              Copiar URL
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
     <>
-      {/* 5.5 Modal interno de Pesquisa Técnica Server-Side (Sem abrir abas externas / Iframe Safe) */}
+      {/* Modal interno de Pesquisa Técnica — fonte oficial única, sem IA sem fonte */}
       <Dialog open={isWebSearchModalOpen} onOpenChange={setIsWebSearchModalOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
           <DialogHeader className="p-4 pb-2 border-b border-slate-100 dark:border-slate-800 bg-teal-50/50 dark:bg-teal-950/20">
             <div className="flex items-center justify-between">
               <DialogTitle className="text-sm font-bold flex items-center gap-2 text-teal-900 dark:text-teal-200">
                 <Globe className="h-4 w-4 text-teal-600" />
-                Busca de Especificações Técnicas (Server-Side)
+                Busca de Especificações Técnicas — Fonte Oficial
               </DialogTitle>
               <Badge
                 variant="outline"
@@ -74,9 +201,8 @@ export function WebSearchSpecsDialog(props: WebSearchSpecsDialogProps) {
               </Badge>
             </div>
             <DialogDescription className="text-xs text-muted-foreground mt-1">
-              Pesquisa realizada no servidor com catálogo BERMO, fichas técnicas de trocadores e IA
-              integrada. Selecione um resultado para aplicar os dados técnicos diretamente no
-              orçamento.
+              Pesquisa restrita ao site oficial do fabricante. Sem resultado oficial, nada é
+              preenchido automaticamente.
             </DialogDescription>
           </DialogHeader>
 
@@ -130,171 +256,55 @@ export function WebSearchSpecsDialog(props: WebSearchSpecsDialogProps) {
                 <Loader2 className="h-8 w-8 text-teal-600 animate-spin" />
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                    Consultando especificações técnicas no servidor...
+                    Consultando o site oficial do fabricante...
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    Verificando base BERMO, fabricantes homologados e parâmetros térmicos
+                    Busca limitada às fontes oficiais aprovadas
                   </p>
                 </div>
               </div>
-            ) : webSearchResults.length > 0 ? (
+            ) : primaryResult ? (
               <div className="space-y-2.5">
-                {webSearchResults.map((resItem) => {
-                  const specs = resItem.specs
-                  return (
-                    <div
-                      key={resItem.id}
-                      className="p-3.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 hover:border-teal-500/50 hover:shadow-xs transition-all space-y-2.5"
+                {renderResultCard(primaryResult)}
+
+                {otherResults.length > 0 && (
+                  <div className="space-y-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowOtherResults((prev) => !prev)}
+                      className="h-7 text-xs w-full border-teal-200 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
-                              {resItem.title}
-                            </span>
-                            {resItem.badge && (
-                              <Badge
-                                variant="secondary"
-                                className="text-[10px] px-1.5 py-0 h-4 bg-teal-50 dark:bg-teal-950 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800"
-                              >
-                                {resItem.badge}
-                              </Badge>
-                            )}
-                          </div>
-                          {resItem.snippet && (
-                            <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
-                              {resItem.snippet}
-                            </p>
-                          )}
-                        </div>
-
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => {
-                            const applied = applySpecsToEquipment(
-                              webSearchActiveIndex,
-                              resItem.specs,
-                              resItem.brand,
-                              resItem.model,
-                            )
-                            if (applied) {
-                              setIsWebSearchModalOpen(false)
-                              toast({
-                                title: 'Especificações aplicadas!',
-                                description: `Dados de ${resItem.title} preenchidos com sucesso no Item #${webSearchActiveIndex + 1}.`,
-                              })
-                            }
-                          }}
-                          className="h-7 px-3 text-xs bg-teal-600 hover:bg-teal-700 text-white shrink-0"
-                        >
-                          <Check className="h-3 w-3 mr-1" />
-                          Aplicar Specs
-                        </Button>
+                      {showOtherResults ? (
+                        <>
+                          <ChevronUp className="h-3 w-3 mr-1" />
+                          Ocultar outros resultados ({otherResults.length})
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3 w-3 mr-1" />
+                          Ver outros resultados ({otherResults.length})
+                        </>
+                      )}
+                    </Button>
+                    {showOtherResults && (
+                      <div className="space-y-2.5">
+                        {otherResults.map((r) => renderResultCard(r))}
                       </div>
-
-                      {/* Grade de Especificações Extraídas */}
-                      {specs && (
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-2 bg-slate-50 dark:bg-slate-950/60 rounded border border-slate-100 dark:border-slate-800/80 text-[11px]">
-                          <div>
-                            <span className="text-muted-foreground block text-[10px]">
-                              Qtd Placas:
-                            </span>
-                            <span className="font-semibold text-slate-800 dark:text-slate-200">
-                              {specs.platesCount || specs.platesRange || 'N/A'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block text-[10px]">
-                              Material:
-                            </span>
-                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                              {specs.material || specs.plateMaterial || 'AISI 316L'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block text-[10px]">
-                              Gaxeta / Vedação:
-                            </span>
-                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                              {specs.gasketMaterial || 'EPDM Clip-on'}
-                            </span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground block text-[10px]">
-                              Conexão / Pressão:
-                            </span>
-                            <span className="font-semibold text-slate-800 dark:text-slate-200 truncate block">
-                              {specs.connection || 'DN50'} • {specs.pressure || '16 bar'}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Link de referência com proteção noopener */}
-                      {resItem.url && (
-                        <div className="flex items-center justify-between pt-0.5 text-[10px] text-muted-foreground">
-                          <span className="truncate max-w-[80%]">Fonte: {resItem.url}</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              navigator.clipboard.writeText(resItem.url || '')
-                              toast({
-                                title: 'URL copiada',
-                                description:
-                                  'Endereço da fonte copiado para a área de transferência.',
-                              })
-                            }}
-                            className="text-teal-600 hover:underline flex items-center gap-1"
-                          >
-                            <Copy className="h-2.5 w-2.5" />
-                            Copiar URL
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="py-8 text-center space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  Nenhuma ficha técnica automática encontrada para &ldquo;{webSearchQuery}&rdquo;.
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                  Não encontrado no site do fabricante — consultar fabricante
                 </p>
-                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-md text-left text-xs space-y-2">
-                  <p className="font-semibold text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-amber-600" />
-                    Busca manual assistida (segura contra bloqueios do navegador):
-                  </p>
-                  <p className="text-muted-foreground text-[11px]">
-                    Copie o termo técnico abaixo e faça a pesquisa diretamente em seu navegador em
-                    nova janela, evitando bloqueios de iframe da prévia:
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      readOnly
-                      value={`${webSearchQuery || equipmentModel || 'trocador de calor'} trocador de calor especificações técnicas datasheet`}
-                      className="h-7 text-xs bg-white dark:bg-slate-900 font-mono"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const term = `${webSearchQuery || equipmentModel || 'trocador de calor'} trocador de calor especificações técnicas datasheet`
-                        navigator.clipboard.writeText(term)
-                        toast({
-                          title: 'Termo copiado!',
-                          description: 'Termo técnico copiado para a área de transferência.',
-                        })
-                      }}
-                      className="h-7 px-2.5 text-xs border-amber-300 text-amber-800 hover:bg-amber-100"
-                    >
-                      <Copy className="h-3 w-3 mr-1" />
-                      Copiar
-                    </Button>
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                  A busca cobre apenas os sites oficiais aprovados. Nenhum dado técnico é preenchido
+                  sem fonte — consulte o fabricante ou insira os dados manualmente.
+                </p>
               </div>
             )}
           </div>
