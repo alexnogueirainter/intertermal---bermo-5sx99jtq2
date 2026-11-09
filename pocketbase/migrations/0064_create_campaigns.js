@@ -122,20 +122,8 @@ migrate(
     //    coleção) — remapear collectionId de relation existente é bloqueado pelo PocketBase.
     //    A fila e a tela usam o campo TEXT campaign_id, não esta relation.
 
-    // 6) Fila pausada por padrão (o Alex decide quando rodar)
-    const cronCol = app.findCollectionByNameOrId('_cron_settings')
-    let cr = null
-    try {
-      cr = app.findFirstRecordByFilter('_cron_settings', 'job = {:j}', { j: 'campaigns_queue' })
-    } catch (_) {
-      cr = null
-    }
-    if (!cr) {
-      cr = new Record(cronCol)
-      cr.set('job', 'campaigns_queue')
-      cr.set('disabled', true)
-      app.save(cr)
-    }
+    // (fila _cron_settings é gerenciada pela plataforma — não criar/alterar aqui;
+    //  o cron só envia quando existe campanha em 'sending', criada pelo clique do Alex)
   },
   (app) => {
     for (const name of ['campaign_recipients', 'campaigns', 'unsubscribes']) {
