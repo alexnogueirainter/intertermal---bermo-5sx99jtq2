@@ -1187,7 +1187,6 @@ export default function IndexPage() {
             <QuickContactButton onCreated={handleCreateQuickContact} />
           </div>
         </header>
-
         {/* Contatos a retornar — alerta no topo do conteúdo, em todas as abas */}
         {returnContacts.length > 0 && (
           <div className="px-4 sm:px-6 lg:px-8 pt-4 shrink-0">
