@@ -328,8 +328,10 @@ export async function buildExecutivePdfFile(
   const rent = profitabilityData(serviceOrders, quotes)
   const holder = document.createElement('div')
   holder.style.position = 'fixed'
-  holder.style.left = '-10000px'
+  holder.style.left = '0'
   holder.style.top = '0'
+  holder.style.zIndex = '-9999'
+  holder.style.background = '#ffffff'
   holder.innerHTML = `<style>${PRINT_CSS}</style>${reportHtml(data, conv, rent)}`
   document.body.appendChild(holder)
   try {
@@ -346,9 +348,11 @@ export async function buildExecutivePdfFile(
           scale: 2,
           useCORS: true,
           logging: false,
+          scrollX: 0,
           scrollY: 0,
           width: 760,
           windowWidth: 760,
+          backgroundColor: '#ffffff',
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] },
