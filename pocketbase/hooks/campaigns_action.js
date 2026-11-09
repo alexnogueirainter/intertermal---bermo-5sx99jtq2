@@ -171,8 +171,8 @@ routerAdd(
           if (Array.isArray(contacts)) {
             for (const ct of contacts) if (ct.email) emails.push(String(ct.email))
           }
+          // A lista explícita vence (etiqueta é resolvida no frontend e chega aqui pronta)
           const manualMatch =
-            !listTag &&
             recipientsIn.length > 0 &&
             emails.some((em) =>
               recipientsIn

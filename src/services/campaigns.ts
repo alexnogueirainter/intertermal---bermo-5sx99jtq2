@@ -114,7 +114,9 @@ export const campaignsService = {
   },
 
   /** Contatos elegíveis (por etiqueta ou todos) para marcar um a um. */
-  async getEligibleContacts(): Promise<{ email: string; name: string; company: string }[]> {
+  async getEligibleContacts(): Promise<
+    { email: string; name: string; company: string; tags: string[] }[]
+  > {
     const clients = await pb.collection('clients').getFullList<any>()
     const unsub = await pb.collection('unsubscribes').getFullList<any>()
     const unsubSet = new Set<string>(
@@ -124,7 +126,7 @@ export const campaignsService = {
           .trim(),
       ),
     )
-    const out: { email: string; name: string; company: string }[] = []
+    const out: { email: string; name: string; company: string; tags: string[] }[] = []
     const seen = new Set<string>()
     for (const c of clients) {
       if (c.unsubscribed_at) continue

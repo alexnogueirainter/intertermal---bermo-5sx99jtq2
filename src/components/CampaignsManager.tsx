@@ -136,12 +136,27 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
     }
     setBusy('save')
     try {
+      // A resolução da ETIQUETA é feita aqui (SDK traz tags parseadas): o hook recebe
+      // sempre uma lista explícita de e-mails — mesmo caminho já provado do manual.
+      const tagEmails = listTag
+        ? contacts.filter((c) => (c.tags || []).includes(listTag)).map((c) => c.email)
+        : []
+      const finalRecipients = listTag ? tagEmails : Array.from(selected)
+      if (listTag && tagEmails.length === 0) {
+        toast({
+          title: 'Nenhum contato com essa etiqueta',
+          description: 'Confira a etiqueta na aba Clientes.',
+          variant: 'destructive',
+        })
+        setBusy('')
+        return
+      }
       const res = await campaignsService.save({
         name: name.trim(),
         subject: subject.trim(),
         body: body.trim(),
         list_tag: listTag || undefined,
-        recipients: listTag ? undefined : Array.from(selected),
+        recipients: finalRecipients,
       })
       if (!res.ok || !res.campaign_id) throw new Error(res.error || 'Falha ao salvar')
       const campaignId = res.campaign_id
