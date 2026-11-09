@@ -17,6 +17,10 @@ import type { ActivityRecord } from '@/types/crm'
 
 interface QuickContactButtonProps {
   onCreated: (record: ActivityRecord) => void
+  /** Controla o botão externamente (ex.: menu "+ Novo"). Sem valor, o botão é autônomo. */
+  openSignal?: number
+  /** Esconde o botão físico quando o acionamento vem do menu "+ Novo". */
+  hideTrigger?: boolean
 }
 
 function tomorrowIsoDate(): string {
@@ -33,9 +37,18 @@ function tomorrowIsoDate(): string {
  * sai da tela em desktop nem no celular). Abre o formulário de 3 campos e
  * cria a atividade "Retornar contato" (padrão: amanhã às 9h, data mudável).
  */
-export const QuickContactButton: React.FC<QuickContactButtonProps> = ({ onCreated }) => {
+export const QuickContactButton: React.FC<QuickContactButtonProps> = ({
+  onCreated,
+  openSignal,
+  hideTrigger = false,
+}) => {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
+
+  // Abertura externa (menu "+ Novo"): cada incremento do sinal abre o formulário
+  React.useEffect(() => {
+    if (openSignal && openSignal > 0) setOpen(true)
+  }, [openSignal])
   const [name, setName] = useState('')
   const [company, setCompany] = useState('')
   const [phone, setPhone] = useState('')
@@ -79,17 +92,19 @@ export const QuickContactButton: React.FC<QuickContactButtonProps> = ({ onCreate
 
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => setOpen(true)}
-        title="Registrar contato rápido"
-        className="h-8 text-xs border-teal-200 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300 dark:hover:bg-teal-950/40"
-      >
-        <Plus className="h-3.5 w-3.5" />
-        <span className="hidden sm:inline">Contato rápido</span>
-        <span className="sm:hidden">Contato</span>
-      </Button>
+      {!hideTrigger && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setOpen(true)}
+          title="Registrar contato rápido"
+          className="h-8 text-xs border-teal-200 text-teal-700 hover:bg-teal-50 dark:border-teal-800 dark:text-teal-300 dark:hover:bg-teal-950/40"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Contato rápido</span>
+          <span className="sm:hidden">Contato</span>
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-[420px]">

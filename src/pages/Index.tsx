@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Users,
   Kanban,
@@ -8,14 +8,12 @@ import {
   Wrench,
   MessageSquare,
   Activity,
-  Bot,
   LayoutDashboard,
   Search,
   Bell,
   CheckCircle2,
   AlertCircle,
   Plus,
-  Compass,
   Package,
   Shield,
   Flame,
@@ -64,6 +62,8 @@ import { BermoProductItem } from '@/data/bermo-catalog'
 import { QuickContactButton } from '@/components/QuickContactButton'
 import { QuickReturnContacts } from '@/components/QuickReturnContacts'
 import { quickContactService } from '@/services/quick-contact'
+import { NewActionsButton, CopilotFloatingButton } from '@/components/NewActionsButton'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
 
 // Feature Components
 import { OverviewDashboard } from '@/components/OverviewDashboard'
@@ -76,7 +76,6 @@ import { EquipmentServiceHistory } from '@/components/EquipmentServiceHistory'
 import { TicketsSupport } from '@/components/TicketsSupport'
 import { ActivitiesManager } from '@/components/ActivitiesManager'
 import { CopilotAssistant } from '@/components/CopilotAssistant'
-import { ModelArchitectureViewer } from '@/components/ModelArchitectureViewer'
 import { BermoCatalogViewer } from '@/components/BermoCatalogViewer'
 import { CampaignsManager } from '@/components/CampaignsManager'
 type ActiveTab =
@@ -90,8 +89,6 @@ type ActiveTab =
   | 'equipment_history'
   | 'tickets'
   | 'activities'
-  | 'copilot'
-  | 'architecture'
   | 'campaigns'
 // Garantir Mail globalmente acessível para QuotesManager antes da renderização do componente
 if (typeof window !== 'undefined' && !(window as any).Mail) {
@@ -106,6 +103,9 @@ export default function IndexPage() {
   const { toast } = useToast()
   const { user, signOut } = useAuth()
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview')
+  const [copilotOpen, setCopilotOpen] = useState(false)
+  const [quickContactSignal, setQuickContactSignal] = useState(0)
+  const navigate = useNavigate()
   const [isLoading, setIsLoading] = useState(true)
 
   // Global CRM State
@@ -887,8 +887,11 @@ export default function IndexPage() {
             </div>
           </div>
 
-          {/* Menu de Navegação */}
-          <nav className="p-3 space-y-1">
+          {/* Menu de Navegação — 5 áreas (Alex, 09/11) */}
+          <nav className="p-3 space-y-1 overflow-y-auto">
+            <p className="px-3 pt-1 pb-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Painel
+            </p>
             <button
               onClick={() => setActiveTab('overview')}
               className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -900,67 +903,24 @@ export default function IndexPage() {
               <LayoutDashboard className="h-4 w-4" />
               Painel Geral
             </button>
-
-            <Link
-              to="/visitas-recebidas"
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-800 dark:hover:text-teal-300 transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <ClipboardList className="h-4 w-4 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
-                <span>Visitas Recebidas</span>
-              </div>
-              <Badge className="bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-200 text-[10px] px-1.5 font-bold">
-                {fieldVisits.length}
-              </Badge>
-            </Link>
-
-            <Link
-              to="/visita-a-campo"
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-800 dark:hover:text-teal-300 transition-all group"
-            >
-              <div className="flex items-center gap-3">
-                <Smartphone className="h-4 w-4 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
-                <span>Visita a campo</span>
-              </div>
-              <Badge className="bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-200 text-[10px] px-1.5 font-bold">
-                Campo
-              </Badge>
-            </Link>
-
             <button
-              onClick={() => setActiveTab('quotes')}
+              onClick={() => setActiveTab('activities')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'quotes'
+                activeTab === 'activities'
                   ? 'bg-teal-700 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
               <div className="flex items-center gap-3">
-                <FileSpreadsheet className="h-4 w-4" />
-                Orçamentos Intertermal
+                <Activity className="h-4 w-4" />
+                Agenda & Visitas
               </div>
-              <Badge className="bg-teal-500/20 text-teal-700 dark:text-teal-300 text-[10px] px-1.5">
-                {quotes.length}
-              </Badge>
+              <span className="text-[11px] text-muted-foreground">{activities.length}</span>
             </button>
 
-            <button
-              onClick={() => setActiveTab('catalog')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'catalog'
-                  ? 'bg-teal-700 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Package className="h-4 w-4" />
-                Catálogo BERMO
-              </div>
-              <Badge variant="outline" className="text-[9px] px-1 py-0 text-slate-500">
-                Oficial
-              </Badge>
-            </button>
-
+            <p className="px-3 pt-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Comercial
+            </p>
             <button
               onClick={() => setActiveTab('deals')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -977,7 +937,6 @@ export default function IndexPage() {
                 {deals.length}
               </Badge>
             </button>
-
             <button
               onClick={() => setActiveTab('clients')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -992,7 +951,65 @@ export default function IndexPage() {
               </div>
               <span className="text-[11px] text-muted-foreground">{clients.length}</span>
             </button>
+            <button
+              onClick={() => setActiveTab('quotes')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'quotes'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <FileSpreadsheet className="h-4 w-4" />
+                Orçamentos Intertermal
+              </div>
+              <Badge className="bg-teal-500/20 text-teal-700 dark:text-teal-300 text-[10px] px-1.5">
+                {quotes.length}
+              </Badge>
+            </button>
+            <button
+              onClick={() => setActiveTab('campaigns')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'campaigns'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Megaphone className="h-4 w-4 text-indigo-500" />
+              Campanhas
+            </button>
 
+            <p className="px-3 pt-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Campo
+            </p>
+            <Link
+              to="/visita-a-campo"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-800 dark:hover:text-teal-300 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <Smartphone className="h-4 w-4 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
+                <span>Visita a campo</span>
+              </div>
+              <Badge className="bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-200 text-[10px] px-1.5 font-bold">
+                Campo
+              </Badge>
+            </Link>
+            <Link
+              to="/visitas-recebidas"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-800 dark:hover:text-teal-300 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <ClipboardList className="h-4 w-4 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform" />
+                <span>Visitas Recebidas</span>
+              </div>
+              <Badge className="bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-200 text-[10px] px-1.5 font-bold">
+                {fieldVisits.length}
+              </Badge>
+            </Link>
+
+            <p className="px-3 pt-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Execução
+            </p>
             <button
               onClick={() => setActiveTab('service_kanban')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -1009,24 +1026,6 @@ export default function IndexPage() {
                 {serviceOrders.length}
               </Badge>
             </button>
-
-            <button
-              onClick={() => setActiveTab('services')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'services'
-                  ? 'bg-teal-700 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Wrench className="h-4 w-4" />
-                Ordens & Contratos
-              </div>
-              <Badge variant="outline" className="text-[10px] px-1.5">
-                {services.length}
-              </Badge>
-            </button>
-
             <button
               onClick={() => setActiveTab('equipment_history')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -1043,7 +1042,6 @@ export default function IndexPage() {
                 Equipamentos
               </Badge>
             </button>
-
             <button
               onClick={() => setActiveTab('tickets')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
@@ -1063,58 +1061,41 @@ export default function IndexPage() {
               )}
             </button>
 
+            <p className="px-3 pt-2 pb-1 text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Cadastros
+            </p>
             <button
-              onClick={() => setActiveTab('activities')}
+              onClick={() => setActiveTab('catalog')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === 'activities'
+                activeTab === 'catalog'
                   ? 'bg-teal-700 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Activity className="h-4 w-4" />
-                Agenda & Visitas
+                <Package className="h-4 w-4" />
+                Catálogo BERMO
               </div>
-              <span className="text-[11px] text-muted-foreground">{activities.length}</span>
+              <Badge variant="outline" className="text-[9px] px-1 py-0 text-slate-500">
+                Oficial
+              </Badge>
             </button>
-
-            <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
-              <button
-                onClick={() => setActiveTab('campaigns')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                  activeTab === 'campaigns'
-                    ? 'bg-teal-700 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                <Megaphone className="h-4 w-4 text-indigo-500" />
-                Campanhas
-              </button>
-
-              <button
-                onClick={() => setActiveTab('copilot')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                  activeTab === 'copilot'
-                    ? 'bg-teal-700 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                <Bot className="h-4 w-4 text-teal-600" />
-                Copilot Técnico Intertermal
-              </button>
-
-              <button
-                onClick={() => setActiveTab('architecture')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-                  activeTab === 'architecture'
-                    ? 'bg-teal-700 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-              >
-                <Compass className="h-4 w-4 text-slate-500" />
-                Arquitetura do Sistema
-              </button>
-            </div>
+            <button
+              onClick={() => setActiveTab('services')}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                activeTab === 'services'
+                  ? 'bg-teal-700 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Wrench className="h-4 w-4" />
+                Ordens & Contratos
+              </div>
+              <Badge variant="outline" className="text-[10px] px-1.5">
+                {services.length}
+              </Badge>
+            </button>
           </nav>
         </div>
 
@@ -1178,8 +1159,6 @@ export default function IndexPage() {
                 {activeTab === 'tickets' && 'Suporte Técnico & Pós-Venda'}
                 {activeTab === 'activities' && 'Agenda & Visitas de Campo'}
                 {activeTab === 'campaigns' && 'Campanhas de E-mail'}
-                {activeTab === 'copilot' && 'Copiloto de Engenharia'}
-                {activeTab === 'architecture' && 'Especificação da Arquitetura'}
               </span>
             </div>
           </div>
@@ -1191,16 +1170,18 @@ export default function IndexPage() {
               Backend Conectado
             </div>
 
-            <Button
-              size="sm"
-              onClick={() => setActiveTab('quotes')}
-              className="bg-teal-700 hover:bg-teal-600 text-white text-xs h-8"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              Novo Orçamento
-            </Button>
+            <NewActionsButton
+              onNewQuote={() => setActiveTab('quotes')}
+              onNewClient={() => setActiveTab('clients')}
+              onQuickContact={() => setQuickContactSignal((s) => s + 1)}
+              onNewVisit={() => navigate('/visita-a-campo')}
+            />
 
-            <QuickContactButton onCreated={handleCreateQuickContact} />
+            <QuickContactButton
+              onCreated={handleCreateQuickContact}
+              openSignal={quickContactSignal}
+              hideTrigger
+            />
           </div>
         </header>
         {/* Contatos a retornar — alerta no topo do conteúdo, em todas as abas */}
@@ -1332,18 +1313,22 @@ export default function IndexPage() {
             />
           )}
           {activeTab === 'campaigns' && <CampaignsManager />}
-          {activeTab === 'copilot' && (
-            <CopilotAssistant
-              clients={clients}
-              deals={deals}
-              quotes={quotes}
-              services={services}
-              tickets={tickets}
-            />
-          )}
-          {activeTab === 'architecture' && <ModelArchitectureViewer />}
         </div>
       </main>
+
+      {/* Copiloto Técnico — botão flutuante no canto da tela (Alex, 09/11) */}
+      <CopilotFloatingButton onClick={() => setCopilotOpen(true)} />
+      <Dialog open={copilotOpen} onOpenChange={setCopilotOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <CopilotAssistant
+            clients={clients}
+            deals={deals}
+            quotes={quotes}
+            services={services}
+            tickets={tickets}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,15 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { QuoteRecord } from '@/types/crm'
-import {
-  Calculator,
-  CheckCircle,
-  Clock,
-  DollarSign,
-  FolderOpen,
-  Plus,
-  Sparkles,
-} from 'lucide-react'
+import { Calculator, CheckCircle, Clock, DollarSign, FolderOpen, Sparkles } from 'lucide-react'
 
 interface QuotesHeaderMetricsProps {
   quotes: QuoteRecord[]
@@ -18,19 +10,10 @@ interface QuotesHeaderMetricsProps {
   approvedQuotes: QuoteRecord[]
   approvedValue: number
   pendingQuotes: QuoteRecord[]
-  handleOpenCreateModal: () => any
 }
 
 export function QuotesHeaderMetrics(props: QuotesHeaderMetricsProps) {
-  const {
-    quotes,
-    onOpenCatalog,
-    totalValue,
-    approvedQuotes,
-    approvedValue,
-    pendingQuotes,
-    handleOpenCreateModal,
-  } = props
+  const { quotes, onOpenCatalog, totalValue, approvedQuotes, approvedValue, pendingQuotes } = props
 
   return (
     <>
@@ -61,16 +44,7 @@ export function QuotesHeaderMetrics(props: QuotesHeaderMetricsProps) {
             </Button>
           )}
 
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            onClick={handleOpenCreateModal}
-            className="text-xs font-bold bg-teal-700 hover:bg-teal-600 text-white shadow-xs"
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Nova Proposta
-          </Button>
+          {/* Criação de proposta centralizada no botão "+ Novo" do topo */}
         </div>
       </div>
 

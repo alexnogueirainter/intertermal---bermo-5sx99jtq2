@@ -21,7 +21,6 @@ import {
 } from '@/components/ui/select'
 import {
   Wrench,
-  Plus,
   Search,
   CheckCircle2,
   Clock,
@@ -271,13 +270,7 @@ export const ServicesManager: React.FC<ServicesManagerProps> = ({
               Relatório de OS
             </button>
           </div>
-          <Button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="bg-teal-700 hover:bg-teal-600 text-white text-xs"
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Nova OS Manual
-          </Button>
+          {/* Criação de OS centralizada no botão "+ Novo" do topo */}
         </div>
       </div>
 

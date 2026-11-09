@@ -21,7 +21,6 @@ import {
 } from '@/components/ui/select'
 import {
   Headphones,
-  Plus,
   MessageSquare,
   Mail,
   Phone,
@@ -166,13 +165,7 @@ export const TicketsSupport: React.FC<TicketsSupportProps> = ({
             Gestão de chamados, canais (WhatsApp/E-mail) e timeline de resolução.
           </p>
         </div>
-        <Button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-500 shadow-sm"
-        >
-          <Plus className="h-4 w-4 mr-1.5" />
-          Novo Chamado / Atendimento
-        </Button>
+        {/* Criação de chamado centralizada no botão "+ Novo" do topo */}
       </div>
 
       {/* Grid: Lista de Tickets + Timeline Interativa */}

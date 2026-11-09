@@ -28,6 +28,7 @@ import { makeLoadQuoteHistory } from './quotes/quoteHistoryLoader'
 import { makeLoadQuoteIntoForm } from './quotes/quoteFormLoader'
 import { makeResetForm } from './quotes/quoteFormReset'
 import { makeQuoteActions } from './quotes/useQuoteActions'
+import { useNewAction } from '@/components/NewActionsButton'
 import { useQuoteEffects } from './quotes/useQuoteEffects'
 import type { ClientRecord, DealRecord, QuoteRecord, QuoteStatus } from '@/types/crm'
 
@@ -111,6 +112,11 @@ export function QuotesManager({
     loadQuoteHistory,
     onUpdateQuote,
     selectedQuote,
+  })
+
+  // "+ Novo" no topo: abre o editor de nova proposta quando a ação vem do menu global
+  useNewAction('quote', () => {
+    if (!isEditorOpen) actionsH.handleOpenCreateModal()
   })
 
   const UI = {

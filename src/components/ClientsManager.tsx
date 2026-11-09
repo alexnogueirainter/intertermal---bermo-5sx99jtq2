@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useNewAction } from '@/components/NewActionsButton'
 import { clientsService } from '@/services/clients'
 import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -230,6 +231,9 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
     updated[index] = { ...updated[index], [field]: value }
     setContacts(updated)
   }
+
+  // "+ Novo" no topo: abre o cadastro de cliente quando a ação vem do menu global
+  useNewAction('client', () => handleOpenNewClientModal())
 
   const handleOpenNewClientModal = () => {
     setEditingClientId(null)
@@ -526,13 +530,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
             <FileText className="h-4 w-4 mr-1.5" />
             Importar planilha
           </Button>
-          <Button
-            onClick={handleOpenNewClientModal}
-            className="bg-indigo-600 hover:bg-indigo-500 shadow-sm"
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Novo Cliente / Conta
-          </Button>
+          {/* Cadastro de cliente centralizado no botão "+ Novo" do topo */}
         </div>
       </div>
       {/* Barra de Filtros */}

@@ -49,6 +49,7 @@ import type { FieldVisitRecord } from '@/services/field-visits'
 import { ExecutiveReportPrintButton } from '@/components/ExecutiveReportPrint'
 import { useToast } from '@/hooks/use-toast'
 import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
+import { fireNewAction } from '@/components/NewActionsButton'
 
 interface OverviewDashboardProps {
   clients: ClientRecord[]
@@ -1353,11 +1354,14 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
               <div className="flex flex-wrap gap-2.5 pt-2">
                 <Button
                   size="sm"
-                  onClick={() => onNavigate('quotes')}
+                  onClick={() => {
+                    onNavigate('quotes')
+                    fireNewAction('quote')
+                  }}
                   className="bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold shadow-md"
                 >
                   <FileSpreadsheet className="h-4 w-4 mr-1.5" />
-                  Novo Orçamento de Serviço
+                  Nova proposta
                 </Button>
 
                 <Button

@@ -20,7 +20,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  Plus,
   DollarSign,
   Calendar,
   Building2,
@@ -157,13 +156,7 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
             Mova oportunidades pelas etapas do modelo de conversão B2B.
           </p>
         </div>
-        <Button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-indigo-600 hover:bg-indigo-500 shadow-sm"
-        >
-          <Plus className="h-4 w-4 mr-1.5" />
-          Nova Oportunidade
-        </Button>
+        {/* Criação de oportunidade centralizada no botão "+ Novo" do topo */}
       </div>
 
       {/* Kanban Board */}
