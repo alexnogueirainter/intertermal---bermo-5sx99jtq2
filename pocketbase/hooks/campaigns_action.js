@@ -2,10 +2,10 @@
  * Hook: Ações da tela Campanhas (uma rota única, 3 ações no corpo).
  * Route (POST, autenticada): /backend/v1/campaigns/action
  * Body: { action: 'save' | 'test' | 'send', ... }
- * - save: cria/atualiza a campanha (modelo, etiqueta, destinatários marcados)
- * - test: envia 1 e-mail de teste para o próprio Alex (RESEND_API_KEY)
+ * - save: cria a campanha (modelo, etiqueta, destinatários) — NÃO envia, não usa chave
+ * - test: envia 1 e-mail de teste para o próprio Alex (exige RESEND_API_KEY)
  * - send: cria os campaign_recipients pendentes e ativa a fila (status → sending)
- * Regra de destinatários: por etiqueta (list_tag) OU marcados um a um (emails[]).
+ * Regra de destinatários: por etiqueta (list_tag) OU marcados um a um (recipients[]).
  * Nunca inclui descadastrados (unsubscribes) nem clientes com unsubscribed_at.
  */
 routerAdd(
@@ -14,14 +14,9 @@ routerAdd(
   (e) => {
     const body = e.requestInfo().body || {}
     const action = String(body.action || '')
+    // A chave só é exigida na AÇÃO TESTE (que envia de fato). Salvar e disparar
+    // não enviam e-mail — a fila usa a chave quando rodar.
     const apiKey = $secrets.get('RESEND_API_KEY') || ''
-
-    if (!apiKey) {
-      return e.json(400, {
-        ok: false,
-        error: 'RESEND_API_KEY não configurada no painel de segredos do Skip',
-      })
-    }
 
     const FROM = 'Intertermal | Grupo Inter <alex.nogueira@intertermal.com.br>'
     const escapeHtml = (s) =>
@@ -116,11 +111,11 @@ routerAdd(
       const subject = String(body.subject || '').trim()
       const bodyTpl = String(body.body || '').trim()
       const listTag = String(body.list_tag || '').trim()
-      const recipients = Array.isArray(body.recipients) ? body.recipients : []
+      const recipientsIn = Array.isArray(body.recipients) ? body.recipients : []
       if (!name || !subject || !bodyTpl) {
         return e.json(400, { ok: false, error: 'Nome, assunto e texto obrigatórios' })
       }
-      if (!listTag && recipients.length === 0) {
+      if (!listTag && recipientsIn.length === 0) {
         return e.json(400, { ok: false, error: 'Escolha a etiqueta ou marque os destinatários' })
       }
 
@@ -166,9 +161,9 @@ routerAdd(
           }
           const manualMatch =
             !listTag &&
-            recipients.length > 0 &&
+            recipientsIn.length > 0 &&
             emails.some((em) =>
-              recipients
+              recipientsIn
                 .map((r) => String(r).toLowerCase().trim())
                 .includes(em.toLowerCase().trim()),
             )
