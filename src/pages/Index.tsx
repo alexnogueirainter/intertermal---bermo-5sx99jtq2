@@ -24,6 +24,7 @@ import {
   Mail,
   Smartphone,
   ClipboardList,
+  Megaphone,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -77,6 +78,7 @@ import { ActivitiesManager } from '@/components/ActivitiesManager'
 import { CopilotAssistant } from '@/components/CopilotAssistant'
 import { ModelArchitectureViewer } from '@/components/ModelArchitectureViewer'
 import { BermoCatalogViewer } from '@/components/BermoCatalogViewer'
+import { CampaignsManager } from '@/components/CampaignsManager'
 type ActiveTab =
   | 'overview'
   | 'quotes'
@@ -90,6 +92,7 @@ type ActiveTab =
   | 'activities'
   | 'copilot'
   | 'architecture'
+  | 'campaigns'
 // Garantir Mail globalmente acessível para QuotesManager antes da renderização do componente
 if (typeof window !== 'undefined' && !(window as any).Mail) {
   ;(window as any).Mail = Mail
@@ -1077,6 +1080,18 @@ export default function IndexPage() {
 
             <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
               <button
+                onClick={() => setActiveTab('campaigns')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'campaigns'
+                    ? 'bg-teal-700 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                <Megaphone className="h-4 w-4 text-indigo-500" />
+                Campanhas
+              </button>
+
+              <button
                 onClick={() => setActiveTab('copilot')}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
                   activeTab === 'copilot'
@@ -1162,6 +1177,7 @@ export default function IndexPage() {
                 {activeTab === 'services' && 'Ordens de Serviço & Contratos'}
                 {activeTab === 'tickets' && 'Suporte Técnico & Pós-Venda'}
                 {activeTab === 'activities' && 'Agenda & Visitas de Campo'}
+                {activeTab === 'copilot' && 'Campanhas de E-mail'}
                 {activeTab === 'copilot' && 'Copiloto de Engenharia'}
                 {activeTab === 'architecture' && 'Especificação da Arquitetura'}
               </span>
@@ -1315,6 +1331,7 @@ export default function IndexPage() {
               onUpdateActivity={handleUpdateActivity}
             />
           )}
+          {activeTab === 'campaigns' && <CampaignsManager />}
           {activeTab === 'copilot' && (
             <CopilotAssistant
               clients={clients}

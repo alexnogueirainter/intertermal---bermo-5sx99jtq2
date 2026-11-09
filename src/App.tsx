@@ -12,6 +12,7 @@ import SellerFieldVisitPage from './pages/SellerFieldVisitPage'
 import ReceivedFieldVisitsPage from './pages/ReceivedFieldVisitsPage'
 import LoginPage from './pages/LoginPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
+import CampaignsPage from './pages/CampaignsPage'
 import { AuthProvider, useAuth } from './lib/auth'
 
 // ONLY IMPORT AND RENDER WORKING PAGES, NEVER ADD PLACEHOLDER COMPONENTS OR PAGES IN THIS FILE
@@ -58,6 +59,7 @@ const App = () => (
 
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
+            <Route path="/campanhas" element={<CampaignsPage />} />
             <Route path="/trocar-senha" element={<ChangePasswordPage />} />
             <Route path="/visita-a-campo" element={<FieldVisitPage />} />
             <Route path="/visitas-recebidas" element={<ReceivedFieldVisitsPage />} />
