@@ -40,6 +40,7 @@ migrate(
     }
 
     // 2) Coleção campaign_recipients: status por destinatário
+    //    campaign_id é TEXT (não relation) — remapear relation após criar a coleção é bloqueado.
     try {
       app.findCollectionByNameOrId('campaign_recipients')
     } catch (_) {
@@ -52,7 +53,7 @@ migrate(
         updateRule: '',
         deleteRule: '',
         fields: [
-          { name: 'campaign', type: 'relation', collectionId: 'pbc_612317808', maxSelect: 1 },
+          { name: 'campaign_id', type: 'text', required: true },
           { name: 'client_id', type: 'text' },
           { name: 'email', type: 'text', required: true },
           { name: 'name', type: 'text' },
@@ -79,7 +80,7 @@ migrate(
           { name: 'updated', type: 'autodate', onCreate: true, onUpdate: true },
         ],
         indexes: [
-          'CREATE INDEX idx_campaign_recipients_campaign ON campaign_recipients (campaign)',
+          'CREATE INDEX idx_campaign_recipients_campaign ON campaign_recipients (campaign_id)',
           'CREATE INDEX idx_campaign_recipients_email ON campaign_recipients (email)',
         ],
       })

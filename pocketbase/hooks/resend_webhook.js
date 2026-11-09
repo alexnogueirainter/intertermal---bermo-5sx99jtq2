@@ -45,7 +45,7 @@ routerAdd('POST', '/backend/v1/resend/webhook', (e) => {
   }
 
   // 1) Match por email_id (resend_id)
-  if (emailId) updateRecipient('resend_id = {:r}', { r: emailId }, null, null)
+  if (emailId) updateRecipient('resend_id = {:r}', { r: emailId }, 'sent', null)
 
   const applyStatus = (newStatus, errTxt) => {
     if (emailId) updateRecipient('resend_id = {:r}', { r: emailId }, newStatus, errTxt)

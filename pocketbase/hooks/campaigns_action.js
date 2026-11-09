@@ -216,7 +216,7 @@ routerAdd(
       let created = 0
       for (const r of recipients) {
         const p = new Record(recCol)
-        p.set('campaign', campaignId)
+        p.set('campaign_id', campaignId)
         p.set(
           'email',
           String(r.email || '')
