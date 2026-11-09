@@ -305,11 +305,13 @@ const PRINT_CSS = `
   .kpi-value { font-size: 15px; font-weight: 800; color: #0f172a; margin-top: 2px; }
   .kpi-note { font-size: 8px; color: #64748b; margin-top: 2px; line-height: 1.35; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 4px; }
-  table { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+  table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 9px; }
   table.wide { margin-top: 4px; }
-  th { text-align: left; background: #f1f5f9; color: #334155; font-size: 8.5px; text-transform: uppercase; letter-spacing: 0.03em; padding: 4px 6px; border-bottom: 1px solid #cbd5e1; }
-  td { padding: 4px 6px; border-bottom: 1px solid #eef2f6; }
+  th { text-align: left; background: #f1f5f9; color: #334155; font-size: 8px; text-transform: uppercase; letter-spacing: 0.02em; padding: 3px 5px; border-bottom: 1px solid #cbd5e1; word-break: break-word; }
+  td { padding: 3px 5px; border-bottom: 1px solid #eef2f6; word-break: break-word; }
   td.num, th.num { text-align: right; white-space: nowrap; }
+  .kpi-grid, .two-col, .rep-section { page-break-inside: avoid; }
+  .rep-section h2 { page-break-after: avoid; }
   tr { page-break-inside: avoid; }
   .empty { color: #94a3b8; font-style: italic; }
   .alerts { margin: 2px 0 0 14px; font-size: 9.5px; color: #334155; }
@@ -340,7 +342,14 @@ export async function buildExecutivePdfFile(
         margin: [10, 10, 12, 10],
         filename: `relatorio-painel-intertermal-${stamp}.pdf`,
         image: { type: 'jpeg', quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, logging: false, scrollY: 0, windowWidth: 780 },
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          scrollY: 0,
+          width: 760,
+          windowWidth: 760,
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['css', 'legacy'] },
       })
