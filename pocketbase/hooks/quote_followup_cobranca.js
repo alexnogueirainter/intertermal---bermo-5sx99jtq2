@@ -15,8 +15,7 @@
  *   nova cobrança em 5 dias se continuar 'sent'.
  * - Não altera nada na proposta além de follow_up_date (âncora do ciclo).
  */
-// TEMPORÁRIO (verificação): '*/2 * * * *' — voltar para '3 11 * * 1-5' após o teste.
-cronAdd('quote_followup_cobranca', '*/2 * * * *', () => {
+cronAdd('quote_followup_cobranca', '3 11 * * 1-5', () => {
   const FOLLOWUP_DAYS = 5
   const nowIso = new Date().toISOString()
 

@@ -42,11 +42,11 @@ interface ActivitiesManagerProps {
 
 const waDigits = (v?: string) => (v || '').replace(/\D/g, '')
 const waMessage = (a: ActivityRecord) => {
-  const contact = ((a as any).quote_contact || '').trim()
+  const contact = ((a as any).quote_contact || '').trim() || a.client_name || 'cliente'
   const numero = ((a as any).quote_number || '').trim()
   return (
     'Olá ' +
-    (contact || 'cliente') +
+    contact +
     ', tudo bem? Conseguiu avaliar a proposta ' +
     (numero || '') +
     '? Fico à disposição.'
