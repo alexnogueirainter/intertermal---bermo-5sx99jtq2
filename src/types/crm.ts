@@ -8,26 +8,17 @@ export type DealStage =
   | 'won'
   | 'lost'
 
-export type QuoteStatus =
-  | 'draft'
-  | 'pending_approval'
-  | 'sent'
-  | 'em_negociacao'
-  | 'approved'
-  | 'rejected'
-  | 'expired'
-  | 'concluida'
+export type QuoteStatus = 'draft' | 'sent' | 'negotiation' | 'approved' | 'rejected' | 'expired'
 
-// Rótulos apenas de apresentação; os registros atuais mantêm os valores salvos.
+// Rótulos de apresentação em português (Alex, 09/11): valores únicos no banco,
+// rótulo só na tela.
 export const QUOTE_STATUS_LABELS: Record<string, string> = {
-  draft: 'Elaborada',
-  pending_approval: 'Em Aprovação',
+  draft: 'Rascunho',
   sent: 'Enviada',
-  em_negociacao: 'Em Negociação',
+  negotiation: 'Em negociação',
   approved: 'Aprovada',
   rejected: 'Recusada',
   expired: 'Expirada',
-  concluida: 'Concluída',
 }
 
 export type ServiceOrderStatus =

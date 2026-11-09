@@ -79,6 +79,7 @@ export function mapQuoteStatusToDealStage(status?: string | QuoteStatus): {
     return { stage: 'lost', probability: 0 }
   }
   if (
+    s === 'negotiation' ||
     s === 'pending_approval' ||
     s === 'pending' ||
     s === 'pendente' ||
@@ -147,10 +148,13 @@ export const quoteDealSyncService = {
     const AUTO_MOVE_STAGES: Record<string, { stage: DealStage; probability: number }> = {
       sent: { stage: 'proposal', probability: 60 },
       enviada: { stage: 'proposal', probability: 60 },
+      negotiation: { stage: 'negotiation', probability: 75 },
+      em_negociacao: { stage: 'negotiation', probability: 75 },
       approved: { stage: 'won', probability: 100 },
       aprovada: { stage: 'won', probability: 100 },
       rejected: { stage: 'lost', probability: 0 },
       recusada: { stage: 'lost', probability: 0 },
+      expired: { stage: 'lost', probability: 0 },
     }
     const sNorm = (quote.status || '').toLowerCase().trim()
     const autoMove = AUTO_MOVE_STAGES[sNorm]

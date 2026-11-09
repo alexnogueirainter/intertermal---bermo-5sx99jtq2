@@ -106,11 +106,17 @@ export function QuotesListCard(props: QuotesListCardProps) {
                   <SelectItem value="sent">
                     Enviada ({quotes.filter((q) => q.status === 'sent').length})
                   </SelectItem>
+                  <SelectItem value="negotiation">
+                    Em negociação ({quotes.filter((q) => q.status === 'negotiation').length})
+                  </SelectItem>
                   <SelectItem value="approved">
                     Aprovada ({quotes.filter((q) => q.status === 'approved').length})
                   </SelectItem>
                   <SelectItem value="rejected">
-                    Rejeitada ({quotes.filter((q) => q.status === 'rejected').length})
+                    Recusada ({quotes.filter((q) => q.status === 'rejected').length})
+                  </SelectItem>
+                  <SelectItem value="expired">
+                    Expirada ({quotes.filter((q) => q.status === 'expired').length})
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -354,7 +360,27 @@ export function QuotesListCard(props: QuotesListCardProps) {
                                     className="text-rose-700 dark:text-rose-400"
                                   >
                                     <Ban className="h-3.5 w-3.5 mr-2 text-rose-600" />
-                                    Marcar como Rejeitada
+                                    Marcar como Recusada
+                                  </DropdownMenuItem>
+                                )}
+
+                                {quote.status !== 'negotiation' && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleSetStatus(quote.id, 'negotiation')}
+                                    className="text-amber-700 dark:text-amber-400"
+                                  >
+                                    <Clock className="h-3.5 w-3.5 mr-2 text-amber-600" />
+                                    Marcar como Em negociação
+                                  </DropdownMenuItem>
+                                )}
+
+                                {quote.status !== 'expired' && (
+                                  <DropdownMenuItem
+                                    onClick={() => handleSetStatus(quote.id, 'expired')}
+                                    className="text-slate-700 dark:text-slate-400"
+                                  >
+                                    <Clock className="h-3.5 w-3.5 mr-2 text-slate-500" />
+                                    Marcar como Expirada
                                   </DropdownMenuItem>
                                 )}
 

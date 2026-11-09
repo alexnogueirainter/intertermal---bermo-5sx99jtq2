@@ -1735,20 +1735,24 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                               ? 'bg-rose-50 text-rose-700 border-rose-300'
                               : q.status === 'sent'
                                 ? 'bg-blue-50 text-blue-700 border-blue-300'
-                                : q.status === 'pending_approval'
+                                : q.status === 'negotiation'
                                   ? 'bg-amber-50 text-amber-700 border-amber-300'
-                                  : 'bg-slate-100 text-slate-700 border-slate-300'
+                                  : q.status === 'expired'
+                                    ? 'bg-slate-100 text-slate-700 border-slate-300'
+                                    : 'bg-slate-100 text-slate-700 border-slate-300'
                         }`}
                       >
                         {isApprovedQuote(q.status)
-                          ? 'Aprovado'
+                          ? 'Aprovada'
                           : isRejectedQuote(q.status)
-                            ? 'Recusado'
+                            ? 'Recusada'
                             : q.status === 'sent'
-                              ? 'Enviado'
-                              : q.status === 'pending_approval'
-                                ? 'Em Aprovação'
-                                : 'Rascunho'}
+                              ? 'Enviada'
+                              : q.status === 'negotiation'
+                                ? 'Em negociação'
+                                : q.status === 'expired'
+                                  ? 'Expirada'
+                                  : 'Rascunho'}
                       </Badge>
                     </div>
                   </div>

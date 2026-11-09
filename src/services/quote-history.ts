@@ -98,9 +98,11 @@ function formatValue(key: keyof QuoteSnapshot, val: any): string {
   if (key === 'status') {
     const labels: Record<string, string> = {
       draft: 'Rascunho',
-      sent: 'Enviada ao Cliente',
+      sent: 'Enviada',
+      negotiation: 'Em negociação',
       approved: 'Aprovada',
-      rejected: 'Rejeitada',
+      rejected: 'Recusada',
+      expired: 'Expirada',
     }
     return labels[String(val)] || String(val)
   }

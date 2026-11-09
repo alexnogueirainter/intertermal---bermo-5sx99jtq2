@@ -738,10 +738,14 @@ export function QuotePdfPreviewDialog({
                   {isApproved
                     ? 'Aprovada'
                     : isRejected
-                      ? 'Rejeitada'
+                      ? 'Recusada'
                       : quote.status === 'sent'
                         ? 'Enviada'
-                        : 'Rascunho'}
+                        : quote.status === 'negotiation'
+                          ? 'Em negociação'
+                          : quote.status === 'expired'
+                            ? 'Expirada'
+                            : 'Rascunho'}
                 </Badge>
                 <Badge
                   variant="outline"
