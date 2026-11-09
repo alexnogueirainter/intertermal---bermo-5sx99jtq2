@@ -53,18 +53,7 @@ const STATUS_META: Record<string, { label: string; color: string }> = {
   failed: { label: 'Falhou', color: 'bg-rose-50 text-rose-700 border-rose-300' },
 }
 
-const TEMPLATE_EXAMPLES = [
-  {
-    name: 'Apresentação Intertermal',
-    subject: 'Assistência técnica Bermo em trocadores e válvulas — {empresa}',
-    body: 'Olá {nome},\n\nSomos a Intertermal, assistência técnica autorizada Bermo Brasil em São Paulo: trocadores de calor, válvulas de segurança e controle, mobilização e fabricação de skids.\n\nPodemos visitar a {empresa} para avaliar o parque de equipamentos? Sem compromisso.\n\nAbs,\nAlex Nogueira — Intertermal',
-  },
-  {
-    name: 'Follow-up pós-orçamento',
-    subject: 'Retorno sobre a proposta — {empresa}',
-    body: 'Olá {nome},\n\nPassando para saber se ficou alguma dúvida sobre a proposta enviada à {empresa}.\n\nSe quiser, ajusto o escopo ou o prazo.\n\nObrigado,\nAlex Nogueira — Intertermal',
-  },
-]
+const TEMPLATE_CATEGORIES = ['Prospecção', 'Follow-up', 'Pós-visita', 'Institucional', 'Outro']
 
 export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) => {
   const { toast } = useToast()
@@ -83,6 +72,13 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
   const [contactSearch, setContactSearch] = useState('')
   const [unsubCount, setUnsubCount] = useState(0)
 
+  // ===== Modelos (banco) =====
+  const [templates, setTemplates] = useState<CampaignTemplateRecord[]>([])
+  const [tplName, setTplName] = useState('')
+  const [tplCategory, setTplCategory] = useState('Prospecção')
+  const [tplEditingId, setTplEditingId] = useState<string | null>(null)
+  const [tplOpen, setTplOpen] = useState(false)
+
   // ===== Estado geral =====
   const [campaigns, setCampaigns] = useState<CampaignRecord[]>([])
   const [recipientsOf, setRecipientsOf] = useState<CampaignRecipientRecord[] | null>(null)
@@ -91,16 +87,18 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
 
   const loadAll = async () => {
     try {
-      const [t, c, cs, u] = await Promise.all([
+      const [t, c, cs, u, tp] = await Promise.all([
         campaignsService.getAllTags(),
         campaignsService.getEligibleContacts(),
         campaignsService.getAll(),
         campaignsService.getUnsubscribedCount(),
+        templatesService.getAll(),
       ])
       setTags(t)
       setContacts(c)
       setCampaigns(cs)
       setUnsubCount(u)
+      setTemplates(tp)
     } catch (err: any) {
       toast({
         title: 'Erro ao carregar campanhas',
@@ -225,6 +223,85 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
     if (selected.size === filteredContacts.length && filteredContacts.length > 0)
       setSelected(new Set())
     else setSelected(new Set(filteredContacts.map((c) => c.email)))
+  }
+
+  // ===== Modelos =====
+  const templatesByCategory = useMemo(() => {
+    const map = new Map<string, CampaignTemplateRecord[]>()
+    for (const t of templates) {
+      const cat = t.category || 'Outro'
+      if (!map.has(cat)) map.set(cat, [])
+      map.get(cat)!.push(t)
+    }
+    return map
+  }, [templates])
+
+  const openTemplatesModal = () => {
+    setTplOpen(true)
+  }
+
+  const applyTemplate = (t: CampaignTemplateRecord) => {
+    setSubject(t.subject)
+    setBody(t.body)
+    if (!name.trim()) setName(t.name)
+    setTplOpen(false)
+  }
+
+  const saveTemplate = async () => {
+    if (!tplName.trim() || !subject.trim() || !body.trim()) {
+      toast({
+        title: 'Preencha nome, assunto e texto antes de salvar o modelo',
+        variant: 'destructive',
+      })
+      return
+    }
+    try {
+      if (tplEditingId) {
+        await templatesService.update(tplEditingId, {
+          name: tplName.trim(),
+          category: tplCategory,
+          subject: subject.trim(),
+          body: body.trim(),
+        })
+        toast({ title: 'Modelo atualizado' })
+      } else {
+        await templatesService.create({
+          name: tplName.trim(),
+          category: tplCategory,
+          subject: subject.trim(),
+          body: body.trim(),
+        })
+        toast({
+          title: 'Modelo salvo',
+          description: 'Aparece no botão Modelos de agora em diante.',
+        })
+      }
+      setTplEditingId(null)
+      setTplName('')
+      setTplCategory('Prospecção')
+      setTemplates(await templatesService.getAll())
+    } catch (err: any) {
+      toast({ title: 'Erro ao salvar modelo', description: err.message, variant: 'destructive' })
+    }
+  }
+
+  const editTemplate = (t: CampaignTemplateRecord) => {
+    setTplEditingId(t.id)
+    setTplName(t.name)
+    setTplCategory(t.category || 'Outro')
+    setSubject(t.subject)
+    setBody(t.body)
+    setTplOpen(false)
+  }
+
+  const deleteTemplate = async (t: CampaignTemplateRecord) => {
+    try {
+      await templatesService.remove(t.id)
+      setTemplates(await templatesService.getAll())
+      toast({ title: 'Modelo excluído' })
+    } catch (err: any) {
+      toast({ title: 'Erro ao excluir modelo', description: err.message, variant: 'destructive' })
+    }
   }
 
   return (
@@ -425,6 +502,61 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
             </CardContent>
           </Card>
 
+          {/* Salvar como modelo */}
+          <Card className="border-slate-200 dark:border-slate-800">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-bold flex items-center gap-2">
+                <FileText className="h-3.5 w-3.5 text-indigo-600" />
+                Salvar como modelo
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  value={tplName}
+                  onChange={(e) => setTplName(e.target.value)}
+                  placeholder="Nome do modelo (ex.: Follow-up 5 dias)"
+                  className="text-xs flex-1"
+                />
+                <Select value={tplCategory} onValueChange={setTplCategory}>
+                  <SelectTrigger className="text-xs w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATE_CATEGORIES.map((c) => (
+                      <SelectItem key={c} value={c} className="text-xs">
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={saveTemplate}
+                disabled={!tplName.trim() || !subject.trim() || !body.trim()}
+                className="text-xs w-full"
+              >
+                {tplEditingId ? 'Atualizar modelo' : 'Salvar modelo'}
+              </Button>
+              {tplEditingId && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setTplEditingId(null)
+                    setTplName('')
+                    setTplCategory('Prospecção')
+                  }}
+                  className="text-[11px] w-full"
+                >
+                  Cancelar edição (novo modelo)
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Ações */}
           <Card className="border-slate-200 dark:border-slate-800">
             <CardContent className="pt-4 flex flex-col sm:flex-row gap-2">
@@ -573,33 +705,78 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
         </div>
       </div>
 
-      {/* Modal de modelos prontos */}
-      <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
-        <DialogContent className="sm:max-w-[560px]">
+      {/* Modal de modelos (banco) */}
+      <Dialog open={tplOpen} onOpenChange={setTplOpen}>
+        <DialogContent className="sm:max-w-[620px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold">Modelos prontos</DialogTitle>
+            <DialogTitle className="text-base font-bold">Modelos de campanha</DialogTitle>
             <DialogDescription className="text-xs">
-              Escolha um modelo e ajuste o texto — {`{nome}`} e {`{empresa}`} são trocados por
-              contato.
+              Clique para usar · edite ou exclua os seus · {`{nome}`} e {`{empresa}`} são trocados
+              por contato.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-1">
-            {TEMPLATE_EXAMPLES.map((t) => (
-              <button
-                key={t.name}
-                onClick={() => {
-                  setSubject(t.subject)
-                  setBody(t.body)
-                  if (!name.trim()) setName(t.name)
-                  setTemplatesOpen(false)
-                }}
-                className="w-full text-left p-3 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-300 transition-all"
-              >
-                <div className="text-xs font-bold text-slate-900 dark:text-slate-100">{t.name}</div>
-                <div className="text-[11px] text-muted-foreground mt-0.5">{t.subject}</div>
-              </button>
+
+          <div className="space-y-3 py-1">
+            {templates.size === 0 && (
+              <p className="text-xs text-muted-foreground">
+                Nenhum modelo salvo ainda. Escreva o assunto e o texto na tela ao lado e clique em
+                "Salvar como modelo".
+              </p>
+            )}
+            {Array.from(templatesByCategory.entries()).map(([cat, list]) => (
+              <div key={cat}>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  {cat}
+                </p>
+                <div className="space-y-1.5">
+                  {list.map((t) => (
+                    <div
+                      key={t.id}
+                      className="flex items-start justify-between gap-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-indigo-300 transition-all"
+                    >
+                      <button onClick={() => applyTemplate(t)} className="flex-1 text-left min-w-0">
+                        <div className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                          {t.name}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground truncate">
+                          {t.subject}
+                        </div>
+                      </button>
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => editTemplate(t)}
+                          className="h-6 px-2 text-[10px]"
+                        >
+                          Editar
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteTemplate(t)}
+                          className="h-6 px-2 text-[10px] text-rose-600 hover:text-rose-700"
+                        >
+                          Excluir
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTplOpen(false)}
+              className="text-xs"
+            >
+              Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

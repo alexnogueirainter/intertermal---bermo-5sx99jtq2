@@ -154,3 +154,36 @@ export const campaignsService = {
     return l.totalItems
   },
 }
+
+export interface CampaignTemplateRecord {
+  id: string
+  name: string
+  category?: string
+  subject: string
+  body: string
+  created?: string
+  updated?: string
+}
+
+export const templatesService = {
+  async getAll(): Promise<CampaignTemplateRecord[]> {
+    return await pb
+      .collection('campaign_templates')
+      .getFullList<CampaignTemplateRecord>({ sort: '-created' })
+  },
+
+  async create(input: { name: string; category?: string; subject: string; body: string }) {
+    return await pb.collection('campaign_templates').create(input)
+  },
+
+  async update(
+    id: string,
+    input: { name?: string; category?: string; subject?: string; body?: string },
+  ) {
+    return await pb.collection('campaign_templates').update(id, input)
+  },
+
+  async remove(id: string) {
+    return await pb.collection('campaign_templates').delete(id)
+  },
+}
