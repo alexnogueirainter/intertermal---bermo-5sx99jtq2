@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import {
   campaignsService,
+  templatesService,
   type CampaignRecord,
   type CampaignRecipientRecord,
+  type CampaignTemplateRecord,
 } from '@/services/campaigns'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
