@@ -58,7 +58,8 @@ export function SteamTrapInspectionSection({
   sellerMode: boolean
 }) {
   const clientVisitId = String((visit as any).clientVisitId || visit.id || '')
-  const [open, setOpen] = useState(false)
+  // Nasce aberto: o card só renderiza quando o técnico seleciona "Inspeção de Purgadores" no item 4
+  const [open, setOpen] = useState(true)
   const [step, setStep] = useState(1)
   const [data, setData] = useState<SteamTrapInspectionData | null>(null)
   const [recId, setRecId] = useState<string | null>(null)
