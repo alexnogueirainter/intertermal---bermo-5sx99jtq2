@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useFieldVisitState } from '@/components/field-visit/useFieldVisitState'
 import { useVisitAutosave } from '@/components/field-visit/useVisitAutosave'
 import { useAiActionPlan } from '@/components/field-visit/useAiActionPlan'
@@ -28,6 +29,7 @@ export default function FieldVisitPage({
   initialVisitData?: FieldVisitData | null
 } = {}) {
   const s = useFieldVisitState({ sellerMode, sellerName, initialVisitData })
+  const [steamTrapOpen, setSteamTrapOpen] = useState(false)
   useVisitAutosave({
     visit: s.visit,
     setSaveStatus: s.setSaveStatus,
@@ -97,10 +99,12 @@ export default function FieldVisitPage({
           handleEndTimeChange={s.handleEndTimeChange}
           handleDurationChange={s.handleDurationChange}
           handleRecalculateDuration={s.handleRecalculateDuration}
+          steamTrapOpen={steamTrapOpen}
+          setSteamTrapOpen={setSteamTrapOpen}
         />
 
-        {/* 4b. Inspeção de Purgadores (VKP) — acessória ao item 4, sem alterar os tipos de visita */}
-        <SteamTrapInspectionSection visit={s.visit} sellerMode={sellerMode} />
+        {/* 4b. Inspeção de Purgadores (VKP) — abre pelo 7º card do item 4 */}
+        {steamTrapOpen && <SteamTrapInspectionSection visit={s.visit} sellerMode={sellerMode} />}
 
         {isLeanFlow ? (
           <LeanFlowSection

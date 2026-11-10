@@ -1,4 +1,4 @@
-import { Clock, User, Building, CheckCircle2, Wrench, Mail } from 'lucide-react'
+import { Clock, User, Building, CheckCircle2, Wrench, Mail, Gauge } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -17,6 +17,8 @@ export function VisitBasicsSections({
   handleEndTimeChange,
   handleDurationChange,
   handleRecalculateDuration,
+  steamTrapOpen,
+  setSteamTrapOpen,
 }: {
   visit: FieldVisitData
   setVisit: Dispatch<SetStateAction<FieldVisitData>>
@@ -27,6 +29,8 @@ export function VisitBasicsSections({
   handleEndTimeChange: (val: string) => void
   handleDurationChange: (val: string) => void
   handleRecalculateDuration: () => void
+  steamTrapOpen: boolean
+  setSteamTrapOpen: Dispatch<SetStateAction<boolean>>
 }) {
   return (
     <>
@@ -326,6 +330,44 @@ export function VisitBasicsSections({
                 </button>
               )
             })}
+
+            {/* 7º card — Inspeção de Purgadores (VKP): abre o módulo abaixo, sem mudar o tipo de visita */}
+            <button
+              type="button"
+              onClick={() => setSteamTrapOpen((o) => !o)}
+              className={`p-4 rounded-xl text-left border-2 transition-all flex flex-col justify-between min-h-[110px] ${
+                steamTrapOpen
+                  ? 'border-sky-600 bg-sky-50/90 dark:bg-sky-950/40 shadow-sm ring-1 ring-sky-600'
+                  : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span
+                  className={`text-sm font-bold ${
+                    steamTrapOpen
+                      ? 'text-sky-950 dark:text-sky-200'
+                      : 'text-slate-800 dark:text-slate-200'
+                  }`}
+                >
+                  Inspeção de Purgadores
+                </span>
+                {steamTrapOpen && (
+                  <CheckCircle2 className="h-5 w-5 text-sky-700 dark:text-sky-400 shrink-0 mt-0.5" />
+                )}
+              </div>
+
+              <div className="mt-2 space-y-1">
+                <Badge
+                  variant="outline"
+                  className="text-[9px] px-1.5 py-0 border-sky-300 text-sky-700 bg-sky-50/50"
+                >
+                  Inspeção VKP
+                </Badge>
+                <p className="text-[11px] text-muted-foreground leading-snug">
+                  Cadastro dos purgadores testados, achados e relatório em PDF no padrão Bermo.
+                </p>
+              </div>
+            </button>
           </div>
 
           {/* Campo de texto livre para 'Outro' */}
