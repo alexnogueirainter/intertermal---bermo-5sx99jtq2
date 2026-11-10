@@ -1006,9 +1006,7 @@ export const ClientsManager: React.FC<ClientsManagerProps> = ({
                           <div className="font-semibold text-slate-900 dark:text-slate-100">
                             {d.title}
                           </div>
-                          <div className="text-[11px] text-muted-foreground">
-                            Etapa: {d.stage} • Probabilidade: {d.probability}%
-                          </div>
+                          <div className="text-[11px] text-muted-foreground">Etapa: {d.stage}</div>
                         </div>
                         <div className="font-bold text-slate-900 dark:text-slate-100">
                           {(d.value || 0).toLocaleString('pt-BR', {

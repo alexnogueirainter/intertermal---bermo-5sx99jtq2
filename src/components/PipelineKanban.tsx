@@ -111,7 +111,6 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
   const [newDealClientId, setNewDealClientId] = useState('')
   const [newDealValue, setNewDealValue] = useState('')
   const [newDealStage, setNewDealStage] = useState<DealStage>('prospecting')
-  const [newDealProbability, setNewDealProbability] = useState('50')
   const [newDealNotes, setNewDealNotes] = useState('')
   const [newDealPriority, setNewDealPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>(
     'medium',
@@ -126,7 +125,6 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
       client_name: selectedClient ? selectedClient.name : undefined,
       value: Number(newDealValue) || 0,
       stage: newDealStage,
-      probability: Number(newDealProbability) || 50,
       priority: newDealPriority,
       notes: newDealNotes,
       assigned_to: 'Alex Nogueia',
@@ -227,15 +225,12 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                      <div className="flex items-center pt-1 border-t border-slate-100 dark:border-slate-800/80">
                         <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
                           {(deal.value || 0).toLocaleString('pt-BR', {
                             style: 'currency',
                             currency: 'BRL',
                           })}
-                        </span>
-                        <span className="text-[10px] font-medium text-slate-500">
-                          {deal.probability || 0}% prob.
                         </span>
                       </div>
 
@@ -396,18 +391,6 @@ export const PipelineKanban: React.FC<PipelineKanbanProps> = ({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium">Probabilidade (%)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  value={newDealProbability}
-                  onChange={(e) => setNewDealProbability(e.target.value)}
-                  className="text-xs"
-                />
               </div>
 
               <div className="space-y-1.5">
