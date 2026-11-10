@@ -15,6 +15,7 @@ import { DetailedFlowSection } from '@/components/field-visit/DetailedFlowSectio
 import { ActionPlanSection } from '@/components/field-visit/ActionPlanSection'
 import { SendFooterSection } from '@/components/field-visit/SendFooterSection'
 import { VisitModals } from '@/components/field-visit/VisitModals'
+import { SteamTrapInspectionSection } from '@/components/field-visit/SteamTrapInspectionSection'
 import type { FieldVisitData } from '@/types/field-visit'
 
 export default function FieldVisitPage({
@@ -97,6 +98,9 @@ export default function FieldVisitPage({
           handleDurationChange={s.handleDurationChange}
           handleRecalculateDuration={s.handleRecalculateDuration}
         />
+
+        {/* 4b. Inspeção de Purgadores (VKP) — acessória ao item 4, sem alterar os tipos de visita */}
+        <SteamTrapInspectionSection visit={s.visit} sellerMode={sellerMode} />
 
         {isLeanFlow ? (
           <LeanFlowSection

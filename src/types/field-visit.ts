@@ -803,3 +803,140 @@ export async function readFileAsMediaAttachment(file: File): Promise<MediaAttach
     size: file.size,
   }
 }
+
+// ===== Inspeção de Purgadores (VKP) =====
+export type SteamTrapResult =
+  | 'Purgador ok'
+  | 'Vazando'
+  | 'Vazando direto'
+  | 'Represando'
+  | 'Parado'
+  | 'Não Avaliado'
+
+export interface SteamTrapFinding {
+  id: string
+  title: string
+  location: string
+  severity: 'Crítica' | 'Alta' | 'Média'
+  description: string
+  recommendation: string
+  mediaIds?: string[] // client_media_id das fotos/vídeos vinculados
+}
+
+export interface SteamTrapRecord {
+  id: string
+  seq: number // nº do registro na inspeção (1, 2, 3…)
+  location: string // Local / equipamento (ex.: Cozinhador I)
+  area: string // Área instalada (lista do contexto ou nova)
+  tagClient?: string // Tag do cliente
+  tagAri?: string // Tag ARI
+  thermoNumber?: string // Nº da termografia
+  manufacturer: string
+  model: string
+  dn: string // DN em mm
+  pressureClass: string // ANSI 150 etc.
+  connection: string // NPT etc.
+  pressureBarg: string // pressão de operação
+  result: SteamTrapResult
+  action: string // ação recomendada
+  lossKgh: number | null // perda medida/estimada (kg/h); null = não medida
+  lossEstimated?: boolean // true quando a perda é estimativa (sem VKP)
+  notes?: string
+  mediaIds?: string[] // client_media_id das fotos/vídeos do registro
+}
+
+export interface SteamTrapImprovement {
+  id: string
+  title: string
+  analyzed: boolean
+  fixed: boolean
+}
+
+export interface SteamTrapInspectionData {
+  version: 1
+  updatedAt: string
+  context: {
+    unit: string
+    inspectionDate: string
+    responsible: string
+    companion: string
+    testEquipment: string // VKP 10 / VKP 42 / VKP 42 Ex / outro
+    areas: string[] // lista de áreas (alimenta dropdown + filtros)
+    steamCostBrlTon: number | null // custo do vapor R$/t
+    hoursPerYear: number // base de horas (padrão 2000)
+    customManufacturers?: string[] // fabricantes fora do catálogo, criados na visita
+  }
+  findings: SteamTrapFinding[]
+  traps: SteamTrapRecord[]
+  improvements: SteamTrapImprovement[]
+  conclusion: string
+  signatures: { name: string; role: string }[]
+}
+
+// Helpers de cálculo (fonte única — usados pelo módulo e pelo PDF)
+export function steamTrapLossTotal(traps: SteamTrapRecord[]): number {
+  return traps.reduce((s, t) => s + (Number(t.lossKgh) || 0), 0)
+}
+export function steamTrapBadCount(traps: SteamTrapRecord[]): number {
+  return traps.filter((t) => t.result !== 'Purgador ok').length
+}
+export function steamTrapEconomics(
+  traps: SteamTrapRecord[],
+  steamCostBrlTon: number | null,
+  hoursPerYear: number,
+): { lossKgh: number; perMonth: number | null; perYear: number | null } {
+  const lossKgh = steamTrapLossTotal(traps)
+  if (steamCostBrlTon == null || !hoursPerYear) {
+    return { lossKgh, perMonth: null, perYear: null }
+  }
+  const perYear = (lossKgh * hoursPerYear * steamCostBrlTon) / 1000
+  return { lossKgh, perMonth: perYear / 12, perYear }
+}
+export function createEmptySteamTrap(seq: number): SteamTrapRecord {
+  return {
+    id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    seq,
+    location: '',
+    area: '',
+    manufacturer: '',
+    model: '',
+    dn: '25',
+    pressureClass: 'ANSI 150',
+    connection: 'NPT',
+    pressureBarg: '3.0',
+    result: 'Purgador ok',
+    action: 'Sem ação',
+    lossKgh: null,
+    lossEstimated: false,
+    notes: '',
+    mediaIds: [],
+  }
+}
+export const STEAM_TRAP_MANUFACTURERS = ['TLV', 'Spirax Sarco', 'Gestra', 'Pennat']
+export const STEAM_TRAP_MODELS: Record<string, string[]> = {
+  TLV: ['JX', 'JHX', 'JH7.2X', 'JH3X', 'SS Bimetálico', 'TA5'],
+  'Spirax Sarco': ['FT14HC', 'FT14X14', 'FT20', 'TDS52', 'TD52'],
+  Gestra: ['UNA 25', 'UNA 25H', 'BK45'],
+  Pennat: ['PT65'],
+}
+export const STEAM_TRAP_RESULTS: SteamTrapResult[] = [
+  'Purgador ok',
+  'Vazando',
+  'Vazando direto',
+  'Represando',
+  'Parado',
+  'Não Avaliado',
+]
+export const STEAM_TRAP_ACTION_BY_RESULT: Record<SteamTrapResult, string> = {
+  'Purgador ok': 'Sem ação',
+  Vazando: 'Substituição',
+  'Vazando direto': 'Substituição',
+  Represando: 'Analisar Instalação',
+  Parado: 'Nova Inspeção',
+  'Não Avaliado': 'Agendar inspeção',
+}
+export const STEAM_TRAP_DN_OPTIONS = ['15', '20', '25', '40', '50', '65', '80', '100']
+export const STEAM_TRAP_CLASS_OPTIONS = ['ANSI 150', 'ANSI 300', 'ANSI 600', 'PN16', 'PN25', 'PN40']
+export const STEAM_TRAP_CONNECTION_OPTIONS = ['NPT', 'BSP', 'Flange', 'Solda (SW)', 'Solda direta']
+export const STEAM_TRAP_TEST_EQUIPMENT = ['VKP 10', 'VKP 42', 'VKP 42 Ex']
+export const STEAM_TRAP_SEVERITIES: SteamTrapFinding['severity'][] = ['Crítica', 'Alta', 'Média']
