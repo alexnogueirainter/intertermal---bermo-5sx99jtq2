@@ -25,6 +25,7 @@ import type {
   ServiceRecord,
   ServiceOrderRecord,
   ActivityRecord,
+  OsExecutionReportRecord,
 } from '@/types/crm'
 import {
   DollarSign,
@@ -49,6 +50,8 @@ import type { FieldVisitRecord } from '@/services/field-visits'
 import { ExecutiveReportPrintButton } from '@/components/ExecutiveReportPrint'
 import { useToast } from '@/hooks/use-toast'
 import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
+import { computeOrderMargins } from '@/lib/order-margins'
+import { osExecutionReportsService } from '@/services/os-execution-reports'
 import { fireNewAction } from '@/components/NewActionsButton'
 
 interface OverviewDashboardProps {
@@ -260,6 +263,34 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
       return true
     })
   }, [deals, periodFilter, customStartDate, customEndDate])
+
+  // Relatórios de execução (custo real lançado por OS) — base da Margem Realizada no painel
+  const [executionReports, setExecutionReports] = React.useState<
+    Record<string, OsExecutionReportRecord[]>
+  >({})
+  React.useEffect(() => {
+    let isMounted = true
+    osExecutionReportsService
+      .getAll()
+      .then((reports) => {
+        if (!isMounted) return
+        const byOrder: Record<string, OsExecutionReportRecord[]> = {}
+        for (const rep of reports) {
+          const soId = (rep as any).service_order_id
+          if (soId) {
+            byOrder[soId] = byOrder[soId] || []
+            byOrder[soId].push(rep)
+          }
+        }
+        setExecutionReports(byOrder)
+      })
+      .catch(() => {
+        // falha silenciosa: margem realizada simplesmente não aparece
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Função utilitária para extrair o valor monetário real de um negócio (com fallback de campos numéricos)
   const getDealNumericValue = (deal: DealRecord | any): number => {
@@ -983,6 +1014,39 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                 ? Math.round((itemsWithCost.length / completedItems.length) * 100)
                 : 0
 
+            // ===== Margens Prevista vs Realizada (Alex, 10/11) =====
+            // Prevista: preço − custo da proposta (internal_cost/total_cost).
+            // Realizada: preço − custos reais lançados nos relatórios de execução
+            // (insumos × custo unitário + horas extras). Só OS com relatório entram
+            // na realizada — sem estimativa (regra do Alex).
+            let plannedSumPrice = 0
+            let plannedSumCost = 0
+            let plannedCount = 0
+            let realSumPrice = 0
+            let realSumCost = 0
+            let realCount = 0
+            for (const so of serviceOrders) {
+              const price = resolveServiceOrderLiveValue(so, quotes)
+              if (!(price > 0)) continue
+              const m = computeOrderMargins(so, price, quotes, executionReports[so.id])
+              if (m.plannedCost !== null) {
+                plannedSumPrice += price
+                plannedSumCost += m.plannedCost
+                plannedCount++
+              }
+              if (m.realCost !== null) {
+                realSumPrice += price
+                realSumCost += m.realCost
+                realCount++
+              }
+            }
+            const plannedMarginPct =
+              plannedCount > 0 ? ((plannedSumPrice - plannedSumCost) / plannedSumPrice) * 100 : null
+            const realMarginPct =
+              realCount > 0 ? ((realSumPrice - realSumCost) / realSumPrice) * 100 : null
+            const plannedProfit = plannedCount > 0 ? plannedSumPrice - plannedSumCost : null
+            const realProfit = realCount > 0 ? realSumPrice - realSumCost : null
+
             // Ordenar por mais rentáveis
             const topProfitable = [...completedItems].sort((a, b) => b.realMargin - a.realMargin)
 
@@ -1152,6 +1216,99 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                             {costCoverage < 100
                               ? `Margem só dos ${itemsWithCost.length} itens com custo informado (${costCoverage}% do total)`
                               : 'Meta operacional atingida (Acima de 25%)'}
+                          </p>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Margens Prevista vs Realizada — lado a lado (Alex, 10/11) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
+                        Margem Prevista (Proposta)
+                      </CardTitle>
+                      <div className="h-8 w-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 flex items-center justify-center font-bold">
+                        <Percent className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {plannedMarginPct !== null ? (
+                        <>
+                          <div
+                            className={`text-xl font-bold ${
+                              plannedMarginPct >= 25
+                                ? 'text-emerald-700 dark:text-emerald-400'
+                                : plannedMarginPct >= 0
+                                  ? 'text-amber-700 dark:text-amber-400'
+                                  : 'text-rose-700 dark:text-rose-400'
+                            }`}
+                          >
+                            {plannedMarginPct.toFixed(1)}%
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Preço − custo da proposta ·{' '}
+                            {(plannedProfit || 0).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}{' '}
+                            de lucro previsto · {plannedCount} OS
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-xl font-bold text-slate-400 dark:text-slate-500">
+                            —
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Nenhuma OS com custo de proposta informado
+                          </p>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xs">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-xs font-semibold text-muted-foreground uppercase">
+                        Margem Realizada (Execução)
+                      </CardTitle>
+                      <div className="h-8 w-8 rounded-lg bg-teal-50 dark:bg-teal-950/60 text-teal-600 flex items-center justify-center font-bold">
+                        <Award className="h-4 w-4" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {realMarginPct !== null ? (
+                        <>
+                          <div
+                            className={`text-xl font-bold ${
+                              realMarginPct >= 25
+                                ? 'text-emerald-700 dark:text-emerald-400'
+                                : realMarginPct >= 0
+                                  ? 'text-amber-700 dark:text-amber-400'
+                                  : 'text-rose-700 dark:text-rose-400'
+                            }`}
+                          >
+                            {realMarginPct.toFixed(1)}%
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Preço − custos reais lançados (insumos + horas extras) ·{' '}
+                            {(realProfit || 0).toLocaleString('pt-BR', {
+                              style: 'currency',
+                              currency: 'BRL',
+                            })}{' '}
+                            de lucro realizado · {realCount} OS
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-xl font-bold text-slate-400 dark:text-slate-500">
+                            —
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-1">
+                            Nenhum custo lançado nos relatórios de execução ainda
                           </p>
                         </>
                       )}
