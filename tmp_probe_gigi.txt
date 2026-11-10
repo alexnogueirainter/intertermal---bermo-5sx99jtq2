@@ -1,4 +1,0 @@
-const a = "dq"
-const r = /\d{4}-\d{2}/
-const t = `x${y}`
-END

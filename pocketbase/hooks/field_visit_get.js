@@ -4,57 +4,6 @@
  * - Valida token + aparelho. Só retorna se a visita foi enviada pelo MESMO token.
  */
 
-routerAdd('GET', '/backend/v1/test/inspect-tostring6', (e) => {
-  const gatewayUrl = $os.getenv('SKIP_AI_GATEWAY_URL') || ''
-  const gatewayKey = $os.getenv('SKIP_AI_GATEWAY_API_KEY') || ''
-  let endpoint = gatewayUrl.replace(/\/+$/, '')
-  if (!endpoint.endsWith('/chat/completions')) {
-    endpoint = endpoint + '/chat/completions'
-  }
-  const tinyPng =
-    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-  const res = $http.send({
-    url: endpoint,
-    method: 'POST',
-    headers: {
-      Authorization: 'Bearer ' + gatewayKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'fast',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'hi' },
-            { type: 'image_url', image_url: { url: tinyPng } },
-          ],
-        },
-      ],
-    }),
-    timeout: 10,
-  })
-
-  // res.body em goja PocketBase v0.26 é byte array -> podemos converter caractere a caractere ou String.fromCharCode
-  let chars = ''
-  try {
-    if (res.body && res.body.length !== undefined) {
-      const len = Math.min(res.body.length, 300)
-      for (let i = 0; i < len; i++) {
-        chars += String.fromCharCode(res.body[i])
-      }
-    }
-  } catch (err) {
-    chars = 'err: ' + err.message
-  }
-
-  return e.json(200, {
-    statusCode: res.statusCode,
-    bodyLen: res.body ? res.body.length : -1,
-    chars,
-  })
-})
-
 routerAdd('GET', '/backend/v1/field-visits/get', (e) => {
   const q = e.requestInfo().query || {}
   const id = String(q['id'] || '').trim()
