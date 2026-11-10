@@ -15,6 +15,8 @@ import {
   ChevronUp,
   Trash2,
   CheckCircle2,
+  Camera,
+  Paperclip,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -79,6 +81,7 @@ export function SteamTrapInspectionSection({
   const [modalOpen, setModalOpen] = useState(false)
   const [draft, setDraft] = useState<SteamTrapRecord | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
   const [mediaFor, setMediaFor] = useState<string | null>(null)
   const loadedForRef = useRef('')
 
@@ -709,6 +712,17 @@ export function SteamTrapInspectionSection({
                       if (fileRef.current) fileRef.current.value = ''
                     }}
                   />
+                  <input
+                    ref={cameraRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (mediaFor) handleTrapMedia(mediaFor, e.target.files)
+                      if (cameraRef.current) cameraRef.current.value = ''
+                    }}
+                  />
                 </div>
               )}
 
@@ -1169,16 +1183,38 @@ export function SteamTrapInspectionSection({
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-semibold mb-1">Foto / vídeo do ponto</label>
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  multiple
-                  onChange={(e) => {
-                    if (draft) handleTrapMedia(draft.id, e.target.files)
-                    e.target.value = ''
-                  }}
-                  className="text-xs"
-                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!draft) return
+                      setMediaFor(draft.id)
+                      if (cameraRef.current) {
+                        cameraRef.current.setAttribute('capture', 'environment')
+                        cameraRef.current.click()
+                      }
+                    }}
+                  >
+                    <Camera className="h-3.5 w-3.5 mr-1" /> Tirar foto
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      if (!draft) return
+                      setMediaFor(draft.id)
+                      if (fileRef.current) {
+                        fileRef.current.removeAttribute('capture')
+                        fileRef.current.click()
+                      }
+                    }}
+                  >
+                    <Paperclip className="h-3.5 w-3.5 mr-1" /> Anexar
+                  </Button>
+                </div>
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Fica vinculado ao registro — sai correlacionado no PDF.
                 </p>
