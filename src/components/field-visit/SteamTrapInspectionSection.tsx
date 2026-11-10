@@ -167,12 +167,19 @@ export function SteamTrapInspectionSection({
       }
     }
     if (added.length && data) {
-      queueSave({
-        ...data,
-        traps: data.traps.map((t) =>
-          t.id === trapId ? { ...t, mediaIds: [...(t.mediaIds || []), ...added] } : t,
-        ),
-      })
+      const inList = data.traps.some((t) => t.id === trapId)
+      if (inList) {
+        queueSave({
+          ...data,
+          traps: data.traps.map((t) =>
+            t.id === trapId ? { ...t, mediaIds: [...(t.mediaIds || []), ...added] } : t,
+          ),
+        })
+      } else if (draft && draft.id === trapId) {
+        // Registro ainda não salvo (modal aberto): a mídia fica no rascunho
+        // e entra no registro quando o técnico confirmar ("Salvar registro")
+        setDraft({ ...draft, mediaIds: [...(draft.mediaIds || []), ...added] })
+      }
       toast({ title: 'Mídia vinculada ao registro', description: `${added.length} arquivo(s).` })
     }
   }
