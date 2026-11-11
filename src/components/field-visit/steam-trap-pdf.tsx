@@ -44,7 +44,7 @@ interface PdfInput {
   mediaIndex?: Map<string, SteamTrapPdfMedia>
 }
 
-export function buildTrapReportHtml({ visit, data, econ, badCount }: PdfInput): string {
+export function buildTrapReportHtml({ visit, data, econ, badCount, mediaIndex }: PdfInput): string {
   const ctx = data.context
   const total = data.traps.length
   const loss = econ.lossKgh
