@@ -35,9 +35,14 @@ import {
   STEAM_TRAP_TEST_EQUIPMENT,
   STEAM_TRAP_SEVERITIES,
   createEmptySteamTrap,
+  isSteamTrapProblem,
   steamTrapEconomics,
 } from '@/types/field-visit'
-import { getOrCreateInspection, saveInspection } from '@/services/steam-traps'
+import {
+  getOrCreateInspection,
+  listVisitMediaForReport,
+  saveInspection,
+} from '@/services/steam-traps'
 import { getStoredToken, getStoredDeviceId } from '@/services/field-visit-token'
 import { buildTrapReportHtml, generateTrapPdfBlob } from '@/components/field-visit/steam-trap-pdf'
 import pb from '@/lib/pocketbase/client'
@@ -127,7 +132,7 @@ export function SteamTrapInspectionSection({
     [data],
   )
   const badCount = useMemo(
-    () => (data ? data.traps.filter((t) => t.result !== 'Purgador ok').length : 0),
+    () => (data ? data.traps.filter((t) => isSteamTrapProblem(t.result)).length : 0),
     [data],
   )
 
@@ -193,12 +198,15 @@ export function SteamTrapInspectionSection({
     if (!data) return
     setGenPdf(true)
     try {
+      const media = await listVisitMediaForReport(clientVisitId, data)
+      const mediaIndex = new Map(media.map((item) => [item.clientMediaId, item]))
       const blob = await generateTrapPdfBlob(
         buildTrapReportHtml({
           visit,
           data,
           econ,
           badCount,
+          mediaIndex,
         }),
       )
       const url = URL.createObjectURL(blob)

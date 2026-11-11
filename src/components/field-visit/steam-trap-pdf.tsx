@@ -6,6 +6,7 @@
 
 import { loadHtml2Pdf } from '@/lib/quote-pdf-generator'
 import { INTERTERMAL_LOGO_BASE64 } from '@/lib/intertermal-logo'
+import { isSteamTrapProblem } from '@/types/field-visit'
 import type { FieldVisitData, SteamTrapInspectionData } from '@/types/field-visit'
 
 const br = (v: number, d = 2) =>
@@ -29,11 +30,18 @@ const RES_CLS: Record<string, string> = {
   'Não Avaliado': 'na',
 }
 
+interface SteamTrapPdfMedia {
+  kind: string
+  originalName: string
+  dataUrl: string
+}
+
 interface PdfInput {
   visit: FieldVisitData
   data: SteamTrapInspectionData
   econ: { lossKgh: number; perMonth: number | null; perYear: number | null }
   badCount: number
+  mediaIndex?: Map<string, SteamTrapPdfMedia>
 }
 
 export function buildTrapReportHtml({ visit, data, econ, badCount }: PdfInput): string {
@@ -72,15 +80,41 @@ export function buildTrapReportHtml({ visit, data, econ, badCount }: PdfInput): 
     )
     .join('')
 
-  const photos = data.traps
-    .flatMap((t) => (t.mediaIds || []).map((mid) => ({ t, mid })))
-    .slice(0, 6)
+  // No PDF entram somente fotos de purgadores com problema confirmado.
+  // Purgadores OK e Não Avaliado ficam fora; vídeos permanecem disponíveis no CRM.
+  const problemTraps = data.traps.filter((t) => isSteamTrapProblem(t.result))
+  const photos: Array<{ t: SteamTrapInspectionData['traps'][number]; media: SteamTrapPdfMedia }> =
+    []
+  for (const trap of problemTraps) {
+    for (const mediaId of trap.mediaIds || []) {
+      const media = mediaIndex?.get(mediaId)
+      if (media && media.kind === 'image' && media.dataUrl) photos.push({ t: trap, media })
+    }
+  }
+  const problemTrapsWithoutPhotos = problemTraps.filter(
+    (t) =>
+      !(t.mediaIds || []).some((mediaId) => {
+        const media = mediaIndex?.get(mediaId)
+        return media?.kind === 'image' && !!media.dataUrl
+      }),
+  )
   const photosHtml = photos
     .map(
-      ({ t }) => `<figure><figcaption><b>Registro ${t.seq} — ${esc(t.location)}</b>
-${esc(t.manufacturer)} ${esc(t.model)} · DN ${esc(t.dn)} · ${br(Number(t.pressureBarg) || 0)} barg · ${esc(t.result)}${t.lossKgh ? ` · ${br(t.lossKgh)} kg/h` : ''}</figcaption></figure>`,
+      ({ t, media }) => `<figure class="trap-photo">
+<img src="${esc(media.dataUrl)}" alt="Foto do purgador ${esc(t.location || `registro ${t.seq}`)}" />
+<figcaption><b>Registro ${esc(t.seq)} — ${esc(t.location || 'Local não informado')}</b>
+${esc(t.manufacturer)} ${esc(t.model)} · DN ${esc(t.dn)} · ${br(Number(t.pressureBarg) || 0)} barg · <b>${esc(t.result)}</b>${t.lossKgh != null ? ` · ${br(t.lossKgh)} kg/h` : ''}${media.originalName ? `<br><span class="photo-name">${esc(media.originalName)}</span>` : ''}</figcaption>
+</figure>`,
     )
     .join('')
+  const missingPhotosHtml = problemTrapsWithoutPhotos.length
+    ? `<div class="missing-photos"><b>Sem foto anexada:</b><ul>${problemTrapsWithoutPhotos
+        .map(
+          (t) =>
+            `<li>Registro ${esc(t.seq)} — ${esc(t.location || 'Local não informado')} — ${esc(t.result)}</li>`,
+        )
+        .join('')}</ul></div>`
+    : ''
 
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 *{margin:0;padding:0;box-sizing:border-box}
@@ -133,9 +167,13 @@ table.mel td{padding:5px 8px;border-bottom:1px solid #e2e8f0;color:#334155}
 .sig2 .s{text-align:center;font-size:9px}
 .sig2 .s .ln{border-top:1px solid #334155;padding-top:4px;margin-top:12mm}
 .sig2 .s b{display:block;font-size:9.5px}
-.fotos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px}
-.fotos figure{border:1px solid #e2e8f0;border-radius:6px;padding:6px;font-size:8px;color:#475569}
+.fotos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:4px}
+.fotos figure{border:1px solid #e2e8f0;border-radius:6px;padding:6px;font-size:8px;color:#475569;break-inside:avoid;page-break-inside:avoid}
+.fotos img{display:block;width:100%;height:58mm;object-fit:contain;background:#f8fafc;border-radius:4px;margin-bottom:5px}
 .fotos figcaption b{color:#0f172a;display:block;margin-bottom:2px}
+.photo-name{font-size:7px;color:#64748b}
+.missing-photos{margin-top:6px;padding:6px 8px;border:1px solid #fed7aa;border-radius:5px;background:#fff7ed;font-size:8px;color:#7c2d12}
+.missing-photos ul{margin:3px 0 0 15px}
 .tnote{font-size:8px;color:#64748b;margin-top:4px}
 </style></head><body><div class="page">
 <div class="bb"></div>
@@ -188,10 +226,11 @@ ${findingsHtml || '<p class="tnote">Nenhum achado registrado.</p>'}
 </div>
 
 ${
-  photos.length
-    ? `<h2><span class="n">6.</span> Registro fotográfico — correlacionado aos registros</h2>
-<div class="fotos">${photosHtml}</div>
-<p class="tnote">Galeria completa de fotos e vídeos disponível na visita no CRM.</p>`
+  problemTraps.length
+    ? `<h2><span class="n">6.</span> Registro fotográfico — purgadores com problema</h2>
+${photos.length ? `<div class="fotos">${photosHtml}</div>` : '<p class="tnote">Nenhuma foto de purgador com problema disponível para este relatório.</p>'}
+${missingPhotosHtml}
+<p class="tnote">Somente fotos de purgadores sinalizados como problema são incorporadas. Vídeos e a galeria completa permanecem disponíveis no CRM.</p>`
     : ''
 }
 

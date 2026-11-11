@@ -1,6 +1,7 @@
 // src/services/steam-traps.ts — serviço completo (arquivo novo, sem dependências além do cliente PB)
 import pb from '@/lib/pocketbase/client'
 import type { SteamTrapInspectionData, SteamTrapRecord } from '@/types/field-visit'
+import { isSteamTrapProblem } from '@/types/field-visit'
 
 export interface SteamTrapInspectionRec {
   id: string
@@ -67,6 +68,85 @@ export async function saveInspection(
     data: { ...data, updatedAt: new Date().toISOString() },
     status,
   })) as unknown as SteamTrapInspectionRec
+}
+
+/** Lista as mídias da visita com URL servida pelo PocketBase, para montar o PDF. */
+export interface SteamTrapMediaFile {
+  clientMediaId: string
+  kind: string
+  originalName: string
+  dataUrl: string
+}
+
+async function compressImageForPdf(url: string): Promise<string> {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`Falha ao baixar imagem (${response.status})`)
+  const objectUrl = URL.createObjectURL(await response.blob())
+  try {
+    const image = new Image()
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve()
+      image.onerror = () => reject(new Error('Formato de imagem não suportado'))
+      image.src = objectUrl
+    })
+    if (!image.naturalWidth || !image.naturalHeight) throw new Error('Imagem inválida')
+
+    const maxDimension = 1280
+    const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Canvas indisponível')
+    context.fillStyle = '#ffffff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.drawImage(image, 0, 0, canvas.width, canvas.height)
+    return canvas.toDataURL('image/jpeg', 0.72)
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
+export async function listVisitMediaForReport(
+  clientVisitId: string,
+  inspection: SteamTrapInspectionData,
+): Promise<SteamTrapMediaFile[]> {
+  if (!clientVisitId) return []
+  const wantedIds = new Set(
+    inspection.traps
+      .filter((trap) => isSteamTrapProblem(trap.result))
+      .flatMap((trap) => trap.mediaIds || []),
+  )
+  if (wantedIds.size === 0) return []
+
+  // Carrega só os metadados desta visita; arquivos são baixados apenas para IDs ligados
+  // a purgadores com problema, evitando baixar imagens de registros OK ou não avaliados.
+  const visitMedia = await pb.collection('field_visit_media').getFullList({
+    filter: pb.filter('client_visit_id = {:visitId}', { visitId: clientVisitId }),
+    fields: 'id,client_media_id,kind,original_name,file,client_visit_id',
+  })
+  const records = visitMedia.filter((record) => wantedIds.has(String(record.client_media_id || '')))
+
+  return Promise.all(
+    records.map(async (record) => {
+      const kind = String(record.kind || 'image')
+      const url = record.file ? pb.files.getURL(record, String(record.file)) : ''
+      let dataUrl = ''
+      if (kind === 'image' && url) {
+        try {
+          dataUrl = await compressImageForPdf(url)
+        } catch (_) {
+          // O relatório continua; o PDF informa quais registros-problema ficaram sem foto legível.
+        }
+      }
+      return {
+        clientMediaId: String(record.client_media_id || ''),
+        kind,
+        originalName: String(record.original_name || ''),
+        dataUrl,
+      }
+    }),
+  )
 }
 
 /** Lista de fotos/vídeos de um registro (pela referência client_media_id). */

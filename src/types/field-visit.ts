@@ -813,6 +813,16 @@ export type SteamTrapResult =
   | 'Parado'
   | 'Não Avaliado'
 
+/** Resultados que representam um problema confirmado e entram na evidência fotográfica do relatório. */
+export function isSteamTrapProblem(result: SteamTrapResult): boolean {
+  return (
+    result === 'Vazando' ||
+    result === 'Vazando direto' ||
+    result === 'Represando' ||
+    result === 'Parado'
+  )
+}
+
 export interface SteamTrapFinding {
   id: string
   title: string
@@ -878,7 +888,7 @@ export function steamTrapLossTotal(traps: SteamTrapRecord[]): number {
   return traps.reduce((s, t) => s + (Number(t.lossKgh) || 0), 0)
 }
 export function steamTrapBadCount(traps: SteamTrapRecord[]): number {
-  return traps.filter((t) => t.result !== 'Purgador ok').length
+  return traps.filter((t) => isSteamTrapProblem(t.result)).length
 }
 export function steamTrapEconomics(
   traps: SteamTrapRecord[],
