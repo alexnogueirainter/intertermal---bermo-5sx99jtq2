@@ -87,8 +87,66 @@ export function SteamTrapInspectionSection({
   const [draft, setDraft] = useState<SteamTrapRecord | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const cameraStreamRef = useRef<MediaStream | null>(null)
   const [mediaFor, setMediaFor] = useState<string | null>(null)
+  const [cameraOpen, setCameraOpen] = useState(false)
+  const [cameraReady, setCameraReady] = useState(false)
+  const [cameraCapturing, setCameraCapturing] = useState(false)
+  const [cameraError, setCameraError] = useState('')
   const loadedForRef = useRef('')
+
+  // No notebook, abre uma prévia real da webcam; no celular, mantém a câmera nativa.
+  useEffect(() => {
+    if (!cameraOpen) return
+    let cancelled = false
+    let activeStream: MediaStream | null = null
+    setCameraReady(false)
+    setCameraError('')
+
+    const startCamera = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Este navegador não disponibiliza acesso à webcam.')
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'user' },
+          width: { ideal: 1280 },
+          height: { ideal: 960 },
+        },
+        audio: false,
+      })
+      if (cancelled) {
+        stream.getTracks().forEach((track) => track.stop())
+        return
+      }
+      activeStream = stream
+      cameraStreamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play().catch(() => {})
+      }
+      setCameraReady(true)
+    }
+
+    startCamera().catch((error: any) => {
+      if (!cancelled) {
+        setCameraError(
+          error?.name === 'NotAllowedError'
+            ? 'Permita o acesso à câmera para este site nas configurações do navegador e tente novamente.'
+            : error?.name === 'NotFoundError'
+              ? 'Nenhuma webcam foi encontrada. Use “Anexar” para escolher uma imagem.'
+              : error?.message || 'Não foi possível abrir a webcam. Use “Anexar” como alternativa.',
+        )
+      }
+    })
+
+    return () => {
+      cancelled = true
+      activeStream?.getTracks().forEach((track) => track.stop())
+      if (cameraStreamRef.current === activeStream) cameraStreamRef.current = null
+    }
+  }, [cameraOpen])
 
   // ---- carregamento (uma vez por visita) ----
   useEffect(() => {
@@ -137,7 +195,7 @@ export function SteamTrapInspectionSection({
   )
 
   // ---- mídia: fotos/vídeos do registro via rota da visita ----
-  const handleTrapMedia = async (trapId: string, files: FileList | null) => {
+  const handleTrapMedia = async (trapId: string, files: FileList | File[] | null) => {
     if (!files || !files.length || !data) return
     const added: string[] = []
     for (const f of Array.from(files)) {
@@ -191,6 +249,62 @@ export function SteamTrapInspectionSection({
       }
       toast({ title: 'Mídia vinculada ao registro', description: `${added.length} arquivo(s).` })
     }
+  }
+
+  const handleCaptureWebcamPhoto = async () => {
+    const video = videoRef.current
+    if (!draft || !video || !video.videoWidth || !video.videoHeight) {
+      toast({
+        title: 'Webcam ainda não está pronta',
+        description: 'Aguarde a imagem aparecer e tente novamente.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setCameraCapturing(true)
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const context = canvas.getContext('2d')
+      if (!context) throw new Error('Não foi possível preparar a imagem da webcam.')
+      context.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (result) => (result ? resolve(result) : reject(new Error('Falha ao capturar a foto.'))),
+          'image/jpeg',
+          0.88,
+        )
+      })
+      const photo = new File([blob], `purgador-${draft.seq}-${Date.now()}.jpg`, {
+        type: 'image/jpeg',
+      })
+      await handleTrapMedia(draft.id, [photo])
+      setCameraOpen(false)
+    } catch (error: any) {
+      toast({
+        title: 'Não foi possível tirar a foto',
+        description: error?.message || 'Tente novamente ou use “Anexar”.',
+        variant: 'destructive',
+      })
+    } finally {
+      setCameraCapturing(false)
+    }
+  }
+
+  const handleOpenCamera = () => {
+    if (!draft) return
+    setMediaFor(draft.id)
+    const isMobileCamera =
+      typeof window !== 'undefined' &&
+      (window.matchMedia('(pointer: coarse)').matches ||
+        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
+    if (isMobileCamera && cameraRef.current) {
+      cameraRef.current.setAttribute('capture', 'environment')
+      cameraRef.current.click()
+      return
+    }
+    setCameraOpen(true)
   }
 
   // ---- PDF ----
@@ -1192,19 +1306,7 @@ export function SteamTrapInspectionSection({
               <div className="col-span-2">
                 <label className="block text-xs font-semibold mb-1">Foto / vídeo do ponto</label>
                 <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (!draft) return
-                      setMediaFor(draft.id)
-                      if (cameraRef.current) {
-                        cameraRef.current.setAttribute('capture', 'environment')
-                        cameraRef.current.click()
-                      }
-                    }}
-                  >
+                  <Button type="button" variant="outline" size="sm" onClick={handleOpenCamera}>
                     <Camera className="h-3.5 w-3.5 mr-1" /> Tirar foto
                   </Button>
                   <Button
@@ -1240,6 +1342,73 @@ export function SteamTrapInspectionSection({
               >
                 <CheckCircle2 className="h-3.5 w-3.5" /> Salvar registro
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cameraOpen && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Tirar foto do purgador"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setCameraOpen(false)
+          }}
+        >
+          <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-slate-900 p-4 space-y-3 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold">Tirar foto do purgador</h3>
+                <p className="text-xs text-muted-foreground">
+                  A webcam será usada; a foto ficará vinculada a este registro.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCameraOpen(false)}
+                className="rounded-md px-2 py-1 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                aria-label="Fechar câmera"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="overflow-hidden rounded-xl bg-black aspect-video flex items-center justify-center">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="h-full w-full object-contain"
+              />
+              {cameraError && (
+                <p className="absolute mx-5 max-w-lg rounded-lg bg-black/75 p-3 text-center text-sm text-white">
+                  {cameraError}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">
+                {cameraReady
+                  ? 'Webcam pronta.'
+                  : cameraError
+                    ? 'Câmera indisponível.'
+                    : 'Abrindo webcam…'}
+              </p>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" onClick={() => setCameraOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleCaptureWebcamPhoto}
+                  disabled={!cameraReady || cameraCapturing}
+                  className="bg-sky-600 hover:bg-sky-700"
+                >
+                  {cameraCapturing ? 'Salvando foto…' : 'Capturar foto'}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
