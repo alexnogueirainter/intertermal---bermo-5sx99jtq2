@@ -1018,6 +1018,33 @@ export function SteamTrapInspectionSection({
                 />
               </div>
               <div>
+                <label className="block text-xs font-semibold mb-1">Tag ARI</label>
+                <Input
+                  value={draft.tagAri || ''}
+                  onChange={(e) => setDraft({ ...draft, tagAri: e.target.value })}
+                  placeholder="Ex.: ARI-0123"
+                  className="h-10 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold mb-1">Tag do cliente</label>
+                <Input
+                  value={draft.tagClient || ''}
+                  onChange={(e) => setDraft({ ...draft, tagClient: e.target.value })}
+                  placeholder="Ex.: JBS-LINS-0042"
+                  className="h-10 text-sm"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-semibold mb-1">Nº termografia</label>
+                <Input
+                  value={draft.thermoNumber || ''}
+                  onChange={(e) => setDraft({ ...draft, thermoNumber: e.target.value })}
+                  placeholder="Ex.: TG-2026-001"
+                  className="h-10 text-sm"
+                />
+              </div>
+              <div>
                 <label className="block text-xs font-semibold mb-1">Área instalada</label>
                 <select
                   value={draft.area}
