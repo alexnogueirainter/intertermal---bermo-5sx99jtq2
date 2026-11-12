@@ -240,7 +240,9 @@ export default function ChecklistPage() {
     if (res.ok && res.checklist) {
       try {
         localStorage.setItem(CHECKLIST_TOKEN_KEY, token)
-      } catch (_) {}
+      } catch (_) {
+        // localStorage indisponível: segue sem persistir o token
+      }
       setData(res)
       setAnswers(res.checklist.answers || {})
       setTexts(res.checklist.texts || {})
