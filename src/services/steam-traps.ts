@@ -123,7 +123,10 @@ export async function listVisitMediaForReport(
   // a purgadores com problema, evitando baixar imagens de registros OK ou não avaliados.
   const visitMedia = await pb.collection('field_visit_media').getFullList({
     filter: pb.filter('client_visit_id = {:visitId}', { visitId: clientVisitId }),
-    fields: 'id,client_media_id,kind,original_name,file,client_visit_id',
+    // collectionId/collectionName são OBRIGATÓRIOS: sem eles o pb.files.getURL()
+    // monta URL quebrada e o download falha em silêncio (catch engole o erro).
+    fields:
+      'id,client_media_id,kind,original_name,file,client_visit_id,collectionId,collectionName',
   })
   const records = visitMedia.filter((record) => wantedIds.has(String(record.client_media_id || '')))
 
