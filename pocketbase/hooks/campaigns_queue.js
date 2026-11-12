@@ -236,6 +236,15 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
     let resendId = ''
     let errTxt = ''
     try {
+      // Payload montado de forma imperativa: o JSVM não suporta spread
+      // condicional em objeto literal (ReferenceError __spreadValues).
+      const resendPayload = {
+        from: FROM,
+        to: [email],
+        subject: personalizar(subject),
+        html: htmlBody,
+      }
+      if (attachments.length > 0) resendPayload.attachments = attachments
       const res = $http.send({
         url: 'https://api.resend.com/emails',
         method: 'POST',
@@ -243,13 +252,7 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
           Authorization: 'Bearer ' + apiKey,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          from: FROM,
-          to: [email],
-          subject: personalizar(subject),
-          html: htmlBody,
-          ...(attachments.length > 0 ? { attachments: attachments } : {}),
-        }),
+        body: JSON.stringify(resendPayload),
         timeout: 20,
       })
       if (res.statusCode === 200 && res.json && res.json.id) {

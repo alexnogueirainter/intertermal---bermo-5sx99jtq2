@@ -68,19 +68,22 @@ routerAdd(
 
     const sendViaResend = (to, subject, bodyTpl, nome, empresa, atts) => {
       const rendered = renderHtml(subject, bodyTpl, nome, empresa, to)
+      // Payload montado de forma imperativa: o JSVM não suporta spread
+      // condicional em objeto literal (ReferenceError __spreadValues).
+      const payload = {
+        from: FROM,
+        to: [to],
+        subject: rendered.subject,
+        html: rendered.html,
+      }
+      if (Array.isArray(atts) && atts.length > 0) payload.attachments = atts
       let res = null
       try {
         res = $http.send({
           url: 'https://api.resend.com/emails',
           method: 'POST',
           headers: { Authorization: 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            from: FROM,
-            to: [to],
-            subject: rendered.subject,
-            html: rendered.html,
-            ...(Array.isArray(atts) && atts.length > 0 ? { attachments: atts } : {}),
-          }),
+          body: JSON.stringify(payload),
           timeout: 20,
         })
       } catch (err) {
