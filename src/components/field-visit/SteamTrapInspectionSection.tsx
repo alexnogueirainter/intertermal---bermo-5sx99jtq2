@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Camera,
   Paperclip,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -45,6 +46,7 @@ import {
 } from '@/services/steam-traps'
 import { getStoredToken, getStoredDeviceId } from '@/services/field-visit-token'
 import { buildTrapReportHtml, generateTrapPdfBlob } from '@/components/field-visit/steam-trap-pdf'
+import { SteamTrapImportDialog } from '@/components/field-visit/SteamTrapImportDialog'
 import pb from '@/lib/pocketbase/client'
 
 const br = (v: number, d = 2) =>
@@ -94,6 +96,7 @@ export function SteamTrapInspectionSection({
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraCapturing, setCameraCapturing] = useState(false)
   const [cameraError, setCameraError] = useState('')
+  const [importOpen, setImportOpen] = useState(false)
   const loadedForRef = useRef('')
 
   // No notebook, abre uma prévia real da webcam; no celular, mantém a câmera nativa.
@@ -387,6 +390,26 @@ export function SteamTrapInspectionSection({
     })
     setModalOpen(false)
     setDraft(null)
+  }
+  const commitImport = (imported: SteamTrapRecord[]) => {
+    if (!data || imported.length === 0) return
+    const startSeq = data.traps.length
+    const numbered = imported.map((t, i) => ({ ...t, seq: startSeq + i + 1 }))
+    queueSave({
+      ...data,
+      context: {
+        ...data.context,
+        // áreas novas da planilha entram na lista do contexto (dropdown do modal)
+        areas: Array.from(
+          new Set([...data.context.areas, ...imported.map((t) => t.area).filter(Boolean)]),
+        ),
+      },
+      traps: [...data.traps, ...numbered],
+    })
+    toast({
+      title: 'Planilha importada',
+      description: `${numbered.length} registro(s) adicionado(s) à inspeção.`,
+    })
   }
   const addArea = () => {
     if (!data || !newArea.trim()) return
@@ -735,9 +758,19 @@ export function SteamTrapInspectionSection({
                       {data.traps.length} registros · perda total{' '}
                       <b className="text-sky-700">{br(econ.lossKgh)} kg/h</b>
                     </div>
-                    <Button type="button" size="sm" onClick={addTrap}>
-                      <Plus className="h-3.5 w-3.5" /> Adicionar purgador
-                    </Button>
+                    <div className="flex gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setImportOpen(true)}
+                      >
+                        <FileSpreadsheet className="h-3.5 w-3.5" /> Importar planilha
+                      </Button>
+                      <Button type="button" size="sm" onClick={addTrap}>
+                        <Plus className="h-3.5 w-3.5" /> Adicionar purgador
+                      </Button>
+                    </div>
                   </div>
                   <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
                     <table className="w-full text-[11px]">
@@ -1372,6 +1405,14 @@ export function SteamTrapInspectionSection({
             </div>
           </div>
         </div>
+      )}
+
+      {importOpen && data && (
+        <SteamTrapImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onImport={commitImport}
+        />
       )}
 
       {cameraOpen && (
