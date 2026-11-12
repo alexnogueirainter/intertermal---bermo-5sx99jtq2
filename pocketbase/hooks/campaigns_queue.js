@@ -130,13 +130,23 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
     const email = String(p.get('email') || '')
       .toLowerCase()
       .trim()
-    const nome = String(p.get('name') || '').trim()
+    const nomeCompleto = String(p.get('name') || '').trim()
     const empresa = String(p.get('company') || '').trim()
+    // {nome} = primeiro nome, sem título (Eng., Dr. etc.), inicial maiúscula;
+    // {nome_completo} = nome inteiro. {nome_completo} TEM de ser trocado antes
+    // de {nome} — senão o split de {nome} quebra o token maior.
+    const limpo = nomeCompleto.replace(/^(eng\.?|dr\.?|dra\.?|sr\.?|sra\.?)\s+/i, '').trim()
+    const primeiro = (limpo.split(/\s+/)[0] || '').trim()
+    const primeiroNome = primeiro
+      ? primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase()
+      : ''
 
     const personalizar = (txt) =>
       String(txt || '')
+        .split('{nome_completo}')
+        .join(nomeCompleto || 'cliente')
         .split('{nome}')
-        .join(nome || 'cliente')
+        .join(primeiroNome || 'cliente')
         .split('{empresa}')
         .join(empresa || 'sua empresa')
 

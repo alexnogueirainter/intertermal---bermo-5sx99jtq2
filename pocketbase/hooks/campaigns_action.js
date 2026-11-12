@@ -26,11 +26,23 @@ routerAdd(
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
 
-    const renderHtml = (subject, bodyTpl, nome, empresa, email) => {
+    const renderHtml = (subject, bodyTpl, nomeCompleto, empresa, email) => {
+      // {nome} = primeiro nome (sem título Eng./Dr., inicial maiúscula);
+      // {nome_completo} = nome inteiro. {nome_completo} TEM de ser trocado
+      // antes de {nome} — senão o split de {nome} quebra o token maior.
+      const limpo = String(nomeCompleto || '')
+        .replace(/^(eng\.?|dr\.?|dra\.?|sr\.?|sra\.?)\s+/i, '')
+        .trim()
+      const primeiro = (limpo.split(/\s+/)[0] || '').trim()
+      const primeiroNome = primeiro
+        ? primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase()
+        : ''
       const personalizar = (txt) =>
         String(txt || '')
+          .split('{nome_completo}')
+          .join(nomeCompleto || 'cliente')
           .split('{nome}')
-          .join(nome || 'cliente')
+          .join(primeiroNome || 'cliente')
           .split('{empresa}')
           .join(empresa || 'sua empresa')
       const htmlBody =
@@ -153,11 +165,23 @@ routerAdd(
         const clients = $app.findRecordsByFilter('clients', 'id != ""', '-created', 5000, 0)
         const picked = new Map()
         for (const c of clients) {
-          // JSON fields chegam como string no JSVM — parse antes de iterar
+          // JSON fields no JSVM chegam como STRING ou como ARRAY DE BYTES —
+          // tratar os dois (bytes faziam os e-mails de contato sumirem e o
+          // save rejeitar qualquer campanha com contato marcado).
           let contacts = c.get('contacts')
           if (typeof contacts === 'string') {
             try {
               contacts = JSON.parse(contacts)
+            } catch (_) {
+              contacts = []
+            }
+          } else if (
+            Array.isArray(contacts) &&
+            contacts.length > 0 &&
+            typeof contacts[0] === 'number'
+          ) {
+            try {
+              contacts = JSON.parse(new TextDecoder().decode(new Uint8Array(contacts)))
             } catch (_) {
               contacts = []
             }
@@ -177,14 +201,29 @@ routerAdd(
             }
           }
           if (!matched) continue
+          // Nome da PESSOA quando o e-mail é de um contato com nome — é o que
+          // vira {nome} no envio ("Olá Carlos,"). E-mail principal da conta
+          // não tem nome de pessoa: name vazio → fila usa "cliente".
+          const company = String(c.get('company_name') || c.get('name') || '')
           for (const em of emails) {
             const key = em.toLowerCase().trim()
             if (!key || !wantSet.has(key) || unsubSet.has(key) || picked.has(key)) continue
-            picked.set(key, {
-              email: key,
-              name: String(c.get('name') || ''),
-              company: String(c.get('company_name') || c.get('name') || ''),
-            })
+            let personName = ''
+            if (Array.isArray(contacts)) {
+              for (const ct of contacts) {
+                if (
+                  ct &&
+                  String(ct.email || '')
+                    .toLowerCase()
+                    .trim() === key &&
+                  String(ct.name || '').trim()
+                ) {
+                  personName = String(ct.name).trim()
+                  break
+                }
+              }
+            }
+            picked.set(key, { email: key, name: personName, company })
           }
         }
         chosen = Array.from(picked.values())

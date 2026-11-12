@@ -334,8 +334,11 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
                 <FileText className="h-4 w-4 text-indigo-600" />1 · Modelo de e-mail
               </CardTitle>
               <CardDescription className="text-xs">
-                Campos automáticos: {'{nome}'} e {'{empresa}'} — trocados por contato.
+                Campos automáticos: {'{nome}'} (primeiro nome), {'{nome_completo}'} e {'{empresa}'}{' '}
+                — trocados por contato.
               </CardDescription>
+              {/* Nota: {nome} vira o primeiro nome do CONTATO (ex.: "Carlos");
+                  sem nome de pessoa, "cliente". {empresa} = nome comercial da conta. */}
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-end justify-between gap-2">
@@ -386,13 +389,21 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
                   </p>
                   <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
                     {subject
-                      .split('{nome}')
+                      .split('{nome_completo}')
                       .join('Alex Nogueira')
+                      .split('{nome}')
+                      .join('Alex')
                       .split('{empresa}')
                       .join('Intertermal')}
                   </p>
                   <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 whitespace-pre-line">
-                    {body}
+                    {body
+                      .split('{nome_completo}')
+                      .join('Alex Nogueira')
+                      .split('{nome}')
+                      .join('Alex')
+                      .split('{empresa}')
+                      .join('Intertermal')}
                   </p>
                 </div>
               )}
