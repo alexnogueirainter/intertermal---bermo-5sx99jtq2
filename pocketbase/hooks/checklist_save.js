@@ -68,10 +68,17 @@ routerAdd('POST', '/backend/v1/checklists/save', (e) => {
         let hist = []
         try {
           const raw = so.get('status_history')
-          if (Array.isArray(raw)) hist = raw
-          else if (typeof raw === 'string' && raw.trim()) hist = JSON.parse(raw)
-          else if (raw && raw.byteLength !== undefined) {
+          if (raw && raw.byteLength !== undefined) {
             hist = JSON.parse(new TextDecoder().decode(new Uint8Array(raw)))
+          } else if (Array.isArray(raw)) {
+            // JSVM pode devolver JSON como array de BYTES (números) — decodificar
+            if (raw.length > 0 && typeof raw[0] === 'number') {
+              hist = JSON.parse(new TextDecoder().decode(new Uint8Array(raw)))
+            } else {
+              hist = raw
+            }
+          } else if (typeof raw === 'string' && raw.trim()) {
+            hist = JSON.parse(raw)
           }
         } catch (_) {
           hist = []
