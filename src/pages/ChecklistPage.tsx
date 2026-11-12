@@ -218,6 +218,15 @@ export default function ChecklistPage() {
   const [answers, setAnswers] = useState<AnswerMap>({})
   const [texts, setTexts] = useState<Record<string, string>>({})
   const [ident, setIdent] = useState<Record<string, any>>({})
+  const [parts, setParts] = useState<
+    Array<{
+      id: string
+      description: string
+      quantity: number
+      unit: string
+      unit_cost: number | ''
+    }>
+  >([])
   const [photos, setPhotos] = useState<PhotoRec[]>([])
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [sending, setSending] = useState(false)
@@ -247,6 +256,21 @@ export default function ChecklistPage() {
       setAnswers(res.checklist.answers || {})
       setTexts(res.checklist.texts || {})
       setIdent((prev) => ({ ...prev, ...(res.checklist?.ident || {}) }))
+      const serverParts = Array.isArray((res.checklist as any).parts)
+        ? (res.checklist as any).parts
+        : []
+      setParts(
+        serverParts.map((p: any, i: number) => ({
+          id: String(p.id || 'p' + i),
+          description: String(p.description || ''),
+          quantity: Number(p.quantity) || 1,
+          unit: String(p.unit || 'un'),
+          unit_cost:
+            p.unit_cost !== undefined && p.unit_cost !== null && Number(p.unit_cost) > 0
+              ? Number(p.unit_cost)
+              : ('' as const),
+        })),
+      )
       const serverPhotos: PhotoRec[] = (res.checklist.media || []).map((m, i) => ({
         id: m.client_media_id,
         url: m.path,
@@ -294,12 +318,21 @@ export default function ChecklistPage() {
         ident,
         answers,
         texts,
+        parts: parts
+          .filter((p) => p.description.trim() || Number(p.quantity) > 0)
+          .map((p) => ({
+            id: p.id,
+            description: p.description.trim(),
+            quantity: Number(p.quantity) || 0,
+            unit: p.unit || 'un',
+            unit_cost: p.unit_cost === '' ? null : Number(p.unit_cost),
+          })),
         ...(extra || {}),
       })
       if (res.ok) setSaveState('saved')
       else setSaveState('error')
     },
-    [checklistId, ident, answers, texts],
+    [checklistId, ident, answers, texts, parts],
   )
 
   const scheduleSave = useCallback(() => {
@@ -342,6 +375,37 @@ export default function ChecklistPage() {
   const setText = useCallback(
     (k: string, v: string) => {
       setTexts((prev) => ({ ...prev, [k]: v }))
+      scheduleSave()
+    },
+    [scheduleSave],
+  )
+
+  // ---- Peças e materiais (custo opcional — alimenta a margem realizada da OS) ----
+  const addPart = useCallback(() => {
+    setParts((prev) => [
+      ...prev,
+      {
+        id: 'p' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        description: '',
+        quantity: 1,
+        unit: 'un',
+        unit_cost: '',
+      },
+    ])
+    scheduleSave()
+  }, [scheduleSave])
+
+  const updatePart = useCallback(
+    (id: string, field: 'description' | 'quantity' | 'unit' | 'unit_cost', value: any) => {
+      setParts((prev) => prev.map((p) => (p.id === id ? { ...p, [field]: value } : p)))
+      scheduleSave()
+    },
+    [scheduleSave],
+  )
+
+  const removePart = useCallback(
+    (id: string) => {
+      setParts((prev) => prev.filter((p) => p.id !== id))
       scheduleSave()
     },
     [scheduleSave],
@@ -861,6 +925,74 @@ export default function ChecklistPage() {
                 />
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        {/* Peças e materiais */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-bold">Peças e materiais utilizados</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-[11px] text-muted-foreground">
+              Opcional. Peça com custo informado entra no custo real da OS (margem realizada). Sem
+              custo, o escritório completa depois.
+            </p>
+            {parts.map((p) => (
+              <div
+                key={p.id}
+                className="grid grid-cols-[1fr_64px_64px_88px_36px] gap-1.5 items-center"
+              >
+                <Input
+                  value={p.description}
+                  onChange={(e) => updatePart(p.id, 'description', e.target.value)}
+                  placeholder="Descrição da peça"
+                  className="text-xs"
+                />
+                <Input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={p.quantity}
+                  onChange={(e) => updatePart(p.id, 'quantity', e.target.value)}
+                  placeholder="Qtd"
+                  className="text-xs"
+                />
+                <Input
+                  value={p.unit}
+                  onChange={(e) => updatePart(p.id, 'unit', e.target.value)}
+                  placeholder="un"
+                  className="text-xs"
+                />
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={p.unit_cost === '' ? '' : p.unit_cost}
+                  onChange={(e) =>
+                    updatePart(
+                      p.id,
+                      'unit_cost',
+                      e.target.value === '' ? '' : Number(e.target.value),
+                    )
+                  }
+                  placeholder="R$ custo"
+                  className="text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removePart(p.id)}
+                  className="h-8 w-8 p-0 text-rose-600"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={addPart} className="text-xs">
+              + Adicionar peça
+            </Button>
           </CardContent>
         </Card>
 

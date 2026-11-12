@@ -114,6 +114,34 @@ routerAdd('GET', '/backend/v1/checklists/open', (e) => {
       ident: cl.get('ident') || {},
       answers: cl.get('answers') || {},
       texts: cl.get('texts') || {},
+      parts: (function () {
+        const raw = cl.get('parts')
+        if (raw && raw.byteLength !== undefined) {
+          try {
+            return JSON.parse(new TextDecoder().decode(new Uint8Array(raw)))
+          } catch (_) {
+            return []
+          }
+        }
+        if (Array.isArray(raw)) {
+          if (raw.length > 0 && typeof raw[0] === 'number') {
+            try {
+              return JSON.parse(new TextDecoder().decode(new Uint8Array(raw)))
+            } catch (_) {
+              return []
+            }
+          }
+          return raw
+        }
+        if (typeof raw === 'string' && raw.trim()) {
+          try {
+            return JSON.parse(raw)
+          } catch (_) {
+            return []
+          }
+        }
+        return []
+      })(),
       media: media,
       updated: String(cl.get('updated') || ''),
     },

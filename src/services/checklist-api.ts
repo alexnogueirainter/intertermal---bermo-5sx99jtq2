@@ -51,6 +51,13 @@ export interface ChecklistOpenResult {
     ident: Record<string, any>
     answers: Record<string, { status: string | null; obs: string }>
     texts: Record<string, string>
+    parts?: Array<{
+      id?: string
+      description: string
+      quantity: number
+      unit?: string
+      unit_cost?: number | null
+    }>
     media: Array<{
       client_media_id: string
       item_numero: number
@@ -117,6 +124,13 @@ export const checklistApi = {
     conformity_pct?: number
     verdict?: string
     economia_ano?: number | null
+    parts?: Array<{
+      id?: string
+      description: string
+      quantity: number
+      unit?: string
+      unit_cost?: number | null
+    }>
   }): Promise<ChecklistSaveResult> {
     try {
       const res = await pb.send('/backend/v1/checklists/save', {

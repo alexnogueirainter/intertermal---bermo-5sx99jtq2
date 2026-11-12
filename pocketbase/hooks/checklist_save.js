@@ -45,6 +45,7 @@ routerAdd('POST', '/backend/v1/checklists/save', (e) => {
   if (body.ident !== undefined) cl.set('ident', body.ident)
   if (body.answers !== undefined) cl.set('answers', body.answers)
   if (body.texts !== undefined) cl.set('texts', body.texts)
+  if (body.parts !== undefined) cl.set('parts', body.parts)
 
   if (action === 'complete') {
     cl.set('status', 'concluido')
@@ -98,6 +99,129 @@ routerAdd('POST', '/backend/v1/checklists/save', (e) => {
       }
     } catch (err) {
       console.warn('[checklist] falha ao atualizar OS: ' + (err && err.message ? err.message : ''))
+    }
+
+    // ============================================================
+    // Peças do checklist → relatório de execução (margem realizada)
+    // Só peças COM custo unitário informado entram no custo real
+    // (regra do Alex: não inventar número). Sem custo, fica no
+    // relatório como item sem custo, para o escritório completar.
+    // ============================================================
+    try {
+      const partsRaw = cl.get('parts')
+      let parts = []
+      if (partsRaw && partsRaw.byteLength !== undefined) {
+        parts = JSON.parse(new TextDecoder().decode(new Uint8Array(partsRaw)))
+      } else if (Array.isArray(partsRaw)) {
+        if (partsRaw.length > 0 && typeof partsRaw[0] === 'number') {
+          parts = JSON.parse(new TextDecoder().decode(new Uint8Array(partsRaw)))
+        } else {
+          parts = partsRaw
+        }
+      } else if (typeof partsRaw === 'string' && partsRaw.trim()) {
+        parts = JSON.parse(partsRaw)
+      }
+      if (!Array.isArray(parts)) parts = []
+      const comCusto = parts.filter(
+        (p) =>
+          p &&
+          String(p.description || '').trim() &&
+          Number(p.unit_cost) > 0 &&
+          Number(p.quantity) > 0,
+      )
+
+      const osId = String(tok.get('service_order_id') || '')
+      const os = $app.findRecordById('service_orders', osId)
+      const osNumber = String(os.get('order_number') || cl.get('os_number') || '')
+
+      // Relatório de execução da OS (criado pelo checklist ou já existente)
+      let rep = null
+      try {
+        rep = $app.findFirstRecordByFilter(
+          'os_execution_reports',
+          'service_order_id = {:o} && created_by = {:by}',
+          { o: osId, by: 'checklist' },
+        )
+      } catch (_) {
+        rep = null
+      }
+      if (!rep) {
+        rep = new Record($app.findCollectionByNameOrId('os_execution_reports'))
+        rep.set('service_order_id', osId)
+        rep.set('order_number', osNumber)
+        rep.set('client_id', String(os.get('client_id') || ''))
+        rep.set('client_name', String(os.get('client_name') || ''))
+        rep.set('created_by', 'checklist')
+        rep.set(
+          'work_start_datetime',
+          new Date().toISOString().slice(0, 16).replace('T', ' ') + ':00',
+        )
+      }
+      rep.set('equipment_model', String(os.get('equipment_model') || ''))
+      let eqTag = ''
+      try {
+        const eqInfo = os.get('equipment_info')
+        if (eqInfo && eqInfo.byteLength !== undefined) {
+          eqTag = String(JSON.parse(new TextDecoder().decode(new Uint8Array(eqInfo))).tag || '')
+        } else if (eqInfo && typeof eqInfo === 'object') {
+          eqTag = String(eqInfo.tag || '')
+        }
+      } catch (_) {
+        eqTag = ''
+      }
+      rep.set('equipment_tag', eqTag)
+      rep.set('technician_name', String(cl.get('technician_name') || ''))
+
+      // materials_used: peças do checklist + observação de origem
+      const mats = []
+      for (const p of comCusto) {
+        mats.push({
+          id: 'chk-' + (p.id || mats.length + 1),
+          description: String(p.description || '').trim(),
+          quantity: Number(p.quantity),
+          unit: String(p.unit || 'un'),
+          unit_cost: Number(p.unit_cost),
+          notes: 'Peça lançada no checklist de campo',
+        })
+      }
+      // Peças SEM custo: entram sem unit_cost (não afetam a margem) para o escritório completar
+      const semCusto = parts.filter(
+        (p) =>
+          p &&
+          String(p.description || '').trim() &&
+          !(Number(p.unit_cost) > 0) &&
+          Number(p.quantity) > 0,
+      )
+      for (const p of semCusto) {
+        mats.push({
+          id: 'chk-' + (p.id || mats.length + 1),
+          description: String(p.description || '').trim(),
+          quantity: Number(p.quantity),
+          unit: String(p.unit || 'un'),
+          notes: 'Peça do checklist SEM custo informado — completar no escritório',
+        })
+      }
+      rep.set('materials_used', mats)
+      rep.set(
+        'observations',
+        'Relatório gerado automaticamente do checklist de campo concluído em ' +
+          new Date().toLocaleString('pt-BR') +
+          '. Peças sem custo ficam marcadas para completar no escritório.',
+      )
+      $app.save(rep)
+      console.log(
+        '[checklist] relatório de execução sincronizado | os=' +
+          osNumber +
+          ' | peças com custo=' +
+          comCusto.length +
+          ' | sem custo=' +
+          semCusto.length,
+      )
+    } catch (err) {
+      console.warn(
+        '[checklist] falha ao sincronizar peças no relatório de execução: ' +
+          (err && err.message ? err.message : ''),
+      )
     }
   }
 
