@@ -170,7 +170,9 @@ export async function parseTrapFile(file: File): Promise<ImportSummary> {
   // assume cp1252 e acentos viram lixo, quebrando o casamento dos cabeçalhos).
   const isCsv = /\.csv$/i.test(file.name) || /^text\/(csv|plain)/.test(file.type || '')
   const wb = isCsv
-    ? XLSX.read(new TextDecoder('utf-8').decode(buf), { type: 'string' })
+    ? // raw:true impede o SheetJS de "adivinhar" tipos — "32,25" viraria 3225
+      // (vírgula tratada como milhar). Como texto, o parseNumberBR decide.
+      XLSX.read(new TextDecoder('utf-8').decode(buf), { type: 'string', raw: true })
     : XLSX.read(buf, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
   if (!ws) throw new Error('A planilha está vazia.')
