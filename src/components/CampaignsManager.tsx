@@ -64,7 +64,8 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
   const [name, setName] = useState('')
   const [subject, setSubject] = useState('')
   const [body, setBody] = useState('')
-  const [templatesOpen, setTemplatesOpen] = useState(false)
+  // Estado morto removido (12/11): o botão "Modelos" ligava templatesOpen, que
+  // ninguém lia — o Dialog está ligado a tplOpen. Agora o botão abre tplOpen.
 
   // ===== Destinatários =====
   const [tags, setTags] = useState<string[]>([])
@@ -350,7 +351,7 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setTemplatesOpen(true)}
+                  onClick={() => setTplOpen(true)}
                   className="text-xs shrink-0 h-8"
                 >
                   <FileText className="h-3.5 w-3.5 mr-1" />
@@ -716,7 +717,7 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
           </DialogHeader>
 
           <div className="space-y-3 py-1">
-            {templates.size === 0 && (
+            {templates.length === 0 && (
               <p className="text-xs text-muted-foreground">
                 Nenhum modelo salvo ainda. Escreva o assunto e o texto na tela ao lado e clique em
                 "Salvar como modelo".
