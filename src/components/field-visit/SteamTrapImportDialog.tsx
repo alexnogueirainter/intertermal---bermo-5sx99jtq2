@@ -141,11 +141,24 @@ const normResult = (v: string): string | null => {
   return null
 }
 
-/** Números com vírgula decimal, ponto de milhar e espaços ("1.234,56") → 1234.56. */
+/** Normaliza número BR/US: "1.234,56" → 1234.56 · "32,25" → 32.25 · "32.25" → 32.25. */
 function parseNumberBR(v: string): number | null {
-  const s = String(v || '').trim()
+  const s = String(v ?? '')
+    .trim()
+    .replace(/\s/g, '')
   if (!s) return null
-  const cleaned = s.replace(/\s/g, '').replace(/\./g, '').replace(',', '.')
+  let cleaned = s
+  const hasDot = s.includes('.')
+  const hasComma = s.includes(',')
+  if (hasDot && hasComma) {
+    // o separador que aparece POR ÚLTIMO é o decimal; o outro é milhar
+    cleaned =
+      s.lastIndexOf(',') > s.lastIndexOf('.')
+        ? s.replace(/\./g, '').replace(',', '.')
+        : s.replace(/,/g, '')
+  } else if (hasComma) {
+    cleaned = s.replace(/,/g, '.') // vírgula sola = decimal (padrão BR)
+  } // ponto sola = decimal (não mexe — "32.25" continua 32.25)
   const n = Number(cleaned)
   return Number.isFinite(n) ? n : null
 }
@@ -153,7 +166,12 @@ function parseNumberBR(v: string): number | null {
 /** Lê .xlsx ou .csv e devolve as linhas normalizadas + erros. */
 export async function parseTrapFile(file: File): Promise<ImportSummary> {
   const buf = await file.arrayBuffer()
-  const wb = XLSX.read(buf, { type: 'array' })
+  // CSV chega em UTF-8 — decodifica como texto antes do SheetJS (sem isso o parser
+  // assume cp1252 e acentos viram lixo, quebrando o casamento dos cabeçalhos).
+  const isCsv = /\.csv$/i.test(file.name) || /^text\/(csv|plain)/.test(file.type || '')
+  const wb = isCsv
+    ? XLSX.read(new TextDecoder('utf-8').decode(buf), { type: 'string' })
+    : XLSX.read(buf, { type: 'array' })
   const ws = wb.Sheets[wb.SheetNames[0]]
   if (!ws) throw new Error('A planilha está vazia.')
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false, defval: '' }) as any[][]
