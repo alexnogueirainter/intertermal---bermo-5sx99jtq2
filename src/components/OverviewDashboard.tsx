@@ -52,6 +52,12 @@ import { useToast } from '@/hooks/use-toast'
 import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
 import { computeOrderMargins } from '@/lib/order-margins'
 import { osExecutionReportsService } from '@/services/os-execution-reports'
+import {
+  fetchChecklistsForDashboard,
+  computeChecklistKpis,
+  type ChecklistSummary,
+} from '@/services/checklist-dashboard'
+import { FieldExecutionTab } from '@/components/FieldExecutionTab'
 import { fireNewAction } from '@/components/NewActionsButton'
 
 interface OverviewDashboardProps {
@@ -82,8 +88,33 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
   const navigate = useNavigate()
   const { toast } = useToast()
   const [dashboardTab, setDashboardTab] = React.useState<
-    'overview' | 'profitability' | 'conversion'
+    'overview' | 'profitability' | 'conversion' | 'field'
   >('overview')
+
+  // Checklists digitais (sub-aba Execução em Campo)
+  const [checklists, setChecklists] = React.useState<ChecklistSummary[]>([])
+  const [checklistsLoading, setChecklistsLoading] = React.useState(false)
+  const [checklistsError, setChecklistsError] = React.useState(false)
+  React.useEffect(() => {
+    let isMounted = true
+    setChecklistsLoading(true)
+    fetchChecklistsForDashboard()
+      .then((res) => {
+        if (!isMounted) return
+        setChecklists(res.checklists)
+        setChecklistsError(res.error)
+      })
+      .finally(() => {
+        if (isMounted) setChecklistsLoading(false)
+      })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+  const checklistKpis = React.useMemo(
+    () => computeChecklistKpis(checklists, serviceOrders),
+    [checklists, serviceOrders],
+  )
   const [periodFilter, setPeriodFilter] = React.useState<
     'all' | 'month' | 'quarter' | 'year' | 'custom'
   >('all')
@@ -455,6 +486,18 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             <BarChart3 className="h-4 w-4" />
             Relatório de Conversão
           </button>
+          <button
+            type="button"
+            onClick={() => setDashboardTab('field')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+              dashboardTab === 'field'
+                ? 'bg-teal-700 text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <ClipboardList className="h-4 w-4" />
+            Execução em Campo
+          </button>
         </div>
 
         {/* Seletor de Período Geral */}
@@ -503,6 +546,7 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
             serviceOrders={serviceOrders}
             fieldVisits={fieldVisits}
             fieldVisitsError={fieldVisitsError}
+            checklists={checklists}
             periodFilter={periodFilter}
             periodLabel={
               periodFilter === 'custom'
@@ -529,7 +573,15 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
         </div>
       </div>
 
-      {dashboardTab === 'conversion' ? (
+      {dashboardTab === 'field' ? (
+        /* ==================== ABA EXECUÇÃO EM CAMPO (CHECKLISTS) ==================== */
+        <FieldExecutionTab
+          kpis={checklistKpis}
+          checklists={checklists}
+          loading={checklistsLoading}
+          error={checklistsError}
+        />
+      ) : dashboardTab === 'conversion' ? (
         /* ==================== ABA RELATÓRIO DE CONVERSÃO ==================== */
         <div className="space-y-6">
           {(() => {
@@ -1621,6 +1673,69 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({
                       Nenhuma visita registrada ainda
                     </div>
                   )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Cartão de Destaque / Checklists de Execução em Campo */}
+          <Card
+            onClick={() => setDashboardTab('field')}
+            className="border-orange-200 dark:border-orange-900/60 bg-gradient-to-br from-white via-orange-50/30 to-amber-50/40 dark:from-slate-900 dark:via-orange-950/20 dark:to-slate-900 shadow-xs cursor-pointer hover:border-orange-500 hover:shadow-md transition-all group"
+          >
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-[#F48C06] text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                  <ClipboardList className="h-4 w-4" />
+                </div>
+                <div>
+                  <CardTitle className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                    Checklists de Execução em Campo
+                  </CardTitle>
+                  <CardDescription className="text-[11px] text-muted-foreground">
+                    Progresso dos técnicos nas OS — clique para abrir a sub-aba
+                  </CardDescription>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] font-semibold text-orange-700 dark:text-orange-400 group-hover:translate-x-0.5 transition-transform">
+                <span className="hidden sm:inline">Ver execução</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-950/60 border border-orange-100 dark:border-orange-900/40">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                    Em Campo
+                  </span>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-teal-800 dark:text-teal-300 mt-0.5">
+                    {checklistsLoading ? '…' : checklistKpis.abertos}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    checklist(s) aberto(s) agora
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-950/60 border border-orange-100 dark:border-orange-900/40">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                    Concluídos
+                  </span>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-0.5">
+                    {checklistsLoading ? '…' : checklistKpis.concluidos}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    conformidade média {checklistKpis.conformidadeMedia}%
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/80 dark:bg-slate-950/60 border border-orange-100 dark:border-orange-900/40">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                    Parados
+                  </span>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-rose-700 dark:text-rose-400 mt-0.5">
+                    {checklistsLoading ? '…' : checklistKpis.parados.length}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    sem alteração há +2 dias úteis
+                  </p>
                 </div>
               </div>
             </CardContent>

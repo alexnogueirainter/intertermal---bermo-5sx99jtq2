@@ -10,6 +10,8 @@ import type {
   TicketRecord,
 } from '@/types/crm'
 import type { FieldVisitRecord } from '@/services/field-visits'
+import type { ChecklistSummary } from '@/services/checklist-dashboard'
+import { businessDaysSince } from '@/services/checklist-dashboard'
 import { buildExecutivePdfFile } from '@/components/ExecutiveReportPdf'
 
 type PeriodFilter = 'all' | 'month' | 'quarter' | 'year' | 'custom'
@@ -28,6 +30,7 @@ interface ExecutiveReportProps {
   customStartDate?: string
   customEndDate?: string
   onPopupBlocked?: () => void
+  checklists?: ChecklistSummary[]
 }
 interface Row {
   key: string
@@ -70,6 +73,17 @@ export interface ReportData {
   clients: { total: number; active: number; leads: number; top: ClientGroup[] }
   visits: { count: number | null; latest: FieldVisitRecord | null }
   tickets: { open: number; urgent: number }
+  checklists: {
+    total: number
+    concluidos: number
+    abertos: number
+    conformidadeMedia: number
+    aprovados: number
+    ressalvas: number
+    reprovados: number
+    economiaTotal: number
+    parados: number
+  }
   overdueActivities: number
   actions: string[]
 }
@@ -111,6 +125,25 @@ const STAGE_LABELS: Record<string, string> = {
   proposal: 'Proposta',
   negotiation: 'Negociação',
 }
+function buildChecklistStats(checklists: ChecklistSummary[]): ReportData['checklists'] {
+  const concluidos = checklists.filter((c) => c.status === 'concluido')
+  const abertos = checklists.filter((c) => c.status !== 'concluido')
+  const comConf = concluidos.filter((c) => c.conformity_pct > 0)
+  return {
+    total: checklists.length,
+    concluidos: concluidos.length,
+    abertos: abertos.length,
+    conformidadeMedia: comConf.length
+      ? Math.round(comConf.reduce((s, c) => s + c.conformity_pct, 0) / comConf.length)
+      : 0,
+    aprovados: concluidos.filter((c) => c.verdict === 'aprovado').length,
+    ressalvas: concluidos.filter((c) => c.verdict === 'ressalvas').length,
+    reprovados: concluidos.filter((c) => c.verdict === 'reprovado').length,
+    economiaTotal: concluidos.reduce((s, c) => s + (c.economia_ano || 0), 0),
+    parados: abertos.filter((c) => businessDaysSince(c.updated) > 2).length,
+  }
+}
+
 const ORDER_LABELS: Record<string, string> = {
   vistoria: 'Vistoria',
   proposta: 'Proposta',
@@ -274,6 +307,14 @@ export function makeReport(p: ExecutiveReportProps, generated: Date): ReportData
     orderMap.set(key, row)
   }
   const statuses = Array.from(orderMap.values()).sort((a, b) => b.count - a.count)
+  const checklists = p.checklists || []
+  const clConcluidos = checklists.filter((c) => c.status === 'concluido')
+  const clAbertos = checklists.filter((c) => c.status !== 'concluido')
+  const clComConf = clConcluidos.filter((c) => c.conformity_pct > 0)
+  const clConfMedia = clComConf.length
+    ? Math.round(clComConf.reduce((s, c) => s + c.conformity_pct, 0) / clComConf.length)
+    : 0
+  const clParados = clAbertos.filter((c) => businessDaysSince(c.updated) > 2).length
   const visits = p.fieldVisits
     .filter((v) => inPeriod(v.visit_date || v.sent_at || v.created, p, generated))
     .sort(
@@ -349,6 +390,7 @@ export function makeReport(p: ExecutiveReportProps, generated: Date): ReportData
       unassigned,
       statuses,
     },
+    checklists: buildChecklistStats(p.checklists || []),
     clients: {
       total: p.clients.length,
       active: p.clients.filter((c) => ['active', 'partner'].includes(norm(c.status))).length,
@@ -617,6 +659,36 @@ function ReportPage({ data }: { data: ReportData }) {
             </div>
             <div className="executive-report-panel-note">
               {data.operations.unassigned} OS ativa(s) sem responsável registrado
+            </div>
+          </article>
+          <article className="executive-report-panel executive-report-operations">
+            <div className="executive-report-panel-heading">
+              <div>
+                <h2>Execução em campo · checklists</h2>
+                <p>Conformidade e vereditos dos serviços executados</p>
+              </div>
+              <span className="executive-report-panel-tag">
+                {data.checklists.concluidos} concluído(s)
+              </span>
+            </div>
+            <div className="executive-report-bars-list executive-report-ops-bars">
+              {data.checklists.total === 0 ? (
+                <div className="executive-report-empty">Sem checklists no período</div>
+              ) : (
+                <>
+                  <div className="executive-report-panel-note">
+                    {data.checklists.abertos} em campo · {data.checklists.parados} parado(s) há +2
+                    dias úteis · conformidade média {data.checklists.conformidadeMedia}%
+                  </div>
+                  <div className="executive-report-panel-note">
+                    Vereditos: {data.checklists.aprovados} aprovado(s) · {data.checklists.ressalvas}{' '}
+                    com ressalvas · {data.checklists.reprovados} reprovado(s)
+                    {data.checklists.economiaTotal > 0
+                      ? ` · economia recuperada ${data.checklists.economiaTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/ano`
+                      : ''}
+                  </div>
+                </>
+              )}
             </div>
           </article>
           <article className="executive-report-panel executive-report-clients">
