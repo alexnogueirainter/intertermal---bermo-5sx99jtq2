@@ -874,6 +874,7 @@ export interface SteamTrapInspectionData {
     areas: string[] // lista de áreas (alimenta dropdown + filtros)
     steamCostBrlTon: number | null // custo do vapor R$/t
     hoursPerYear: number // base de horas (padrão 2000)
+    monthlyConsumptionTon?: number | null // consumo informado pela unidade (t/mês) — informativo
     customManufacturers?: string[] // fabricantes fora do catálogo, criados na visita
   }
   findings: SteamTrapFinding[]

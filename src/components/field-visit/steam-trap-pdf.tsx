@@ -116,6 +116,62 @@ ${esc(t.manufacturer)} ${esc(t.model)} · DN ${esc(t.dn)} · ${br(Number(t.press
         .join('')}</ul></div>`
     : ''
 
+  // Gráficos: pizza por resultado + barras por área (SVG inline, sem dependências)
+  const RES_COLORS: Record<string, string> = {
+    'Purgador ok': '#16a34a',
+    Vazando: '#dc2626',
+    'Vazando direto': '#b91c1c',
+    Represando: '#ea580c',
+    Parado: '#64748b',
+    'Não Avaliado': '#cbd5e1',
+  }
+  const resultCounts = new Map<string, number>()
+  for (const t of data.traps) resultCounts.set(t.result, (resultCounts.get(t.result) || 0) + 1)
+  const pieData = [...resultCounts.entries()].sort((a, b) => b[1] - a[1])
+  const pieTotal = pieData.reduce((s, [, n]) => s + n, 0) || 1
+  let pieAngle = -90
+  const pieSlices = pieData
+    .map(([res, n]) => {
+      const frac = n / pieTotal
+      const a0 = pieAngle
+      const a1 = pieAngle + frac * 360
+      pieAngle = a1
+      const rad = (deg: number) => (deg * Math.PI) / 180
+      const cx = 60,
+        cy = 60,
+        r = 52
+      const x0 = cx + r * Math.cos(rad(a0)),
+        y0 = cy + r * Math.sin(rad(a0))
+      const x1 = cx + r * Math.cos(rad(a1)),
+        y1 = cy + r * Math.sin(rad(a1))
+      const large = frac > 0.5 ? 1 : 0
+      return `<path d="M ${cx} ${cy} L ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z" fill="${RES_COLORS[res] || '#94a3b8'}"/>`
+    })
+    .join('')
+  const pieLegend = pieData
+    .map(
+      ([res, n]) =>
+        `<div class="lg"><span class="dot" style="background:${RES_COLORS[res] || '#94a3b8'}"></span>${esc(res)} — ${n} (${Math.round((n / pieTotal) * 100)}%)</div>`,
+    )
+    .join('')
+
+  const areaLoss = new Map<string, number>()
+  for (const t of data.traps) {
+    if (t.area) areaLoss.set(t.area, (areaLoss.get(t.area) || 0) + (Number(t.lossKgh) || 0))
+  }
+  const areaData = [...areaLoss.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+  const areaMax = areaData.reduce((m, [, v]) => Math.max(m, v), 0) || 1
+  const areaBars = areaData
+    .map(
+      ([area, loss]) =>
+        `<div class="bar-row"><span class="bar-label">${esc(area)}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.max(2, Math.round((loss / areaMax) * 100))}%"></div></div><span class="bar-val">${br(loss)} kg/h</span></div>`,
+    )
+    .join('')
+  const chartsHtml =
+    pieData.length > 0
+      ? `<div class="charts"><div class="chart"><h6>Purgadores por resultado</h6><svg viewBox="0 0 120 120" width="120" height="120">${pieSlices}</svg><div class="legend">${pieLegend}</div></div><div class="chart wide"><h6>Perda de vapor por área (kg/h)</h6>${areaBars || '<p class="tnote">Sem perdas registradas.</p>'}</div></div>`
+      : ''
+
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1e293b;font-size:10.5px;line-height:1.5}
@@ -174,6 +230,17 @@ table.mel td{padding:5px 8px;border-bottom:1px solid #e2e8f0;color:#334155}
 .photo-name{font-size:7px;color:#64748b}
 .missing-photos{margin-top:6px;padding:6px 8px;border:1px solid #fed7aa;border-radius:5px;background:#fff7ed;font-size:8px;color:#7c2d12}
 .missing-photos ul{margin:3px 0 0 15px}
+.charts{display:grid;grid-template-columns:auto 1fr;gap:14px;margin-top:8px;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;page-break-inside:avoid}
+.chart h6{font-size:8.5px;color:#000030;text-transform:uppercase;margin-bottom:5px;letter-spacing:.3px}
+.chart .legend{margin-top:4px}
+.chart .lg{font-size:7.5px;color:#334155;display:flex;align-items:center;gap:4px;margin-bottom:2px}
+.chart .dot{width:7px;height:7px;border-radius:99px;display:inline-block;flex:none}
+.chart.wide{min-width:0}
+.bar-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.bar-label{font-size:7.5px;color:#334155;width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+.bar-track{flex:1;height:9px;background:#f1f5f9;border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;background:linear-gradient(90deg,#0078C0,#F08020);border-radius:99px}
+.bar-val{font-size:7.5px;color:#475569;width:64px;text-align:right;flex:none}
 .tnote{font-size:8px;color:#64748b;margin-top:4px}
 </style></head><body><div class="page">
 <div class="bb"></div>
@@ -210,8 +277,9 @@ ${findingsHtml || '<p class="tnote">Nenhum achado registrado.</p>'}
 <div class="econ">
 <h6>Bloco econômico — calculado automaticamente pelo CRM</h6>
 <div class="f">Σ perdas ${br(loss)} kg/h × ${horas} h/ano × R$ ${br(custo || 0)}/t ÷ 1.000 = ${econ.perYear != null ? 'R$ ' + br(econ.perYear) + '/ano' : 'informe o custo do vapor'}</div>
-<div class="obs">${custo != null ? `Custo do vapor R$ ${br(custo)}/t e base de ${horas} h/ano (configuráveis no CRM).` : 'Custo do vapor não informado — bloco econômico em kg/h.'}</div>
+<div class="obs">${custo != null ? `Custo do vapor R$ ${br(custo)}/t e base de ${horas} h/ano (configuráveis no CRM).${ctx.monthlyConsumptionTon ? ` Consumo informado pela unidade: ${br(ctx.monthlyConsumptionTon)} t/mês.` : ''}` : 'Custo do vapor não informado — bloco econômico em kg/h.'}</div>
 </div>
+${chartsHtml}
 
 <h2><span class="n">4.</span> Pontos de melhoria — acompanhamento</h2>
 <table class="mel"><thead><tr><th>Ponto de melhoria</th><th style="width:20mm;text-align:center">Analisado</th><th style="width:20mm;text-align:center">Corrigido</th></tr></thead>

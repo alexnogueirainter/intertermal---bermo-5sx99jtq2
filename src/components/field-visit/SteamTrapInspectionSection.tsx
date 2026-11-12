@@ -97,6 +97,9 @@ export function SteamTrapInspectionSection({
   const [cameraCapturing, setCameraCapturing] = useState(false)
   const [cameraError, setCameraError] = useState('')
   const [importOpen, setImportOpen] = useState(false)
+  const [filterArea, setFilterArea] = useState('')
+  const [filterResult, setFilterResult] = useState('')
+  const [aiBusyFor, setAiBusyFor] = useState<string | null>(null)
   const loadedForRef = useRef('')
 
   // No notebook, abre uma prévia real da webcam; no celular, mantém a câmera nativa.
@@ -391,6 +394,90 @@ export function SteamTrapInspectionSection({
     setModalOpen(false)
     setDraft(null)
   }
+  // Filtros da tabela (área + resultado) — só afetam a exibição, nunca os dados
+  const filteredTraps = useMemo(() => {
+    if (!data) return []
+    return data.traps.filter(
+      (t) => (!filterArea || t.area === filterArea) && (!filterResult || t.result === filterResult),
+    )
+  }, [data, filterArea, filterResult])
+
+  const filteredLoss = useMemo(
+    () => filteredTraps.reduce((s, t) => s + (Number(t.lossKgh) || 0), 0),
+    [filteredTraps],
+  )
+
+  // Medidor de completude do relatório (0–100): contexto, achados, registros, conclusão, assinaturas
+  const completeness = useMemo(() => {
+    if (!data) return 0
+    let score = 0
+    if (data.context.unit) score += 15
+    if (data.context.inspectionDate) score += 10
+    if (data.context.responsible) score += 10
+    if (data.context.steamCostBrlTon != null) score += 10
+    if (data.context.monthlyConsumptionTon) score += 5
+    if (data.traps.length > 0) score += 20
+    if (data.traps.every((t) => t.tagAri || t.tagClient)) score += 10
+    if (data.findings.length > 0) score += 10
+    if (data.conclusion.trim().length > 20) score += 5
+    if (data.signatures.length > 0 && data.signatures[0]?.name) score += 5
+    return Math.min(100, score)
+  }, [data])
+
+  const missingItems = useMemo(() => {
+    if (!data) return []
+    const miss: string[] = []
+    if (!data.context.unit) miss.push('unidade/planta')
+    if (!data.context.responsible) miss.push('responsável técnico')
+    if (data.context.steamCostBrlTon == null) miss.push('custo do vapor')
+    if (data.traps.length === 0) miss.push('registros de purgadores')
+    if (data.traps.some((t) => !t.tagAri && !t.tagClient)) miss.push('tags em alguns purgadores')
+    if (data.findings.length === 0) miss.push('achados')
+    if (data.conclusion.trim().length <= 20) miss.push('conclusão')
+    if (!(data.signatures.length > 0 && data.signatures[0]?.name))
+      miss.push('assinatura do responsável')
+    return miss
+  }, [data])
+
+  // IA: sugere severidade + recomendação para um achado
+  const suggestFinding = async (findingId: string) => {
+    if (!data) return
+    const f = data.findings.find((x) => x.id === findingId)
+    if (!f) return
+    if (!f.title.trim() && !f.description.trim()) {
+      toast({
+        title: 'Preencha o achado primeiro',
+        description: 'Escreva ao menos o título ou a descrição para a IA sugerir.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setAiBusyFor(findingId)
+    try {
+      const res = await pb.send('/backend/v1/steam-trap/ai-suggest', {
+        method: 'POST',
+        body: JSON.stringify({ title: f.title, description: f.description, location: f.location }),
+      })
+      queueSave({
+        ...data,
+        findings: data.findings.map((x) =>
+          x.id === findingId
+            ? { ...x, severity: res.severity, recommendation: res.recommendation }
+            : x,
+        ),
+      })
+      toast({ title: 'IA sugeriu', description: 'Severidade e recomendação aplicadas ao achado.' })
+    } catch (err: any) {
+      toast({
+        title: 'IA indisponível',
+        description: err?.message || 'Tente novamente em instantes.',
+        variant: 'destructive',
+      })
+    } finally {
+      setAiBusyFor(null)
+    }
+  }
+
   const commitImport = (imported: SteamTrapRecord[]) => {
     if (!data || imported.length === 0) return
     const startSeq = data.traps.length
@@ -475,20 +562,37 @@ export function SteamTrapInspectionSection({
             <>
               {/* Passos */}
               <div className="flex gap-1.5 flex-wrap">
-                {['Contexto', 'Achados', 'Inspeção VKP', 'Resumo'].map((s, i) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setStep(i + 1)}
-                    className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg border ${
-                      step === i + 1
-                        ? 'bg-sky-600 text-white border-sky-600'
-                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                    }`}
-                  >
-                    {i + 1}. {s}
-                  </button>
-                ))}
+                {['Contexto', 'Achados', 'Inspeção VKP', 'Resumo'].map((s, i) => {
+                  const counters: Record<number, string> = {
+                    1: data.context.areas.length + ' áreas',
+                    2: data.findings.length + ' achados',
+                    3: data.traps.length + ' registros',
+                    4: completeness + '%',
+                  }
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setStep(i + 1)}
+                      className={`text-[11px] font-semibold px-3 py-1.5 rounded-lg border inline-flex items-center gap-1.5 ${
+                        step === i + 1
+                          ? 'bg-sky-600 text-white border-sky-600'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {i + 1}. {s}
+                      <span
+                        className={`text-[9.5px] px-1.5 py-0.5 rounded-full ${
+                          step === i + 1
+                            ? 'bg-white/20 text-white'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                        }`}
+                      >
+                        {counters[i + 1]}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
 
               {/* PASSO 1 — CONTEXTO */}
@@ -609,6 +713,28 @@ export function SteamTrapInspectionSection({
                         className="h-10 text-sm"
                       />
                     </div>
+                    <div>
+                      <label className="block text-xs font-semibold mb-1.5">
+                        Consumo informado (t/mês)
+                      </label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={data.context.monthlyConsumptionTon ?? ''}
+                        onChange={(e) =>
+                          queueSave({
+                            ...data,
+                            context: {
+                              ...data.context,
+                              monthlyConsumptionTon:
+                                e.target.value === '' ? null : Number(e.target.value),
+                            },
+                          })
+                        }
+                        placeholder="Ex.: 18279,60"
+                        className="h-10 text-sm"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-semibold mb-1.5">
@@ -691,6 +817,20 @@ export function SteamTrapInspectionSection({
                         </select>
                         <button
                           type="button"
+                          onClick={() => suggestFinding(f.id)}
+                          disabled={aiBusyFor === f.id}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 hover:underline disabled:opacity-50"
+                          title="IA sugere severidade e recomendação a partir do texto"
+                        >
+                          {aiBusyFor === f.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            '✨'
+                          )}
+                          IA
+                        </button>
+                        <button
+                          type="button"
                           onClick={() =>
                             queueSave({
                               ...data,
@@ -755,8 +895,13 @@ export function SteamTrapInspectionSection({
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="text-xs text-muted-foreground">
-                      {data.traps.length} registros · perda total{' '}
-                      <b className="text-sky-700">{br(econ.lossKgh)} kg/h</b>
+                      {filterArea || filterResult
+                        ? `${filteredTraps.length} de ${data.traps.length} registros (filtro)`
+                        : `${data.traps.length} registros`}{' '}
+                      · perda {filterArea || filterResult ? 'filtrada' : 'total'}{' '}
+                      <b className="text-sky-700">
+                        {br(filterArea || filterResult ? filteredLoss : econ.lossKgh)} kg/h
+                      </b>
                     </div>
                     <div className="flex gap-1.5">
                       <Button
@@ -772,6 +917,40 @@ export function SteamTrapInspectionSection({
                       </Button>
                     </div>
                   </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <select
+                      value={filterArea}
+                      onChange={(e) => setFilterArea(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-white dark:bg-slate-900 px-2 text-xs"
+                    >
+                      <option value="">Área: todas</option>
+                      {data.context.areas.map((a) => (
+                        <option key={a}>{a}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={filterResult}
+                      onChange={(e) => setFilterResult(e.target.value)}
+                      className="h-8 rounded-md border border-input bg-white dark:bg-slate-900 px-2 text-xs"
+                    >
+                      <option value="">Resultado: todos</option>
+                      {STEAM_TRAP_RESULTS.map((r) => (
+                        <option key={r}>{r}</option>
+                      ))}
+                    </select>
+                    {(filterArea || filterResult) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFilterArea('')
+                          setFilterResult('')
+                        }}
+                        className="text-[11px] text-sky-700 hover:underline"
+                      >
+                        limpar filtros
+                      </button>
+                    )}
+                  </div>
                   <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
                     <table className="w-full text-[11px]">
                       <thead>
@@ -784,12 +963,13 @@ export function SteamTrapInspectionSection({
                           <th className="px-2 py-2">DN</th>
                           <th className="px-2 py-2">Resultado</th>
                           <th className="px-2 py-2">kg/h</th>
+                          <th className="px-2 py-2">R$/mês</th>
                           <th className="px-2 py-2">📷</th>
                           <th className="px-2 py-2"></th>
                         </tr>
                       </thead>
                       <tbody>
-                        {data.traps.map((t) => (
+                        {filteredTraps.map((t) => (
                           <tr
                             key={t.id}
                             className="border-t border-slate-100 dark:border-slate-800"
@@ -808,6 +988,18 @@ export function SteamTrapInspectionSection({
                               </span>
                             </td>
                             <td className="px-2 py-1.5">{t.lossKgh ? br(t.lossKgh) : '—'}</td>
+                            <td className="px-2 py-1.5">
+                              {t.lossKgh && data.context.steamCostBrlTon != null
+                                ? 'R$ ' +
+                                  br(
+                                    (t.lossKgh *
+                                      data.context.hoursPerYear *
+                                      data.context.steamCostBrlTon) /
+                                      1000 /
+                                      12,
+                                  )
+                                : '—'}
+                            </td>
                             <td className="px-2 py-1.5">
                               {(t.mediaIds || []).length > 0 ? '📷' : ''}
                             </td>
@@ -846,10 +1038,20 @@ export function SteamTrapInspectionSection({
                         {data.traps.length === 0 && (
                           <tr>
                             <td
-                              colSpan={10}
+                              colSpan={11}
                               className="px-2 py-4 text-center text-muted-foreground"
                             >
                               Nenhum purgador registrado ainda.
+                            </td>
+                          </tr>
+                        )}
+                        {data.traps.length > 0 && filteredTraps.length === 0 && (
+                          <tr>
+                            <td
+                              colSpan={11}
+                              className="px-2 py-4 text-center text-muted-foreground"
+                            >
+                              Nenhum registro com os filtros ativos.
                             </td>
                           </tr>
                         )}
@@ -921,6 +1123,65 @@ export function SteamTrapInspectionSection({
                         ? `R$ ${br(econ.perYear)}/ano`
                         : 'informe o custo do vapor'}
                     </b>
+                  </div>
+                  {/* Medidor de completude */}
+                  <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="font-semibold">Completude do relatório</span>
+                      <b className={completeness >= 80 ? 'text-emerald-700' : 'text-amber-700'}>
+                        {completeness}%
+                      </b>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-sky-600 to-orange-500 transition-all"
+                        style={{ width: completeness + '%' }}
+                      />
+                    </div>
+                    {missingItems.length > 0 && (
+                      <p className="text-[10.5px] text-muted-foreground mt-1.5">
+                        Falta: <b>{missingItems.join(' · ')}</b>
+                      </p>
+                    )}
+                  </div>
+                  {/* Assinaturas editáveis */}
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5">
+                      Assinaturas do relatório
+                    </label>
+                    <div className="space-y-1.5">
+                      {[0, 1].map((i) => {
+                        const sig = data.signatures[i] || { name: '', role: '' }
+                        return (
+                          <div key={i} className="flex gap-2">
+                            <Input
+                              value={sig.name}
+                              onChange={(e) => {
+                                const next = [...data.signatures]
+                                next[i] = { name: e.target.value, role: sig.role || '' }
+                                queueSave({ ...data, signatures: next })
+                              }}
+                              placeholder={
+                                i === 0 ? 'Nome (ex.: Pedro Ferraz)' : 'Nome (2ª assinatura)'
+                              }
+                              className="h-9 text-xs"
+                            />
+                            <Input
+                              value={sig.role}
+                              onChange={(e) => {
+                                const next = [...data.signatures]
+                                next[i] = { name: sig.name || '', role: e.target.value }
+                                queueSave({ ...data, signatures: next })
+                              }}
+                              placeholder={
+                                i === 0 ? 'Cargo (ex.: Eng. Aplicação · Bermo)' : 'Cargo'
+                              }
+                              className="h-9 text-xs"
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-semibold mb-1.5">Conclusão</label>
