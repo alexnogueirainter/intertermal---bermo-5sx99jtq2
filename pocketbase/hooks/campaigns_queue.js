@@ -71,6 +71,69 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
   const subject = String(campaign.get('subject') || '')
   const bodyTpl = String(campaign.get('body') || '')
 
+  // ---- Anexos da campanha (o mesmo arquivo sai em todos os e-mails) ----
+  // Mesmo padrão provado do envio de propostas: baixa o arquivo do próprio
+  // PocketBase e converte para Base64 (o runtime JSVM não tem btoa).
+  const uint8ToBase64 = (bytes) => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+    const out = []
+    for (let i = 0; i < bytes.length; i += 3) {
+      const b1 = bytes[i]
+      const b2 = i + 1 < bytes.length ? bytes[i + 1] : 0
+      const b3 = i + 2 < bytes.length ? bytes[i + 2] : 0
+      const has2 = i + 1 < bytes.length
+      const has3 = i + 2 < bytes.length
+      out.push(
+        chars[b1 >> 2],
+        chars[((b1 & 3) << 4) | (b2 >> 4)],
+        has2 ? chars[((b2 & 15) << 2) | (b3 >> 6)] : '=',
+        has3 ? chars[b3 & 63] : '=',
+      )
+    }
+    return out.join('')
+  }
+  const attachments = []
+  try {
+    const atts = $app.findRecordsByFilter(
+      'campaign_attachments',
+      'campaign_id = {:c}',
+      '-created',
+      10,
+      0,
+      { c: campaignId },
+    )
+    for (const a of atts) {
+      const fname = String(a.get('file') || '')
+      if (!fname) continue
+      const fileUrl =
+        ($secrets.get('PB_INSTANCE_URL') || '') +
+        '/api/files/' +
+        a.collection().id +
+        '/' +
+        a.id +
+        '/' +
+        encodeURIComponent(fname) +
+        '?token=' +
+        ($secrets.get('PB_SUPERUSER_TOKEN') || '')
+      try {
+        const fRes = $http.send({ url: fileUrl, method: 'GET', timeout: 30 })
+        if (fRes.statusCode === 200 && fRes.body && fRes.body.length > 0) {
+          attachments.push({
+            filename: String(a.get('filename') || fname),
+            content: uint8ToBase64(new Uint8Array(fRes.body)),
+          })
+        } else {
+          console.warn('[campanhas] Anexo não baixado (HTTP ' + fRes.statusCode + '): ' + fname)
+        }
+      } catch (errA) {
+        console.warn('[campanhas] Falha ao baixar anexo ' + fname + ':', errA)
+      }
+    }
+  } catch (_) {
+    /* coleção sem anexos ou indisponível: envia sem anexo */
+  }
+  if (attachments.length > 0) console.log('[campanhas] Anexos carregados: ' + attachments.length)
+
   // ---- Descadastrados (nunca recebem) ----
   const unsubSet = new Set()
   try {
@@ -185,6 +248,7 @@ cronAdd('campaigns_queue', '7 13 * * 1-5', () => {
           to: [email],
           subject: personalizar(subject),
           html: htmlBody,
+          ...(attachments.length > 0 ? { attachments: attachments } : {}),
         }),
         timeout: 20,
       })

@@ -2,9 +2,11 @@ import React, { useState, useEffect, useMemo } from 'react'
 import {
   campaignsService,
   templatesService,
+  attachmentsService,
   type CampaignRecord,
   type CampaignRecipientRecord,
   type CampaignTemplateRecord,
+  type CampaignAttachmentRecord,
 } from '@/services/campaigns'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -38,6 +40,7 @@ import {
   RefreshCw,
   FlaskConical,
   Megaphone,
+  Paperclip,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -88,6 +91,10 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
   const [recipientsOfId, setRecipientsOfId] = useState('')
   const [busy, setBusy] = useState('')
 
+  // ===== Anexos (o mesmo arquivo sai em todos os e-mails da campanha) =====
+  const [attachments, setAttachments] = useState<CampaignAttachmentRecord[]>([])
+  const [uploadingAtt, setUploadingAtt] = useState(false)
+
   const loadAll = async () => {
     try {
       const [t, c, cs, u] = await Promise.all([
@@ -117,6 +124,45 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
   useEffect(() => {
     loadAll()
   }, [])
+
+  // ===== Anexos: upload/remoção =====
+  const MAX_ATT = 3
+  const MAX_ATT_BYTES = 10 * 1024 * 1024
+
+  const handleAttUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    e.target.value = ''
+    for (const f of files) {
+      if (attachments.length >= MAX_ATT) {
+        toast({ title: 'Máximo de 3 anexos por campanha', variant: 'destructive' })
+        break
+      }
+      if (f.size > MAX_ATT_BYTES) {
+        toast({
+          title: `"${f.name}" passa de 10MB`,
+          description: 'Reduza o arquivo ou envie como link no texto do e-mail.',
+          variant: 'destructive',
+        })
+        continue
+      }
+      setUploadingAtt(true)
+      try {
+        const rec = await attachmentsService.upload(f)
+        setAttachments((prev) => [...prev, rec])
+      } catch (err: any) {
+        toast({ title: 'Erro ao anexar', description: err.message, variant: 'destructive' })
+      } finally {
+        setUploadingAtt(false)
+      }
+    }
+  }
+
+  const handleAttRemove = async (a: CampaignAttachmentRecord) => {
+    setAttachments((prev) => prev.filter((x) => x.id !== a.id))
+    try {
+      await attachmentsService.remove(a.id)
+    } catch (_) {}
+  }
 
   const filteredContacts = useMemo(() => {
     const q = contactSearch.toLowerCase().trim()
@@ -176,6 +222,7 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
       setBody('')
       setListTag('')
       setSelected(new Set())
+      setAttachments([])
       await loadAll()
       onDone?.()
     } catch (err: any) {
@@ -192,15 +239,19 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
     }
     setBusy('test')
     try {
-      const res = await campaignsService.sendOne(
-        'alex.nogueira@intertermal.com.br',
+      // Rota única das campanhas (action=test) — leva os anexos da tela.
+      const res = await campaignsService.sendTest(
         '[TESTE] ' + subject.trim(),
         body.trim(),
+        attachments.map((a) => a.id),
       )
       if (!res.ok) throw new Error(res.error || 'Falha no teste')
       toast({
         title: 'Teste enviado!',
-        description: 'Cheque a caixa de alex.nogueira@intertermal.com.br.',
+        description:
+          attachments.length > 0
+            ? `Com ${attachments.length} anexo(s) · cheque a caixa de alex.nogueira@intertermal.com.br.`
+            : 'Cheque a caixa de alex.nogueira@intertermal.com.br.',
       })
     } catch (err: any) {
       toast({ title: 'Erro no envio de teste', description: err.message, variant: 'destructive' })
@@ -246,11 +297,24 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
     setTplOpen(true)
   }
 
-  const applyTemplate = (t: CampaignTemplateRecord) => {
+  const applyTemplate = async (t: CampaignTemplateRecord) => {
     setSubject(t.subject)
     setBody(t.body)
     if (!name.trim()) setName(t.name)
     setTplOpen(false)
+    // Anexos do modelo vêm junto (cópia nova — o original fica no modelo).
+    try {
+      const tAtts = await attachmentsService.forTemplate(t.id)
+      const copies: CampaignAttachmentRecord[] = []
+      for (const a of tAtts) {
+        try {
+          copies.push(await attachmentsService.copy(a))
+        } catch (_) {}
+      }
+      setAttachments(copies)
+    } catch (_) {
+      setAttachments([])
+    }
   }
 
   const saveTemplate = async () => {
@@ -269,11 +333,15 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
         subject: subject.trim(),
         body: body.trim(),
         template_id: tplEditingId || undefined,
+        attachment_ids: attachments.map((a) => a.id),
       })
       if (!res.ok) throw new Error(res.error || 'Falha ao salvar modelo')
       toast({
         title: tplEditingId ? 'Modelo atualizado' : 'Modelo salvo',
-        description: 'Aparece no botão Modelos de agora em diante.',
+        description:
+          attachments.length > 0
+            ? `Com ${attachments.length} anexo(s) — aparece no botão Modelos.`
+            : 'Aparece no botão Modelos de agora em diante.',
       })
       setTplEditingId(null)
       setTplName('')
@@ -284,13 +352,19 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
     }
   }
 
-  const editTemplate = (t: CampaignTemplateRecord) => {
+  const editTemplate = async (t: CampaignTemplateRecord) => {
     setTplEditingId(t.id)
     setTplName(t.name)
     setTplCategory(t.category || 'Outro')
     setSubject(t.subject)
     setBody(t.body)
     setTplOpen(false)
+    // Carrega os anexos já salvos do modelo para editar/ remover.
+    try {
+      setAttachments(await attachmentsService.forTemplate(t.id))
+    } catch (_) {
+      setAttachments([])
+    }
   }
 
   const deleteTemplate = async (t: CampaignTemplateRecord) => {
@@ -407,6 +481,61 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
                   </p>
                 </div>
               )}
+              {/* Anexos (o mesmo arquivo sai em todos os e-mails da campanha) */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Anexos (opcional)</Label>
+                {attachments.length > 0 && (
+                  <div className="space-y-1">
+                    {attachments.map((a) => (
+                      <div
+                        key={a.id}
+                        className="flex items-center justify-between gap-2 p-2 rounded-lg border border-slate-200 dark:border-slate-800"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <Paperclip className="h-3 w-3 text-indigo-600 shrink-0" />
+                          <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-200 truncate">
+                            {a.filename || a.file}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground shrink-0">
+                            {a.size ? Math.round(a.size / 1024) + ' KB' : ''}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleAttRemove(a)}
+                          className="h-6 px-2 text-[10px] text-rose-600 hover:text-rose-700 shrink-0"
+                        >
+                          Remover
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {attachments.length < MAX_ATT && (
+                  <label className="flex items-center gap-2 text-[11px] text-indigo-600 dark:text-indigo-400 cursor-pointer hover:underline">
+                    {uploadingAtt ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <Paperclip className="h-3 w-3" />
+                    )}
+                    {uploadingAtt
+                      ? 'Enviando…'
+                      : 'Anexar arquivo (PDF, imagem ou Office · até 10MB)'}
+                    <input
+                      type="file"
+                      multiple
+                      onChange={handleAttUpload}
+                      className="hidden"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.zip"
+                    />
+                  </label>
+                )}
+                <p className="text-[10px] text-muted-foreground">
+                  O mesmo arquivo sai em todos os e-mails da campanha. Em prospecção fria, prefira
+                  link no texto — anexo pesado aumenta risco de spam.
+                </p>
+              </div>
             </CardContent>
           </Card>
 

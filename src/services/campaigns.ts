@@ -46,13 +46,14 @@ export interface CampaignRecipientRecord {
 }
 
 export const campaignsService = {
-  /** Salva a campanha (modelo + destinatários) no backend. */
+  /** Salva a campanha (modelo + destinatários + anexos) no backend. */
   async save(input: {
     name: string
     subject: string
     body: string
     list_tag?: string
     recipients?: string[]
+    attachment_ids?: string[]
   }): Promise<{ ok: boolean; campaign_id?: string; recipients?: number; error?: string }> {
     return await pb.send('/backend/v1/campaigns/action', {
       method: 'POST',
@@ -61,11 +62,21 @@ export const campaignsService = {
     })
   },
 
-  /** Envia um e-mail de teste para o próprio Alex. */
-  async sendTest(subject: string, body: string): Promise<{ ok: boolean; error?: string }> {
+  /** Envia um e-mail de teste para o próprio Alex (leva os anexos informados). */
+  async sendTest(
+    subject: string,
+    body: string,
+    attachment_ids?: string[],
+  ): Promise<{ ok: boolean; error?: string; attachments?: number }> {
     return await pb.send('/backend/v1/campaigns/action', {
       method: 'POST',
-      body: { action: 'test', subject, body, to: 'alex.nogueira@intertermal.com.br' },
+      body: {
+        action: 'test',
+        subject,
+        body,
+        to: 'alex.nogueira@intertermal.com.br',
+        attachment_ids,
+      },
       requestKey: null,
     })
   },
@@ -83,13 +94,14 @@ export const campaignsService = {
     })
   },
 
-  /** Salva/edita um modelo de campanha pelo hook do backend. */
+  /** Salva/edita um modelo de campanha pelo hook do backend (leva anexos). */
   async saveTemplate(input: {
     name: string
     category?: string
     subject: string
     body: string
     template_id?: string
+    attachment_ids?: string[]
   }): Promise<{ ok: boolean; error?: string }> {
     return await pb.send('/backend/v1/campaigns/action', {
       method: 'POST',
@@ -201,5 +213,50 @@ export const templatesService = {
 
   async remove(id: string) {
     return await pb.collection('campaign_templates').delete(id)
+  },
+}
+
+export interface CampaignAttachmentRecord {
+  id: string
+  campaign_id?: string
+  template_id?: string
+  file: string
+  filename?: string
+  size?: number
+  created?: string
+  updated?: string
+}
+
+export const attachmentsService = {
+  /** Sobe 1 arquivo (multipart nativo do SDK) — coleção campaign_attachments. */
+  async upload(file: File): Promise<CampaignAttachmentRecord> {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('filename', file.name)
+    fd.append('size', String(file.size))
+    return await pb.collection('campaign_attachments').create<CampaignAttachmentRecord>(fd)
+  },
+
+  async remove(id: string) {
+    return await pb.collection('campaign_attachments').delete(id)
+  },
+
+  /** Anexos vinculados a um modelo (template_id). */
+  async forTemplate(templateId: string): Promise<CampaignAttachmentRecord[]> {
+    return await pb.collection('campaign_attachments').getFullList<CampaignAttachmentRecord>({
+      filter: `template_id = "${templateId}"`,
+      sort: '-created',
+    })
+  },
+
+  /** Copia um anexo (ex.: do modelo para o rascunho) — baixa e sobe como novo. */
+  async copy(rec: CampaignAttachmentRecord): Promise<CampaignAttachmentRecord> {
+    const url =
+      pb.baseUrl + '/api/files/campaign_attachments/' + rec.id + '/' + encodeURIComponent(rec.file)
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('Falha ao baixar o anexo do modelo')
+    const blob = await res.blob()
+    const file = new File([blob], rec.filename || rec.file, { type: blob.type })
+    return await attachmentsService.upload(file)
   },
 }

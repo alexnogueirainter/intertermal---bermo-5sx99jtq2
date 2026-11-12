@@ -66,7 +66,7 @@ routerAdd(
       return { subject: personalizar(subject), html: htmlBody }
     }
 
-    const sendViaResend = (to, subject, bodyTpl, nome, empresa) => {
+    const sendViaResend = (to, subject, bodyTpl, nome, empresa, atts) => {
       const rendered = renderHtml(subject, bodyTpl, nome, empresa, to)
       let res = null
       try {
@@ -79,6 +79,7 @@ routerAdd(
             to: [to],
             subject: rendered.subject,
             html: rendered.html,
+            ...(Array.isArray(atts) && atts.length > 0 ? { attachments: atts } : {}),
           }),
           timeout: 20,
         })
@@ -102,6 +103,70 @@ routerAdd(
       }
     }
 
+    // ---- Anexos (Base64 p/ o Resend) — mesmo padrão provado do envio de propostas ----
+    // O runtime JSVM não tem btoa: conversão manual byte a byte.
+    const uint8ToBase64 = (bytes) => {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+      const out = []
+      for (let i = 0; i < bytes.length; i += 3) {
+        const b1 = bytes[i]
+        const b2 = i + 1 < bytes.length ? bytes[i + 1] : 0
+        const b3 = i + 2 < bytes.length ? bytes[i + 2] : 0
+        const has2 = i + 1 < bytes.length
+        const has3 = i + 2 < bytes.length
+        out.push(
+          chars[b1 >> 2],
+          chars[((b1 & 3) << 4) | (b2 >> 4)],
+          has2 ? chars[((b2 & 15) << 2) | (b3 >> 6)] : '=',
+          has3 ? chars[b3 & 63] : '=',
+        )
+      }
+      return out.join('')
+    }
+
+    // Baixa os anexos (campaign_attachments) e devolve no formato do Resend.
+    // $http.send é síncrono; o body volta como bytes → Uint8Array.
+    const buildAttachments = (ids) => {
+      const out = []
+      for (const id0 of Array.isArray(ids) ? ids : []) {
+        const id = String(id0 || '').trim()
+        if (!id) continue
+        let rec = null
+        try {
+          rec = $app.findRecordById('campaign_attachments', id)
+        } catch (_) {
+          rec = null
+        }
+        if (!rec) continue
+        const fname = String(rec.get('file') || '')
+        if (!fname) continue
+        const displayName = String(rec.get('filename') || fname)
+        const fileUrl =
+          ($secrets.get('PB_INSTANCE_URL') || '') +
+          '/api/files/' +
+          rec.collection().id +
+          '/' +
+          rec.id +
+          '/' +
+          encodeURIComponent(fname) +
+          '?token=' +
+          ($secrets.get('PB_SUPERUSER_TOKEN') || '')
+        try {
+          const fRes = $http.send({ url: fileUrl, method: 'GET', timeout: 30 })
+          if (fRes.statusCode === 200 && fRes.body && fRes.body.length > 0) {
+            out.push({ filename: displayName, content: uint8ToBase64(new Uint8Array(fRes.body)) })
+          } else {
+            console.warn(
+              '[campanhas] Anexo não baixado (HTTP ' + fRes.statusCode + '): ' + displayName,
+            )
+          }
+        } catch (errA) {
+          console.warn('[campanhas] Falha ao baixar anexo ' + displayName + ':', errA)
+        }
+      }
+      return out
+    }
+
     // ===== AÇÃO: TESTE =====
     if (action === 'test') {
       if (!apiKey) {
@@ -117,9 +182,10 @@ routerAdd(
         .trim()
       if (!subject || !bodyTpl)
         return e.json(400, { ok: false, error: 'Assunto e texto obrigatórios' })
-      const r = sendViaResend(to, subject, bodyTpl, 'Alex Nogueira', 'Intertermal')
+      const atts = buildAttachments(body.attachment_ids)
+      const r = sendViaResend(to, subject, bodyTpl, 'Alex Nogueira', 'Intertermal', atts)
       if (!r.ok) return e.json(502, { ok: false, error: r.error })
-      return e.json(200, { ok: true, resend_id: r.id })
+      return e.json(200, { ok: true, resend_id: r.id, attachments: atts.length })
     }
 
     // ===== AÇÃO: SAVE =====
@@ -252,6 +318,21 @@ routerAdd(
       rec.set('created_by', String(e.auth ? e.auth.get('email') || '' : ''))
       $app.save(rec)
 
+      // Vínculo dos anexos: os arquivos já subiram pela API do PocketBase
+      // (campaign_attachments com campaign_id vazio) — aqui só assina o dono.
+      const attIds = Array.isArray(body.attachment_ids) ? body.attachment_ids : []
+      for (const id0 of attIds) {
+        const id = String(id0 || '').trim()
+        if (!id) continue
+        try {
+          const a = $app.findRecordById('campaign_attachments', id)
+          if (!String(a.get('campaign_id') || '')) {
+            a.set('campaign_id', rec.id)
+            $app.save(a)
+          }
+        } catch (_) {}
+      }
+
       console.log(
         '[campanhas] Campanha salva: ' + rec.id + ' (' + chosen.length + ' destinatários)',
       )
@@ -268,6 +349,36 @@ routerAdd(
         const templateId = String(body.template_id || '').trim()
         if (!name || !subject || !bodyTpl) {
           return e.json(400, { ok: false, error: 'Nome, assunto e texto obrigatórios' })
+        }
+        // Anexos do modelo: os arquivos já subiram pela API (template_id vazio)
+        // — aqui só assina o dono. Anexos desmarcados são apagados.
+        const attIds = Array.isArray(body.attachment_ids) ? body.attachment_ids : []
+        const wantSet = new Set(attIds.map((x) => String(x || '').trim()).filter(Boolean))
+        if (templateId) {
+          try {
+            const old = $app.findRecordsByFilter(
+              'campaign_attachments',
+              'template_id = {:t}',
+              '-created',
+              10,
+              0,
+              { t: templateId },
+            )
+            for (const o of old) {
+              if (!wantSet.has(String(o.id))) $app.delete(o)
+            }
+          } catch (_) {}
+        }
+        for (const id0 of attIds) {
+          const id = String(id0 || '').trim()
+          if (!id) continue
+          try {
+            const a = $app.findRecordById('campaign_attachments', id)
+            if (!String(a.get('template_id') || '')) {
+              a.set('template_id', templateId)
+              $app.save(a)
+            }
+          } catch (_) {}
         }
         const col = $app.findCollectionByNameOrId('campaign_templates')
         if (templateId) {
