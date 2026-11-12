@@ -13,6 +13,7 @@ import ReceivedFieldVisitsPage from './pages/ReceivedFieldVisitsPage'
 import LoginPage from './pages/LoginPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
 import CampaignsPage from './pages/CampaignsPage'
+import ChecklistPage from './pages/ChecklistPage'
 import { AuthProvider, useAuth } from './lib/auth'
 
 // ONLY IMPORT AND RENDER WORKING PAGES, NEVER ADD PLACEHOLDER COMPONENTS OR PAGES IN THIS FILE
@@ -56,6 +57,7 @@ const App = () => (
           <Route path="/aprovar/:token" element={<PublicProposalApprovalPage />} />
           <Route path="/proposta/:token" element={<PublicProposalApprovalPage />} />
           <Route path="/visita-vendedor" element={<SellerFieldVisitPage />} />
+          <Route path="/checklist" element={<ChecklistPage />} />
 
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>

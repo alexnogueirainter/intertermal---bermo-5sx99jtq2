@@ -58,6 +58,9 @@ import {
 } from 'lucide-react'
 import { OsExecutionReportDialog } from '@/components/OsExecutionReportDialog'
 import { osExecutionReportsService } from '@/services/os-execution-reports'
+import { checklistLinkService } from '@/services/checklist-link'
+import { useToast } from '@/hooks/use-toast'
+import { ClipboardList, Copy, MessageCircle } from 'lucide-react'
 import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
 import { computeOrderMargins } from '@/lib/order-margins'
 import type {
@@ -182,6 +185,7 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   onCreateServiceOrder,
   onSelectServiceOrder,
 }) => {
+  const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState('')
   const [clientFilter, setClientFilter] = useState<string>('all')
   const [selectedOrder, setSelectedOrder] = useState<ServiceOrderRecord | null>(null)
@@ -233,6 +237,30 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [isCancelling, setIsCancelling] = useState(false)
+
+  // Checklist Digital: modal com link restrito do técnico + mensagem WhatsApp
+  const [checklistModalOrder, setChecklistModalOrder] = useState<ServiceOrderRecord | null>(null)
+  const [checklistToken, setChecklistToken] = useState('')
+  const [checklistGenerating, setChecklistGenerating] = useState(false)
+  const handleOpenChecklist = async (order: ServiceOrderRecord) => {
+    setChecklistModalOrder(order)
+    setChecklistToken('')
+    setChecklistGenerating(true)
+    const res = await checklistLinkService.generate(order)
+    setChecklistGenerating(false)
+    if (res.ok && res.token) setChecklistToken(res.token)
+    else
+      toast({
+        title: 'Não foi possível gerar o checklist',
+        description:
+          res.error === 'network_error' ? 'Sem conexão. Tente de novo.' : 'Erro no servidor.',
+        variant: 'destructive',
+      })
+  }
+  const copyToClipboard = (text: string) => {
+    if (navigator.clipboard) navigator.clipboard.writeText(text)
+    toast({ title: 'Copiado ✓' })
+  }
 
   // Filtragem
   const filteredOrders = serviceOrders.filter((so) => {
@@ -485,6 +513,22 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                                 Alta
                               </Badge>
                             ) : null}
+
+                            {/* Botão Checklist Digital (link restrito do técnico) */}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleOpenChecklist(order)
+                              }}
+                              className="h-6 w-6 text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/40 transition-colors"
+                              title="Checklist Digital — link do técnico"
+                              aria-label={`Checklist Digital OS #${order.order_number || order.id}`}
+                            >
+                              <ClipboardList className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+                            </Button>
 
                             {/* Botão Relatório de Execução da OS (PDF) */}
                             <Button
@@ -1057,6 +1101,65 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
               Fechar
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DIÁLOGO DO CHECKLIST DIGITAL (LINK RESTRITO + WHATSAPP) */}
+      <Dialog
+        open={!!checklistModalOrder}
+        onOpenChange={(open) => !open && setChecklistModalOrder(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <ClipboardList className="h-4 w-4 text-orange-600" />
+              Checklist Digital — OS #{checklistModalOrder?.order_number || ''}
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground">
+              Link restrito ao técnico: abre SÓ o checklist desta OS — sem painel, sem clientes, sem
+              valores. 1 código = 1 aparelho.
+            </p>
+          </DialogHeader>
+          {checklistGenerating ? (
+            <div className="flex items-center gap-2 py-6 justify-center text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Gerando checklist…
+            </div>
+          ) : checklistToken ? (
+            <div className="space-y-3">
+              <div className="rounded-lg bg-slate-900 text-teal-300 px-3 py-2.5 font-mono text-xs break-all">
+                {checklistLinkService.link(checklistToken)}
+              </div>
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-3 text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">
+                {checklistLinkService.message(checklistModalOrder!, checklistToken)}
+              </div>
+              <DialogFooter className="gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyToClipboard(checklistLinkService.link(checklistToken))}
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copiar link
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-teal-700 hover:bg-teal-600 text-white"
+                  onClick={() =>
+                    copyToClipboard(
+                      checklistLinkService.message(checklistModalOrder!, checklistToken),
+                    )
+                  }
+                >
+                  <MessageCircle className="h-3.5 w-3.5 mr-1" /> Copiar mensagem p/ WhatsApp
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              Falha ao gerar. Feche e tente novamente.
+            </p>
+          )}
         </DialogContent>
       </Dialog>
 

@@ -52,6 +52,31 @@ routerAdd('GET', '/backend/v1/checklists/open', (e) => {
   }
   if (!cl) return e.json(404, { ok: false, error: 'checklist_not_found' })
 
+  // Fotos já no servidor (a página do técnico recarrega e não perde a galeria)
+  const media = []
+  try {
+    const mrecs = $app.findRecordsByFilter(
+      'os_checklist_media',
+      'checklist_id = {:c}',
+      'created',
+      500,
+      0,
+      { c: cl.id },
+    )
+    for (const m of mrecs) {
+      const fname = String(m.get('file') || '')
+      media.push({
+        client_media_id: String(m.get('client_media_id') || ''),
+        item_numero: Number(m.get('item_numero') || 0),
+        etapa: Number(m.get('etapa') || 0),
+        legenda: String(m.get('legenda') || ''),
+        selecionada: !!m.get('selecionada'),
+        ordem: Number(m.get('ordem') || 0),
+        path: fname ? '/api/files/os_checklist_media/' + m.id + '/' + fname : '',
+      })
+    }
+  } catch (_) {}
+
   // Identificação pré-preenchida: OS + cliente
   let so = null
   try {
@@ -89,6 +114,7 @@ routerAdd('GET', '/backend/v1/checklists/open', (e) => {
       ident: cl.get('ident') || {},
       answers: cl.get('answers') || {},
       texts: cl.get('texts') || {},
+      media: media,
       updated: String(cl.get('updated') || ''),
     },
     os: {
