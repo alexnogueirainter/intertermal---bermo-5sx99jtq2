@@ -161,7 +161,9 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
     setAttachments((prev) => prev.filter((x) => x.id !== a.id))
     try {
       await attachmentsService.remove(a.id)
-    } catch (_) {}
+    } catch (_) {
+      // Remoção no servidor é best-effort — a tela já tirou o anexo da lista.
+    }
   }
 
   const filteredContacts = useMemo(() => {
@@ -309,7 +311,9 @@ export const CampaignsManager: React.FC<CampaignsManagerProps> = ({ onDone }) =>
       for (const a of tAtts) {
         try {
           copies.push(await attachmentsService.copy(a))
-        } catch (_) {}
+        } catch (_) {
+          // Anexo que falha ao copiar segue fora — a campanha salva com o resto.
+        }
       }
       setAttachments(copies)
     } catch (_) {
