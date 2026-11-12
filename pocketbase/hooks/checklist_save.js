@@ -62,14 +62,21 @@ routerAdd('POST', '/backend/v1/checklists/save', (e) => {
       const terminal = ['fechado', 'completed', 'cancelled', 'rejected']
       const isTerminal = terminal.indexOf(current.toLowerCase()) >= 0
       if (!isTerminal) {
-        // status_history: append com justificativa (mesmo padrão da regra do funil)
+        // status_history: append com justificativa (mesmo padrão da regra do funil).
+        // JSONField no JSVM pode voltar como array de bytes, string ou array —
+        // cobre os três e grava o objeto direto (PocketBase serializa).
         let hist = []
         try {
           const raw = so.get('status_history')
-          hist = typeof raw === 'string' ? JSON.parse(raw || '[]') : Array.isArray(raw) ? raw : []
+          if (Array.isArray(raw)) hist = raw
+          else if (typeof raw === 'string' && raw.trim()) hist = JSON.parse(raw)
+          else if (raw && raw.byteLength !== undefined) {
+            hist = JSON.parse(new TextDecoder().decode(new Uint8Array(raw)))
+          }
         } catch (_) {
           hist = []
         }
+        if (!Array.isArray(hist)) hist = []
         hist.push({
           from: current,
           to: 'completed',
@@ -79,7 +86,7 @@ routerAdd('POST', '/backend/v1/checklists/save', (e) => {
             'Checklist concluído pelo técnico — veredito ' + String(body.verdict || 'pendente'),
         })
         so.set('status', 'completed')
-        so.set('status_history', hist)
+        so.set('status_history', JSON.stringify(hist))
         $app.save(so)
       }
     } catch (err) {
