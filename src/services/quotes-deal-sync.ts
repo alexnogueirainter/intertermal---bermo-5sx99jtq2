@@ -305,6 +305,19 @@ export const quoteDealSyncService = {
     const quoteTitle = quote.title || `OS-${quoteCode}: Manutenção e Revisão de Equipamentos BERMO`
     const technicalDetails = (quote as any).service_details || {}
 
+    // Lista oficial dos itens a trabalhar (base do checklist multi-equipamento):
+    // equipments[] da proposta → {tag, model, brand, plate_count} por item.
+    const equipmentItems = Array.isArray((quote as any).equipments)
+      ? (quote as any).equipments
+          .map((eq: any, i: number) => ({
+            tag: String(eq?.tag || '').trim(),
+            model: String(eq?.model || '').trim(),
+            brand: String(eq?.brand || '').trim(),
+            plate_count: Number(eq?.plate_count || eq?.plateCount || 0) || undefined,
+          }))
+          .filter((it: any) => it.tag || it.model)
+      : []
+
     const updatedSOs: ServiceOrderRecord[] = []
 
     try {
@@ -332,6 +345,16 @@ export const quoteDealSyncService = {
             equipment_brand: equipBrand || so.equipment_brand,
             title: so.title || quoteTitle,
             technical_details: technicalDetails,
+          }
+
+          // Copia a lista de itens (só quando a proposta tem lista e a OS ainda não tem)
+          if (equipmentItems.length > 0) {
+            const currentItems = Array.isArray((so as any).equipment_items)
+              ? ((so as any).equipment_items as any[])
+              : []
+            if (currentItems.length === 0) {
+              ;(soPayload as any).equipment_items = equipmentItems
+            }
           }
 
           const updatedSO = await pb

@@ -15,6 +15,9 @@ export interface ChecklistLinkResult {
   os_number?: string
   template?: string
   already?: boolean
+  created_count?: number
+  total_checklists?: number
+  items?: Array<{ tag: string; label: string; template: string }>
   error?: string
 }
 
@@ -42,11 +45,14 @@ function waMessage(
 }
 
 export const checklistLinkService = {
-  async generate(os: ServiceOrderRecord): Promise<ChecklistLinkResult> {
+  async generate(
+    os: ServiceOrderRecord,
+    items?: Array<{ tag: string; label: string; template: string }>,
+  ): Promise<ChecklistLinkResult> {
     try {
       const res = (await pb.send('/backend/v1/checklists/generate', {
         method: 'POST',
-        body: JSON.stringify({ os_id: os.id }),
+        body: JSON.stringify({ os_id: os.id, ...(items && items.length ? { items } : {}) }),
       })) as ChecklistLinkResult
       return res
     } catch (err: any) {

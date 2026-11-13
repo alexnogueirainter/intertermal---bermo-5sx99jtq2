@@ -242,20 +242,68 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   const [checklistModalOrder, setChecklistModalOrder] = useState<ServiceOrderRecord | null>(null)
   const [checklistToken, setChecklistToken] = useState('')
   const [checklistGenerating, setChecklistGenerating] = useState(false)
+  const [checklistItems, setChecklistItems] = useState<
+    Array<{ tag: string; label: string; template: string }>
+  >([])
+  const [checklistItemsSource, setChecklistItemsSource] = useState<'os' | 'manual' | 'none'>('none')
   const handleOpenChecklist = async (order: ServiceOrderRecord) => {
     setChecklistModalOrder(order)
     setChecklistToken('')
+    setChecklistItems([])
+    setChecklistItemsSource('none')
     setChecklistGenerating(true)
     const res = await checklistLinkService.generate(order)
     setChecklistGenerating(false)
-    if (res.ok && res.token) setChecklistToken(res.token)
-    else
+    if (res.ok && res.token) {
+      setChecklistToken(res.token)
+      if (Array.isArray(res.items) && res.items.length > 0) {
+        setChecklistItems(res.items)
+        setChecklistItemsSource('os')
+      } else {
+        setChecklistItemsSource('manual')
+      }
+    } else
       toast({
         title: 'Não foi possível gerar o checklist',
         description:
           res.error === 'network_error' ? 'Sem conexão. Tente de novo.' : 'Erro no servidor.',
         variant: 'destructive',
       })
+  }
+  const addManualItem = () => {
+    setChecklistItems((prev) => [...prev, { tag: '', label: '', template: 'trocador' }])
+  }
+  const updateManualItem = (idx: number, field: 'tag' | 'label' | 'template', value: string) => {
+    setChecklistItems((prev) => prev.map((it, i) => (i === idx ? { ...it, [field]: value } : it)))
+  }
+  const removeManualItem = (idx: number) => {
+    setChecklistItems((prev) => prev.filter((_, i) => i !== idx))
+  }
+  const regenerateWithItems = async () => {
+    if (!checklistModalOrder) return
+    setChecklistGenerating(true)
+    const res = await checklistLinkService.generate(
+      checklistModalOrder,
+      checklistItems.map((it) => ({
+        tag: it.tag.trim(),
+        label: it.label.trim() || (it.tag.trim() ? it.tag.trim() : 'Equipamento'),
+        template: it.template,
+      })),
+    )
+    setChecklistGenerating(false)
+    if (res.ok && res.token) {
+      setChecklistToken(res.token)
+      setChecklistItems(res.items || [])
+      setChecklistItemsSource('os')
+      toast({ title: 'Checklists gerados: ' + (res.total_checklists || 1) })
+    } else {
+      toast({
+        title: 'Não foi possível gerar os checklists',
+        description:
+          res.error === 'network_error' ? 'Sem conexão. Tente de novo.' : 'Erro no servidor.',
+        variant: 'destructive',
+      })
+    }
   }
   const copyToClipboard = (text: string) => {
     if (navigator.clipboard) navigator.clipboard.writeText(text)
@@ -1123,6 +1171,110 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
           {checklistGenerating ? (
             <div className="flex items-center gap-2 py-6 justify-center text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Gerando checklist…
+            </div>
+          ) : checklistToken && checklistItemsSource === 'os' ? (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-teal-200 dark:border-teal-900/60 bg-teal-50/60 dark:bg-teal-950/30 p-3 text-xs">
+                <p className="font-semibold text-teal-800 dark:text-teal-300">
+                  {checklistItems.length} checklist(s) gerado(s) — 1 por equipamento:
+                </p>
+                <ul className="mt-1.5 space-y-0.5">
+                  {checklistItems.map((it, i) => (
+                    <li key={i} className="text-slate-700 dark:text-slate-300">
+                      • {it.label}
+                      {it.tag ? ` — TAG ${it.tag}` : ''} ·{' '}
+                      {it.template === 'trocador'
+                        ? 'Trocador'
+                        : it.template === 'valvulas'
+                          ? 'Válvula'
+                          : 'Purgador'}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-lg bg-slate-900 text-teal-300 px-3 py-2.5 font-mono text-xs break-all">
+                {checklistLinkService.link(checklistToken)}
+              </div>
+              <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-3 text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">
+                {checklistLinkService.message(checklistModalOrder!, checklistToken)}
+              </div>
+              <DialogFooter className="gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => copyToClipboard(checklistLinkService.link(checklistToken))}
+                >
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copiar link
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-teal-700 hover:bg-teal-600 text-white"
+                  onClick={() =>
+                    copyToClipboard(
+                      checklistLinkService.message(checklistModalOrder!, checklistToken),
+                    )
+                  }
+                >
+                  <MessageCircle className="h-3.5 w-3.5 mr-1" /> Copiar mensagem p/ WhatsApp
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : checklistToken && checklistItemsSource === 'manual' ? (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Esta OS não tem lista de equipamentos da proposta. Informe os itens a trabalhar — 1
+                checklist por item, TAG o técnico confirma no campo.
+              </p>
+              {checklistItems.map((it, i) => (
+                <div key={i} className="grid grid-cols-[1fr_110px_36px] gap-1.5 items-center">
+                  <Input
+                    value={it.tag}
+                    onChange={(e) => updateManualItem(i, 'tag', e.target.value)}
+                    placeholder="TAG (opcional)"
+                    className="text-xs"
+                  />
+                  <select
+                    value={it.template}
+                    onChange={(e) => updateManualItem(i, 'template', e.target.value)}
+                    className="h-8 text-xs rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2"
+                  >
+                    <option value="trocador">Trocador</option>
+                    <option value="valvulas">Válvula</option>
+                    <option value="purgadores">Purgador</option>
+                  </select>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-rose-600"
+                    onClick={() => removeManualItem(i)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addManualItem}
+                className="text-xs"
+              >
+                + Adicionar equipamento
+              </Button>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-teal-700 hover:bg-teal-600 text-white"
+                  disabled={checklistItems.length === 0}
+                  onClick={regenerateWithItems}
+                >
+                  Gerar {checklistItems.length || ''} checklist(s)
+                </Button>
+              </DialogFooter>
             </div>
           ) : checklistToken ? (
             <div className="space-y-3">

@@ -32,10 +32,18 @@ routerAdd('POST', '/backend/v1/checklists/save', (e) => {
   }
 
   let cl = null
+  const osId = String(tok.get('service_order_id') || '')
+  // Multi-equipamento: body.checklist_id escolhe a aba; sem ele, cai no 1º da OS
+  const wantId = String(body.checklist_id || '').trim()
   try {
-    cl = $app.findFirstRecordByFilter('os_checklists', 'service_order_id = {:o}', {
-      o: String(tok.get('service_order_id') || ''),
-    })
+    if (wantId) {
+      cl = $app.findFirstRecordByFilter('os_checklists', 'service_order_id = {:o} && id = {:c}', {
+        o: osId,
+        c: wantId,
+      })
+    } else {
+      cl = $app.findFirstRecordByFilter('os_checklists', 'service_order_id = {:o}', { o: osId })
+    }
   } catch (_) {
     cl = null
   }
@@ -93,9 +101,27 @@ routerAdd('POST', '/backend/v1/checklists/save', (e) => {
           reason:
             'Checklist concluído pelo técnico — veredito ' + String(body.verdict || 'pendente'),
         })
-        so.set('status', 'completed')
-        so.set('status_history', JSON.stringify(hist))
-        $app.save(so)
+        // Multi-equipamento: a OS só conclui quando TODOS os checklists concluírem.
+        // Este complete marca ESTE checklist; se ainda há outro em rascunho, a OS segue.
+        let pendingOthers = 0
+        try {
+          const others = $app.findRecordsByFilter(
+            'os_checklists',
+            'service_order_id = {:o} && id != {:c} && status != {:s}',
+            'created',
+            500,
+            0,
+            { o: osId, c: cl.id, s: 'concluido' },
+          )
+          pendingOthers = others.length
+        } catch (_) {
+          pendingOthers = 0
+        }
+        if (pendingOthers === 0) {
+          so.set('status', 'completed')
+          so.set('status_history', JSON.stringify(hist))
+          $app.save(so)
+        }
       }
     } catch (err) {
       console.warn('[checklist] falha ao atualizar OS: ' + (err && err.message ? err.message : ''))
@@ -108,29 +134,44 @@ routerAdd('POST', '/backend/v1/checklists/save', (e) => {
     // relatório como item sem custo, para o escritório completar.
     // ============================================================
     try {
-      const partsRaw = cl.get('parts')
-      let parts = []
-      if (partsRaw && partsRaw.byteLength !== undefined) {
-        parts = JSON.parse(new TextDecoder().decode(new Uint8Array(partsRaw)))
-      } else if (Array.isArray(partsRaw)) {
-        if (partsRaw.length > 0 && typeof partsRaw[0] === 'number') {
-          parts = JSON.parse(new TextDecoder().decode(new Uint8Array(partsRaw)))
-        } else {
-          parts = partsRaw
-        }
-      } else if (typeof partsRaw === 'string' && partsRaw.trim()) {
-        parts = JSON.parse(partsRaw)
-      }
-      if (!Array.isArray(parts)) parts = []
-      const comCusto = parts.filter(
-        (p) =>
-          p &&
-          String(p.description || '').trim() &&
-          Number(p.unit_cost) > 0 &&
-          Number(p.quantity) > 0,
+      // Multi-equipamento: agrega as peças de TODOS os checklists concluídos da OS
+      // (cada complete reconstrói o relatório com o total, sem perder equipamentos)
+      const allCls = $app.findRecordsByFilter(
+        'os_checklists',
+        'service_order_id = {:o} && status = {:s}',
+        'created',
+        500,
+        0,
+        { o: osId, s: 'concluido' },
       )
+      let parts = []
+      for (const c of allCls) {
+        const partsRaw = c.get('parts')
+        let cParts = []
+        if (partsRaw && partsRaw.byteLength !== undefined) {
+          cParts = JSON.parse(new TextDecoder().decode(new Uint8Array(partsRaw)))
+        } else if (Array.isArray(partsRaw)) {
+          if (partsRaw.length > 0 && typeof partsRaw[0] === 'number') {
+            cParts = JSON.parse(new TextDecoder().decode(new Uint8Array(partsRaw)))
+          } else {
+            cParts = partsRaw
+          }
+        } else if (typeof partsRaw === 'string' && partsRaw.trim()) {
+          cParts = JSON.parse(partsRaw)
+        }
+        if (!Array.isArray(cParts)) cParts = []
+        const cTag = String(c.get('equipment_tag') || '')
+        const cLabel = String(c.get('equipment_label') || '')
+        const cRef = cTag || cLabel
+        for (const p of cParts) {
+          if (p && String(p.description || '').trim() && Number(p.quantity) > 0) {
+            p.equipment = cRef
+            parts.push(p)
+          }
+        }
+      }
+      const comCusto = parts.filter((p) => Number(p.unit_cost) > 0)
 
-      const osId = String(tok.get('service_order_id') || '')
       const os = $app.findRecordById('service_orders', osId)
       const osNumber = String(os.get('order_number') || cl.get('os_number') || '')
 
@@ -181,24 +222,21 @@ routerAdd('POST', '/backend/v1/checklists/save', (e) => {
           quantity: Number(p.quantity),
           unit: String(p.unit || 'un'),
           unit_cost: Number(p.unit_cost),
-          notes: 'Peça lançada no checklist de campo',
+          notes:
+            'Peça lançada no checklist de campo' + (p.equipment ? ' — ' + String(p.equipment) : ''),
         })
       }
       // Peças SEM custo: entram sem unit_cost (não afetam a margem) para o escritório completar
-      const semCusto = parts.filter(
-        (p) =>
-          p &&
-          String(p.description || '').trim() &&
-          !(Number(p.unit_cost) > 0) &&
-          Number(p.quantity) > 0,
-      )
+      const semCusto = parts.filter((p) => !(Number(p.unit_cost) > 0))
       for (const p of semCusto) {
         mats.push({
           id: 'chk-' + (p.id || mats.length + 1),
           description: String(p.description || '').trim(),
           quantity: Number(p.quantity),
           unit: String(p.unit || 'un'),
-          notes: 'Peça do checklist SEM custo informado — completar no escritório',
+          notes:
+            'Peça do checklist SEM custo informado — completar no escritório' +
+            (p.equipment ? ' — ' + String(p.equipment) : ''),
         })
       }
       rep.set('materials_used', mats)

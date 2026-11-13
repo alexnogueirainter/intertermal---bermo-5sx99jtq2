@@ -41,16 +41,18 @@ routerAdd('GET', '/backend/v1/checklists/open', (e) => {
     console.log('[checklist] aparelho vinculado | token=' + token + ' | ip=' + e.request.remoteAddr)
   }
 
-  // Checklist da OS do token
-  let cl = null
+  // Checklists da OS do token (multi-equipamento: 1 checklist por equipamento)
+  const osId = String(tok.get('service_order_id') || '')
+  let cls = []
   try {
-    cl = $app.findFirstRecordByFilter('os_checklists', 'service_order_id = {:o}', {
-      o: String(tok.get('service_order_id') || ''),
+    cls = $app.findRecordsByFilter('os_checklists', 'service_order_id = {:o}', 'created', 500, 0, {
+      o: osId,
     })
   } catch (_) {
-    cl = null
+    cls = []
   }
-  if (!cl) return e.json(404, { ok: false, error: 'checklist_not_found' })
+  if (cls.length === 0) return e.json(404, { ok: false, error: 'checklist_not_found' })
+  const cl = cls[0]
 
   // Fotos já no servidor (a página do técnico recarrega e não perde a galeria)
   const media = []
@@ -76,6 +78,40 @@ routerAdd('GET', '/backend/v1/checklists/open', (e) => {
       })
     }
   } catch (_) {}
+
+  // Lista de abas (todos os checklists da OS) — cada uma com seu estado
+  const tabs = []
+  for (const c of cls) {
+    let cParts = []
+    try {
+      const pr = c.get('parts')
+      if (pr && pr.byteLength !== undefined) {
+        cParts = JSON.parse(new TextDecoder().decode(new Uint8Array(pr)))
+      } else if (Array.isArray(pr)) {
+        if (pr.length > 0 && typeof pr[0] === 'number') {
+          cParts = JSON.parse(new TextDecoder().decode(new Uint8Array(pr)))
+        } else {
+          cParts = pr
+        }
+      } else if (typeof pr === 'string' && pr.trim()) {
+        cParts = JSON.parse(pr)
+      }
+    } catch (_) {
+      cParts = []
+    }
+    tabs.push({
+      id: c.id,
+      template: String(c.get('template') || 'trocador'),
+      equipment_tag: String(c.get('equipment_tag') || ''),
+      equipment_label: String(c.get('equipment_label') || ''),
+      status: String(c.get('status') || 'rascunho'),
+      conformity_pct: Number(c.get('conformity_pct') || 0),
+      verdict: String(c.get('verdict') || ''),
+      answers: c.get('answers') || {},
+      texts: c.get('texts') || {},
+      parts: cParts,
+    })
+  }
 
   // Identificação pré-preenchida: OS + cliente
   let so = null
@@ -109,6 +145,7 @@ routerAdd('GET', '/backend/v1/checklists/open', (e) => {
     status: String(cl.get('status') || 'rascunho'),
     conformity_pct: Number(cl.get('conformity_pct') || 0),
     verdict: String(cl.get('verdict') || ''),
+    tabs: tabs,
     checklist: {
       id: cl.id,
       ident: cl.get('ident') || {},

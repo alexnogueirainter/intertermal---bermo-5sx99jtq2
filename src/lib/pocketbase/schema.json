@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-12T19:52:59.586Z",
+  "generatedAt": "2026-11-13T11:09:08.630Z",
   "collections": [
     {
       "name": "users",
@@ -1857,6 +1857,12 @@
           "required": false,
           "system": false,
           "collectionRef": "os_checklists"
+        },
+        {
+          "name": "equipment_items",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -3761,6 +3767,18 @@
         {
           "name": "parts",
           "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_tag",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "equipment_label",
+          "type": "text",
           "required": false,
           "system": false
         }
