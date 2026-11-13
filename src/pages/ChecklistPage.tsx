@@ -269,75 +269,82 @@ export default function ChecklistPage() {
         // localStorage indisponível: segue sem persistir o token
       }
       setData(res)
-// Multi-equipamento: abas com todos os checklists da OS
-const serverTabs: ChecklistTab[] = Array.isArray((res as any).tabs)
-  ? (res as any).tabs.length > 0
-    ? (res as any).tabs
-    : [
-        {
-          id: res.checklist.id,
-          template: String(res.template || 'trocador'),
-          equipment_tag: '',
-          equipment_label: '',
-          status: String(res.status || 'rascunho'),
-          conformity_pct: Number(res.conformity_pct || 0),
-          verdict: String(res.verdict || ''),
-          answers: res.checklist.answers || {},
-          texts: res.checklist.texts || {},
-          parts: Array.isArray((res.checklist as any).parts) ? (res.checklist as any).parts : [],
-        },
-      ]
-  : [
-      {
-        id: res.checklist.id,
-        template: String(res.template || 'trocador'),
-        equipment_tag: '',
-        equipment_label: '',
-        status: String(res.status || 'rascunho'),
-        conformity_pct: Number(res.conformity_pct || 0),
-        verdict: String(res.verdict || ''),
-        answers: res.checklist.answers || {},
-        texts: res.checklist.texts || {},
-        parts: Array.isArray((res.checklist as any).parts) ? (res.checklist as any).parts : [],
-      },
-    ]
-setTabs(serverTabs)
-const first = serverTabs[0]
-setActiveTabId(first.id)
-setAnswers(first.answers || {})
-setTexts(first.texts || {})
-setIdent((prev) => ({
-  ...prev,
-  ...(res.checklist?.ident || {}),
-  ...(first.equipment_tag ? { tag: first.equipment_tag } : {}),
-}))
-const serverParts = Array.isArray(first.parts) ? first.parts : []
-setParts(
-  serverParts.map((p: any, i: number) => ({
-    id: String(p.id || 'p' + i),
-    description: String(p.description || ''),
-    quantity: Number(p.quantity) || 1,
-    unit: String(p.unit || 'un'),
-    unit_cost: p.unit_cost !== undefined && p.unit_cost !== null && Number(p.unit_cost) > 0 ? Number(p.unit_cost) : ('' as const),
-  })),
-)
-const serverPhotos: PhotoRec[] = (res.checklist.media || []).map((m, i) => ({
-  id: m.client_media_id,
-  url: m.path,
-  serverPath: m.path,
-  etapa: m.etapa,
-  itemNumero: m.item_numero,
-  legenda: m.legenda,
-  selecionada: m.selecionada,
-  uploadStatus: 'enviado',
-  timestamp: '',
-  ordem: m.ordem || i + 1,
-}))
-setPhotos(serverPhotos)
-if (serverTabs.every((t) => t.status === 'concluido')) setSentDone(true)
-setStatus('ok')
-return true
-}
+      // Multi-equipamento: abas com todos os checklists da OS
+      const serverTabs: ChecklistTab[] = Array.isArray((res as any).tabs)
+        ? (res as any).tabs.length > 0
+          ? (res as any).tabs
+          : [
+              {
+                id: res.checklist.id,
+                template: String(res.template || 'trocador'),
+                equipment_tag: '',
+                equipment_label: '',
+                status: String(res.status || 'rascunho'),
+                conformity_pct: Number(res.conformity_pct || 0),
+                verdict: String(res.verdict || ''),
+                answers: res.checklist.answers || {},
+                texts: res.checklist.texts || {},
+                parts: Array.isArray((res.checklist as any).parts)
+                  ? (res.checklist as any).parts
+                  : [],
+              },
+            ]
+        : [
+            {
+              id: res.checklist.id,
+              template: String(res.template || 'trocador'),
+              equipment_tag: '',
+              equipment_label: '',
+              status: String(res.status || 'rascunho'),
+              conformity_pct: Number(res.conformity_pct || 0),
+              verdict: String(res.verdict || ''),
+              answers: res.checklist.answers || {},
+              texts: res.checklist.texts || {},
+              parts: Array.isArray((res.checklist as any).parts)
+                ? (res.checklist as any).parts
+                : [],
+            },
+          ]
+      setTabs(serverTabs)
+      const first = serverTabs[0]
+      setActiveTabId(first.id)
+      setAnswers(first.answers || {})
+      setTexts(first.texts || {})
+      setIdent((prev) => ({
+        ...prev,
+        ...(res.checklist?.ident || {}),
+        ...(first.equipment_tag ? { tag: first.equipment_tag } : {}),
+      }))
+      const serverParts = Array.isArray(first.parts) ? first.parts : []
+      setParts(
+        serverParts.map((p: any, i: number) => ({
+          id: String(p.id || 'p' + i),
+          description: String(p.description || ''),
+          quantity: Number(p.quantity) || 1,
+          unit: String(p.unit || 'un'),
+          unit_cost:
+            p.unit_cost !== undefined && p.unit_cost !== null && Number(p.unit_cost) > 0
+              ? Number(p.unit_cost)
+              : ('' as const),
+        })),
+      )
+      const serverPhotos: PhotoRec[] = (res.checklist.media || []).map((m, i) => ({
+        id: m.client_media_id,
+        url: m.path,
+        serverPath: m.path,
+        etapa: m.etapa,
+        itemNumero: m.item_numero,
+        legenda: m.legenda,
+        selecionada: m.selecionada,
+        uploadStatus: 'enviado',
+        timestamp: '',
+        ordem: m.ordem || i + 1,
+      }))
+      setPhotos(serverPhotos)
+      if (serverTabs.every((t) => t.status === 'concluido')) setSentDone(true)
+      setStatus('ok')
+      return true
+    }
     if (res.error === 'device_not_authorized') setStatus('device')
     else if (res.error === 'network_error') setStatus('network')
     else setStatus('invalid')
@@ -438,7 +445,9 @@ return true
       // persiste a aba atual em memória (autosave já roda em background)
       setTabs((prev) =>
         prev.map((t) =>
-          t.id === activeTabId ? { ...t, answers: answers, texts: texts, parts: parts as any[] } : t,
+          t.id === activeTabId
+            ? { ...t, answers: answers, texts: texts, parts: parts as any[] }
+            : t,
         ),
       )
       const target = tabs.find((t) => t.id === tabId)
@@ -623,7 +632,9 @@ return true
     })
     const pendingTabs = tabs.filter((t) => t.id !== activeTabId && t.status !== 'concluido')
     for (const t of pendingTabs) {
-      const tTemplate = CHECKLIST_TEMPLATES[(t.template as ChecklistTemplateType['id']) || 'trocador'] || CHECKLIST_TEMPLATES.trocador
+      const tTemplate =
+        CHECKLIST_TEMPLATES[(t.template as ChecklistTemplateType['id']) || 'trocador'] ||
+        CHECKLIST_TEMPLATES.trocador
       const tStats = computeStats(tTemplate.itens, t.answers || {})
       if (tStats.applicable === 0) continue // aba nunca preenchida: não bloqueia o envio
       await checklistApi.save({
@@ -638,7 +649,10 @@ return true
           description: String(p.description || ''),
           quantity: Number(p.quantity) || 0,
           unit: p.unit || 'un',
-          unit_cost: p.unit_cost === '' || p.unit_cost === undefined || p.unit_cost === null ? null : Number(p.unit_cost),
+          unit_cost:
+            p.unit_cost === '' || p.unit_cost === undefined || p.unit_cost === null
+              ? null
+              : Number(p.unit_cost),
         })),
         conformity_pct: tStats.pct,
         verdict: tStats.verdict,
@@ -825,8 +839,6 @@ return true
               })}
             </div>
           )}
-        </div>
-          </div>
           <div className="mt-2">
             <div className="flex justify-between text-[11px] font-semibold">
               <span>
