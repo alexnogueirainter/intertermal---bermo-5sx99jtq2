@@ -24,6 +24,8 @@ routerAdd(
         status: String(r.get('status') || ''),
         conformity_pct: Number(r.get('conformity_pct') || 0),
         verdict: String(r.get('verdict') || ''),
+        equipment_tag: String(r.get('equipment_tag') || ''),
+        equipment_label: String(r.get('equipment_label') || ''),
         economia_ano: Number(r.get('economia_ano') || 0),
         completed_at: String(r.get('completed_at') || ''),
         created: String(r.get('created') || ''),

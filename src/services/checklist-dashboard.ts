@@ -16,6 +16,8 @@ export interface ChecklistSummary {
   status: 'rascunho' | 'concluido' | string
   conformity_pct: number
   verdict: string
+  equipment_tag?: string
+  equipment_label?: string
   economia_ano: number
   completed_at: string
   created: string

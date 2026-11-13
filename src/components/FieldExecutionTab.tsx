@@ -146,7 +146,7 @@ export const FieldExecutionTab: React.FC<{
         </Card>
       </div>
 
-      {/* OS em campo agora (rascunhos) */}
+      {/* OS em campo agora (rascunhos) — agrupado por OS (multi-equipamento) */}
       <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -177,32 +177,76 @@ export const FieldExecutionTab: React.FC<{
                     </td>
                   </tr>
                 ) : (
-                  abertos.map((c) => {
-                    const dias = businessDaysSince(c.updated)
-                    const parado = kpis.parados.some((p) => p.id === c.id)
-                    return (
-                      <tr key={c.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/40">
-                        <td className="py-3 px-4 font-mono font-bold text-teal-800 dark:text-teal-300">
-                          {c.os_number || '—'}
-                        </td>
-                        <td className="py-3 px-4 font-semibold">{c.client_name || '—'}</td>
-                        <td className="py-3 px-4">{c.template}</td>
-                        <td className="py-3 px-4">{c.technician_name || '—'}</td>
-                        <td className="py-3 px-4 text-center">{fmtDate(c.updated)}</td>
-                        <td className="py-3 px-4 text-center">
-                          {parado ? (
-                            <Badge className="bg-rose-600 text-white text-[10px]">
-                              PARADO {dias}d
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-[10px]">
-                              EM CAMPO
-                            </Badge>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })
+                  (() => {
+                    // Agrupa por OS (multi-equipamento): "2/3 concluídos" + equipamentos pendentes
+                    const byOs = new Map<
+                      string,
+                      {
+                        client: string
+                        tech: string
+                        total: number
+                        done: number
+                        lastUpd: string
+                        parado: boolean
+                        pendentes: string[]
+                      }
+                    >()
+                    for (const c of checklists) {
+                      const osN = c.os_number || '—'
+                      const g = byOs.get(osN) || {
+                        client: c.client_name || '—',
+                        tech: c.technician_name || '—',
+                        total: 0,
+                        done: 0,
+                        lastUpd: '',
+                        parado: false,
+                        pendentes: [],
+                      }
+                      g.total++
+                      if (c.status === 'concluido') {
+                        g.done++
+                      } else {
+                        if (!g.lastUpd || c.updated > g.lastUpd) g.lastUpd = c.updated
+                        if (kpis.parados.some((p) => p.id === c.id)) g.parado = true
+                        const t =
+                          c.template === 'trocador'
+                            ? 'Trocador'
+                            : c.template === 'valvulas'
+                              ? 'Válvula'
+                              : 'Purgador'
+                        const tag = (c as any).equipment_tag || ''
+                        const label = (c as any).equipment_label || ''
+                        g.pendentes.push(tag || label || t)
+                      }
+                    }
+                    return Array.from(byOs.entries())
+                      .filter(([, g]) => g.done < g.total)
+                      .map(([osN, g]) => {
+                        const dias = businessDaysSince(g.lastUpd)
+                        return (
+                          <tr key={osN} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/40">
+                            <td className="py-3 px-4 font-mono font-bold text-teal-800 dark:text-teal-300">
+                              {osN}
+                            </td>
+                            <td className="py-3 px-4 font-semibold">{g.client}</td>
+                            <td className="py-3 px-4 text-xs">{g.pendentes.join(', ') || '—'}</td>
+                            <td className="py-3 px-4">{g.tech}</td>
+                            <td className="py-3 px-4 text-center">{fmtDate(g.lastUpd)}</td>
+                            <td className="py-3 px-4 text-center">
+                              <Badge
+                                className={
+                                  g.parado
+                                    ? 'bg-rose-600 text-white text-[10px]'
+                                    : 'bg-teal-700 text-white text-[10px]'
+                                }
+                              >
+                                {g.done}/{g.total} concluídos{g.parado ? ` · PARADO ${dias}d` : ''}
+                              </Badge>
+                            </td>
+                          </tr>
+                        )
+                      })
+                  })()
                 )}
               </tbody>
             </table>

@@ -118,6 +118,7 @@ export const checklistApi = {
     token: string
     device_id: string
     action: 'autosave' | 'complete'
+    checklist_id?: string
     ident?: Record<string, any>
     answers?: Record<string, any>
     texts?: Record<string, any>
