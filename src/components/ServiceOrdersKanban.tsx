@@ -55,6 +55,7 @@ import {
   Loader2,
   Eye,
   Printer,
+  RefreshCw,
 } from 'lucide-react'
 import { OsExecutionReportDialog } from '@/components/OsExecutionReportDialog'
 import { osExecutionReportsService } from '@/services/os-execution-reports'
@@ -246,6 +247,7 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
     Array<{ tag: string; label: string; template: string }>
   >([])
   const [checklistItemsSource, setChecklistItemsSource] = useState<'os' | 'manual' | 'none'>('none')
+  const [checklistUnbinding, setChecklistUnbinding] = useState(false)
   const handleOpenChecklist = async (order: ServiceOrderRecord) => {
     setChecklistModalOrder(order)
     setChecklistToken('')
@@ -1218,6 +1220,38 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                   }
                 >
                   <MessageCircle className="h-3.5 w-3.5 mr-1" /> Copiar mensagem p/ WhatsApp
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-amber-700 dark:text-amber-400 text-xs"
+                  disabled={checklistUnbinding}
+                  onClick={async () => {
+                    setChecklistUnbinding(true)
+                    const r = await checklistLinkService.unbindDevice(checklistToken)
+                    setChecklistUnbinding(false)
+                    if (r.ok) {
+                      toast({
+                        title: 'Aparelho liberado ✓',
+                        description:
+                          'O próximo que abrir o link fica amarrado. Mande o link de novo pro técnico.',
+                      })
+                    } else {
+                      toast({
+                        title: 'Não foi possível liberar',
+                        description: 'Tente de novo ou me chama no chat.',
+                        variant: 'destructive',
+                      })
+                    }
+                  }}
+                >
+                  {checklistUnbinding ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  Liberar aparelho
                 </Button>
               </DialogFooter>
             </div>

@@ -67,6 +67,21 @@ export const checklistLinkService = {
     return base + '/checklist?t=' + encodeURIComponent(token)
   },
 
+  /** Libera o aparelho amarrado ao token (técnico trocou de celular ou link foi
+   *  aberto por engano num computador antes de ir pro campo). */
+  async unbindDevice(token: string): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await pb.send('/backend/v1/checklists/unbind', {
+        method: 'POST',
+        body: JSON.stringify({ token }),
+      })
+      return { ok: true }
+    } catch (err: any) {
+      const data = err?.response?.data || err?.data || {}
+      return { ok: false, error: data.error || 'network_error' }
+    }
+  },
+
   message(os: ServiceOrderRecord, token: string, technician?: string): string {
     const equip =
       [os.equipment_brand, os.equipment_model].filter(Boolean).join(' ') || 'equipamento'
