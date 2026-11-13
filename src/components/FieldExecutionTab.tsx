@@ -202,6 +202,7 @@ export const FieldExecutionTab: React.FC<{
                         parado: false,
                         pendentes: [],
                       }
+                      byOs.set(osN, g)
                       g.total++
                       if (c.status === 'concluido') {
                         g.done++
