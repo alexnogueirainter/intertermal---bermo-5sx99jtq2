@@ -390,6 +390,8 @@ export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
 
     // Proposta importada: valor e itens vêm do PDF (preservados), não da composição.
     // Busca a proposta carregada no editor pela lista + activeQuoteId (sem estado novo).
+    // REGRA DURA: proposta importada NUNCA recalcula valor — nem se o total atual vier 0
+    // (o auto-save antigo chegou a zerar registros; a marcação importacao é a fonte da verdade).
     const allQuotes: QuoteRecord[] = Array.isArray((p as any).quotes) ? (p as any).quotes : []
     const loadedQuote =
       ((p as any).activeQuoteId
@@ -404,7 +406,12 @@ export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
       : []
     const importedTotal = Number(loadedQuote?.total) || 0
     const isImportedQuote =
-      importedItems.length > 0 || (importedTotal > 0 && !!serviceDetailsSource?.importacao)
+      importedItems.length > 0 ||
+      !!serviceDetailsSource?.importacao ||
+      (!!loadedQuote && String(loadedQuote?.notes || '').includes('PROPOSTA IMPORTADA'))
+    // Valor preservado: o atual da proposta; se vier 0 (registro danificado), mantém 0
+    // no payload para NÃO sobrescrever com cálculo — a reparação é feita no banco, não aqui.
+    const preservedTotal = importedTotal
 
     return {
       title:
@@ -635,9 +642,9 @@ export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
       // vem do PDF. Preservar o total importado e NÃO recalcular (o auto-save de 2s
       // zerava o valor porque mão de obra/deslocamento são 0 nessas propostas).
       // Preserva também os itens orçados e a trilha de importação.
-      final_price: isImportedQuote ? importedTotal : calculatedSalePrice,
-      total: isImportedQuote ? importedTotal : calculatedSalePrice,
-      subtotal: isImportedQuote ? importedTotal : calculatedSalePrice,
+      final_price: isImportedQuote ? preservedTotal : calculatedSalePrice,
+      total: isImportedQuote ? preservedTotal : calculatedSalePrice,
+      subtotal: isImportedQuote ? preservedTotal : calculatedSalePrice,
       items: isImportedQuote ? importedItems : undefined,
       service_details: isImportedQuote
         ? {
