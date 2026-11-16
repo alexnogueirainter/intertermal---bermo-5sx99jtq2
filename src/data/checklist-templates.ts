@@ -237,8 +237,14 @@ const ITENS_TROCADOR: ChecklistItemType[] = [
   [
     6,
     35,
-    'Registro fotográfico final e assinatura do cliente',
-    'Fotos anexadas e checklist assinado',
+    'Registro fotográfico final do equipamento fechado',
+    'Fotos do equipamento montado e limpo anexadas',
+  ],
+  [
+    6,
+    36,
+    'Liberação do equipamento registrada (data, hora e foto)',
+    'Equipamento fechado, limpo e liberado para operação — foto final anexada',
   ],
 ].map((r) => ({ etapa: r[0], num: r[1], titulo: r[2], criterio: r[3] }))
 
@@ -547,6 +553,12 @@ const ITENS_PURGADORES: ChecklistItemType[] = [
 ].map((r) => ({ etapa: r[0], num: r[1], titulo: r[2], criterio: r[3] }))
 
 const CAMPOS_TROCADOR = [
+  {
+    key: 'numFabricacao',
+    label: 'Nº de fabricação (plaqueta)',
+    tipo: 'text',
+    helper: 'Número de série gravado na plaqueta do equipamento',
+  },
   {
     key: 'medRef',
     label: 'Medida A de referência (mm)',

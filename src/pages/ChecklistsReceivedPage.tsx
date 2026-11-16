@@ -17,6 +17,8 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { CHECKLIST_TEMPLATES } from '@/data/checklist-templates'
+import { ChecklistFinalReportDialog } from '@/components/ChecklistFinalReportDialog'
+import { FileText } from 'lucide-react'
 
 /**
  * Tela "Checklists Recebidos" — visão operacional do escritório.
@@ -105,6 +107,7 @@ function verdictBadge(v: string) {
 export default function ChecklistsReceivedPage() {
   const navigate = useNavigate()
   const { id } = useParams()
+  const [reportOpen, setReportOpen] = useState(false)
   const [rows, setRows] = useState<ChecklistRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -214,6 +217,16 @@ export default function ChecklistsReceivedPage() {
                   </div>
                 </div>
               </CardHeader>
+              <CardContent className="pb-2 -mt-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setReportOpen(true)}
+                  className="bg-teal-700 hover:bg-teal-600 text-white text-xs h-8"
+                >
+                  <FileText className="h-3.5 w-3.5 mr-1" /> Ver relatório final
+                </Button>
+              </CardContent>
               <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                 <div>
                   <span className="text-[10px] font-bold uppercase text-muted-foreground block">
@@ -407,6 +420,13 @@ export default function ChecklistsReceivedPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Relatório final (prévia + impressão) */}
+            <ChecklistFinalReportDialog
+              open={reportOpen}
+              onOpenChange={setReportOpen}
+              checklistId={detail.id}
+            />
 
             {/* Rastreabilidade */}
             <Card className="border-slate-200 dark:border-slate-800">

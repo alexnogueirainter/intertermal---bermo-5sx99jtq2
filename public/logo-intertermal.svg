@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 752 357" width="752" height="357">
+  <!-- Símbolo: dois U intercalados -->
+  <g>
+    <!-- U externo (navy) -->
+    <path d="M 40 40 L 40 200 Q 40 260 100 260 Q 160 260 160 200 L 160 40 L 128 40 L 128 196 Q 128 228 100 228 Q 72 228 72 196 L 72 40 Z" fill="#000031"/>
+    <!-- U interno (azul) -->
+    <path d="M 96 40 L 96 180 Q 96 224 132 224 Q 168 224 168 180 L 168 40 L 142 40 L 142 176 Q 142 200 132 200 Q 122 200 122 176 L 122 40 Z" fill="#007DC5" opacity="0.92"/>
+  </g>
+  <!-- INTER -->
+  <text x="200" y="150" font-family="Arial, Helvetica, sans-serif" font-size="120" font-weight="800" letter-spacing="2" fill="#000031">INTER</text>
+  <!-- TERMAL -->
+  <text x="202" y="235" font-family="Arial, Helvetica, sans-serif" font-size="62" font-weight="700" letter-spacing="6" fill="#007DC5">TERMAL</text>
+  <!-- Linhas + tagline -->
+  <line x1="202" y1="262" x2="740" y2="262" stroke="#000031" stroke-width="3"/>
+  <text x="202" y="300" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700" letter-spacing="4" fill="#F58220">SISTEMAS DE TROCA TÉRMICA</text>
+  <line x1="202" y1="322" x2="740" y2="322" stroke="#000031" stroke-width="3"/>
+</svg>
