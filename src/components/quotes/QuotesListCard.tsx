@@ -21,6 +21,8 @@ import {
 } from '@/components/ui/select'
 import { QuoteEquipmentItem, QuoteRecord, QuoteStatus } from '@/types/crm'
 import pb from '@/lib/pocketbase/client'
+import { ImportedItemsDialog } from './ImportedItemsDialog'
+import { useState } from 'react'
 import {
   Archive,
   ArchiveRestore,
@@ -62,6 +64,7 @@ interface QuotesListCardProps {
 }
 
 export function QuotesListCard(props: QuotesListCardProps) {
+  const [itemsQuote, setItemsQuote] = useState<QuoteRecord | null>(null)
   const {
     quotes,
     searchTerm,
@@ -206,7 +209,20 @@ export function QuotesListCard(props: QuotesListCardProps) {
                         {/* Identificação / Número */}
                         <td className="py-3 px-4 font-mono font-bold text-teal-700 dark:text-teal-400 whitespace-nowrap">
                           <div>
-                            <span className="font-semibold">{quote.quote_number || 'INT-S/N'}</span>
+                            {quote.pdf_file ? (
+                              <button
+                                type="button"
+                                className="font-semibold underline decoration-dotted underline-offset-2 hover:text-teal-600 cursor-pointer text-left"
+                                title="Ver itens desta proposta importada"
+                                onClick={() => setItemsQuote(quote)}
+                              >
+                                {quote.quote_number || 'INT-S/N'}
+                              </button>
+                            ) : (
+                              <span className="font-semibold">
+                                {quote.quote_number || 'INT-S/N'}
+                              </span>
+                            )}
                             {quote.created && (
                               <span className="block text-[10px] text-muted-foreground font-normal font-sans">
                                 {new Date(quote.created).toLocaleDateString('pt-BR')}
@@ -511,6 +527,14 @@ export function QuotesListCard(props: QuotesListCardProps) {
           )}
         </CardContent>
       </Card>
+
+      <ImportedItemsDialog
+        quote={itemsQuote}
+        open={!!itemsQuote}
+        onOpenChange={(o) => {
+          if (!o) setItemsQuote(null)
+        }}
+      />
     </>
   )
 }
