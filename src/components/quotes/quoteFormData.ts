@@ -388,6 +388,24 @@ export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
 
     const currentSavedTime = new Date().toISOString()
 
+    // Proposta importada: valor e itens vêm do PDF (preservados), não da composição.
+    // Busca a proposta carregada no editor pela lista + activeQuoteId (sem estado novo).
+    const allQuotes: QuoteRecord[] = Array.isArray((p as any).quotes) ? (p as any).quotes : []
+    const loadedQuote =
+      ((p as any).activeQuoteId
+        ? allQuotes.find((q) => q.id === (p as any).activeQuoteId)
+        : null) || null
+    const serviceDetailsSource: any =
+      (loadedQuote?.service_details as any) && typeof loadedQuote!.service_details === 'object'
+        ? loadedQuote!.service_details
+        : null
+    const importedItems: any[] = Array.isArray(loadedQuote?.items)
+      ? (loadedQuote!.items as any[])
+      : []
+    const importedTotal = Number(loadedQuote?.total) || 0
+    const isImportedQuote =
+      importedItems.length > 0 || (importedTotal > 0 && !!serviceDetailsSource?.importacao)
+
     return {
       title:
         quoteTitle ||
@@ -613,9 +631,119 @@ export function makeGetFormDataObject(p: MakeGetFormDataObjectDeps) {
         totalIndirectMarkupSum,
       }),
 
-      final_price: calculatedSalePrice,
-      total: calculatedSalePrice,
-      subtotal: calculatedSalePrice,
+      // PROPOSTA IMPORTADA (modelo PI): o valor não vem da composição de custos —
+      // vem do PDF. Preservar o total importado e NÃO recalcular (o auto-save de 2s
+      // zerava o valor porque mão de obra/deslocamento são 0 nessas propostas).
+      // Preserva também os itens orçados e a trilha de importação.
+      final_price: isImportedQuote ? importedTotal : calculatedSalePrice,
+      total: isImportedQuote ? importedTotal : calculatedSalePrice,
+      subtotal: isImportedQuote ? importedTotal : calculatedSalePrice,
+      items: isImportedQuote ? importedItems : undefined,
+      service_details: isImportedQuote
+        ? {
+            ...(typeof serviceDetailsSource === 'object' && serviceDetailsSource
+              ? serviceDetailsSource
+              : {}),
+            importacao: {
+              ...(serviceDetailsSource?.importacao || {}),
+              valor_preservado: true,
+            },
+          }
+        : buildServiceDetails({
+            primaryEq,
+            sanitizedEquipments,
+            connectionSize,
+            equipmentModel,
+            equipmentBrand,
+            plateCount,
+            plateMaterial,
+            gasketMaterial,
+            pressureTestBar,
+            workingPressureBar,
+            workFluid,
+            integrationRequired,
+            scopeOfWork,
+            techCount,
+            techHours,
+            techRate,
+            helperCount,
+            helperHours,
+            helperRate,
+            inspectorCount,
+            inspectorHours,
+            inspectorRate,
+            welderCount,
+            welderHours,
+            welderRate,
+            plumberCount,
+            plumberHours,
+            plumberRate,
+            foremanCount,
+            foremanHours,
+            foremanRate,
+            originCep,
+            originAddress,
+            destinationCep,
+            destinationAddress,
+            distanceKm,
+            isRoundTrip,
+            consumptionKmL,
+            fuelPrice,
+            tollRoadPercent,
+            manualFuelAdj,
+            manualTollAdj,
+            carRentalType,
+            carRentalDailyRate,
+            carRentalDays,
+            hotelDays,
+            hotelRate,
+            mealsDays,
+            mealsRate,
+            mealVoucherHousedQty,
+            mealVoucherHousedRate,
+            mealVoucherUnhousedQty,
+            mealVoucherUnhousedRate,
+            materialsCost,
+            serviceMargin,
+            salesCommission,
+            adminRate,
+            pisRate,
+            cofinsRate,
+            issRate,
+            csllRate,
+            irpjRate,
+            irDiffRate,
+            paymentTerms,
+            validityDays,
+            materialsItemsTotal,
+            chemicalProductsTotal,
+            techTotal,
+            helperTotal,
+            inspectorTotal,
+            welderTotal,
+            plumberTotal,
+            foremanTotal,
+            totalLaborCost,
+            baseFuelCost,
+            baseTollCost,
+            carRentalSubtotal,
+            travelTotalCost,
+            lodgingMealsTotalCost,
+            totalMaterialsWithChemicals,
+            materialsPassThrough,
+            effectiveIntegrationCost,
+            serviceDirectCostsTotal,
+            directCostsTotal,
+            totalTaxesPercent,
+            divisor,
+            adminAmount,
+            serviceSalePrice,
+            calculatedSalePrice,
+            serviceMarginAmount,
+            salesCommissionAmount,
+            taxesAmount,
+            totalIndirectMarkupSum,
+          }),
       payment_terms: paymentTerms,
       validity_days: validityDays,
       technical_notes: technicalNotes,
