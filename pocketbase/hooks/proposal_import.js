@@ -132,6 +132,16 @@ routerAdd(
       const nowIso = new Date().toISOString()
       const hoje = new Date()
       const d5 = new Date(hoje.getTime() + 5 * 86400000)
+      // JSVM (goja) não suporta toLocaleString com locale — formatar na mão
+      const pad2 = (n) => String(n).padStart(2, '0')
+      const fmtBR = (d) =>
+        pad2(d.getUTCDate()) + '/' + pad2(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear()
+      const fmtBRL = (n) =>
+        'R$ ' +
+        n
+          .toFixed(2)
+          .replace('.', ',')
+          .replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 
       // ---- 1. Cliente: match por CNPJ (client_document), depois por nome ----
       let clientRecord = null
@@ -180,7 +190,7 @@ routerAdd(
         clientRecord.set(
           'notes',
           'Cadastrado via importação de proposta em ' +
-            hoje.toLocaleDateString('pt-BR') +
+            fmtBR(hoje) +
             (client.notes ? ' — ' + client.notes : ''),
         )
         const contacts = []
@@ -301,9 +311,7 @@ routerAdd(
           hoje.toLocaleString('pt-BR') +
           ' por Alex Nogueira.\n' +
           (optionalTotal > 0
-            ? 'Itens opcionais fora do total: R$ ' +
-              optionalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) +
-              '\n'
+            ? 'Itens opcionais fora do total: R$ ' + fmtBRL(optionalTotal) + '\n'
             : '') +
           (proposal.delivery_weeks
             ? 'Prazo de entrega informado: ' + proposal.delivery_weeks + '\n'
@@ -382,7 +390,7 @@ routerAdd(
         act.set(
           'description',
           'Proposta importada e registrada no CRM. Cobrança automática em ' +
-            d5.toLocaleDateString('pt-BR') +
+            fmtBR(d5) +
             ' (5 dias corridos) se continuar sem resposta.',
         )
         $app.save(act)
