@@ -279,6 +279,20 @@ function buildReportHtml(
   medidaApo: string,
 ): string {
   const logo = LOGO_URL
+  // Fotos do servidor: path relativo (/api/files/...) NÃO resolve no frontend (403).
+  // Montar URL absoluta contra o backend (pb.baseUrl) — mesmo padrão do hook open.
+  const fileUrl = (p: string) => {
+    if (!p) return ''
+    if (
+      p.startsWith('http://') ||
+      p.startsWith('https://') ||
+      p.startsWith('data:') ||
+      p.startsWith('blob:')
+    )
+      return p
+    const base = (pb.baseUrl || '').replace(/\/$/, '')
+    return base + (p.startsWith('/') ? p : '/' + p)
+  }
   const fotoLabel = FOTO_ETAPA_LABEL[d.template] || FOTO_ETAPA_LABEL.trocador
   const cliente = d.client_name || '—'
   const headMeta = (pg: number) =>
@@ -342,7 +356,7 @@ function buildReportHtml(
     fotoHtml += `<div class="rf-h2">Registro Fotográfico — Etapa ${et.n} · ${et.nome}</div><div class="rf-photos">`
     for (const f of fotos) {
       imgNum++
-      fotoHtml += `<div class="rf-photo"><div class="rf-photo-img"><img src="${f.path}" crossorigin="anonymous"></div><div class="rf-photo-cap">IMAGEM ${String(imgNum).padStart(2, '0')} — ${fotoLabel[et.n] || et.nome}${f.legenda ? ' · ' + f.legenda : ''}</div></div>`
+      fotoHtml += `<div class="rf-photo"><div class="rf-photo-img"><img src="${fileUrl(f.path)}"></div><div class="rf-photo-cap">IMAGEM ${String(imgNum).padStart(2, '0')} — ${fotoLabel[et.n] || et.nome}${f.legenda ? ' · ' + f.legenda : ''}</div></div>`
     }
     fotoHtml += '</div>'
   }

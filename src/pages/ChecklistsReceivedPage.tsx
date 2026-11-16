@@ -17,8 +17,23 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { CHECKLIST_TEMPLATES } from '@/data/checklist-templates'
+import pb from '@/lib/pocketbase/client'
 import { ChecklistFinalReportDialog } from '@/components/ChecklistFinalReportDialog'
 import { FileText } from 'lucide-react'
+
+/** URL absoluta de arquivo do backend (path relativo /api/files/... não resolve no frontend). */
+function fileUrl(p?: string): string {
+  if (!p) return ''
+  if (
+    p.startsWith('http://') ||
+    p.startsWith('https://') ||
+    p.startsWith('data:') ||
+    p.startsWith('blob:')
+  )
+    return p
+  const base = (pb.baseUrl || '').replace(/\/$/, '')
+  return base + (p.startsWith('/') ? p : '/' + p)
+}
 
 /**
  * Tela "Checklists Recebidos" — visão operacional do escritório.
@@ -363,7 +378,7 @@ export default function ChecklistsReceivedPage() {
                         className="rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden"
                       >
                         <img
-                          src={m.path}
+                          src={fileUrl(m.path)}
                           alt={m.legenda || 'Foto de campo'}
                           className="w-full aspect-4/3 object-cover bg-slate-100"
                         />
