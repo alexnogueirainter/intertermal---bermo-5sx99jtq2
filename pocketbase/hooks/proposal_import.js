@@ -42,10 +42,12 @@ routerAdd(
         'Você é o extrator de propostas técnico-comerciais da INTERPROJECT (modelo "PI").\n' +
         'Abaixo está o texto (Markdown) de uma proposta em PDF. Extraia os dados e responda SOMENTE um JSON válido:\n' +
         '{"client":{"name","document","contact_name","contact_email","contact_phone","contact_mobile","city","state","segment","notes"},' +
-        '"proposal":{"quote_number","title","issue_date","total","optional_items":[{"code","description","value"}],"payment_terms","validity_days","valid_until","scope_summary","delivery_weeks"},' +
+        '"proposal":{"quote_number","title","issue_date","total","items":[{"description","qty","value"}],"optional_items":[{"code","description","value"}],"payment_terms","validity_days","valid_until","scope_summary","delivery_weeks"},' +
         '"deal":{"suggested_title","priority"},"warnings":["..."]}\n' +
         'Regras: valores em reais como número sem símbolo (ex.: 2119000.00); datas em YYYY-MM-DD; NUNCA invente — campo vazio quando não achar;\n' +
-        'preserve o número da proposta EXATAMENTE como escrito (ex.: PI-26229P); optional_items = itens opcionais FORA do valor total;\n' +
+        'preserve o número da proposta EXATAMENTE como escrito (ex.: PI-26229P);\n' +
+        'items = TODOS os itens orçados da seção de CONDIÇÕES COMERCIAIS (tabela de fornecimento: descrição, quantidade e preço total de cada linha) — o valor total da proposta costuma ser a soma deles;\n' +
+        'optional_items = itens opcionais FORA do valor total;\n' +
         'priority = "high" para ticket alto, "medium" padrão; warnings = inconsistências do documento (ex.: CNPJ inconsistente, validade vencida).\n\n' +
         'TEXTO DA PROPOSTA:\n' +
         markdown.slice(0, 60000)
@@ -314,28 +316,50 @@ routerAdd(
       if (proposal.scope_summary) {
         quoteRec.set('scope_of_work', String(proposal.scope_summary).slice(0, 4000))
       }
+      // Itens orçados: fornecimento (base) + opcionais, como na seção de condições comerciais do PDF
+      const baseItems = Array.isArray(proposal.items) ? proposal.items : []
+      const toNumBR = (v) =>
+        Number(
+          String(v ?? '0')
+            .replace(/\./g, '')
+            .replace(',', '.'),
+        ) || 0
+      const mappedBase = baseItems
+        .map((it, i) => {
+          const val = toNumBR(it.value ?? it.total)
+          if (!String(it.description || '').trim() && val === 0) return null
+          return {
+            id: 'it-' + (i + 1),
+            name: String(it.description || 'Item ' + (i + 1)).slice(0, 300),
+            quantity: Number(it.qty) || 1,
+            unit_price: val,
+            discount: 0,
+            total: val,
+            opcional: false,
+          }
+        })
+        .filter(Boolean)
       quoteRec.set(
         'items',
-        optionalItems.map((it, i) => ({
-          id: 'opt-' + (i + 1),
-          name: String(it.description || it.code || 'Item opcional').slice(0, 300),
-          quantity: 1,
-          unit_price:
-            Number(
-              String(it.value || '0')
-                .replace(/\./g, '')
-                .replace(',', '.'),
-            ) || 0,
-          discount: 0,
-          total:
-            Number(
-              String(it.value || '0')
-                .replace(/\./g, '')
-                .replace(',', '.'),
-            ) || 0,
-          opcional: true,
-        })),
+        mappedBase.concat(
+          optionalItems.map((it, i) => ({
+            id: 'opt-' + (i + 1),
+            name: String(it.description || it.code || 'Item opcional').slice(0, 300),
+            quantity: 1,
+            unit_price: toNumBR(it.value),
+            discount: 0,
+            total: toNumBR(it.value),
+            opcional: true,
+          })),
+        ),
       )
+      // Sem total identificado mas com itens orçados: usa a soma dos itens base
+      const baseItemsTotal = mappedBase.reduce((acc, it) => acc + it.total, 0)
+      if (!totalNum && baseItemsTotal > 0) {
+        quoteRec.set('total', baseItemsTotal)
+        quoteRec.set('subtotal', baseItemsTotal)
+        quoteRec.set('final_price', baseItemsTotal)
+      }
       // Follow-up: âncora = hoje -> cron de cobrança cria a atividade em D+5 dias corridos.
       quoteRec.set('follow_up_date', nowIso)
       quoteRec.set(
