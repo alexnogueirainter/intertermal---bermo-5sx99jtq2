@@ -60,6 +60,8 @@ import {
 import { OsExecutionReportDialog } from '@/components/OsExecutionReportDialog'
 import { osExecutionReportsService } from '@/services/os-execution-reports'
 import { checklistLinkService } from '@/services/checklist-link'
+import pb from '@/lib/pocketbase/client'
+import { useNavigate } from 'react-router-dom'
 import { useToast } from '@/hooks/use-toast'
 import { ClipboardList, Copy, MessageCircle } from 'lucide-react'
 import { resolveServiceOrderLiveValue } from '@/lib/service-order-live-value'
@@ -187,6 +189,7 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
   onSelectServiceOrder,
 }) => {
   const { toast } = useToast()
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [clientFilter, setClientFilter] = useState<string>('all')
   const [selectedOrder, setSelectedOrder] = useState<ServiceOrderRecord | null>(null)
@@ -228,6 +231,30 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
       isMounted = false
     }
   }, [isReportModalOpen])
+
+  // Checklists por OS (badge do card): fetch leve no mount
+  const [checklistsByOrder, setChecklistsByOrder] = useState<Record<string, any[]>>({})
+  useEffect(() => {
+    let isMounted = true
+    ;(async () => {
+      try {
+        const res = (await pb.send('/backend/v1/checklists/list', { method: 'GET' })) as any
+        if (!isMounted || !res?.ok || !Array.isArray(res.checklists)) return
+        const byOrder: Record<string, any[]> = {}
+        for (const c of res.checklists) {
+          const key = String(c.service_order_id || '')
+          byOrder[key] = byOrder[key] || []
+          byOrder[key].push(c)
+        }
+        setChecklistsByOrder(byOrder)
+      } catch (_) {
+        // falha silenciosa: badge simplesmente não aparece
+      }
+    })()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Modais de Exclusão e Cancelamento de OS
   const [orderToDelete, setOrderToDelete] = useState<ServiceOrderRecord | null>(null)
@@ -724,6 +751,40 @@ export const ServiceOrdersKanban: React.FC<ServiceOrdersKanbanProps> = ({
                             </div>
                           )
                         })()}
+
+                        {/* Checklist: badge de estado (multi-equipamento) — clique abre o detalhe */}
+                        {order.checklist_id && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              navigate('/checklists/' + order.checklist_id)
+                            }}
+                            className="w-full flex items-center justify-between rounded-lg border border-orange-200 dark:border-orange-900/60 bg-orange-50/60 dark:bg-orange-950/30 px-2.5 py-1.5 text-[10px] font-bold text-orange-800 dark:text-orange-300 hover:border-orange-400 transition-all"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <ClipboardList className="h-3.5 w-3.5" />
+                              Checklist
+                            </span>
+                            <span>
+                              {(() => {
+                                const cls = checklistsByOrder[order.checklist_id] || []
+                                const done = cls.filter((c: any) => c.status === 'concluido').length
+                                const total = cls.length
+                                const allApproved =
+                                  total > 0 &&
+                                  done === total &&
+                                  cls.every((c: any) => c.verdict === 'aprovado')
+                                if (total === 0) return 'carregando…'
+                                if (done === total)
+                                  return allApproved
+                                    ? `✓ ${done}/${total} APROVADO`
+                                    : `${done}/${total} concluído(s)`
+                                return `${done}/${total} em campo`
+                              })()}
+                            </span>
+                          </button>
+                        )}
 
                         {/* Recusa registrada (rejected_at/rejected_by/rejection_notes) */}
                         {(order.rejected_at || order.rejected_by || order.rejection_notes) && (

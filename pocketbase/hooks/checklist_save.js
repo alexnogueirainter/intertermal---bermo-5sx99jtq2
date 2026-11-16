@@ -64,6 +64,61 @@ routerAdd('POST', '/backend/v1/checklists/save', (e) => {
     }
     cl.set('completed_at', new Date().toISOString())
 
+    // Aviso automático no painel: atividade "Checklist recebido" (idempotente)
+    try {
+      const osIdNotify = String(tok.get('service_order_id') || '')
+      const osNotify = $app.findRecordById('service_orders', osIdNotify)
+      const marker = 'chk-notify:' + cl.id
+      const eqRef =
+        String(cl.get('equipment_tag') || '') || String(cl.get('equipment_label') || '') || ''
+      const already = $app.findRecordsByFilter(
+        'activities',
+        'description ~ {:m}',
+        'created',
+        1,
+        0,
+        { m: marker },
+      )
+      if (already.length === 0) {
+        const actCol = $app.findCollectionByNameOrId('activities')
+        const act = new Record(actCol)
+        act.set(
+          'title',
+          'Checklist recebido — OS ' +
+            String(osNotify.get('order_number') || cl.get('os_number') || '') +
+            (eqRef ? ' · ' + eqRef : '') +
+            ' · ' +
+            String(body.verdict || 'pendente').toUpperCase(),
+        )
+        act.set(
+          'description',
+          marker +
+            '\nChecklist de campo concluído pelo técnico. Conformidade ' +
+            Number(body.conformity_pct || 0) +
+            '% · veredito ' +
+            String(body.verdict || 'pendente') +
+            '. Abrir detalhe: /checklists/' +
+            cl.id,
+        )
+        act.set('type', 'meeting')
+        act.set('status', 'pending')
+        act.set('completed', false)
+        act.set('due_date', new Date().toISOString().slice(0, 10))
+        act.set('client_id', String(osNotify.get('client_id') || ''))
+        act.set('client_name', String(osNotify.get('client_name') || cl.get('client_name') || ''))
+        act.set(
+          'assigned_to',
+          String(osNotify.get('assigned_to') || cl.get('technician_name') || 'Alex Nogueira'),
+        )
+        $app.save(act)
+      }
+    } catch (errNotify) {
+      console.warn(
+        '[checklist] falha ao criar aviso de checklist recebido: ' +
+          (errNotify && errNotify.message ? errNotify.message : ''),
+      )
+    }
+
     // Regra dos 3 momentos na OS: conclusão do checklist = mudança real de status
     try {
       const so = $app.findRecordById('service_orders', String(tok.get('service_order_id') || ''))

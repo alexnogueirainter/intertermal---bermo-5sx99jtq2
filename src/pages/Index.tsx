@@ -23,7 +23,9 @@ import {
   Smartphone,
   ClipboardList,
   Megaphone,
+  ShieldCheck,
 } from 'lucide-react'
+import { fetchChecklistsForDashboard, type ChecklistSummary } from '@/services/checklist-dashboard'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -126,6 +128,7 @@ export default function IndexPage() {
   const [activities, setActivities] = useState<ActivityRecord[]>([])
   const [fieldVisits, setFieldVisits] = useState<FieldVisitRecord[]>([])
   const [fieldVisitsError, setFieldVisitsError] = useState(false)
+  const [checklists, setChecklists] = useState<ChecklistSummary[]>([])
 
   // Selection states for cross-view navigation
   const [selectedClient, setSelectedClient] = useState<ClientRecord | null>(null)
@@ -194,6 +197,10 @@ export default function IndexPage() {
           setFieldVisitsError(true)
           return [] as FieldVisitRecord[]
         }),
+        fetchChecklistsForDashboard().catch((err) => {
+          console.warn('Erro ao carregar checklists no menu:', err)
+          return { checklists: [], error: true }
+        }),
       ])
 
       setClients(clientsRes)
@@ -205,6 +212,7 @@ export default function IndexPage() {
       setServiceOrders(serviceOrdersRes)
       setActivities(activitiesRes)
       setFieldVisits(fieldVisitsRes)
+      setChecklists((checklistsRes as any)?.checklists || [])
 
       // Não sincronizar propostas -> negócios em lote ao carregar o CRM.
       // Esta rotina de leitura alterava registros persistidos e já foi removida do carregamento.
@@ -1021,6 +1029,18 @@ export default function IndexPage() {
               </div>
               <Badge className="bg-teal-600/10 text-teal-700 dark:text-teal-300 border-teal-200 text-[10px] px-1.5 font-bold">
                 {fieldVisits.length}
+              </Badge>
+            </Link>
+            <Link
+              to="/checklists"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-teal-50 dark:hover:bg-teal-950/40 hover:text-teal-800 dark:hover:text-teal-300 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="h-4 w-4 text-orange-600 dark:text-orange-400 group-hover:scale-110 transition-transform" />
+                <span>Checklists Recebidos</span>
+              </div>
+              <Badge className="bg-orange-600/10 text-orange-700 dark:text-orange-300 border-orange-200 text-[10px] px-1.5 font-bold">
+                {checklists.length}
               </Badge>
             </Link>
 

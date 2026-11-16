@@ -14,6 +14,7 @@ import LoginPage from './pages/LoginPage'
 import ChangePasswordPage from './pages/ChangePasswordPage'
 import CampaignsPage from './pages/CampaignsPage'
 import ChecklistPage from './pages/ChecklistPage'
+import ChecklistsReceivedPage from './pages/ChecklistsReceivedPage'
 import { AuthProvider, useAuth } from './lib/auth'
 
 // ONLY IMPORT AND RENDER WORKING PAGES, NEVER ADD PLACEHOLDER COMPONENTS OR PAGES IN THIS FILE
@@ -65,6 +66,8 @@ const App = () => (
             <Route path="/trocar-senha" element={<ChangePasswordPage />} />
             <Route path="/visita-a-campo" element={<FieldVisitPage />} />
             <Route path="/visitas-recebidas" element={<ReceivedFieldVisitsPage />} />
+            <Route path="/checklists" element={<ChecklistsReceivedPage />} />
+            <Route path="/checklists/:id" element={<ChecklistsReceivedPage />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Index />} />
               {/* ADD ALL CUSTOM ROUTES MUST BE ADDED HERE */}
