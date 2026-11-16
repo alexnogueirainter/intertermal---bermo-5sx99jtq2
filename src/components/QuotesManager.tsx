@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { QuotePdfPreviewDialog } from './QuotePdfPreviewDialog'
 import { EditorDialogFooter } from './quotes/EditorDialogFooter'
 import { EditorDialogHeader } from './quotes/EditorDialogHeader'
@@ -7,6 +8,7 @@ import { LaborSection } from './quotes/LaborSection'
 import { LodgingMealsSection } from './quotes/LodgingMealsSection'
 import { MarginsClosingSection } from './quotes/MarginsClosingSection'
 import { NewClientDialog } from './quotes/NewClientDialog'
+import { ProposalImportDialog } from './quotes/ProposalImportDialog'
 import { QuoteHistoryCard } from './quotes/QuoteHistoryCard'
 import { QuotesHeaderMetrics } from './quotes/QuotesHeaderMetrics'
 import { QuotesListCard } from './quotes/QuotesListCard'
@@ -66,6 +68,7 @@ export function QuotesManager({
   onOpenCatalog,
 }: QuotesManagerProps) {
   const S = useQuoteEditorState()
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const {
     isEditorOpen,
     setIsEditorOpen,
@@ -119,6 +122,11 @@ export function QuotesManager({
     if (!isEditorOpen) actionsH.handleOpenCreateModal()
   })
 
+  // Importação de proposta recebida (modelo PI) — Alex, 16/11
+  useNewAction('import_quote', () => {
+    setIsImportOpen(true)
+  })
+
   const UI = {
     ...S,
     ...D,
@@ -150,7 +158,17 @@ export function QuotesManager({
   return (
     <div className="space-y-6">
       <QuotesHeaderMetrics {...UI} />
-      <QuotesListCard {...UI} />
+      <QuotesListCard {...UI} onOpenImport={() => setIsImportOpen(true)} />
+
+      <ProposalImportDialog
+        open={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        clients={clients}
+        onImported={() => {
+          // O Index recarrega os dados ao reabrir a aba; aqui sinalizamos via evento
+          window.dispatchEvent(new CustomEvent('intertermal:data-changed'))
+        }}
+      />
 
       {/* 5. DIALOG / MODAL DE EDIÇÃO E COMPOSIÇÃO DE PROPOSTA */}
       <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>

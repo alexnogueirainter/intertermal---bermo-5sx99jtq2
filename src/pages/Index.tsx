@@ -64,7 +64,11 @@ import { BermoProductItem } from '@/data/bermo-catalog'
 import { QuickContactButton } from '@/components/QuickContactButton'
 import { QuickReturnContacts } from '@/components/QuickReturnContacts'
 import { quickContactService } from '@/services/quick-contact'
-import { NewActionsButton, CopilotFloatingButton } from '@/components/NewActionsButton'
+import {
+  NewActionsButton,
+  CopilotFloatingButton,
+  fireNewAction,
+} from '@/components/NewActionsButton'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 
 // Feature Components
@@ -233,6 +237,17 @@ export default function IndexPage() {
 
   useEffect(() => {
     loadAllData()
+  }, [])
+
+  // Importação de proposta (modelo PI): recarrega os dados quando o diálogo de
+  // importação sinaliza que gravou cliente/proposta/deal novos.
+  useEffect(() => {
+    const h = () => {
+      loadAllData(true)
+    }
+    window.addEventListener('intertermal:data-changed', h)
+    return () => window.removeEventListener('intertermal:data-changed', h)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Inscrição em Realtime para a coleção 'quotes'
@@ -1212,6 +1227,11 @@ export default function IndexPage() {
               onNewClient={() => setActiveTab('clients')}
               onQuickContact={() => setQuickContactSignal((s) => s + 1)}
               onNewVisit={() => navigate('/visita-a-campo')}
+              onImportQuote={() => {
+                setActiveTab('quotes')
+                // abre o diálogo de importação dentro da aba de propostas
+                window.setTimeout(() => fireNewAction('import_quote'), 150)
+              }}
             />
 
             <QuickContactButton

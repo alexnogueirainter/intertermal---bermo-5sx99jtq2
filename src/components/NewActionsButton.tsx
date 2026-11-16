@@ -1,5 +1,13 @@
 import { useEffect } from 'react'
-import { Bot, Building2, FileSpreadsheet, Plus, Smartphone, UserPlus } from 'lucide-react'
+import {
+  Bot,
+  Building2,
+  FileInput,
+  FileSpreadsheet,
+  Plus,
+  Smartphone,
+  UserPlus,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -18,7 +26,7 @@ import {
  */
 export const NEW_ACTION_EVENT = 'intertermal:new-action'
 
-export type NewActionKind = 'quote' | 'client' | 'quick_contact' | 'visit'
+export type NewActionKind = 'quote' | 'client' | 'quick_contact' | 'visit' | 'import_quote'
 
 export function fireNewAction(kind: NewActionKind) {
   window.dispatchEvent(new CustomEvent(NEW_ACTION_EVENT, { detail: { kind } }))
@@ -42,6 +50,7 @@ interface NewActionsButtonProps {
   onNewClient: () => void
   onQuickContact: () => void
   onNewVisit: () => void
+  onImportQuote?: () => void
 }
 
 export function NewActionsButton({
@@ -49,6 +58,7 @@ export function NewActionsButton({
   onNewClient,
   onQuickContact,
   onNewVisit,
+  onImportQuote,
 }: NewActionsButtonProps) {
   return (
     <DropdownMenu>
@@ -75,6 +85,12 @@ export function NewActionsButton({
           <FileSpreadsheet className="h-3.5 w-3.5 mr-2 text-teal-600" />
           Proposta
         </DropdownMenuItem>
+        {onImportQuote && (
+          <DropdownMenuItem className="text-xs cursor-pointer" onClick={onImportQuote}>
+            <FileInput className="h-3.5 w-3.5 mr-2 text-indigo-600" />
+            Importar proposta recebida
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           className="text-xs cursor-pointer"
           onClick={() => {

@@ -51,6 +51,7 @@ interface QuotesListCardProps {
   handleSetStatus: (quoteId: string, newStatus: QuoteStatus) => any
   handleOpenPdfPreview: (quoteObj: QuoteRecord, mode: 'client' | 'internal') => any
   handleDelete: (quote: QuoteRecord) => any
+  onOpenImport?: () => void
   archivedQuotes?: QuoteRecord[]
   onArchiveQuote?: (quote: QuoteRecord) => void
   onRestoreQuote?: (quote: QuoteRecord) => void
@@ -72,6 +73,7 @@ export function QuotesListCard(props: QuotesListCardProps) {
     handleSetStatus,
     handleOpenPdfPreview,
     handleDelete,
+    onOpenImport,
     archivedQuotes = [],
     onArchiveQuote,
     onRestoreQuote,
@@ -130,6 +132,19 @@ export function QuotesListCard(props: QuotesListCardProps) {
                   className="text-xs h-9 text-muted-foreground hover:text-slate-900"
                 >
                   Limpar busca
+                </Button>
+              )}
+
+              {onOpenImport && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenImport}
+                  className="text-xs h-9 border-teal-300 text-teal-700 hover:bg-teal-50"
+                >
+                  <FileText className="h-3.5 w-3.5 mr-1" />
+                  Importar proposta recebida
                 </Button>
               )}
             </div>
