@@ -17,7 +17,6 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { CHECKLIST_TEMPLATES } from '@/data/checklist-templates'
-import pb from '@/lib/pocketbase/client'
 import { ChecklistFinalReportDialog } from '@/components/ChecklistFinalReportDialog'
 import { FileText } from 'lucide-react'
 
