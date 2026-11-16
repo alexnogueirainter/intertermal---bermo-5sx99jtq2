@@ -30,7 +30,9 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
       <section className="w-full max-w-md rounded-xl border bg-white p-6 shadow-sm sm:p-8">
         <div className="mb-6">
-          <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">Intertermal</p>
+          <p className="text-sm font-semibold uppercase tracking-wide text-[#12a8aa]">
+            Intertermal
+          </p>
           <h1 className="mt-2 text-2xl font-bold text-slate-900">Entrar no CRM</h1>
           <p className="mt-2 text-sm text-slate-600">Use sua conta corporativa para continuar.</p>
         </div>
