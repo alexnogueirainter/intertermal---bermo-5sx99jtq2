@@ -94,14 +94,48 @@ routerAdd(
       const emails = markdown.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || []
       const contactEmail = emails.find((m2) => !/interproject\.com\.br$/i.test(m2))
       data.client.contact_email = fill(data.client.contact_email, contactEmail || '')
-      const totalMatch = markdown.match(
+      // Valor total: vários padrões de layout (o modelo PI varia entre propostas)
+      const toNum = (s) => Number(String(s).replace(/\./g, '').replace(',', '.')) || 0
+      const totalPatterns = [
         /Valor Total do Investimento\s*\*{0,2}\s*R\$\s*([\d.]+,\d{2})/,
-      )
-      if (totalMatch) {
-        data.proposal.total = fill(
-          data.proposal.total,
-          totalMatch[1].replace(/\./g, '').replace(',', '.'),
-        )
+        /Valor Total[^\n]{0,80}?R\$\s*([\d.]+,\d{2})/,
+        /Total do Investimento[^\n]{0,80}?R\$\s*([\d.]+,\d{2})/,
+        /(?:^|\n)[^\n]{0,60}TOTAL GERAL[^\n]{0,60}?R\$\s*([\d.]+,\d{2})/,
+        /(?:^|\n)[^\n]{0,60}Valor Global[^\n]{0,60}?R\$\s*([\d.]+,\d{2})/,
+      ]
+      if (!toNum(data.proposal.total)) {
+        for (const p of totalPatterns) {
+          const tm = markdown.match(p)
+          if (tm && toNum(tm[1]) > 0) {
+            data.proposal.total = toNum(tm[1])
+            break
+          }
+        }
+      }
+      // Último recurso: maior valor monetário do documento (em propostas de 1 item,
+      // o maior valor é o preço do fornecimento; opcionais são menores)
+      if (!toNum(data.proposal.total)) {
+        const allVals = [...markdown.matchAll(/R\$\s*([\d.]+,\d{2})/g)].map((mm) => toNum(mm[1]))
+        if (allVals.length > 0) {
+          const maior = Math.max(...allVals)
+          if (maior > 0) {
+            data.proposal.total = maior
+            if (!Array.isArray(data.warnings)) data.warnings = []
+            data.warnings.push(
+              'Valor total estimado pelo maior valor monetário do PDF — confira na revisão.',
+            )
+          }
+        }
+      }
+      // Aviso quando o valor não vier
+      if (!toNum(data.proposal.total)) {
+        if (!Array.isArray(data.warnings)) data.warnings = []
+        data.warnings.push('VALOR TOTAL não identificado no PDF — preencha manualmente na revisão.')
+      }
+      // Aviso quando o número da proposta não vier
+      if (!String(data.proposal.quote_number || '').trim()) {
+        if (!Array.isArray(data.warnings)) data.warnings = []
+        data.warnings.push('NÚMERO da proposta não identificado — preencha manualmente na revisão.')
       }
       const validadeMatch = markdown.match(/Validade desta proposta:\s*([^\n*]+)/)
       if (validadeMatch) {

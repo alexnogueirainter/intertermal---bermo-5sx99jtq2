@@ -9,6 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+// FileDown usado no botão do PDF original anexado
+import { FileDown } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -18,6 +20,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { QuoteEquipmentItem, QuoteRecord, QuoteStatus } from '@/types/crm'
+import pb from '@/lib/pocketbase/client'
 import {
   Archive,
   ArchiveRestore,
@@ -192,6 +195,9 @@ export function QuotesListCard(props: QuotesListCardProps) {
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {filteredQuotes.map((quote) => {
                     const price = quote.total || quote.final_price || 0
+                    const pdfUrl = quote.pdf_file
+                      ? pb.files.getURL(quote as any, quote.pdf_file)
+                      : ''
                     return (
                       <tr
                         key={quote.id}
@@ -308,6 +314,20 @@ export function QuotesListCard(props: QuotesListCardProps) {
                               <FileText className="h-3.5 w-3.5 mr-1 text-teal-600" />
                               PDF
                             </Button>
+
+                            {/* PDF original anexado (proposta recebida/importada) */}
+                            {pdfUrl && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs text-slate-500 hover:text-teal-700"
+                                onClick={() => window.open(pdfUrl, '_blank')}
+                                title="Abrir o PDF original anexado (proposta recebida do cliente)"
+                              >
+                                <FileDown className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
 
                             {/* Menu de Ações Secundárias */}
                             <DropdownMenu>

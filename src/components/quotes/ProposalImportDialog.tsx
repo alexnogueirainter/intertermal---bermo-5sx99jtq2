@@ -324,6 +324,14 @@ export function ProposalImportDialog({
                       {fmtBRL(data.proposal.total)}
                     </p>
                   )}
+                  {(!data.proposal.total ||
+                    Number(String(data.proposal.total).replace(/\./g, '').replace(',', '.')) ===
+                      0) && (
+                    <p className="text-[11px] text-amber-600 font-semibold mt-1 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" /> Valor não identificado — preencha
+                      manualmente
+                    </p>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <Label className="text-xs">Título / objeto</Label>
